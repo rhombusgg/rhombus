@@ -1,0 +1,3 @@
+[workspace]
+members = ["rhombus", "examples/plugin", "examples/with-plugin"]
+resolver = "2"
