@@ -1,3 +1,8 @@
 [workspace]
-members = ["rhombus", "examples/plugin", "examples/external-plugin"]
+members = [
+    "rhombus",
+    "examples/plugin",
+    "examples/external-plugin",
+    "examples/shuttle",
+]
 resolver = "2"

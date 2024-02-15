@@ -1,0 +1,12 @@
+[package]
+name = "shuttle"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rhombus = { path = "../../rhombus" }
+shuttle-axum = "0.39.0"
+shuttle-runtime = "0.39.0"
+shuttle-shared-db = { version = "0.39.0", features = ["postgres", "sqlx"] }
+sqlx = { version = "0.7.3", features = ["runtime-tokio", "postgres"] }
+tokio = { version = "1.36.0", features = ["full"] }

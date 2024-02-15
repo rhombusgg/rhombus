@@ -5,13 +5,12 @@ use axum::{
     Router,
 };
 use challenges::route_challenges;
-use listenfd::ListenFd;
-use maud::{html, Markup, Render, DOCTYPE};
+use maud::{html, Render, DOCTYPE};
 use plugin::Plugin;
 use sqlx::PgPool;
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tower_http::services::ServeDir;
-use tracing::{debug, info};
+use tracing::info;
 
 pub mod challenges;
 pub mod plugin;
@@ -31,7 +30,7 @@ async fn handler_404() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, Html("404"))
 }
 
-pub fn page_layout(child: impl Render) -> Markup {
+pub fn page_layout(child: impl Render) -> impl Render {
     html! {
         (DOCTYPE)
         html {
@@ -94,9 +93,9 @@ impl Rhombus {
 
 pub async fn serve(router: Router, address: impl ToSocketAddrs) -> Result<(), std::io::Error> {
     #[cfg(debug_assertions)]
-    let listener = match ListenFd::from_env().take_tcp_listener(0).unwrap() {
+    let listener = match listenfd::ListenFd::from_env().take_tcp_listener(0).unwrap() {
         Some(listener) => {
-            debug!("restored socket from listenfd");
+            tracing::debug!("restored socket from listenfd");
             listener.set_nonblocking(true).unwrap();
             TcpListener::from_std(listener).unwrap()
         }
