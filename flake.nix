@@ -29,7 +29,7 @@
 
         apps.default = {
           type = "app";
-          program = "${packages.default}/bin/with-plugin";
+          program = "${packages.default}/bin/external-plugin";
         };
 
         devShells.default = pkgs.mkShell {

@@ -1,9 +1,12 @@
+use maud::html;
+
 use axum::{
     extract::{FromRef, State},
     response::Html,
     routing, Router,
 };
-use rhombus::{plugin::Plugin, RhombusRouterState};
+use rhombus::{challenges::ChallengeModel, plugin::Plugin, RhombusRouterState};
+use sqlx::{Executor, PgPool};
 
 pub struct MyPlugin {
     state: MyPluginRouterState,
@@ -29,24 +32,42 @@ impl MyPlugin {
     }
 }
 
-async fn route_c(
-    State(state): State<MyPluginRouterState>,
-    State(rhombus): State<RhombusRouterState>,
-) -> Html<String> {
-    Html(format!("<h1>plugin c {} {}</h1>", state.a, rhombus.my_val))
-}
-
 impl Plugin for MyPlugin {
     fn routes(&self, state: RhombusRouterState) -> Router {
         Router::new()
-            .route("/c", routing::get(route_c))
+            .route("/challenges", routing::get(route_plugin_challenges))
             .with_state(MyPluginRouterState {
                 a: self.state.a,
                 rhombus: Some(state),
             })
     }
 
-    fn migrate(&self) {
-        tracing::info!("migrate plugin1");
+    async fn migrate(&self, db: PgPool) {
+        db.execute(include_str!("../migrations/standalone.sql"))
+            .await
+            .unwrap();
     }
+}
+
+async fn route_plugin_challenges(
+    State(state): State<MyPluginRouterState>,
+    State(rhombus): State<RhombusRouterState>,
+) -> Html<String> {
+    let model = ChallengeModel::new(rhombus.db).await;
+
+    Html(
+        html! {
+            h1 { "plugin view " (state.a) }
+            ul {
+                @for challenge in model.challenges {
+                    li class="flex gap-2" {
+                        div { (challenge.id) }
+                        div { (challenge.name) }
+                        div { (challenge.description) }
+                    }
+                }
+            }
+        }
+        .0,
+    )
 }

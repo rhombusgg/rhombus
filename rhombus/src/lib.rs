@@ -4,8 +4,16 @@ use axum::{
     routing::get,
     Router,
 };
+use challenges::route_challenges;
+use listenfd::ListenFd;
+use maud::{html, Markup, Render, DOCTYPE};
+use plugin::Plugin;
+use sqlx::PgPool;
 use tokio::net::{TcpListener, ToSocketAddrs};
+use tower_http::services::ServeDir;
+use tracing::{debug, info};
 
+pub mod challenges;
 pub mod plugin;
 
 pub struct Rhombus {
@@ -16,34 +24,47 @@ pub struct Rhombus {
 
 #[derive(Clone)]
 pub struct RhombusRouterState {
-    pub my_val: i32,
-}
-
-impl Default for Rhombus {
-    fn default() -> Self {
-        Self::new()
-    }
+    pub db: PgPool,
 }
 
 async fn handler_404() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, Html("404"))
 }
 
+pub fn page_layout(child: impl Render) -> Markup {
+    html! {
+        (DOCTYPE)
+        html {
+            head {
+                title { "Rhombus" }
+                script src="https://unpkg.com/htmx.org@1.9.10" {};
+                link rel="stylesheet" type="text/css" href="/static/tailwind.css";
+            }
+            body {
+                div class="flex flex-col justify-center items-center h-screen" {
+                    (child)
+                }
+            }
+        }
+    }
+}
+
+static STATIC_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/static");
+
 impl Rhombus {
-    pub fn new() -> Self {
-        let router_state = RhombusRouterState { my_val: 4 };
+    pub async fn new(db: PgPool) -> Self {
+        sqlx::migrate!().run(&db).await.unwrap();
+
         Self {
-            router_state: router_state.clone(),
-            app_router: Router::new()
-                .fallback(handler_404)
-                .route("/a", get(|| async { Html("<h1>app1 a</h1>") }))
-                .with_state(router_state.clone()),
+            router_state: RhombusRouterState { db },
+            app_router: Router::new(),
             plugin_router: Router::new(),
         }
     }
 
-    pub fn plugin(self, plugin: impl plugin::Plugin) -> Self {
-        plugin.migrate();
+    pub async fn plugin(self, plugin: impl Plugin) -> Self {
+        plugin.migrate(self.router_state.db.clone()).await;
+
         Rhombus {
             router_state: self.router_state.clone(),
             app_router: self.app_router,
@@ -53,31 +74,41 @@ impl Rhombus {
         }
     }
 
-    pub async fn serve(self, address: impl ToSocketAddrs) -> Result<(), std::io::Error> {
-        let app = Router::new()
-            .fallback_service(self.app_router)
+    pub fn build(self) -> Router {
+        let router = Router::new()
+            .fallback_service(
+                Router::new()
+                    .fallback(handler_404)
+                    .nest_service("/static", ServeDir::new(STATIC_DIR))
+                    .route("/challenges", get(route_challenges))
+                    .with_state(self.router_state.clone()),
+            )
             .nest("/", self.plugin_router);
 
         #[cfg(debug_assertions)]
-        let listener = match listenfd::ListenFd::from_env().take_tcp_listener(0).unwrap() {
-            Some(listener) => {
-                tracing::debug!("restored socket from listenfd");
-                listener.set_nonblocking(true).unwrap();
-                TcpListener::from_std(listener).unwrap()
-            }
-            None => TcpListener::bind(address).await.unwrap(),
-        };
+        let router = router.layer(tower_livereload::LiveReloadLayer::new());
 
-        #[cfg(not(debug_assertions))]
-        let listener = TcpListener::bind(address).await.unwrap();
-
-        #[cfg(debug_assertions)]
-        let app = app.layer(tower_livereload::LiveReloadLayer::new());
-
-        let address = listener.local_addr().unwrap().to_string();
-        tracing::info!(address, "listening on {}", listener.local_addr().unwrap());
-        axum::serve(listener, app).await?;
-
-        Ok(())
+        router
     }
+}
+
+pub async fn serve(router: Router, address: impl ToSocketAddrs) -> Result<(), std::io::Error> {
+    #[cfg(debug_assertions)]
+    let listener = match ListenFd::from_env().take_tcp_listener(0).unwrap() {
+        Some(listener) => {
+            debug!("restored socket from listenfd");
+            listener.set_nonblocking(true).unwrap();
+            TcpListener::from_std(listener).unwrap()
+        }
+        None => TcpListener::bind(address).await.unwrap(),
+    };
+
+    #[cfg(not(debug_assertions))]
+    let listener = TcpListener::bind(address).await.unwrap();
+
+    let address = listener.local_addr().unwrap().to_string();
+    info!(address, "listening on {}", listener.local_addr().unwrap());
+    axum::serve(listener, router).await?;
+
+    Ok(())
 }

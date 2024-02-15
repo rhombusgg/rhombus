@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS plugin (
+    id BIGSERIAL PRIMARY KEY,
+    description TEXT NOT NULL
+);
