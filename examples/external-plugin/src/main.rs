@@ -6,7 +6,6 @@ async fn main() {
                 .with_file(true)
                 .with_line_number(true),
         )
-        .with_max_level(tracing::Level::TRACE)
         .init();
 
     let pool = sqlx::postgres::PgPoolOptions::new()
@@ -15,11 +14,11 @@ async fn main() {
         .await
         .unwrap();
 
-    let app = rhombus::Rhombus::new(pool)
+    let app = rhombus::Rhombus::new(pool, ())
         .await
-        .plugin(plugin::MyPlugin::new(11))
-        .await
-        .build();
+        .plugin(plugin::MyPlugin::new(3))
+        .build()
+        .await;
 
     rhombus::serve(app, "127.0.0.1:3000").await.unwrap();
 }

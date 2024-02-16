@@ -1,13 +1,16 @@
 use maud::html;
 
 use axum::{
+    async_trait,
     extract::{FromRef, State},
     response::Html,
     routing, Router,
 };
 use rhombus::{challenges::ChallengeModel, plugin::Plugin, RhombusRouterState};
 use sqlx::{Executor, PgPool};
+use tracing::info;
 
+#[derive(Clone)]
 pub struct MyPlugin {
     state: MyPluginRouterState,
 }
@@ -32,6 +35,7 @@ impl MyPlugin {
     }
 }
 
+#[async_trait]
 impl Plugin for MyPlugin {
     fn routes(&self, state: RhombusRouterState) -> Router {
         Router::new()
@@ -43,6 +47,7 @@ impl Plugin for MyPlugin {
     }
 
     async fn migrate(&self, db: PgPool) {
+        info!("migrating");
         db.execute(include_str!("../migrations/standalone.sql"))
             .await
             .unwrap();
@@ -55,19 +60,5 @@ async fn route_plugin_challenges(
 ) -> Html<String> {
     let model = ChallengeModel::new(rhombus.db).await;
 
-    Html(
-        html! {
-            h1 { "plugin view " (state.a) }
-            ul {
-                @for challenge in model.challenges {
-                    li class="flex gap-2" {
-                        div { (challenge.id) }
-                        div { (challenge.name) }
-                        div { (challenge.description) }
-                    }
-                }
-            }
-        }
-        .0,
-    )
+    Html("a".to_string())
 }

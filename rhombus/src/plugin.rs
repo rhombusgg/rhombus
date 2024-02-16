@@ -1,17 +1,17 @@
 use std::future::{self, Future};
 
-use axum::Router;
+use axum::{async_trait, Router};
 use sqlx::PgPool;
 
 use crate::RhombusRouterState;
 
+#[async_trait]
 pub trait Plugin {
     fn routes(&self, state: RhombusRouterState) -> Router {
         Router::new().with_state(state)
     }
 
-    fn migrate(&self, db: PgPool) -> impl Future<Output = ()> {
+    async fn migrate(&self, db: PgPool) {
         _ = db;
-        future::ready(())
     }
 }

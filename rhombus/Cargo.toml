@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+askama = "0.12.1"
+async-trait = "0.1.77"
 axum = "0.7.4"
 chrono = "0.4.34"
 http-body-util = "0.1.0"

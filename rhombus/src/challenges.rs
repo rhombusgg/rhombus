@@ -22,6 +22,25 @@ impl ChallengeModel {
     }
 }
 
+pub type ChallengeRenderFn = fn(&ChallengeModel) -> String;
+
+pub fn challenge_view(model: &ChallengeModel) -> String {
+    page_layout(html! {
+        h1 { "rhombus view" }
+        ul {
+            @for challenge in &model.challenges {
+                li class="flex gap-2" {
+                    div { (challenge.id) }
+                    div { (challenge.name) }
+                    div { (challenge.description) }
+                }
+            }
+        }
+    })
+    .render()
+    .0
+}
+
 #[derive(FromRow, Debug)]
 pub struct Challenge {
     pub id: i64,
@@ -30,25 +49,7 @@ pub struct Challenge {
 }
 
 pub async fn route_challenges(state: State<RhombusRouterState>) -> impl IntoResponse {
-    let challenges = sqlx::query_as::<_, Challenge>("SELECT * FROM challenge")
-        .fetch_all(&state.db)
-        .await
-        .unwrap();
+    let model = ChallengeModel::new(state.db.clone()).await;
 
-    Html(
-        page_layout(html! {
-            h1 { "rhombus view" }
-            ul {
-                @for challenge in challenges {
-                    li class="flex gap-2" {
-                        div { (challenge.id) }
-                        div { (challenge.name) }
-                        div { (challenge.description) }
-                    }
-                }
-            }
-        })
-        .render()
-        .0,
-    )
+    Html((state.views.challenges)(&model))
 }
