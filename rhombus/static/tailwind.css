@@ -548,20 +548,20 @@ video {
   position: static;
 }
 
+.block {
+  display: block;
+}
+
 .flex {
   display: flex;
 }
 
-.h-2 {
-  height: 0.5rem;
-}
-
-.h-full {
-  height: 100%;
-}
-
 .h-screen {
   height: 100vh;
+}
+
+.list-disc {
+  list-style-type: disc;
 }
 
 .flex-col {

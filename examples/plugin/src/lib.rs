@@ -1,13 +1,12 @@
-use maud::html;
-
 use axum::{
     async_trait,
     extract::{FromRef, State},
     response::Html,
     routing, Router,
 };
-use rhombus::{challenges::ChallengeModel, plugin::Plugin, RhombusRouterState};
+use rhombus::{plugin::Plugin, RhombusRouterState};
 use sqlx::{Executor, PgPool};
+use tera::Tera;
 use tracing::info;
 
 #[derive(Clone)]
@@ -35,15 +34,25 @@ impl MyPlugin {
     }
 }
 
+static TEMPLATES_GLOB: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/templates/**/*.html");
+
 #[async_trait]
 impl Plugin for MyPlugin {
     fn routes(&self, state: RhombusRouterState) -> Router {
         Router::new()
-            .route("/challenges", routing::get(route_plugin_challenges))
+            .route("/", routing::get(route_home))
             .with_state(MyPluginRouterState {
                 a: self.state.a,
                 rhombus: Some(state),
             })
+    }
+
+    fn theme(&self, tera: &Tera) -> Tera {
+        let mut plugin_tera = Tera::parse(TEMPLATES_GLOB).unwrap();
+        plugin_tera.extend(&tera).unwrap();
+        plugin_tera.build_inheritance_chains().unwrap();
+
+        plugin_tera
     }
 
     async fn migrate(&self, db: PgPool) {
@@ -54,11 +63,11 @@ impl Plugin for MyPlugin {
     }
 }
 
-async fn route_plugin_challenges(
-    State(state): State<MyPluginRouterState>,
+async fn route_home(
     State(rhombus): State<RhombusRouterState>,
+    State(plugin): State<MyPluginRouterState>,
 ) -> Html<String> {
-    let model = ChallengeModel::new(rhombus.db).await;
-
-    Html("a".to_string())
+    let mut context = tera::Context::new();
+    context.insert("a", &plugin.a);
+    Html(rhombus.tera.render("home.html", &context).unwrap())
 }

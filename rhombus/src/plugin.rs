@@ -1,7 +1,6 @@
-use std::future::{self, Future};
-
 use axum::{async_trait, Router};
 use sqlx::PgPool;
+use tera::Tera;
 
 use crate::RhombusRouterState;
 
@@ -9,6 +8,10 @@ use crate::RhombusRouterState;
 pub trait Plugin {
     fn routes(&self, state: RhombusRouterState) -> Router {
         Router::new().with_state(state)
+    }
+
+    fn theme(&self, tera: &Tera) -> Tera {
+        tera.clone()
     }
 
     async fn migrate(&self, db: PgPool) {

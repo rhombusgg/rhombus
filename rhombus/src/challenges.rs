@@ -2,11 +2,13 @@ use axum::{
     extract::State,
     response::{Html, IntoResponse},
 };
-use maud::{html, Render};
+use serde::Serialize;
 use sqlx::{prelude::FromRow, PgPool};
+use tera::Context;
 
-use crate::{page_layout, RhombusRouterState};
+use crate::RhombusRouterState;
 
+#[derive(Serialize)]
 pub struct ChallengeModel {
     pub challenges: Vec<Challenge>,
 }
@@ -22,26 +24,7 @@ impl ChallengeModel {
     }
 }
 
-pub type ChallengeRenderFn = fn(&ChallengeModel) -> String;
-
-pub fn challenge_view(model: &ChallengeModel) -> String {
-    page_layout(html! {
-        h1 { "rhombus view" }
-        ul {
-            @for challenge in &model.challenges {
-                li class="flex gap-2" {
-                    div { (challenge.id) }
-                    div { (challenge.name) }
-                    div { (challenge.description) }
-                }
-            }
-        }
-    })
-    .render()
-    .0
-}
-
-#[derive(FromRow, Debug)]
+#[derive(FromRow, Debug, Serialize)]
 pub struct Challenge {
     pub id: i64,
     pub name: String,
@@ -51,5 +34,10 @@ pub struct Challenge {
 pub async fn route_challenges(state: State<RhombusRouterState>) -> impl IntoResponse {
     let model = ChallengeModel::new(state.db.clone()).await;
 
-    Html((state.views.challenges)(&model))
+    let rendered = state
+        .tera
+        .render("challenges.html", &Context::from_serialize(model).unwrap())
+        .unwrap();
+
+    Html(rendered)
 }

@@ -14,9 +14,8 @@ async fn main() {
         .await
         .unwrap();
 
-    let app = rhombus::Rhombus::new(pool, ())
-        .await
-        .plugin(plugin::MyPlugin::new(3))
+    let app = rhombus::Rhombus::new(pool)
+        .plugin(&plugin::MyPlugin::new(3))
         .build()
         .await;
 
