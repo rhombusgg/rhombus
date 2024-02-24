@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+dotenvy = "0.15.7"
 plugin = { path = "../plugin" }
 rhombus = { path = "../../rhombus" }
 sqlx = { version = "0.7.3", features = ["runtime-tokio", "postgres"] }

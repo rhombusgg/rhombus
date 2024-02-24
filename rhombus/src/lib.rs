@@ -1,5 +1,10 @@
+#![forbid(unsafe_code)]
+
+use auth::{auth, route_discord_callback, route_signin};
 use axum::{
-    http::StatusCode,
+    extract::State,
+    http::{StatusCode, Uri},
+    middleware,
     response::{Html, IntoResponse},
     routing::get,
     Router,
@@ -9,21 +14,33 @@ use plugin::Plugin;
 use sqlx::PgPool;
 use tera::Tera;
 use tokio::net::{TcpListener, ToSocketAddrs};
-use tower_http::services::ServeDir;
+use tower_http::{compression::CompressionLayer, services::ServeDir};
 use tracing::info;
 
+pub mod auth;
 pub mod challenges;
 pub mod plugin;
 
 pub struct Rhombus<'a> {
     db: PgPool,
+    config: Config,
     plugins: Vec<&'a (dyn Plugin + Sync)>,
+}
+
+#[derive(Clone)]
+pub struct Config {
+    pub jwt_secret: String,
+    pub discord_client_id: String,
+    pub discord_client_secret: String,
+    pub location_url: String,
 }
 
 #[derive(Clone)]
 pub struct RhombusRouterState {
     pub db: PgPool,
     pub tera: Tera,
+    pub config: Config,
+    pub discord_signin_url: String,
 }
 
 async fn handler_404() -> impl IntoResponse {
@@ -34,10 +51,11 @@ static STATIC_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/static");
 static TEMPLATES_GLOB: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/templates/**/*.html");
 
 impl<'a> Rhombus<'a> {
-    pub fn new(db: PgPool) -> Self {
+    pub fn new(db: PgPool, config: Config) -> Self {
         Self {
             db,
             plugins: Vec::new(),
+            config,
         }
     }
 
@@ -48,6 +66,7 @@ impl<'a> Rhombus<'a> {
         Self {
             db: self.db,
             plugins,
+            config: self.config,
         }
     }
 
@@ -66,6 +85,12 @@ impl<'a> Rhombus<'a> {
         let router_state = RhombusRouterState {
             db: self.db.clone(),
             tera,
+            config: self.config.clone(),
+            discord_signin_url: format!(
+                "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}&response_type=code&scope=identify",
+                self.config.discord_client_id,
+                format!("{}/signin/discord", self.config.location_url)
+            ),
         };
 
         let mut plugin_router = Router::new();
@@ -77,17 +102,30 @@ impl<'a> Rhombus<'a> {
             .fallback_service(
                 Router::new()
                     .fallback(handler_404)
+                    .route("/secret", get(|| async { "Hello, World!" }))
+                    .route_layer(middleware::from_fn_with_state(router_state.clone(), auth))
                     .nest_service("/static", ServeDir::new(STATIC_DIR))
+                    .route("/", get(route_home))
                     .route("/challenges", get(route_challenges))
+                    .route("/signin", get(route_signin))
+                    .route("/signin/discord", get(route_discord_callback))
                     .with_state(router_state),
             )
             .nest("/", plugin_router);
 
         #[cfg(debug_assertions)]
-        let router = router.layer(tower_livereload::LiveReloadLayer::new());
+        let router = router
+            .layer(tower_livereload::LiveReloadLayer::new().request_predicate(not_htmx_predicate));
+
+        let router = router.layer(CompressionLayer::new());
 
         router
     }
+}
+
+#[cfg(debug_assertions)]
+fn not_htmx_predicate<T>(req: &axum::http::Request<T>) -> bool {
+    !req.headers().contains_key("hx-request")
 }
 
 pub async fn serve(router: Router, address: impl ToSocketAddrs) -> Result<(), std::io::Error> {
@@ -109,4 +147,10 @@ pub async fn serve(router: Router, address: impl ToSocketAddrs) -> Result<(), st
     axum::serve(listener, router).await?;
 
     Ok(())
+}
+
+async fn route_home(State(state): State<RhombusRouterState>, uri: Uri) -> Html<String> {
+    let mut context = tera::Context::new();
+    context.insert("uri", &uri.to_string());
+    Html(state.tera.render("home.html", &context).unwrap())
 }

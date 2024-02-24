@@ -1,6 +1,7 @@
 use axum::{
     async_trait,
     extract::{FromRef, State},
+    http::Uri,
     response::Html,
     routing, Router,
 };
@@ -66,8 +67,10 @@ impl Plugin for MyPlugin {
 async fn route_home(
     State(rhombus): State<RhombusRouterState>,
     State(plugin): State<MyPluginRouterState>,
+    uri: Uri,
 ) -> Html<String> {
     let mut context = tera::Context::new();
     context.insert("a", &plugin.a);
+    context.insert("uri", &uri.to_string());
     Html(rhombus.tera.render("home.html", &context).unwrap())
 }

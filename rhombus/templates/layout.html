@@ -1,13 +1,17 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Rhombus</title>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <link rel="stylesheet" href="/static/tailwind.css" />
-  </head>
-  <body>
-    <div class="flex flex-col justify-center items-center h-screen">
-      {% block content %}{% endblock %}
-    </div>
-  </body>
-</html>
+{% import "navbar-item.html" as navbarItem %}
+{% import "icons.html" as icons %}
+{% extends "base.html" %}
+
+{% block body %}
+  <div class="bg-gray-50 border-b">
+    <nav
+      hx-boost="true"
+      class="flex items-center overflow-auto md:container md:mx-auto"
+    >
+      {{ navbarItem::navbarItem(label="Home", href="/", uri=uri, icon=icons::home()) }}
+      {{ navbarItem::navbarItem(label="Sign In", href="/signin", uri=uri) }}
+    </nav>
+  </div>
+  {% block content %}
+  {% endblock %}
+{% endblock %}
