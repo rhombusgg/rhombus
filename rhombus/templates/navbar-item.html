@@ -2,7 +2,7 @@
   {% set active = uri == href %}
   <a class="whitespace-nowrap py-2 group relative" href="{{ href }}">
     <div
-      class="px-3 py-2 flex items-center rounded-md group-hover:bg-gray-200 after:absolute after:bottom-0 after:right-3 after:left-3 after:h-0.5 after:bg-black text-black after:rounded-sm {% if active %}after:visible{% else %}after:invisible{% endif %}"
+      class="px-3 py-2 flex items-center rounded-md hover:bg-secondary after:absolute after:bottom-0 after:right-3 after:left-3 after:h-0.5 after:bg-primary text-foreground after:rounded-sm {% if active %}after:visible{% else %}after:invisible{% endif %}"
     >
       {% if icon %}
         <div class="mr-2 [&>*]:size-5 hidden sm:inline-block">

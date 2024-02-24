@@ -1,9 +1,50 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block title %}Rhombus{% endblock %}</title>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <link rel="stylesheet" href="/static/tailwind.css" />
+
+    <script>
+      // Dark/light mode theme switcher
+
+      const getThemePreference = () => {
+        if (
+          typeof localStorage !== "undefined" &&
+          localStorage.getItem("rhombus-theme")
+        ) {
+          return localStorage.getItem("rhombus-theme");
+        }
+        return window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+      };
+      const setTheme = (isDark) => {
+        document.documentElement.classList[isDark ? "add" : "remove"]("dark");
+      };
+
+      window
+        .matchMedia("(prefers-color-scheme: dark)")
+        .addEventListener("change", (event) => {
+          setTheme(event.matches);
+        });
+
+      setTheme(getThemePreference() === "dark");
+
+      if (typeof localStorage !== "undefined") {
+        const observer = new MutationObserver(() => {
+          const isDark = document.documentElement.classList.contains("dark");
+          console.log(isDark);
+          localStorage.setItem("rhombus-theme", isDark ? "dark" : "light");
+        });
+        observer.observe(document.documentElement, {
+          attributes: true,
+          attributeFilter: ["class"],
+        });
+      }
+    </script>
   </head>
   <body>
     {% block body %}{% endblock %}
