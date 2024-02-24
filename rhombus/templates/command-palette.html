@@ -1,0 +1,18 @@
+<div
+  class="fixed z-50 flex items-center bg-background/50 justify-center bottom-0 left-0 right-0 top-0 transition-opacity htmx-added:opacity-0 opacity-100"
+  _="on closeModal add .opacity-0 then add .scale-90 to #command-palette then wait for transitionend then remove me"
+>
+  <div
+    class="absolute bottom-0 left-0 right-0 top-0 -z-10"
+    _="on click trigger closeModal"
+  ></div>
+  <div
+    id="command-palette"
+    class="max-w-prose border p-4 bg-background shadow rounded transition-transform htmx-added:scale-90 scale-100"
+  >
+    <h1>Command Palette</h1>
+    This is the command palette
+    <div class="mt-4"></div>
+    <button _="on click trigger closeModal">Close</button>
+  </div>
+</div>

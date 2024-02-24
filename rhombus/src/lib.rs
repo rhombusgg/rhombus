@@ -10,6 +10,7 @@ use axum::{
     Router,
 };
 use challenges::route_challenges;
+use command_palette::route_command_palette;
 use plugin::Plugin;
 use sqlx::PgPool;
 use tera::Tera;
@@ -19,6 +20,7 @@ use tracing::info;
 
 pub mod auth;
 pub mod challenges;
+pub mod command_palette;
 pub mod plugin;
 
 pub struct Rhombus<'a> {
@@ -107,6 +109,7 @@ impl<'a> Rhombus<'a> {
                     .nest_service("/static", ServeDir::new(STATIC_DIR))
                     .route("/", get(route_home))
                     .route("/challenges", get(route_challenges))
+                    .route("/modal", get(route_command_palette))
                     .route("/signin", get(route_signin))
                     .route("/signin/discord", get(route_discord_callback))
                     .with_state(router_state),
