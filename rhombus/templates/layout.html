@@ -3,17 +3,15 @@
 {% extends "base.html" %}
 
 {% block body %}
-  <header class="border-b">
-    <div class="flex items-center overflow-auto md:container md:mx-auto">
-      <nav hx-boost="true" class="flex">
-        {{ navbarItem::navbarItem(label="Home", href="/", uri=uri) }}
-        {{ navbarItem::navbarItem(label="Sign In", href="/signin", uri=uri) }}
-      </nav>
-      <button hx-get="/modal" hx-target="body" hx-swap="beforeend">
-        Open Command Palette
-      </button>
-    </div>
-  </header>
-  {% block content %}
-  {% endblock %}
+<header class="border-b">
+  <div class="flex items-center overflow-auto md:container md:mx-auto">
+    <nav hx-boost="true" class="flex">
+      {{ navbarItem::navbarItem(label="Home", href="/", uri=uri) }}
+      {{ navbarItem::navbarItem(label="Sign In", href="/signin", uri=uri) }}
+    </nav>
+  </div>
+</header>
+{% include "command-palette.html" %}
+{% block content %}
+{% endblock %}
 {% endblock %}

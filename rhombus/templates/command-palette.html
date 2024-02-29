@@ -1,18 +1,111 @@
 <div
-  class="fixed z-50 flex items-center bg-background/50 justify-center bottom-0 left-0 right-0 top-0 transition-opacity htmx-added:opacity-0 opacity-100"
-  _="on closeModal add .opacity-0 then add .scale-90 to #command-palette then wait for transitionend then remove me"
->
-  <div
-    class="absolute bottom-0 left-0 right-0 top-0 -z-10"
-    _="on click trigger closeModal"
-  ></div>
-  <div
-    id="command-palette"
-    class="max-w-prose border p-4 bg-background shadow rounded transition-transform htmx-added:scale-90 scale-100"
-  >
-    <h1>Command Palette</h1>
-    This is the command palette
-    <div class="mt-4"></div>
-    <button _="on click trigger closeModal">Close</button>
+  class="fixed z-50 flex items-center bg-background/50 justify-center bottom-0 left-0 right-0 top-0 transition-opacity htmx-added:opacity-0 opacity-100">
+  <div class="absolute bottom-0 left-0 right-0 top-0 -z-10" _="on click trigger closeModal"></div>
+  <div id="commandPalette"
+    class="max-w-prose border p-4 bg-background shadow rounded transition-transform htmx-added:scale-90 scale-100">
+    <input autofocus type="text" id="commandInput" class="w-full px-2 py-1 mb-2 border rounded"
+      placeholder="Type a command...">
+    <ul id="commandList" class="space-y-2"></ul>
   </div>
 </div>
+<script>
+  class CommandPalette {
+    /**
+     * @typedef { {category: string, displayName: string, action: Function} } Command
+     */
+
+    /**
+     * @param {HTMLElement} container
+     * @param {Command[]} commands
+     */
+    constructor(container, commands) {
+      this.container = container;
+      this.commands = commands;
+      this.filteredCommands = this.commands;
+      this.input = container.querySelector('#commandInput');
+      this.commandList = container.querySelector('#commandList');
+      this.selectedIndex = 0;
+
+      this.input.addEventListener('input', this.filterCommands.bind(this));
+      this.input.addEventListener('keydown', this.navigateCommands.bind(this));
+      this.renderCommands();
+    }
+
+    renderCommands() {
+      this.commandList.innerHTML = '';
+
+      let currentCategory = null;
+      this.filteredCommands.forEach((command, index) => {
+        if (currentCategory !== command.category) {
+          currentCategory = command.category;
+          const categoryHeader = document.createElement('li');
+          categoryHeader.textContent = currentCategory;
+          categoryHeader.classList.add('font-semibold', 'text-muted-foreground', 'mt-2');
+          this.commandList.appendChild(categoryHeader);
+        }
+
+        const li = document.createElement('li');
+        li.textContent = command.displayName;
+        li.classList.add('action', 'cursor-pointer', 'py-1', 'px-2');
+        if (index === this.selectedIndex) {
+          li.classList.add('bg-primary');
+        }
+        li.addEventListener('mouseover', () => {
+          this.selectedIndex = index;
+          this.renderCommands();
+        });
+        li.addEventListener('mousedown', () => {
+          this.runAction();
+        });
+        this.commandList.appendChild(li);
+      });
+    }
+
+    filterCommands() {
+      const query = this.input.value.toLowerCase();
+      this.filteredCommands = this.commands.filter(command =>
+        command.displayName.toLowerCase().includes(query)
+      );
+      this.selectedIndex = 0;
+      this.renderCommands();
+    }
+
+    /**
+     * @param {KeyboardEvent} event
+     */
+    navigateCommands(event) {
+      const commands = this.commandList.querySelectorAll('li.action');
+      if (event.key === 'ArrowUp' || (event.key === 'Tab' && event.shiftKey)) {
+        event.preventDefault();
+        this.selectedIndex = (this.selectedIndex - 1 + commands.length) % commands.length;
+        this.renderCommands();
+      } else if (event.key === 'ArrowDown' || event.key === 'Tab') {
+        event.preventDefault();
+        this.selectedIndex = (this.selectedIndex + 1) % commands.length;
+        this.renderCommands();
+      } else if (event.key === 'Enter') {
+        this.runAction();
+      }
+    }
+
+    runAction() {
+      const selectedCommand = this.filteredCommands[this.selectedIndex];
+      if (selectedCommand) {
+        selectedCommand.action();
+      }
+    }
+  }
+
+  /**
+   * @type {Command[]}
+   */
+  const commands = [
+    {category: 'Utilities', displayName: 'Log Hello', action: () => console.log('Hello')},
+    {category: 'Utilities', displayName: 'Alert World', action: () => alert('World')},
+    {category: 'Settings', displayName: 'Change Theme', action: () => console.log('Changing theme...')},
+    {category: 'Settings', displayName: 'Update Profile', action: () => console.log('Updating profile...')},
+  ];
+
+  const container = document.getElementById('commandPalette');
+  const commandPalette = new CommandPalette(container, commands);
+</script>

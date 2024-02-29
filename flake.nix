@@ -36,9 +36,12 @@
           name = "${name}-devshell";
           packages = with pkgs;
             [
+              tailwindcss-language-server
+              vscode-langservers-extracted
+              alejandra
+
               cargo-watch
               systemfd
-              alejandra
               (rust-bin.stable.latest.default.override {
                 extensions = ["rust-src"];
                 targets = ["x86_64-unknown-linux-musl"];

@@ -1,13 +1,16 @@
 #![forbid(unsafe_code)]
 
+use std::{sync::Arc, time::Duration};
+
 use auth::{auth, route_discord_callback, route_signin};
 use axum::{
+    error_handling::HandleErrorLayer,
     extract::State,
     http::{StatusCode, Uri},
     middleware,
     response::{Html, IntoResponse},
     routing::get,
-    Router,
+    BoxError, Router,
 };
 use challenges::route_challenges;
 use command_palette::route_command_palette;
@@ -15,6 +18,7 @@ use plugin::Plugin;
 use sqlx::PgPool;
 use tera::Tera;
 use tokio::net::{TcpListener, ToSocketAddrs};
+use tower::{buffer::BufferLayer, limit::RateLimitLayer, ServiceBuilder};
 use tower_http::{compression::CompressionLayer, services::ServeDir};
 use tracing::info;
 
@@ -37,8 +41,9 @@ pub struct Config {
     pub location_url: String,
 }
 
-#[derive(Clone)]
-pub struct RhombusRouterState {
+pub type RhombusRouterState = Arc<RhombusRouterStateInner>;
+
+pub struct RhombusRouterStateInner {
     pub db: PgPool,
     pub tera: Tera,
     pub config: Config,
@@ -84,7 +89,7 @@ impl<'a> Rhombus<'a> {
             tera = plugin.theme(&tera);
         }
 
-        let router_state = RhombusRouterState {
+        let router_state = Arc::new(RhombusRouterStateInner {
             db: self.db.clone(),
             tera,
             config: self.config.clone(),
@@ -93,7 +98,7 @@ impl<'a> Rhombus<'a> {
                 self.config.discord_client_id,
                 format!("{}/signin/discord", self.config.location_url)
             ),
-        };
+        });
 
         let mut plugin_router = Router::new();
         for plugin in self.plugins.iter() {
@@ -114,7 +119,18 @@ impl<'a> Rhombus<'a> {
                     .route("/signin/discord", get(route_discord_callback))
                     .with_state(router_state),
             )
-            .nest("/", plugin_router);
+            .nest("/", plugin_router)
+            .layer(
+                ServiceBuilder::new()
+                    .layer(HandleErrorLayer::new(|err: BoxError| async move {
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            format!("Unhandled error: {}", err),
+                        )
+                    }))
+                    .layer(BufferLayer::new(1024))
+                    .layer(RateLimitLayer::new(2, Duration::from_secs(1))),
+            );
 
         #[cfg(debug_assertions)]
         let router = router
