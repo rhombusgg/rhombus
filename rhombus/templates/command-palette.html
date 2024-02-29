@@ -1,11 +1,17 @@
+{% import "icons.html" as icons %}
+
 <div
   class="fixed z-50 flex items-center bg-background/50 justify-center bottom-0 left-0 right-0 top-0 transition-opacity htmx-added:opacity-0 opacity-100">
-  <div class="absolute bottom-0 left-0 right-0 top-0 -z-10" _="on click trigger closeModal"></div>
+  <div class="absolute bottom-0 left-0 right-0 top-0 -z-10"></div>
   <div id="commandPalette"
-    class="max-w-prose border p-4 bg-background shadow rounded transition-transform htmx-added:scale-90 scale-100">
-    <input autofocus type="text" id="commandInput" class="w-full px-2 py-1 mb-2 border rounded"
-      placeholder="Type a command...">
-    <ul id="commandList" class="space-y-2"></ul>
+    class="max-w-lg w-full border bg-background shadow rounded-lg transition-transform htmx-added:scale-90 scale-100">
+    <div class="flex items-center border-b px-3">
+      {{ icons::search(attrs='class="mr-2 size-4 opacity-50"') }}
+      <input autofocus type="text" id="commandInput"
+        class="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+        placeholder="Type a command...">
+    </div>
+    <ul id="commandList" class="p-1 max-h-[300px] overflow-y-auto scroll-smooth"></ul>
   </div>
 </div>
 <script>
@@ -40,21 +46,22 @@
           currentCategory = command.category;
           const categoryHeader = document.createElement('li');
           categoryHeader.textContent = currentCategory;
-          categoryHeader.classList.add('font-semibold', 'text-muted-foreground', 'mt-2');
+          categoryHeader.classList.add('font-medium', 'text-muted-foreground', 'py-1.5', 'px-2');
           this.commandList.appendChild(categoryHeader);
         }
 
         const li = document.createElement('li');
         li.textContent = command.displayName;
-        li.classList.add('action', 'cursor-pointer', 'py-1', 'px-2');
+        li.classList.add('action', 'rounded-lg', 'cursor-pointer', 'py-3', 'px-2');
         if (index === this.selectedIndex) {
-          li.classList.add('bg-primary');
+          li.classList.add('bg-primary/20');
         }
-        li.addEventListener('mouseover', () => {
+        li.addEventListener('mouseenter', () => {
           this.selectedIndex = index;
           this.renderCommands();
         });
-        li.addEventListener('mousedown', () => {
+        li.addEventListener('mousedown', (e) => {
+          e.preventDefault();
           this.runAction();
         });
         this.commandList.appendChild(li);
@@ -78,10 +85,12 @@
       if (event.key === 'ArrowUp' || (event.key === 'Tab' && event.shiftKey)) {
         event.preventDefault();
         this.selectedIndex = (this.selectedIndex - 1 + commands.length) % commands.length;
+        commands[this.selectedIndex].scrollIntoView({block: "center"});
         this.renderCommands();
       } else if (event.key === 'ArrowDown' || event.key === 'Tab') {
         event.preventDefault();
         this.selectedIndex = (this.selectedIndex + 1) % commands.length;
+        commands[this.selectedIndex].scrollIntoView({block: "center"});
         this.renderCommands();
       } else if (event.key === 'Enter') {
         this.runAction();
