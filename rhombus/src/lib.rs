@@ -1,30 +1,30 @@
 #![forbid(unsafe_code)]
 
-use std::{sync::Arc, time::Duration};
-
 use auth::{auth, route_discord_callback, route_signin};
 use axum::{
-    error_handling::HandleErrorLayer,
     extract::State,
     http::{StatusCode, Uri},
     middleware,
     response::{Html, IntoResponse},
     routing::get,
-    BoxError, Router,
+    Router,
 };
 use challenges::route_challenges;
 use command_palette::route_command_palette;
+use ip::log_ip;
 use plugin::Plugin;
 use sqlx::PgPool;
+use std::{net::SocketAddr, sync::Arc};
 use tera::Tera;
 use tokio::net::{TcpListener, ToSocketAddrs};
-use tower::{buffer::BufferLayer, limit::RateLimitLayer, ServiceBuilder};
+use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::{compression::CompressionLayer, services::ServeDir};
 use tracing::info;
 
 pub mod auth;
 pub mod challenges;
 pub mod command_palette;
+pub mod ip;
 pub mod plugin;
 
 pub struct Rhombus<'a> {
@@ -105,6 +105,15 @@ impl<'a> Rhombus<'a> {
             plugin_router = plugin_router.merge(plugin.routes(router_state.clone()));
         }
 
+        let governor_conf = Box::new(
+            GovernorConfigBuilder::default()
+                .per_second(2)
+                .burst_size(5)
+                .use_headers()
+                .finish()
+                .unwrap(),
+        );
+
         let router = Router::new()
             .fallback_service(
                 Router::new()
@@ -120,17 +129,10 @@ impl<'a> Rhombus<'a> {
                     .with_state(router_state),
             )
             .nest("/", plugin_router)
-            .layer(
-                ServiceBuilder::new()
-                    .layer(HandleErrorLayer::new(|err: BoxError| async move {
-                        (
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            format!("Unhandled error: {}", err),
-                        )
-                    }))
-                    .layer(BufferLayer::new(1024))
-                    .layer(RateLimitLayer::new(2, Duration::from_secs(1))),
-            );
+            .route_layer(middleware::from_fn(log_ip))
+            .layer(GovernorLayer {
+                config: Box::leak(governor_conf),
+            });
 
         #[cfg(debug_assertions)]
         let router = router
@@ -163,7 +165,11 @@ pub async fn serve(router: Router, address: impl ToSocketAddrs) -> Result<(), st
 
     let address = listener.local_addr().unwrap().to_string();
     info!(address, "listening on {}", listener.local_addr().unwrap());
-    axum::serve(listener, router).await?;
+    axum::serve(
+        listener,
+        router.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
 
     Ok(())
 }

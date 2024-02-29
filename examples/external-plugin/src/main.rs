@@ -29,5 +29,5 @@ async fn main() {
     .build()
     .await;
 
-    rhombus::serve(app, "127.0.0.1:3000").await.unwrap();
+    rhombus::serve(app, "0.0.0.0:3000").await.unwrap();
 }
