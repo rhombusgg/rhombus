@@ -13,6 +13,11 @@
       action: () => navigate("/signin"),
     },
     {
+      category: "Pages",
+      name: "Secret",
+      action: () => (window.location = "/secret"),
+    },
+    {
       category: "Utilities",
       name: "Log Hello",
       action: () => console.log("Hello"),
