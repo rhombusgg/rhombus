@@ -107,8 +107,8 @@ impl<'a> Rhombus<'a> {
 
         let governor_conf = Box::new(
             GovernorConfigBuilder::default()
-                .per_second(2)
-                .burst_size(5)
+                .per_second(1)
+                .burst_size(50)
                 .use_headers()
                 .finish()
                 .unwrap(),
