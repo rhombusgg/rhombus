@@ -36,6 +36,7 @@ jobs:
           cargo install sqlx-cli --no-default-features --features postgres
 
       - name: Migrate database
+        working-directory: rhombus
         run: |
           DATABASE_URL=postgres://postgres:postgres@localhost/postgres sqlx migrate run
 
