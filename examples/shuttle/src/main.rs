@@ -6,7 +6,8 @@ async fn main(
     let app = rhombus::Rhombus::new(
         pool,
         rhombus::Config {
-            location_url: "https://rhombus-rs.shuttleapp.rs".to_string(),
+            location_url: "http://localhost:3001".to_string(),
+            // location_url: "https://rhombus-rs.shuttleapp.rs".to_string(),
             discord_client_id: secrets.get("DISCORD_CLIENT_ID").unwrap(),
             discord_client_secret: secrets.get("DISCORD_CLIENT_SECRET").unwrap(),
             jwt_secret: secrets.get("JWT_SECRET").unwrap(),

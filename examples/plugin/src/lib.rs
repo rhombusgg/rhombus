@@ -3,12 +3,11 @@ use axum::{
     extract::{FromRef, State},
     http::Uri,
     response::Html,
-    routing, Router,
+    routing, Extension, Router,
 };
-use rhombus::{plugin::Plugin, RhombusRouterState};
+use rhombus::{auth::MaybeUser, plugin::Plugin, RhombusRouterState};
 use sqlx::{Executor, PgPool};
 use tera::Tera;
-use tracing::info;
 
 #[derive(Clone)]
 pub struct MyPlugin {
@@ -57,7 +56,6 @@ impl Plugin for MyPlugin {
     }
 
     async fn migrate(&self, db: PgPool) {
-        info!("migrating");
         db.execute(include_str!("../migrations/standalone.sql"))
             .await
             .unwrap();
@@ -67,10 +65,12 @@ impl Plugin for MyPlugin {
 async fn route_home(
     State(rhombus): State<RhombusRouterState>,
     State(plugin): State<MyPluginRouterState>,
+    Extension(user): Extension<MaybeUser>,
     uri: Uri,
 ) -> Html<String> {
     let mut context = tera::Context::new();
-    context.insert("a", &plugin.a);
+    context.insert("user", &user.ok());
     context.insert("uri", &uri.to_string());
+    context.insert("a", &plugin.a);
     Html(rhombus.tera.render("home.html", &context).unwrap())
 }

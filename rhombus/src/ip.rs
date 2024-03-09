@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 use std::net::SocketAddr;
 
 use axum::{
@@ -10,6 +12,6 @@ pub async fn log_ip(
     req: Request<Body>,
     next: Next,
 ) -> impl IntoResponse {
-    info!("ip {}", addr);
+    // info!("ip {}", addr);
     next.run(req).await
 }

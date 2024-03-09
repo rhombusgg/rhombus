@@ -9,8 +9,15 @@
     >
       <nav hx-boost="true" class="flex">
         {{ navbarItem::navbarItem(label="Home", href="/", uri=uri) }}
-        {{ navbarItem::navbarItem(label="Sign In", href="/signin", uri=uri) }}
+        {% if user %}
+          {{ navbarItem::navbarItem(label="Account", href="/account", uri=uri) }}
+        {% else %}
+          {{ navbarItem::navbarItem(label="Sign In", href="/signin", uri=uri) }}
+        {% endif %}
       </nav>
+      {% if user %}
+        {{ user.name }}
+      {% endif %}
       {% include "command-palette.html" %}
     </div>
   </header>

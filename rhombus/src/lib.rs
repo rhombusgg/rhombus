@@ -1,13 +1,17 @@
 #![forbid(unsafe_code)]
 
-use auth::{auth, route_discord_callback, route_signin};
+use account::route_account;
+use auth::{
+    auth_injector_middleware, enforce_auth_middleware, route_discord_callback, route_signin,
+    route_signout, MaybeUser,
+};
 use axum::{
     extract::State,
     http::{StatusCode, Uri},
     middleware,
     response::{Html, IntoResponse},
     routing::get,
-    Router,
+    Extension, Router,
 };
 use challenges::route_challenges;
 use command_palette::route_command_palette;
@@ -21,6 +25,7 @@ use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::{compression::CompressionLayer, services::ServeDir};
 use tracing::info;
 
+pub mod account;
 pub mod auth;
 pub mod challenges;
 pub mod command_palette;
@@ -105,6 +110,32 @@ impl<'a> Rhombus<'a> {
             plugin_router = plugin_router.merge(plugin.routes(router_state.clone()));
         }
 
+        let rhombus_router = Router::new()
+            .fallback(handler_404)
+            .route("/secret", get(|| async { "Hello, World!" }))
+            .route("/account", get(route_account))
+            .route_layer(middleware::from_fn(enforce_auth_middleware))
+            .nest_service("/static", ServeDir::new(STATIC_DIR))
+            .route("/", get(route_home))
+            .route("/challenges", get(route_challenges))
+            .route("/modal", get(route_command_palette))
+            .route("/signout", get(route_signout))
+            .route("/signin", get(route_signin))
+            .route("/signin/discord", get(route_discord_callback))
+            .route_layer(middleware::from_fn_with_state(
+                router_state.clone(),
+                auth_injector_middleware,
+            ))
+            .with_state(router_state.clone());
+
+        let router = if self.plugins.is_empty() {
+            rhombus_router
+        } else {
+            Router::new()
+                .fallback_service(rhombus_router)
+                .nest("/", plugin_router)
+        };
+
         let governor_conf = Box::new(
             GovernorConfigBuilder::default()
                 .per_second(1)
@@ -114,21 +145,11 @@ impl<'a> Rhombus<'a> {
                 .unwrap(),
         );
 
-        let router = Router::new()
-            .fallback_service(
-                Router::new()
-                    .fallback(handler_404)
-                    .route("/secret", get(|| async { "Hello, World!" }))
-                    .route_layer(middleware::from_fn_with_state(router_state.clone(), auth))
-                    .nest_service("/static", ServeDir::new(STATIC_DIR))
-                    .route("/", get(route_home))
-                    .route("/challenges", get(route_challenges))
-                    .route("/modal", get(route_command_palette))
-                    .route("/signin", get(route_signin))
-                    .route("/signin/discord", get(route_discord_callback))
-                    .with_state(router_state),
-            )
-            .nest("/", plugin_router)
+        let router = router
+            .route_layer(middleware::from_fn_with_state(
+                router_state.clone(),
+                auth_injector_middleware,
+            ))
             .route_layer(middleware::from_fn(log_ip))
             .layer(GovernorLayer {
                 config: Box::leak(governor_conf),
@@ -174,8 +195,13 @@ pub async fn serve(router: Router, address: impl ToSocketAddrs) -> Result<(), st
     Ok(())
 }
 
-async fn route_home(State(state): State<RhombusRouterState>, uri: Uri) -> Html<String> {
+async fn route_home(
+    State(state): State<RhombusRouterState>,
+    Extension(user): Extension<MaybeUser>,
+    uri: Uri,
+) -> Html<String> {
     let mut context = tera::Context::new();
+    context.insert("user", &user.ok());
     context.insert("uri", &uri.to_string());
     Html(state.tera.render("home.html", &context).unwrap())
 }
