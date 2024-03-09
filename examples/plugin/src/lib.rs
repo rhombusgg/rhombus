@@ -5,7 +5,7 @@ use axum::{
     response::Html,
     routing, Extension, Router,
 };
-use rhombus::{auth::MaybeUser, plugin::Plugin, RhombusRouterState};
+use rhombus::{auth::MaybeClientUser, plugin::Plugin, RhombusRouterState};
 use sqlx::{Executor, PgPool};
 use tera::Tera;
 
@@ -65,12 +65,13 @@ impl Plugin for MyPlugin {
 async fn route_home(
     State(rhombus): State<RhombusRouterState>,
     State(plugin): State<MyPluginRouterState>,
-    Extension(user): Extension<MaybeUser>,
+    Extension(user): Extension<MaybeClientUser>,
     uri: Uri,
 ) -> Html<String> {
     let mut context = tera::Context::new();
-    context.insert("user", &user.ok());
+    context.insert("user", &user);
     context.insert("uri", &uri.to_string());
+    context.insert("discord_signin_url", &rhombus.discord_signin_url);
     context.insert("a", &plugin.a);
     Html(rhombus.tera.render("home.html", &context).unwrap())
 }

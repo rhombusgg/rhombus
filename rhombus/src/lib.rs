@@ -3,7 +3,7 @@
 use account::route_account;
 use auth::{
     auth_injector_middleware, enforce_auth_middleware, route_discord_callback, route_signin,
-    route_signout, MaybeUser,
+    route_signout, MaybeClientUser,
 };
 use axum::{
     extract::State,
@@ -197,11 +197,12 @@ pub async fn serve(router: Router, address: impl ToSocketAddrs) -> Result<(), st
 
 async fn route_home(
     State(state): State<RhombusRouterState>,
-    Extension(user): Extension<MaybeUser>,
+    Extension(user): Extension<MaybeClientUser>,
     uri: Uri,
 ) -> Html<String> {
     let mut context = tera::Context::new();
-    context.insert("user", &user.ok());
+    context.insert("user", &user);
     context.insert("uri", &uri.to_string());
+    context.insert("discord_signin_url", &state.discord_signin_url);
     Html(state.tera.render("home.html", &context).unwrap())
 }

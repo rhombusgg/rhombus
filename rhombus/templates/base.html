@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block title %}Rhombus{% endblock %}</title>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/fuse.js@7.0.0/dist/fuse.js"></script>
     <link rel="stylesheet" href="/static/tailwind.css" />
 
     <script>
@@ -36,7 +37,6 @@
       if (typeof localStorage !== "undefined") {
         const observer = new MutationObserver(() => {
           const isDark = document.documentElement.classList.contains("dark");
-          console.log(isDark);
           localStorage.setItem("rhombus-theme", isDark ? "dark" : "light");
         });
         observer.observe(document.documentElement, {
@@ -49,6 +49,5 @@
 
   <body>
     {% block body %}{% endblock %}
-    <script src="/static/command-palette.js"></script>
   </body>
 </html>

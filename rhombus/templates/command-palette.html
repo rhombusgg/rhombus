@@ -15,13 +15,11 @@
 
 <div
   id="command-palette"
-  class="fixed z-50 flex items-center bg-background/50 justify-center bottom-0 left-0 right-0 top-0 transition-opacity"
-  style="opacity: 0; pointer-events: none;"
+  class="fixed z-50 items-center bg-background/50 justify-center bottom-0 left-0 right-0 top-0"
+  style="display: none;"
 >
   <div id="overlay" class="absolute bottom-0 left-0 right-0 top-0 -z-10"></div>
-  <div
-    class="max-w-lg w-full border bg-background shadow rounded-lg transition-transform scale-90"
-  >
+  <div class="max-w-lg w-full border bg-background shadow rounded-lg">
     <div class="flex items-center border-b px-3">
       {{ icons::search(attrs='class="mr-2 size-4 opacity-50"') }}
       <input
@@ -38,3 +36,193 @@
     ></ul>
   </div>
 </div>
+
+<script>
+  (function () {
+    const commandPaletteOpener = document.querySelector(
+      "#commandPaletteOpener",
+    );
+    const commandPalette = document.querySelector("#command-palette");
+    const overlay = commandPalette.querySelector("#overlay");
+    const input = commandPalette.querySelector("input");
+    const commandList = commandPalette.querySelector("#commandList");
+
+    const commands = [
+      {
+        category: "Pages",
+        name: "Home",
+        action: () => navigate("/"),
+      },
+      // {% if not user %}
+      {
+        category: "Pages",
+        name: "Sign In",
+        action: () => navigate("/signin"),
+      },
+      // {% endif %} {{ 1 }}
+      // {% if user %}
+      {
+        category: "Pages",
+        name: "Account",
+        action: () => (window.location = "/account"),
+      },
+      // {% endif %} {{ 1 }}
+      // {% if not user %}
+      {
+        category: "Account",
+        name: "Sign In With Discord",
+        action: () => (window.location = "{{ discord_signin_url | safe }}"),
+      },
+      // {% endif %} {{ 1 }}
+      // {% if user %}
+      {
+        category: "Account",
+        name: "Sign out",
+        action: () => (window.location = "/signout"),
+      },
+      // {% endif %} {{ 1 }}
+      {
+        category: "Theme",
+        name: "Dark Theme",
+        action: () => setTheme(true),
+      },
+      {
+        category: "Theme",
+        name: "Light Theme",
+        action: () => setTheme(false),
+      },
+    ];
+
+    let filteredCommands = commands;
+    let selectedIndex = 0;
+
+    input.addEventListener("input", filterCommands);
+    input.addEventListener("keydown", navigateCommands);
+    renderCommands();
+
+    function renderCommands() {
+      commandList.innerHTML = "";
+
+      let currentCategory = null;
+      filteredCommands.forEach((command, index) => {
+        if (currentCategory !== command.category) {
+          currentCategory = command.category;
+          const categoryHeader = document.createElement("li");
+          categoryHeader.textContent = currentCategory;
+          categoryHeader.classList.add(
+            "font-medium",
+            "text-muted-foreground",
+            "py-1.5",
+            "px-2",
+          );
+          commandList.appendChild(categoryHeader);
+        }
+
+        const li = document.createElement("li");
+        li.textContent = command.name;
+        li.classList.add(
+          "action",
+          "rounded-lg",
+          "cursor-pointer",
+          "py-3",
+          "px-2",
+        );
+        if (index === selectedIndex) {
+          li.classList.add("bg-primary/20");
+        }
+        li.addEventListener("mouseenter", () => {
+          selectedIndex = index;
+          renderCommands();
+        });
+        li.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          runAction();
+        });
+        commandList.appendChild(li);
+      });
+    }
+
+    function filterCommands() {
+      const query = input.value.toLowerCase();
+      const fuse = new Fuse(commands, {
+        keys: ["name", "category"],
+        threshold: 0.3,
+      });
+      filteredCommands = fuse.search(query).map((result) => result.item);
+      if (filteredCommands.length === 0) {
+        filteredCommands = commands;
+      }
+      selectedIndex = 0;
+      renderCommands();
+    }
+
+    /**
+     * @param {KeyboardEvent} event
+     */
+    function navigateCommands(event) {
+      if (event.key === "Escape") {
+        closeModal();
+      }
+
+      const commandElements = commandList.querySelectorAll("li.action");
+      if (event.key === "ArrowUp" || (event.key === "Tab" && event.shiftKey)) {
+        event.preventDefault();
+        selectedIndex =
+          (selectedIndex - 1 + commandElements.length) % commandElements.length;
+        commandElements[selectedIndex].scrollIntoView({ block: "center" });
+        renderCommands();
+      } else if (event.key === "ArrowDown" || event.key === "Tab") {
+        event.preventDefault();
+        selectedIndex = (selectedIndex + 1) % commandElements.length;
+        commandElements[selectedIndex].scrollIntoView({ block: "center" });
+        renderCommands();
+      } else if (event.key === "Enter") {
+        runAction();
+      }
+    }
+
+    function runAction() {
+      const selectedCommand = filteredCommands[selectedIndex];
+      closeModal();
+      if (selectedCommand) {
+        selectedCommand.action();
+      }
+    }
+
+    /**
+     * @param {string} url
+     */
+    function navigate(url) {
+      htmx.ajax("GET", url, document);
+      window.history.pushState({}, "", url);
+    }
+
+    function openModal() {
+      input.value = "";
+      commandPalette.style.display = "flex";
+      commandList.scrollTop = 0;
+      filterCommands();
+      renderCommands();
+      input.focus();
+    }
+
+    function closeModal() {
+      commandPalette.style.display = "none";
+    }
+
+    commandPaletteOpener.addEventListener("click", () => openModal());
+    overlay.addEventListener("click", () => closeModal());
+
+    document.addEventListener("keydown", (e) => {
+      if (e.ctrlKey && e.key === "k") {
+        e.preventDefault();
+
+        if (commandPalette.style.display === "none") {
+          openModal();
+        } else {
+          closeModal();
+        }
+      }
+    });
+  })();
+</script>

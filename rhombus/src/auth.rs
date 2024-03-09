@@ -29,12 +29,27 @@ pub struct User {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TokenClaims {
     pub sub: i64,
+    pub name: String,
+    pub email: String,
+    pub avatar: String,
+    pub discord_id: String,
     pub iat: usize,
     pub exp: usize,
 }
+
+#[derive(Debug, Serialize, Clone)]
+pub struct ClientUser {
+    pub id: i64,
+    pub name: String,
+    pub email: String,
+    pub avatar: String,
+    pub discord_id: String,
+}
+
+pub type MaybeClientUser = Option<ClientUser>;
 
 #[derive(Debug, Serialize, Clone)]
 pub struct ErrorResponse {
@@ -42,19 +57,24 @@ pub struct ErrorResponse {
 }
 
 pub async fn enforce_auth_middleware(
-    Extension(user): Extension<MaybeUser>,
+    Extension(user): Extension<MaybeClientUser>,
     mut req: Request<Body>,
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
-    if let Ok(user) = user {
-        req.extensions_mut().insert(user);
-        return Ok(next.run(req).await);
+    if user.is_none() {
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(ErrorResponse {
+                message: "Unauthorized".to_string(),
+            }),
+        ));
     }
+    let user = user.unwrap();
 
-    Err(user.unwrap_err())
+    req.extensions_mut().insert(user);
+
+    Ok(next.run(req).await)
 }
-
-pub type MaybeUser = Result<User, (StatusCode, Json<ErrorResponse>)>;
 
 pub async fn auth_injector_middleware(
     cookie_jar: CookieJar,
@@ -79,11 +99,8 @@ pub async fn auth_injector_middleware(
         });
 
     if token.is_none() {
-        let json_error = ErrorResponse {
-            message: "You are not logged in".to_string(),
-        };
-        let user: MaybeUser = Err((StatusCode::UNAUTHORIZED, Json(json_error)));
-        req.extensions_mut().insert(user);
+        let client_user: MaybeClientUser = None;
+        req.extensions_mut().insert(client_user);
         return next.run(req).await;
     }
     let token = token.unwrap();
@@ -94,52 +111,30 @@ pub async fn auth_injector_middleware(
         &Validation::default(),
     );
     if claims.is_err() {
-        let json_error = ErrorResponse {
-            message: "Invalid token".to_string(),
-        };
-        let user: MaybeUser = Err((StatusCode::UNAUTHORIZED, Json(json_error)));
-        req.extensions_mut().insert(user);
+        let client_user: MaybeClientUser = None;
+        req.extensions_mut().insert(client_user);
         return next.run(req).await;
     }
     let claims = claims.unwrap().claims;
 
-    let user = sqlx::query_as::<_, User>(r#"SELECT * FROM "User" WHERE id = $1"#)
-        .bind(claims.sub)
-        .fetch_optional(&data.db)
-        .await;
-
-    if user.is_err() {
-        let json_error = ErrorResponse {
-            message: "Error fetching user from database".to_string(),
-        };
-        let user: MaybeUser = Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json_error)));
-        req.extensions_mut().insert(user);
-        return next.run(req).await;
-    }
-    let user = user.unwrap();
-
-    if user.is_none() {
-        let json_error = ErrorResponse {
-            message: "The user belonging to this token no longer exists".to_string(),
-        };
-        let user: MaybeUser = Err((StatusCode::UNAUTHORIZED, Json(json_error)));
-        req.extensions_mut().insert(user);
-        return next.run(req).await;
-    }
-    let user = user.unwrap();
-
-    let user: MaybeUser = Ok(user);
-    req.extensions_mut().insert(user);
+    let client_user: MaybeClientUser = Some(ClientUser {
+        id: claims.sub,
+        name: claims.name,
+        email: claims.email,
+        avatar: claims.avatar,
+        discord_id: claims.discord_id,
+    });
+    req.extensions_mut().insert(client_user);
     next.run(req).await
 }
 
 pub async fn route_signin(
     state: State<RhombusRouterState>,
-    Extension(user): Extension<MaybeUser>,
+    Extension(user): Extension<MaybeClientUser>,
     uri: Uri,
 ) -> impl IntoResponse {
     let mut context = tera::Context::new();
-    context.insert("user", &user.ok());
+    context.insert("user", &user);
     context.insert("uri", &uri.to_string());
     context.insert("discord_signin_url", &state.discord_signin_url);
     let rendered = state.tera.render("signin.html", &context).unwrap();
@@ -281,6 +276,10 @@ pub async fn route_discord_callback(
     let exp = (now + chrono::Duration::minutes(60)).timestamp() as usize;
     let claims = TokenClaims {
         sub: user.id,
+        name: profile.global_name,
+        email: profile.email,
+        avatar,
+        discord_id: profile.id,
         exp,
         iat,
     };
@@ -312,7 +311,7 @@ pub async fn route_signout() -> impl IntoResponse {
         .same_site(SameSite::Lax)
         .http_only(true);
 
-    let mut response = Redirect::permanent("/").into_response();
+    let mut response = Redirect::to("/signin").into_response();
     response
         .headers_mut()
         .insert(header::SET_COOKIE, cookie.to_string().parse().unwrap());

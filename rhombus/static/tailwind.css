@@ -928,6 +928,10 @@ body {
   transition-duration: 150ms;
 }
 
+.duration-700 {
+  transition-duration: 700ms;
+}
+
 @media (min-width: 768px) {
   .md\:container {
     width: 100%;
