@@ -37,9 +37,13 @@ jobs:
 
       - name: Migrate database
         working-directory: rhombus
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost/postgres
         run: |
-          DATABASE_URL=postgres://postgres:postgres@localhost/postgres sqlx migrate run
+          sqlx migrate run
 
       - name: Build
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost/postgres
         run: |
           cargo build
