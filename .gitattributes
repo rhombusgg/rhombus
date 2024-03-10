@@ -1,1 +1,2 @@
 tailwind.css linguist-vendored=true
+*.sql linguist-detectable=true
