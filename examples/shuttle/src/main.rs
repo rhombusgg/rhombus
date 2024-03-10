@@ -10,6 +10,8 @@ async fn main(
             // location_url: "https://rhombus-rs.shuttleapp.rs".to_string(),
             discord_client_id: secrets.get("DISCORD_CLIENT_ID").unwrap(),
             discord_client_secret: secrets.get("DISCORD_CLIENT_SECRET").unwrap(),
+            discord_bot_token: std::env::var("DISCORD_TOKEN").unwrap(),
+            discord_guild_id: std::env::var("DISCORD_GUILD_ID").unwrap(),
             jwt_secret: secrets.get("JWT_SECRET").unwrap(),
         },
     )
