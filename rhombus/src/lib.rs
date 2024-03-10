@@ -43,6 +43,8 @@ pub struct Config {
     pub jwt_secret: String,
     pub discord_client_id: String,
     pub discord_client_secret: String,
+    pub discord_bot_token: String,
+    pub discord_guild_id: String,
     pub location_url: String,
 }
 
@@ -99,7 +101,7 @@ impl<'a> Rhombus<'a> {
             tera,
             config: self.config.clone(),
             discord_signin_url: format!(
-                "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}&response_type=code&scope=identify",
+                "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}&response_type=code&scope=identify+guilds.join",
                 self.config.discord_client_id,
                 format!("{}/signin/discord", self.config.location_url)
             ),

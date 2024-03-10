@@ -15,6 +15,7 @@ use chrono::{DateTime, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 #[derive(Debug, Deserialize, sqlx::FromRow, Serialize, Clone)]
 pub struct User {
@@ -224,7 +225,7 @@ pub async fn route_discord_callback(
 
     let res = client
         .get("https://discord.com/api/users/@me")
-        .bearer_auth(oauth_token.access_token)
+        .bearer_auth(oauth_token.access_token.clone())
         .send()
         .await
         .unwrap();
@@ -237,6 +238,31 @@ pub async fn route_discord_callback(
 
     let profile = res.json::<DiscordProfile>().await.unwrap();
 
+    // join the user to the guild
+    let client = Client::new();
+    let res = client
+        .put(format!(
+            "https://discord.com/api/guilds/{}/members/{}",
+            state.config.discord_guild_id, profile.id
+        ))
+        .header(
+            "Authorization",
+            format!("Bot {}", state.config.discord_bot_token),
+        )
+        .json(&json!({
+            "access_token": oauth_token.access_token,
+        }))
+        .send()
+        .await
+        .unwrap();
+    if !res.status().is_success() {
+        let json_error = ErrorResponse {
+            message: format!("Discord returned an error: {:?}", res.text().await),
+        };
+        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+    }
+
+    // get the user's avatar
     let avatar = if let Some(avatar) = profile.avatar {
         format!(
             "https://cdn.discordapp.com/avatars/{}/{}.{}",

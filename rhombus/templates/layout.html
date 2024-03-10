@@ -15,9 +15,6 @@
           {{ navbarItem::navbarItem(label="Sign In", href="/signin", uri=uri) }}
         {% endif %}
       </nav>
-      {% if user %}
-        {{ user.name }}
-      {% endif %}
       {% include "command-palette.html" %}
     </div>
   </header>

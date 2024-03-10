@@ -22,6 +22,8 @@ async fn main() {
             location_url: "http://localhost:3000".to_string(),
             discord_client_id: std::env::var("DISCORD_CLIENT_ID").unwrap(),
             discord_client_secret: std::env::var("DISCORD_CLIENT_SECRET").unwrap(),
+            discord_bot_token: std::env::var("DISCORD_TOKEN").unwrap(),
+            discord_guild_id: std::env::var("DISCORD_GUILD_ID").unwrap(),
             jwt_secret: std::env::var("JWT_SECRET").unwrap(),
         },
     )
