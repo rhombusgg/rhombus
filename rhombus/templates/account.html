@@ -1,7 +1,17 @@
 {% extends "layout.html" %}
+{% import "card.html" as card %}
 
 {% block title %}{{ super() }} - Account{% endblock %}
 
 {% block content %}
   <h1>Account</h1>
+  {{
+    card::root(inner=[
+      card::header(inner=[
+        card::title(inner="Discord Integration"),
+        card::description(inner="ho")
+      ] | join()),
+      card::content(inner="hi")
+    ] | join())
+  }}
 {% endblock %}

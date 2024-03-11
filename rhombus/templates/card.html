@@ -1,0 +1,23 @@
+{% macro root(inner) %}
+  <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+    {{ inner | safe }}
+  </div>
+{% endmacro %}
+
+{% macro header(inner) %}
+  <div class="flex flex-col space-y-1.5 p-6">{{ inner | safe }}</div>
+{% endmacro %}
+
+{% macro title(inner) %}
+  <div class="text-lg font-semibold leading-none tracking-tight">
+    {{ inner | safe }}
+  </div>
+{% endmacro %}
+
+{% macro description(inner) %}
+  <div class="text-sm text-muted-foreground">{{ inner | safe }}</div>
+{% endmacro %}
+
+{% macro content(inner) %}
+  <div class="p-6 pt-0">{{ inner | safe }}</div>
+{% endmacro %}
