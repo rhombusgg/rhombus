@@ -5,13 +5,19 @@
 
 {% block content %}
   <h1>Account</h1>
-  {{
-    card::root(inner=[
-      card::header(inner=[
-        card::title(inner="Discord Integration"),
-        card::description(inner="ho")
-      ] | join()),
-      card::content(inner="hi")
-    ] | join())
-  }}
+  {% call card.root() %}
+    {% import "card.html" as card %}
+    {% call card.header() %}
+      {% import "card.html" as card %}
+      {% call card.title() %}
+        hi
+      {% endcall %}
+      {% call card.description() %}
+        hi
+      {% endcall %}
+    {% endcall %}
+    {% call card.content() %}
+      hi
+    {% endcall %}
+  {% endcall %}
 {% endblock %}

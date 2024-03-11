@@ -1,4 +1,5 @@
 use axum::{extract::State, http::Uri, response::Html, Extension};
+use minijinja::context;
 use reqwest::Client;
 use tracing::info;
 
@@ -35,8 +36,15 @@ pub async fn route_account(
 
     info!("is_in_server: {}", val);
 
-    let mut context = tera::Context::new();
-    context.insert("user", &user);
-    context.insert("uri", &uri.to_string());
-    Html(state.tera.render("account.html", &context).unwrap())
+    Html(
+        state
+            .jinja
+            .get_template("account.html")
+            .unwrap()
+            .render(context! {
+                user => user,
+                uri => uri.to_string(),
+            })
+            .unwrap(),
+    )
 }

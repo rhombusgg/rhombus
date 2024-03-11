@@ -2,9 +2,9 @@ use axum::{
     extract::State,
     response::{Html, IntoResponse},
 };
+use minijinja::context;
 use serde::Serialize;
 use sqlx::{prelude::FromRow, PgPool};
-use tera::Context;
 
 use crate::RhombusRouterState;
 
@@ -34,10 +34,14 @@ pub struct Challenge {
 pub async fn route_challenges(state: State<RhombusRouterState>) -> impl IntoResponse {
     let model = ChallengeModel::new(state.db.clone()).await;
 
-    let rendered = state
-        .tera
-        .render("challenges.html", &Context::from_serialize(model).unwrap())
-        .unwrap();
-
-    Html(rendered)
+    Html(
+        state
+            .jinja
+            .get_template("challenges.html")
+            .unwrap()
+            .render(context! {
+                challenges => model.challenges,
+            })
+            .unwrap(),
+    )
 }

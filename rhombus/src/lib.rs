@@ -16,10 +16,10 @@ use axum::{
 use challenges::route_challenges;
 use command_palette::route_command_palette;
 use ip::log_ip;
+use minijinja::{context, path_loader, Environment};
 use plugin::Plugin;
 use sqlx::PgPool;
-use std::{net::SocketAddr, sync::Arc};
-use tera::Tera;
+use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::{compression::CompressionLayer, services::ServeDir};
@@ -52,7 +52,7 @@ pub type RhombusRouterState = Arc<RhombusRouterStateInner>;
 
 pub struct RhombusRouterStateInner {
     pub db: PgPool,
-    pub tera: Tera,
+    pub jinja: Environment<'static>,
     pub config: Config,
     pub discord_signin_url: String,
 }
@@ -62,7 +62,6 @@ async fn handler_404() -> impl IntoResponse {
 }
 
 static STATIC_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/static");
-static TEMPLATES_GLOB: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/templates/**/*.html");
 
 impl<'a> Rhombus<'a> {
     pub fn new(db: PgPool, config: Config) -> Self {
@@ -91,14 +90,17 @@ impl<'a> Rhombus<'a> {
             plugin.migrate(self.db.clone()).await;
         }
 
-        let mut tera = Tera::new(TEMPLATES_GLOB).unwrap();
+        let template_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("templates");
+        let mut env = Environment::new();
+        env.set_loader(path_loader(&template_path));
+
         for plugin in self.plugins.iter() {
-            tera = plugin.theme(&tera);
+            plugin.theme(&mut env);
         }
 
         let router_state = Arc::new(RhombusRouterStateInner {
             db: self.db.clone(),
-            tera,
+            jinja: env,
             config: self.config.clone(),
             discord_signin_url: format!(
                 "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}&response_type=code&scope=identify+guilds.join",
@@ -202,9 +204,16 @@ async fn route_home(
     Extension(user): Extension<MaybeClientUser>,
     uri: Uri,
 ) -> Html<String> {
-    let mut context = tera::Context::new();
-    context.insert("user", &user);
-    context.insert("uri", &uri.to_string());
-    context.insert("discord_signin_url", &state.discord_signin_url);
-    Html(state.tera.render("home.html", &context).unwrap())
+    Html(
+        state
+            .jinja
+            .get_template("home.html")
+            .unwrap()
+            .render(context! {
+                user => user,
+                uri => uri.to_string(),
+                discord_signin_url => &state.discord_signin_url
+            })
+            .unwrap(),
+    )
 }

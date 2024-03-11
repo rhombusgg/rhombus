@@ -1,4 +1,4 @@
-{% import "icons.html" as icons %}
+{% from "icons.html" import search %}
 
 <button
   id="commandPaletteOpener"
@@ -21,7 +21,7 @@
   <div id="overlay" class="absolute bottom-0 left-0 right-0 top-0 -z-10"></div>
   <div class="max-w-lg w-full border bg-background shadow rounded-lg">
     <div class="flex items-center border-b px-3">
-      {{ icons::search(attrs='class="mr-2 size-4 opacity-50"') }}
+      {{ search(attrs='class="mr-2 size-4 opacity-50"') }}
       <input
         autofocus
         type="text"
@@ -59,28 +59,28 @@
         name: "Sign In",
         action: () => navigate("/signin"),
       },
-      // {% endif %} {{ 1 }}
+      // {% endif %}
       // {% if user %}
       {
         category: "Pages",
         name: "Account",
         action: () => (window.location = "/account"),
       },
-      // {% endif %} {{ 1 }}
+      // {% endif %}
       // {% if not user %}
       {
         category: "Account",
         name: "Sign In With Discord",
         action: () => (window.location = "{{ discord_signin_url | safe }}"),
       },
-      // {% endif %} {{ 1 }}
+      // {% endif %}
       // {% if user %}
       {
         category: "Account",
         name: "Sign out",
         action: () => (window.location = "/signout"),
       },
-      // {% endif %} {{ 1 }}
+      // {% endif %}
       {
         category: "Theme",
         name: "Dark Theme",

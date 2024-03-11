@@ -1,6 +1,6 @@
 use axum::{async_trait, Router};
+use minijinja::Environment;
 use sqlx::PgPool;
-use tera::Tera;
 
 use crate::RhombusRouterState;
 
@@ -10,8 +10,8 @@ pub trait Plugin {
         Router::new().with_state(state)
     }
 
-    fn theme(&self, tera: &Tera) -> Tera {
-        tera.clone()
+    fn theme(&self, jinja: &mut Environment<'static>) {
+        _ = jinja;
     }
 
     async fn migrate(&self, db: PgPool) {

@@ -1,5 +1,4 @@
-{% import "navbar-item.html" as navbarItem %}
-{% import "icons.html" as icons %}
+{% from "navbar-item.html" import navbarItem %}
 {% extends "base.html" %}
 
 {% block body %}
@@ -8,11 +7,11 @@
       class="flex items-center justify-between overflow-auto md:container md:mx-auto"
     >
       <nav hx-boost="true" class="flex">
-        {{ navbarItem::navbarItem(label="Home", href="/", uri=uri) }}
+        {{ navbarItem(label="Home", href="/", uri=uri) }}
         {% if user %}
-          {{ navbarItem::navbarItem(label="Account", href="/account", uri=uri) }}
+          {{ navbarItem(label="Account", href="/account", uri=uri) }}
         {% else %}
-          {{ navbarItem::navbarItem(label="Sign In", href="/signin", uri=uri) }}
+          {{ navbarItem(label="Sign In", href="/signin", uri=uri) }}
         {% endif %}
       </nav>
       {% include "command-palette.html" %}

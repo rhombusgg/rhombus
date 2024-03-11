@@ -5,9 +5,9 @@ use axum::{
     response::Html,
     routing, Extension, Router,
 };
+use minijinja::{context, Environment};
 use rhombus::{auth::MaybeClientUser, plugin::Plugin, RhombusRouterState};
 use sqlx::{Executor, PgPool};
-use tera::Tera;
 
 #[derive(Clone)]
 pub struct MyPlugin {
@@ -34,8 +34,6 @@ impl MyPlugin {
     }
 }
 
-static TEMPLATES_GLOB: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/templates/**/*.html");
-
 #[async_trait]
 impl Plugin for MyPlugin {
     fn routes(&self, state: RhombusRouterState) -> Router {
@@ -47,12 +45,10 @@ impl Plugin for MyPlugin {
             })
     }
 
-    fn theme(&self, tera: &Tera) -> Tera {
-        let mut plugin_tera = Tera::parse(TEMPLATES_GLOB).unwrap();
-        plugin_tera.extend(&tera).unwrap();
-        plugin_tera.build_inheritance_chains().unwrap();
-
-        plugin_tera
+    fn theme(&self, jinja: &mut Environment<'static>) {
+        jinja
+            .add_template("home.html", include_str!("../templates/home.html"))
+            .unwrap();
     }
 
     async fn migrate(&self, db: PgPool) {
@@ -68,10 +64,17 @@ async fn route_home(
     Extension(user): Extension<MaybeClientUser>,
     uri: Uri,
 ) -> Html<String> {
-    let mut context = tera::Context::new();
-    context.insert("user", &user);
-    context.insert("uri", &uri.to_string());
-    context.insert("discord_signin_url", &rhombus.discord_signin_url);
-    context.insert("a", &plugin.a);
-    Html(rhombus.tera.render("home.html", &context).unwrap())
+    Html(
+        rhombus
+            .jinja
+            .get_template("home.html")
+            .unwrap()
+            .render(context! {
+                user => user,
+                uri => uri.to_string(),
+                discord_signin_url => &rhombus.discord_signin_url,
+                a => &plugin.a,
+            })
+            .unwrap(),
+    )
 }

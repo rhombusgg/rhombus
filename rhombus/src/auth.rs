@@ -13,6 +13,7 @@ use axum_extra::extract::{
 };
 use chrono::{DateTime, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use minijinja::context;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -134,13 +135,18 @@ pub async fn route_signin(
     Extension(user): Extension<MaybeClientUser>,
     uri: Uri,
 ) -> impl IntoResponse {
-    let mut context = tera::Context::new();
-    context.insert("user", &user);
-    context.insert("uri", &uri.to_string());
-    context.insert("discord_signin_url", &state.discord_signin_url);
-    let rendered = state.tera.render("signin.html", &context).unwrap();
-
-    Html(rendered)
+    Html(
+        state
+            .jinja
+            .get_template("signin.html")
+            .unwrap()
+            .render(context! {
+                user => user,
+                uri => uri.to_string(),
+                discord_signin_url => &state.discord_signin_url
+            })
+            .unwrap(),
+    )
 }
 
 #[derive(Deserialize)]
