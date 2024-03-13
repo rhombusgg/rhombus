@@ -17,6 +17,7 @@ use challenges::route_challenges;
 use command_palette::route_command_palette;
 use ip::log_ip;
 use minijinja::{context, path_loader, Environment};
+use open_graph::route_default_og_image;
 use plugin::Plugin;
 use sqlx::PgPool;
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
@@ -30,6 +31,7 @@ pub mod auth;
 pub mod challenges;
 pub mod command_palette;
 pub mod ip;
+pub mod open_graph;
 pub mod plugin;
 
 pub struct Rhombus<'a> {
@@ -116,7 +118,6 @@ impl<'a> Rhombus<'a> {
 
         let rhombus_router = Router::new()
             .fallback(handler_404)
-            .route("/secret", get(|| async { "Hello, World!" }))
             .route("/account", get(route_account))
             .route_layer(middleware::from_fn(enforce_auth_middleware))
             .nest_service("/static", ServeDir::new(STATIC_DIR))
@@ -130,6 +131,7 @@ impl<'a> Rhombus<'a> {
                 router_state.clone(),
                 auth_injector_middleware,
             ))
+            .route("/og-image.png", get(route_default_og_image))
             .with_state(router_state.clone());
 
         let router = if self.plugins.is_empty() {
@@ -212,7 +214,9 @@ async fn route_home(
             .render(context! {
                 user => user,
                 uri => uri.to_string(),
-                discord_signin_url => &state.discord_signin_url
+                location_url => state.config.location_url,
+                discord_signin_url => &state.discord_signin_url,
+                og_image => format!("{}/og-image.png", state.config.location_url)
             })
             .unwrap(),
     )

@@ -44,6 +44,8 @@ pub async fn route_account(
             .render(context! {
                 user => user,
                 uri => uri.to_string(),
+                location_url => state.config.location_url,
+                og_image => format!("{}/og-image.png", state.config.location_url)
             })
             .unwrap(),
     )

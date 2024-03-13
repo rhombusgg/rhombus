@@ -1,13 +1,20 @@
 {% from "navbar-item.html" import navbarItem %}
+{% import "icons.html" as icons %}
 {% extends "base.html" %}
 
 {% block body %}
   <header class="border-b">
     <div
-      class="flex items-center justify-between overflow-auto md:container md:mx-auto"
+      class="flex items-center justify-between overflow-auto md:container md:mx-auto mx-4"
     >
       <nav hx-boost="true" class="flex">
-        {{ navbarItem(label="Home", href="/", uri=uri) }}
+        <a href="/" class="mr-6 flex items-center space-x-2">
+          {{ icons.rhombus(attrs='class="size-9"') }}
+
+          <span class="hidden font-bold sm:inline-block lg:text-base"
+            >Rhombus</span
+          >
+        </a>
         {% if user %}
           {{ navbarItem(label="Account", href="/account", uri=uri) }}
         {% else %}

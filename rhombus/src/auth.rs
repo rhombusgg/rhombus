@@ -143,7 +143,9 @@ pub async fn route_signin(
             .render(context! {
                 user => user,
                 uri => uri.to_string(),
-                discord_signin_url => &state.discord_signin_url
+                location_url => state.config.location_url,
+                discord_signin_url => &state.discord_signin_url,
+                og_image => format!("{}/og-image.png", state.config.location_url)
             })
             .unwrap(),
     )

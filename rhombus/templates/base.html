@@ -4,6 +4,23 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block title %}Rhombus{% endblock %}</title>
+    <meta
+      property="og:title"
+      content="{% block og_title %}Rhombus{% endblock %}"
+    />
+    <!-- prettier-ignore -->
+    <meta property="og:description" content="{% block og_description %}Next generation extendable CTF framework with batteries included{% endblock %}" />
+    <meta
+      property="og:url"
+      content="{% block og_url %}{{ location_url | safe }}{{ uri | safe }}{% endblock %}"
+    />
+
+    {% if og_image %}<meta
+      property="og:image"
+      content="{{ og_image | safe }}"
+    />{% endif %}
+    <meta name="twitter:card" content="summary_large_image" />
+
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://unpkg.com/fuse.js@7.0.0/dist/fuse.js"></script>
     <link rel="stylesheet" href="/static/tailwind.css" />
