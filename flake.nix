@@ -33,21 +33,20 @@
 
         devShells.default = pkgs.mkShell {
           name = "${name}-devshell";
-          packages = with pkgs;
-            [
-              tailwindcss-language-server
-              vscode-langservers-extracted
-              alejandra
+          packages = with pkgs; [
+            tailwindcss-language-server
+            vscode-langservers-extracted
+            alejandra
 
-              go-task
-              tailwindcss
-              cargo-watch
-              systemfd
-              (rust-bin.stable.latest.default.override {
-                extensions = ["rust-src"];
-                targets = ["x86_64-unknown-linux-musl"];
-              })
-            ];
+            go-task
+            tailwindcss
+            cargo-watch
+            systemfd
+            (rust-bin.stable.latest.default.override {
+              extensions = ["rust-src"];
+              targets = ["x86_64-unknown-linux-musl"];
+            })
+          ];
         };
       }
     );

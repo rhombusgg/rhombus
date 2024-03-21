@@ -7,16 +7,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:latest
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -30,17 +20,6 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Install sqlx-cli
-        run: |
-          which sqlx || cargo install sqlx-cli --no-default-features --features postgres
-
-      - name: Migrate database
-        working-directory: rhombus
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost/postgres
-        run: |
-          sqlx migrate run
 
       - name: Build
         env:

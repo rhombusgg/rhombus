@@ -293,7 +293,7 @@ pub async fn route_discord_callback(
     let user = sqlx::query!(
         r#"
         INSERT INTO "User" (name, email, avatar, discord_id) VALUES ($1, $2, $3, $4)
-        ON CONFLICT (discord_id) DO UPDATE SET name = $1, email = $2, updated_at = now()
+        ON CONFLICT (discord_id) DO UPDATE SET name = $1, email = $2, avatar = $3, updated_at = now()
         RETURNING id
         "#,
         profile.global_name,
@@ -307,7 +307,7 @@ pub async fn route_discord_callback(
 
     let now = chrono::Utc::now();
     let iat = now.timestamp() as usize;
-    let exp = (now + chrono::Duration::minutes(60)).timestamp() as usize;
+    let exp = (now + chrono::Duration::try_minutes(60).unwrap()).timestamp() as usize;
     let claims = TokenClaims {
         sub: user.id,
         name: profile.global_name,
