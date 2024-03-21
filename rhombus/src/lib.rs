@@ -1,10 +1,13 @@
 #![forbid(unsafe_code)]
 
-use account::route_account;
-use auth::{
-    auth_injector_middleware, enforce_auth_middleware, route_discord_callback, route_signin,
-    route_signout, MaybeClientUser,
-};
+pub mod account;
+pub mod auth;
+pub mod challenges;
+pub mod command_palette;
+pub mod open_graph;
+pub mod plugin;
+pub mod track;
+
 use axum::{
     extract::State,
     http::{StatusCode, Uri},
@@ -13,12 +16,7 @@ use axum::{
     routing::get,
     Extension, Router,
 };
-use challenges::route_challenges;
-use command_palette::route_command_palette;
-use ip::log_ip;
 use minijinja::{context, path_loader, Environment};
-use open_graph::route_default_og_image;
-use plugin::Plugin;
 use sqlx::PgPool;
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 use tokio::net::{TcpListener, ToSocketAddrs};
@@ -26,13 +24,16 @@ use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::{compression::CompressionLayer, services::ServeDir};
 use tracing::info;
 
-pub mod account;
-pub mod auth;
-pub mod challenges;
-pub mod command_palette;
-pub mod ip;
-pub mod open_graph;
-pub mod plugin;
+use account::route_account;
+use auth::{
+    auth_injector_middleware, enforce_auth_middleware, route_discord_callback, route_signin,
+    route_signout, MaybeClientUser,
+};
+use challenges::route_challenges;
+use command_palette::route_command_palette;
+use open_graph::route_default_og_image;
+use plugin::Plugin;
+use track::track;
 
 pub struct Rhombus<'a> {
     db: PgPool,
@@ -127,6 +128,7 @@ impl<'a> Rhombus<'a> {
             .route("/signout", get(route_signout))
             .route("/signin", get(route_signin))
             .route("/signin/discord", get(route_discord_callback))
+            .route_layer(middleware::from_fn_with_state(router_state.clone(), track))
             .route_layer(middleware::from_fn_with_state(
                 router_state.clone(),
                 auth_injector_middleware,
@@ -152,11 +154,11 @@ impl<'a> Rhombus<'a> {
         );
 
         let router = router
+            .route_layer(middleware::from_fn_with_state(router_state.clone(), track))
             .route_layer(middleware::from_fn_with_state(
                 router_state.clone(),
                 auth_injector_middleware,
             ))
-            .route_layer(middleware::from_fn(log_ip))
             .layer(GovernorLayer {
                 config: Box::leak(governor_conf),
             });

@@ -1,10 +1,10 @@
 use axum::{extract::State, http::Uri, response::Html, Extension};
+use cached::proc_macro::cached;
 use minijinja::context;
 use reqwest::Client;
 use tracing::info;
 
 use crate::{auth::ClientUser, RhombusRouterState};
-use cached::proc_macro::cached;
 
 #[cached(time = 10, key = "String", convert = "{ discord_id.to_string() }")]
 async fn is_in_server(discord_guild_id: &str, discord_id: &str, discord_bot_token: &str) -> bool {

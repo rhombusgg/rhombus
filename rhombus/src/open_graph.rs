@@ -1,4 +1,5 @@
 use axum::{body::Body, extract::State, http::Response, response::IntoResponse};
+use cached::proc_macro::cached;
 use lazy_static::lazy_static;
 use minijinja::context;
 use resvg::tiny_skia;
@@ -12,11 +13,11 @@ lazy_static! {
     static ref GLOBAL_FONTDB: std::sync::Mutex<usvg::fontdb::Database> = {
         let mut fontdb = usvg::fontdb::Database::new();
         fontdb.load_fonts_dir(FONTS_DIR);
-        fontdb.set_sans_serif_family("Noto Sans");
         std::sync::Mutex::new(fontdb)
     };
 }
 
+#[cached(time = 120, key = "String", convert = "{ svg.to_string() }")]
 fn convert_svg_to_png(svg: &str) -> Vec<u8> {
     let opt = usvg::Options::default();
     let tree = {
@@ -47,17 +48,4 @@ pub async fn route_default_og_image(State(state): State<RhombusRouterState>) -> 
         .header("Content-Type", "image/png")
         .body(Body::from(png))
         .unwrap()
-    // Response::builder()
-    //     .header("Content-Type", "image/svg+xml")
-    //     .body(
-    //         state
-    //             .jinja
-    //             .get_template("og.svg")
-    //             .unwrap()
-    //             .render(context! {
-    //                 title => "Rhombus",
-    //             })
-    //             .unwrap(),
-    //     )
-    //     .unwrap()
 }

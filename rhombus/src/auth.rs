@@ -17,6 +17,7 @@ use minijinja::context;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use sqlx::prelude::FromRow;
 
 #[derive(Debug, Deserialize, sqlx::FromRow, Serialize, Clone)]
 pub struct User {
@@ -178,6 +179,11 @@ struct DiscordProfile {
     discriminator: Option<String>,
 }
 
+#[derive(FromRow)]
+struct UserInsertResult {
+    id: i64,
+}
+
 pub async fn route_discord_callback(
     state: State<RhombusRouterState>,
     params: Query<DiscordCallback>,
@@ -290,20 +296,20 @@ pub async fn route_discord_callback(
         )
     };
 
-    let user = sqlx::query!(
-        r#"
-        INSERT INTO "User" (name, email, avatar, discord_id) VALUES ($1, $2, $3, $4)
-        ON CONFLICT (discord_id) DO UPDATE SET name = $1, email = $2, avatar = $3, updated_at = now()
-        RETURNING id
-        "#,
-        profile.global_name,
-        profile.email,
-        avatar,
-        profile.id,
-    )
-    .fetch_one(&state.db)
-    .await
-    .unwrap();
+    let user = sqlx::query_as::<_, UserInsertResult>(
+            r#"
+            INSERT INTO "User" (name, email, avatar, discord_id) VALUES ($1, $2, $3, $4)
+            ON CONFLICT (discord_id) DO UPDATE SET name = $1, email = $2, avatar = $3, updated_at = now()
+            RETURNING id
+            "#
+        )
+        .bind(&profile.global_name)
+        .bind(&profile.email)
+        .bind(&avatar)
+        .bind(&profile.id)
+        .fetch_one(&state.db)
+        .await
+        .unwrap();
 
     let now = chrono::Utc::now();
     let iat = now.timestamp() as usize;

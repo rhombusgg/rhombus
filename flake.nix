@@ -38,6 +38,7 @@
             vscode-langservers-extracted
             alejandra
 
+            sqlx-cli
             go-task
             tailwindcss
             cargo-watch
