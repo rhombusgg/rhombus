@@ -1,7 +1,11 @@
 [[language]]
-name = "html"
+name = "jinja"
 language-servers = [ "vscode-html-language-server", "tailwindcss-ls" ]
+file-types = ["html"]
 
 [[language]]
 name = "css"
 language-servers = [ "vscode-css-language-server", "tailwindcss-ls" ]
+
+[language-server.tailwindcss-ls]
+config = { userLanguages = { jinja = "html" } }
