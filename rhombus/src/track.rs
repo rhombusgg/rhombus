@@ -11,7 +11,8 @@ use std::net::SocketAddr;
 use crate::{auth::MaybeClientUser, RhombusRouterState};
 
 /// Middleware to log the IP and user agent of the client in the database as track.
-/// Associates the track with the user if the user is logged in.
+/// Associates the track with the user if the user is logged in. Runs asynchronously,
+/// so it does not block the request and passes on to the next middleware immediately.
 pub async fn track(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Extension(user): Extension<MaybeClientUser>,
