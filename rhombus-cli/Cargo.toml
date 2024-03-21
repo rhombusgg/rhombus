@@ -1,0 +1,13 @@
+[package]
+name = "rhombus-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Official CLI tool to interact with the Rhombus CTF framework."
+authors = ["Mark Bundschuh <mark@mbund.dev>"]
+license = "GPL-3.0-only"
+repository = "https://github.com/rhombusgg/rhombus-rs"
+homepage = "https://rhombus.gg"
+keywords = ["ctf", "cli"]
+
+[dependencies]
+clap = { version = "4.5.3", features = ["derive"] }

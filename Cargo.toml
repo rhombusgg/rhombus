@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "rhombus",
+    "rhombus-cli",
     "examples/plugin",
     "examples/external-plugin",
     "examples/shuttle",
