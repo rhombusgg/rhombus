@@ -1,0 +1,25 @@
+version: "3"
+
+tasks:
+  dev:
+    deps:
+      - watch-external-plugin
+      - watch-tailwindcss
+    desc: Run cargo watch and tailwindcss concurrently
+
+  watch-external-plugin:
+    desc: Start cargo watch
+    cmds:
+      - cargo watch -x 'run --bin external-plugin'
+
+  watch-external-plugin-systemfd:
+    desc: Start cargo watch using systemfd to not drop connections on restart
+    cmds:
+      - systemfd --no-pid -s http::3000 -- cargo watch -x 'run --bin external-plugin'
+
+  watch-tailwindcss:
+    desc: Start Tailwind CSS in watch mode
+    dir: rhombus
+    silent: true
+    cmds:
+      - tailwindcss --input app.css -w -o static/tailwind.css

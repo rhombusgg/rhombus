@@ -653,20 +653,20 @@ body {
   margin: 0px;
 }
 
-.m-14 {
-  margin: 3.5rem;
-}
-
-.m-3 {
-  margin: 0.75rem;
-}
-
 .m-12 {
   margin: 3rem;
 }
 
+.m-14 {
+  margin: 3.5rem;
+}
+
 .m-2 {
   margin: 0.5rem;
+}
+
+.m-3 {
+  margin: 0.75rem;
 }
 
 .mx-4 {
@@ -703,11 +703,6 @@ body {
   height: 1rem;
 }
 
-.size-8 {
-  width: 2rem;
-  height: 2rem;
-}
-
 .size-9 {
   width: 2.25rem;
   height: 2.25rem;
@@ -725,20 +720,12 @@ body {
   height: 2rem;
 }
 
-.h-14 {
-  height: 3.5rem;
-}
-
 .max-h-\[300px\] {
   max-height: 300px;
 }
 
 .w-full {
   width: 100%;
-}
-
-.w-8 {
-  width: 2rem;
 }
 
 .max-w-lg {
@@ -787,6 +774,12 @@ body {
   gap: 0.25rem;
 }
 
+.space-x-2 > :not([hidden]) ~ :not([hidden]) {
+  --tw-space-x-reverse: 0;
+  margin-right: calc(0.5rem * var(--tw-space-x-reverse));
+  margin-left: calc(0.5rem * calc(1 - var(--tw-space-x-reverse)));
+}
+
 .space-y-1 > :not([hidden]) ~ :not([hidden]) {
   --tw-space-y-reverse: 0;
   margin-top: calc(0.25rem * calc(1 - var(--tw-space-y-reverse)));
@@ -797,12 +790,6 @@ body {
   --tw-space-y-reverse: 0;
   margin-top: calc(0.375rem * calc(1 - var(--tw-space-y-reverse)));
   margin-bottom: calc(0.375rem * var(--tw-space-y-reverse));
-}
-
-.space-x-2 > :not([hidden]) ~ :not([hidden]) {
-  --tw-space-x-reverse: 0;
-  margin-right: calc(0.5rem * var(--tw-space-x-reverse));
-  margin-left: calc(0.5rem * calc(1 - var(--tw-space-x-reverse)));
 }
 
 .overflow-auto {
@@ -871,18 +858,6 @@ body {
 
 .bg-transparent {
   background-color: transparent;
-}
-
-.fill-blue-600 {
-  fill: #2563eb;
-}
-
-.fill-blue-500 {
-  fill: #3b82f6;
-}
-
-.stroke-red-500 {
-  stroke: #ef4444;
 }
 
 .p-1 {
@@ -960,8 +935,8 @@ body {
   line-height: 1.25rem;
 }
 
-.text-\[15px\] {
-  font-size: 15px;
+.font-bold {
+  font-weight: 700;
 }
 
 .font-medium {
@@ -974,10 +949,6 @@ body {
 
 .font-semibold {
   font-weight: 600;
-}
-
-.font-bold {
-  font-weight: 700;
 }
 
 .leading-none {
@@ -1036,10 +1007,6 @@ body {
 
 .outline {
   outline-style: solid;
-}
-
-.outline-red-500 {
-  outline-color: #ef4444;
 }
 
 .transition-colors {
@@ -1157,16 +1124,6 @@ body {
 }
 
 @media (min-width: 640px) {
-  .sm\:mx-2 {
-    margin-left: 0.5rem;
-    margin-right: 0.5rem;
-  }
-
-  .sm\:mx-4 {
-    margin-left: 1rem;
-    margin-right: 1rem;
-  }
-
   .sm\:inline-block {
     display: inline-block;
   }

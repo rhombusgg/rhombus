@@ -18,7 +18,6 @@
           inherit system;
           overlays = [(import rust-overlay)];
         };
-        deps = with pkgs; [];
       in rec {
         packages.default = pkgs.rustPlatform.buildRustPackage {
           pname = name;
@@ -40,14 +39,15 @@
               vscode-langservers-extracted
               alejandra
 
+              go-task
+              tailwindcss
               cargo-watch
               systemfd
               (rust-bin.stable.latest.default.override {
                 extensions = ["rust-src"];
                 targets = ["x86_64-unknown-linux-musl"];
               })
-            ]
-            ++ deps;
+            ];
         };
       }
     );
