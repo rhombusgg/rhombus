@@ -22,7 +22,5 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost/postgres
         run: |
           cargo build
