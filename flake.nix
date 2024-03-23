@@ -13,26 +13,42 @@
   }:
     utils.lib.eachDefaultSystem (
       system: let
-        name = "rhombus";
         pkgs = import nixpkgs {
           inherit system;
           overlays = [(import rust-overlay)];
         };
       in rec {
-        packages.default = pkgs.rustPlatform.buildRustPackage {
-          pname = name;
+        packages.rhombus-cli = pkgs.rustPlatform.buildRustPackage {
+          pname = "rhombus-cli";
+          buildAndTestSubdir = "rhombus-cli";
           version = "0.1.0";
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
         };
 
-        apps.default = {
-          type = "app";
-          program = "${packages.default}/bin/external-plugin";
+        packages.standalone = pkgs.rustPlatform.buildRustPackage {
+          pname = "standalone";
+          buildAndTestSubdir = "examples/standalone";
+          version = "0.1.0";
+          src = ./.;
+          cargoLock.lockFile = ./Cargo.lock;
         };
 
+        apps.rhombus-cli = {
+          type = "app";
+          program = "${packages.rhombus-cli}/bin/rhombus-cli";
+        };
+
+        apps.standalone = {
+          type = "app";
+          program = "${packages.standalone}/bin/standalone";
+        };
+
+        packages.default = packages.rhombus-cli;
+        app.default = apps.rhombus-cli;
+
         devShells.default = pkgs.mkShell {
-          name = "${name}-devshell";
+          name = "rhombus-devshell";
           packages = with pkgs; [
             tailwindcss-language-server
             vscode-langservers-extracted

@@ -27,7 +27,6 @@ async fn main() {
             jwt_secret: std::env::var("JWT_SECRET").unwrap(),
         },
     )
-    .plugin(&plugin::MyPlugin::new(3))
     .build()
     .await;
 

@@ -179,11 +179,6 @@ struct DiscordProfile {
     discriminator: Option<String>,
 }
 
-#[derive(FromRow)]
-struct UserInsertResult {
-    id: i64,
-}
-
 pub async fn route_discord_callback(
     state: State<RhombusRouterState>,
     params: Query<DiscordCallback>,
@@ -296,7 +291,12 @@ pub async fn route_discord_callback(
         )
     };
 
-    let user = sqlx::query_as::<_, UserInsertResult>(
+    #[derive(FromRow)]
+    struct InsertUserResult {
+        id: i64,
+    }
+
+    let user = sqlx::query_as::<_, InsertUserResult>(
             r#"
             INSERT INTO "User" (name, email, avatar, discord_id) VALUES ($1, $2, $3, $4)
             ON CONFLICT (discord_id) DO UPDATE SET name = $1, email = $2, avatar = $3, updated_at = now()

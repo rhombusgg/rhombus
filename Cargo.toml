@@ -2,6 +2,7 @@
 members = [
     "rhombus",
     "rhombus-cli",
+    "examples/standalone",
     "examples/plugin",
     "examples/external-plugin",
     "examples/shuttle",

@@ -7,12 +7,15 @@ use resvg::usvg;
 
 use crate::RhombusRouterState;
 
-static FONTS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/fonts");
+static INTER_FONT: &'static [u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/fonts/inter/Inter.ttc"
+));
 
 lazy_static! {
     static ref GLOBAL_FONTDB: std::sync::Mutex<usvg::fontdb::Database> = {
         let mut fontdb = usvg::fontdb::Database::new();
-        fontdb.load_fonts_dir(FONTS_DIR);
+        fontdb.load_font_data(INTER_FONT.to_vec());
         std::sync::Mutex::new(fontdb)
     };
 }

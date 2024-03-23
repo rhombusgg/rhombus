@@ -16,9 +16,9 @@ use axum::{
     routing::get,
     Extension, Router,
 };
-use minijinja::{context, path_loader, Environment};
+use minijinja::{context, Environment};
 use sqlx::PgPool;
-use std::{net::SocketAddr, path::PathBuf, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::{compression::CompressionLayer, services::ServeDir};
@@ -93,9 +93,8 @@ impl<'a> Rhombus<'a> {
             plugin.migrate(self.db.clone()).await;
         }
 
-        let template_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("templates");
         let mut env = Environment::new();
-        env.set_loader(path_loader(&template_path));
+        minijinja_embed::load_templates!(&mut env);
 
         for plugin in self.plugins.iter() {
             plugin.theme(&mut env);
