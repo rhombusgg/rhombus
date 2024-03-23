@@ -1,7 +1,7 @@
 use axum::{
     body::Body,
     extract::{ConnectInfo, State},
-    http::Request,
+    http::{header::USER_AGENT, Request},
     middleware::Next,
     response::IntoResponse,
     Extension,
@@ -24,7 +24,7 @@ pub async fn track(
     let user_id = user.as_ref().map(|u| u.id);
     let user_agent = req
         .headers()
-        .get("User-Agent")
+        .get(&USER_AGENT)
         .map(|header| header.to_str().unwrap().to_string());
 
     tokio::spawn(async move {

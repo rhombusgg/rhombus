@@ -2,7 +2,10 @@ use crate::RhombusRouterState;
 use axum::{
     body::Body,
     extract::{Query, State},
-    http::{header, Request, StatusCode, Uri},
+    http::{
+        header::{self, AUTHORIZATION},
+        Request, StatusCode, Uri,
+    },
     middleware::Next,
     response::{Html, IntoResponse, Redirect, Response},
     Extension, Json,
@@ -90,7 +93,7 @@ pub async fn auth_injector_middleware(
         .map(|cookie| cookie.value().to_string())
         .or_else(|| {
             req.headers()
-                .get(header::AUTHORIZATION)
+                .get(&AUTHORIZATION)
                 .and_then(|auth_header| auth_header.to_str().ok())
                 .and_then(|auth_value| {
                     if auth_value.starts_with("Bearer ") {

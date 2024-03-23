@@ -4,6 +4,7 @@ pub mod account;
 pub mod auth;
 pub mod challenges;
 pub mod command_palette;
+pub mod locales;
 pub mod open_graph;
 pub mod plugin;
 pub mod track;
@@ -31,6 +32,7 @@ use auth::{
 };
 use challenges::route_challenges;
 use command_palette::route_command_palette;
+use locales::{translate, Lang};
 use open_graph::route_default_og_image;
 use plugin::Plugin;
 use track::track;
@@ -95,6 +97,7 @@ impl<'a> Rhombus<'a> {
 
         let mut env = Environment::new();
         minijinja_embed::load_templates!(&mut env);
+        env.add_function("_", translate);
 
         for plugin in self.plugins.iter() {
             plugin.theme(&mut env);
@@ -127,6 +130,7 @@ impl<'a> Rhombus<'a> {
             .route("/signout", get(route_signout))
             .route("/signin", get(route_signin))
             .route("/signin/discord", get(route_discord_callback))
+            .route_layer(middleware::from_fn(locales::locale))
             .route_layer(middleware::from_fn_with_state(router_state.clone(), track))
             .route_layer(middleware::from_fn_with_state(
                 router_state.clone(),
@@ -153,6 +157,7 @@ impl<'a> Rhombus<'a> {
         );
 
         let router = router
+            .route_layer(middleware::from_fn(locales::locale))
             .route_layer(middleware::from_fn_with_state(router_state.clone(), track))
             .route_layer(middleware::from_fn_with_state(
                 router_state.clone(),
@@ -205,6 +210,7 @@ pub async fn serve(router: Router, address: impl ToSocketAddrs) -> Result<(), st
 async fn route_home(
     State(state): State<RhombusRouterState>,
     Extension(user): Extension<MaybeClientUser>,
+    Extension(lang): Extension<Lang>,
     uri: Uri,
 ) -> Html<String> {
     Html(
@@ -213,6 +219,7 @@ async fn route_home(
             .get_template("home.html")
             .unwrap()
             .render(context! {
+                lang => lang,
                 user => user,
                 uri => uri.to_string(),
                 location_url => state.config.location_url,
