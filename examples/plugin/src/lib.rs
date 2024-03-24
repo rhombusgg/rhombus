@@ -5,9 +5,16 @@ use axum::{
     response::Html,
     routing, Extension, Router,
 };
+use fluent::FluentResource;
 use minijinja::{context, Environment};
-use rhombus::{auth::MaybeClientUser, plugin::Plugin, RhombusRouterState};
+use rhombus::{
+    auth::MaybeClientUser,
+    locales::{BundleMap, Lang},
+    plugin::Plugin,
+    RhombusRouterState,
+};
 use sqlx::{Executor, PgPool};
+use unic_langid::LanguageIdentifier;
 
 #[derive(Clone)]
 pub struct MyPlugin {
@@ -51,6 +58,14 @@ impl Plugin for MyPlugin {
             .unwrap();
     }
 
+    fn localize(&self, bundlemap: &mut BundleMap) {
+        let lang = "en".parse::<LanguageIdentifier>().unwrap();
+        let res = FluentResource::try_new("test1 = Hello there\nho = Hol".to_string()).unwrap();
+        let bundle = bundlemap.get_mut(&lang).unwrap();
+
+        bundle.add_resource_overriding(res);
+    }
+
     async fn migrate(&self, db: PgPool) {
         db.execute(include_str!("../migrations/standalone.sql"))
             .await
@@ -62,6 +77,7 @@ async fn route_home(
     State(rhombus): State<RhombusRouterState>,
     State(plugin): State<MyPluginRouterState>,
     Extension(user): Extension<MaybeClientUser>,
+    Extension(lang): Extension<Lang>,
     uri: Uri,
 ) -> Html<String> {
     Html(
@@ -70,6 +86,7 @@ async fn route_home(
             .get_template("home.html")
             .unwrap()
             .render(context! {
+                lang => lang,
                 user => user,
                 uri => uri.to_string(),
                 location_url => rhombus.config.location_url,

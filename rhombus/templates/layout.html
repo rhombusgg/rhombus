@@ -16,9 +16,9 @@
           >
         </a>
         {% if user %}
-          {{ navbarItem(label="Account", href="/account", uri=uri) }}
+          {{ navbarItem(label=_("account"), href="/account", uri=uri) }}
         {% else %}
-          {{ navbarItem(label="Sign In", href="/signin", uri=uri) }}
+          {{ navbarItem(label=_("sign-in"), href="/signin", uri=uri) }}
         {% endif %}
       </nav>
       {% include "command-palette.html" %}

@@ -2,7 +2,7 @@ use axum::{async_trait, Router};
 use minijinja::Environment;
 use sqlx::PgPool;
 
-use crate::RhombusRouterState;
+use crate::{locales::BundleMap, RhombusRouterState};
 
 #[async_trait]
 pub trait Plugin {
@@ -12,6 +12,10 @@ pub trait Plugin {
 
     fn theme(&self, jinja: &mut Environment<'static>) {
         _ = jinja;
+    }
+
+    fn localize(&self, bundlemap: &mut BundleMap) {
+        _ = bundlemap;
     }
 
     async fn migrate(&self, db: PgPool) {

@@ -37,6 +37,8 @@ use open_graph::route_default_og_image;
 use plugin::Plugin;
 use track::track;
 
+use crate::locales::Localizations;
+
 pub struct Rhombus<'a> {
     db: PgPool,
     config: Config,
@@ -95,9 +97,21 @@ impl<'a> Rhombus<'a> {
             plugin.migrate(self.db.clone()).await;
         }
 
+        let mut localizer = Localizations::new();
+
+        for plugin in self.plugins.clone().iter() {
+            plugin.localize(&mut localizer.bundles);
+        }
+
         let mut env = Environment::new();
         minijinja_embed::load_templates!(&mut env);
-        env.add_function("_", translate);
+
+        env.add_function(
+            "_",
+            move |msg_id: &str, kwargs: minijinja::value::Kwargs, state: &minijinja::State| {
+                translate(&localizer, msg_id, kwargs, state)
+            },
+        );
 
         for plugin in self.plugins.iter() {
             plugin.theme(&mut env);

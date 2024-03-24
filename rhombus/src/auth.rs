@@ -1,4 +1,4 @@
-use crate::RhombusRouterState;
+use crate::{locales::Lang, RhombusRouterState};
 use axum::{
     body::Body,
     extract::{Query, State},
@@ -137,6 +137,7 @@ pub async fn auth_injector_middleware(
 pub async fn route_signin(
     state: State<RhombusRouterState>,
     Extension(user): Extension<MaybeClientUser>,
+    Extension(lang): Extension<Lang>,
     uri: Uri,
 ) -> impl IntoResponse {
     Html(
@@ -145,6 +146,7 @@ pub async fn route_signin(
             .get_template("signin.html")
             .unwrap()
             .render(context! {
+                lang => lang,
                 user => user,
                 uri => uri.to_string(),
                 location_url => state.config.location_url,
