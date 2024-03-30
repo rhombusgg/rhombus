@@ -20,7 +20,6 @@ use minijinja::context;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use sqlx::prelude::FromRow;
 
 #[derive(Debug, Deserialize, sqlx::FromRow, Serialize, Clone)]
 pub struct User {
@@ -296,31 +295,16 @@ pub async fn route_discord_callback(
         )
     };
 
-    #[derive(FromRow)]
-    struct InsertUserResult {
-        id: i64,
-    }
-
-    let user = sqlx::query_as::<_, InsertUserResult>(
-            r#"
-            INSERT INTO "User" (name, email, avatar, discord_id) VALUES ($1, $2, $3, $4)
-            ON CONFLICT (discord_id) DO UPDATE SET name = $1, email = $2, avatar = $3, updated_at = now()
-            RETURNING id
-            "#
-        )
-        .bind(&profile.global_name)
-        .bind(&profile.email)
-        .bind(&avatar)
-        .bind(&profile.id)
-        .fetch_one(&state.db)
-        .await
-        .unwrap();
+    let id = state
+        .db
+        .upsert_user(&profile.global_name, &profile.email, &avatar, &profile.id)
+        .await;
 
     let now = chrono::Utc::now();
     let iat = now.timestamp() as usize;
     let exp = (now + chrono::Duration::try_minutes(60).unwrap()).timestamp() as usize;
     let claims = TokenClaims {
-        sub: user.id,
+        sub: id,
         name: profile.global_name,
         email: profile.email,
         avatar,

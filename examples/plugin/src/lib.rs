@@ -11,9 +11,10 @@ use rhombus::{
     auth::MaybeClientUser,
     locales::{BundleMap, Lang},
     plugin::Plugin,
+    postgresql::Postgres,
     RhombusRouterState,
 };
-use sqlx::{Executor, PgPool};
+use sqlx::Executor;
 use unic_langid::LanguageIdentifier;
 
 #[derive(Clone)]
@@ -43,6 +44,10 @@ impl MyPlugin {
 
 #[async_trait]
 impl Plugin for MyPlugin {
+    fn name(&self) -> String {
+        "MyPlugin".to_owned()
+    }
+
     fn routes(&self, state: RhombusRouterState) -> Router {
         Router::new()
             .route("/", routing::get(route_home))
@@ -52,24 +57,25 @@ impl Plugin for MyPlugin {
             })
     }
 
-    fn theme(&self, jinja: &mut Environment<'static>) {
-        jinja
-            .add_template("home.html", include_str!("../templates/home.html"))
-            .unwrap();
+    fn theme(&self, jinja: &mut Environment<'static>) -> rhombus::plugin::Result<()> {
+        jinja.add_template("home.html", include_str!("../templates/home.html"))?;
+        Ok(())
     }
 
-    fn localize(&self, bundlemap: &mut BundleMap) {
+    fn localize(&self, bundlemap: &mut BundleMap) -> rhombus::plugin::Result<()> {
         let lang = "en".parse::<LanguageIdentifier>().unwrap();
         let res = FluentResource::try_new("test1 = Hello there\nho = Hol".to_string()).unwrap();
         let bundle = bundlemap.get_mut(&lang).unwrap();
 
         bundle.add_resource_overriding(res);
+        Ok(())
     }
 
-    async fn migrate(&self, db: PgPool) {
-        db.execute(include_str!("../migrations/standalone.sql"))
-            .await
-            .unwrap();
+    async fn migrate_postgresql(&self, db: Postgres) -> rhombus::plugin::Result<()> {
+        db.pool
+            .execute(include_str!("../migrations/standalone.sql"))
+            .await?;
+        Ok(())
     }
 }
 

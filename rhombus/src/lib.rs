@@ -1,14 +1,17 @@
 #![forbid(unsafe_code)]
 
-pub mod account;
+mod account;
 pub mod auth;
-pub mod challenges;
-pub mod command_palette;
+mod challenges;
+mod command_palette;
+pub mod database;
 pub mod locales;
-pub mod open_graph;
+mod open_graph;
 pub mod plugin;
-pub mod track;
+pub mod postgresql;
+mod track;
 
+use anyhow::bail;
 use axum::{
     extract::State,
     http::{StatusCode, Uri},
@@ -17,13 +20,14 @@ use axum::{
     routing::get,
     Extension, Router,
 };
+use database::Connection;
 use minijinja::{context, Environment};
-use sqlx::PgPool;
+use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::{compression::CompressionLayer, services::ServeDir};
-use tracing::info;
+use tracing::{debug, info};
 
 use account::route_account;
 use auth::{
@@ -37,12 +41,13 @@ use open_graph::route_default_og_image;
 use plugin::Plugin;
 use track::track;
 
-use crate::locales::Localizations;
+use crate::{locales::Localizations, postgresql::Postgres};
 
 pub struct Rhombus<'a> {
-    db: PgPool,
+    database_url: Option<String>,
     config: Config,
     plugins: Vec<&'a (dyn Plugin + Sync)>,
+    pgpool: Option<PgPool>,
 }
 
 #[derive(Clone)]
@@ -58,7 +63,7 @@ pub struct Config {
 pub type RhombusRouterState = Arc<RhombusRouterStateInner>;
 
 pub struct RhombusRouterStateInner {
-    pub db: PgPool,
+    pub db: Connection,
     pub jinja: Environment<'static>,
     pub config: Config,
     pub discord_signin_url: String,
@@ -71,11 +76,12 @@ async fn handler_404() -> impl IntoResponse {
 static STATIC_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/static");
 
 impl<'a> Rhombus<'a> {
-    pub fn new(db: PgPool, config: Config) -> Self {
+    pub fn new(config: Config) -> Self {
         Self {
-            db,
-            plugins: Vec::new(),
             config,
+            database_url: None,
+            plugins: Vec::new(),
+            pgpool: None,
         }
     }
 
@@ -83,24 +89,73 @@ impl<'a> Rhombus<'a> {
         let mut plugins = self.plugins;
         plugins.push(plugin);
 
+        Self { plugins, ..self }
+    }
+
+    pub fn connect_from_url(self, url: &str) -> Self {
         Self {
-            db: self.db,
-            plugins,
-            config: self.config,
+            database_url: Some(url.to_owned()),
+            ..self
         }
     }
 
-    pub async fn build(&self) -> Router {
-        sqlx::migrate!().run(&self.db).await.unwrap();
-
-        for plugin in self.plugins.clone().iter() {
-            plugin.migrate(self.db.clone()).await;
+    pub fn pgpool(self, pool: sqlx::PgPool) -> Self {
+        Self {
+            pgpool: Some(pool),
+            ..self
         }
+    }
+
+    async fn build_database(&self) -> anyhow::Result<Connection> {
+        // The user may have provided a raw sqlx PgPool
+        if let Some(pool) = self.pgpool.clone() {
+            let postgres = Postgres::new(pool);
+
+            for plugin in self.plugins.clone().iter() {
+                plugin.migrate_postgresql(postgres.clone()).await?;
+            }
+
+            return Ok(Arc::new(postgres));
+        }
+
+        // A plugin may have a complete database override. We should take
+        // the last one implements one.
+        for plugin in self.plugins.clone().iter().rev() {
+            if let Ok(Some(db)) = plugin.database().await {
+                let name = plugin.name();
+                debug!("Using plugin {name}'s database backend");
+                return Ok(db);
+            }
+        }
+
+        // Otherwise, try to figure out the database from the url
+        let Some(database_url) = &self.database_url else {
+            bail!("Database needs to be set");
+        };
+
+        if database_url.starts_with("postgres://") {
+            let pool = PgPoolOptions::new().connect(database_url).await?;
+            let postgres = Postgres::new(pool);
+
+            for plugin in self.plugins.clone().iter() {
+                plugin.migrate_postgresql(postgres.clone()).await?;
+            }
+
+            return Ok(Arc::new(postgres));
+        }
+
+        bail!("Unkown database scheme in url {database_url}");
+    }
+
+    pub async fn build(&self) -> anyhow::Result<Router> {
+        let db = self.build_database().await?;
 
         let mut localizer = Localizations::new();
 
         for plugin in self.plugins.clone().iter() {
-            plugin.localize(&mut localizer.bundles);
+            let name = plugin.name();
+            debug!("Loading plugin {name}");
+            plugin.localize(&mut localizer.bundles)?;
         }
 
         let mut env = Environment::new();
@@ -114,11 +169,11 @@ impl<'a> Rhombus<'a> {
         );
 
         for plugin in self.plugins.iter() {
-            plugin.theme(&mut env);
+            plugin.theme(&mut env)?;
         }
 
         let router_state = Arc::new(RhombusRouterStateInner {
-            db: self.db.clone(),
+            db,
             jinja: env,
             config: self.config.clone(),
             discord_signin_url: format!(
@@ -187,7 +242,7 @@ impl<'a> Rhombus<'a> {
 
         let router = router.layer(CompressionLayer::new());
 
-        router
+        Ok(router)
     }
 }
 

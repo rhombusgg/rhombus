@@ -29,36 +29,19 @@ pub async fn track(
 
     tokio::spawn(async move {
         let now = chrono::Utc::now();
-        sqlx::query(
-            r#"
-            INSERT INTO Track (ip, user_agent, last_seen_at) VALUES ($1, $2, $3)
-            ON CONFLICT (ip, user_agent) DO UPDATE SET last_seen_at = $3
-            "#,
-        )
-        .bind(ip.to_string())
-        .bind(&user_agent)
-        .bind(now)
-        .execute(&state.db)
-        .await
-        .unwrap();
+        state
+            .db
+            .insert_track(&ip.to_string(), user_agent.as_deref(), now)
+            .await;
 
         // this query does not need to be a part of a transaction because we
         // never expect ips to be deleted, so at this point the foriegn key
         // constraint will never fail.
         if let Some(user_id) = user_id {
-            sqlx::query(
-                r#"
-                INSERT INTO TrackConnection (ip, user_agent, user_id, last_seen_at) VALUES ($1, $2, $3, $4)
-                ON CONFLICT (ip, user_agent, user_id) DO UPDATE SET last_seen_at = $4
-                "#,
-            )
-            .bind(ip.to_string())
-            .bind(&user_agent)
-            .bind(user_id)
-            .bind(now)
-            .execute(&state.db)
-            .await
-            .unwrap();
+            state
+                .db
+                .insert_track_user(&ip.to_string(), user_agent.as_deref(), user_id, now)
+                .await;
         }
     });
 

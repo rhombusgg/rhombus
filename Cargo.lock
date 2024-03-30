@@ -125,9 +125,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.79"
+version = "1.0.81"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "080e9890a082662b09c1ad45f567faeeb47f22b5fb23895fbe1e651e718e25ca"
+checksum = "0952808a6c2afd1aa8947271f3a60f1a6763c7b912d210184c5149b5cf147247"
 
 [[package]]
 name = "arrayref"
@@ -181,9 +181,9 @@ dependencies = [
 
 [[package]]
 name = "async-trait"
-version = "0.1.77"
+version = "0.1.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c980ee35e870bd1a4d2c8294d4c04d0499e67bca1e4b5cefcc693c2fa00caea9"
+checksum = "a507401cad91ec6a857ed5513a2073c82a9b9048762b885bb98655b306964681"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -884,7 +884,6 @@ dependencies = [
  "dotenvy",
  "plugin",
  "rhombus",
- "sqlx",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -943,7 +942,7 @@ version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e242c601dec9711505f6d5bbff5bedd4b61b2469f2e8bb8e57ee7c9747a87ffd"
 dependencies = [
- "fluent-langneg 0.13.0",
+ "fluent-langneg",
  "fluent-syntax",
  "intl-memoizer",
  "intl_pluralrules",
@@ -960,15 +959,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c4ad0989667548f06ccd0e306ed56b61bd4d35458d54df5ec7587c0e8ed5e94"
 dependencies = [
  "unic-langid",
-]
-
-[[package]]
-name = "fluent-langneg"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a56f2b85e609878e71a22e16b2a8c5b9de24c3d5a1c780536f3800a6a114b07"
-dependencies = [
- "icu_locid",
 ]
 
 [[package]]
@@ -1541,18 +1531,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "icu_locid"
-version = "1.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c0aa2536adc14c07e2a521e95512b75ed8ef832f0fdf9299d4a0a45d2be2a9d"
-dependencies = [
- "displaydoc",
- "litemap",
- "tinystr",
- "writeable",
-]
-
-[[package]]
 name = "ident_case"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1773,12 +1751,6 @@ dependencies = [
  "uuid",
  "winapi",
 ]
-
-[[package]]
-name = "litemap"
-version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9d642685b028806386b2b6e75685faadd3eb65a85fff7df711ce18446a422da"
 
 [[package]]
 name = "lock_api"
@@ -2605,13 +2577,13 @@ dependencies = [
 name = "rhombus"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
  "axum 0.7.4",
  "axum-extra",
  "cached",
  "chrono",
  "fluent",
- "fluent-langneg 0.14.0",
- "http-body-util",
  "intl-memoizer",
  "jsonwebtoken",
  "lazy_static",
@@ -3472,7 +3444,6 @@ version = "0.1.0"
 dependencies = [
  "dotenvy",
  "rhombus",
- "sqlx",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -4628,12 +4599,6 @@ dependencies = [
  "cfg-if",
  "windows-sys 0.48.0",
 ]
-
-[[package]]
-name = "writeable"
-version = "0.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dad7bb64b8ef9c0aa27b6da38b452b0ee9fd82beaf276a87dd796fb55cbae14e"
 
 [[package]]
 name = "xmlwriter"
