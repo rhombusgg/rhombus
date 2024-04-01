@@ -1,0 +1,8 @@
+[toolchain]
+channel = "1.76.0"
+profile = "default"
+components = ["rustfmt", "rust-analyzer"]
+targets = [
+  "x86_64-unknown-linux-musl",
+  "aarch64-unknown-linux-musl",
+]

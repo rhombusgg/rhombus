@@ -1,14 +1,16 @@
+use tracing_subscriber::EnvFilter;
+
 #[tokio::main]
 async fn main() {
+    dotenvy::dotenv().unwrap();
+
     tracing_subscriber::fmt()
-        .event_format(
-            tracing_subscriber::fmt::format()
-                .with_file(true)
-                .with_line_number(true),
+        .with_env_filter(
+            EnvFilter::try_from_default_env()
+                .or_else(|_| EnvFilter::try_new("rhombus=trace"))
+                .unwrap(),
         )
         .init();
-
-    dotenvy::dotenv().unwrap();
 
     let app = rhombus::Rhombus::new(rhombus::Config {
         location_url: "http://localhost:3000".to_string(),

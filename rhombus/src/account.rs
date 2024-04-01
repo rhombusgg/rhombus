@@ -2,6 +2,7 @@ use axum::{extract::State, http::Uri, response::Html, Extension};
 use cached::proc_macro::cached;
 use minijinja::context;
 use reqwest::Client;
+use tracing::debug;
 
 use crate::{auth::ClientUser, locales::Lang, RhombusRouterState};
 
@@ -33,6 +34,7 @@ pub async fn route_account(
         &state.config.discord_bot_token,
     )
     .await;
+    debug!(user_id = user.id, in_server, "Discord");
 
     Html(
         state

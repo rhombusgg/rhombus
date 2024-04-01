@@ -52,7 +52,10 @@ impl Database for Postgres {
         sqlx::query(
             r#"
             INSERT INTO Track (ip, user_agent, last_seen_at) VALUES ($1, $2, $3)
-            ON CONFLICT (ip, user_agent) DO UPDATE SET last_seen_at = $3
+            ON CONFLICT (ip, user_agent) DO
+                UPDATE SET
+                    last_seen_at = $3,
+                    requests = Track.requests + 1
             "#,
         )
         .bind(ip)
@@ -73,7 +76,10 @@ impl Database for Postgres {
         sqlx::query(
             r#"
             INSERT INTO TrackConnection (ip, user_agent, user_id, last_seen_at) VALUES ($1, $2, $3, $4)
-            ON CONFLICT (ip, user_agent, user_id) DO UPDATE SET last_seen_at = $4
+            ON CONFLICT (ip, user_agent, user_id) DO
+                UPDATE SET
+                    last_seen_at = $4,
+                    requests = TrackConnection.requests + 1
             "#,
         )
         .bind(ip)

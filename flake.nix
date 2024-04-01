@@ -17,6 +17,8 @@
           inherit system;
           overlays = [(import rust-overlay)];
         };
+
+        rust-toolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
       in rec {
         packages.rhombus-cli = pkgs.rustPlatform.buildRustPackage {
           pname = "rhombus-cli";
@@ -54,15 +56,13 @@
             vscode-langservers-extracted
             alejandra
 
-            sqlx-cli
+            rustup
+            cargo-cross
             go-task
             tailwindcss
             cargo-watch
             systemfd
-            (rust-bin.stable.latest.default.override {
-              extensions = ["rust-src"];
-              targets = ["x86_64-unknown-linux-musl"];
-            })
+            rust-toolchain
           ];
         };
       }

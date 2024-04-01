@@ -41,7 +41,7 @@ use open_graph::route_default_og_image;
 use plugin::Plugin;
 use track::track;
 
-use crate::{locales::Localizations, postgresql::Postgres};
+use crate::{database::Database, locales::Localizations, postgresql::Postgres};
 
 pub struct Rhombus<'a> {
     database_url: Option<String>,
@@ -110,6 +110,7 @@ impl<'a> Rhombus<'a> {
         // The user may have provided a raw sqlx PgPool
         if let Some(pool) = self.pgpool.clone() {
             let postgres = Postgres::new(pool);
+            postgres.migrate().await?;
 
             for plugin in self.plugins.clone().iter() {
                 plugin.migrate_postgresql(postgres.clone()).await?;
@@ -122,8 +123,7 @@ impl<'a> Rhombus<'a> {
         // the last one implements one.
         for plugin in self.plugins.clone().iter().rev() {
             if let Ok(Some(db)) = plugin.database().await {
-                let name = plugin.name();
-                debug!("Using plugin {name}'s database backend");
+                debug!(plugin_name = plugin.name(), "Using plugin database backend");
                 return Ok(db);
             }
         }
@@ -136,6 +136,7 @@ impl<'a> Rhombus<'a> {
         if database_url.starts_with("postgres://") {
             let pool = PgPoolOptions::new().connect(database_url).await?;
             let postgres = Postgres::new(pool);
+            postgres.migrate().await?;
 
             for plugin in self.plugins.clone().iter() {
                 plugin.migrate_postgresql(postgres.clone()).await?;
@@ -151,10 +152,8 @@ impl<'a> Rhombus<'a> {
         let db = self.build_database().await?;
 
         let mut localizer = Localizations::new();
-
         for plugin in self.plugins.clone().iter() {
-            let name = plugin.name();
-            debug!("Loading plugin {name}");
+            debug!(plugin_name = plugin.name(), "Loading");
             plugin.localize(&mut localizer.bundles)?;
         }
 
@@ -199,12 +198,6 @@ impl<'a> Rhombus<'a> {
             .route("/signout", get(route_signout))
             .route("/signin", get(route_signin))
             .route("/signin/discord", get(route_discord_callback))
-            .route_layer(middleware::from_fn(locales::locale))
-            .route_layer(middleware::from_fn_with_state(router_state.clone(), track))
-            .route_layer(middleware::from_fn_with_state(
-                router_state.clone(),
-                auth_injector_middleware,
-            ))
             .route("/og-image.png", get(route_default_og_image))
             .with_state(router_state.clone());
 
@@ -226,9 +219,9 @@ impl<'a> Rhombus<'a> {
         );
 
         let router = router
-            .route_layer(middleware::from_fn(locales::locale))
-            .route_layer(middleware::from_fn_with_state(router_state.clone(), track))
-            .route_layer(middleware::from_fn_with_state(
+            .layer(middleware::from_fn(locales::locale))
+            .layer(middleware::from_fn_with_state(router_state.clone(), track))
+            .layer(middleware::from_fn_with_state(
                 router_state.clone(),
                 auth_injector_middleware,
             ))
@@ -265,8 +258,10 @@ pub async fn serve(router: Router, address: impl ToSocketAddrs) -> Result<(), st
     #[cfg(not(debug_assertions))]
     let listener = TcpListener::bind(address).await.unwrap();
 
-    let address = listener.local_addr().unwrap().to_string();
-    info!(address, "listening on {}", listener.local_addr().unwrap());
+    info!(
+        address = listener.local_addr().unwrap().to_string(),
+        "listening on"
+    );
     axum::serve(
         listener,
         router.into_make_service_with_connect_info::<SocketAddr>(),
