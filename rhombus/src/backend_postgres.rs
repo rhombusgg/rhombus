@@ -93,10 +93,10 @@ impl Database for Postgres {
 
     async fn get_challenges(&self) -> Vec<Challenge> {
         #[derive(FromRow)]
-        pub struct DBChallenge {
-            pub id: i64,
-            pub name: String,
-            pub description: String,
+        struct DBChallenge {
+            id: i64,
+            name: String,
+            description: String,
         }
 
         let challenges = sqlx::query_as::<_, DBChallenge>("SELECT * FROM challenge")

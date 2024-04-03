@@ -9,9 +9,9 @@ use fluent::FluentResource;
 use minijinja::{context, Environment};
 use rhombus::{
     auth::MaybeClientUser,
+    backend_postgres::Postgres,
     locales::{BundleMap, Lang},
     plugin::Plugin,
-    postgresql::Postgres,
     RhombusRouterState,
 };
 use sqlx::Executor;

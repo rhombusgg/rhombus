@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS challenge;
+DROP TABLE IF EXISTS user;
+DROP TABLE IF EXISTS track;
+DROP TABLE IF EXISTS track_connection;

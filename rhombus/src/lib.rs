@@ -2,16 +2,17 @@
 
 mod account;
 pub mod auth;
+pub mod backend_libsql;
+pub mod backend_postgres;
 mod challenges;
 mod command_palette;
 pub mod database;
 pub mod locales;
 mod open_graph;
 pub mod plugin;
-pub mod postgresql;
 mod track;
 
-use anyhow::bail;
+use anyhow::anyhow;
 use axum::{
     extract::State,
     http::{StatusCode, Uri},
@@ -23,7 +24,7 @@ use axum::{
 use database::Connection;
 use minijinja::{context, Environment};
 use sqlx::{postgres::PgPoolOptions, PgPool};
-use std::{net::SocketAddr, sync::Arc};
+use std::{env, net::SocketAddr, sync::Arc};
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::{compression::CompressionLayer, services::ServeDir};
@@ -41,13 +42,63 @@ use open_graph::route_default_og_image;
 use plugin::Plugin;
 use track::track;
 
-use crate::{database::Database, locales::Localizations, postgresql::Postgres};
+use crate::{
+    backend_libsql::LibSQL, backend_postgres::Postgres, database::Database, locales::Localizations,
+};
 
-pub struct Rhombus<'a> {
-    database_url: Option<String>,
-    config: Config,
+#[derive(Default)]
+pub struct Builder<'a> {
     plugins: Vec<&'a (dyn Plugin + Sync)>,
-    pgpool: Option<PgPool>,
+    database: Option<DbConfig>,
+    jwt_secret: Option<String>,
+    discord_client_id: Option<String>,
+    discord_client_secret: Option<String>,
+    discord_bot_token: Option<String>,
+    discord_guild_id: Option<String>,
+    location_url: Option<String>,
+}
+
+pub enum DbConfig {
+    Url(String),
+    LibSQL(String, String),
+    RawPostgres(PgPool),
+    RawLibSQL(libsql::Connection),
+}
+
+impl From<String> for DbConfig {
+    fn from(value: String) -> Self {
+        Self::Url(value)
+    }
+}
+
+impl From<&str> for DbConfig {
+    fn from(value: &str) -> Self {
+        Self::Url(value.to_owned())
+    }
+}
+
+impl From<PgPool> for DbConfig {
+    fn from(value: PgPool) -> Self {
+        Self::RawPostgres(value)
+    }
+}
+
+impl From<libsql::Connection> for DbConfig {
+    fn from(value: libsql::Connection) -> Self {
+        Self::RawLibSQL(value)
+    }
+}
+
+impl From<(&str, &str)> for DbConfig {
+    fn from(value: (&str, &str)) -> Self {
+        Self::LibSQL(value.0.to_owned(), value.1.to_owned())
+    }
+}
+
+impl From<(String, String)> for DbConfig {
+    fn from(value: (String, String)) -> Self {
+        Self::LibSQL(value.0, value.1)
+    }
 }
 
 #[derive(Clone)]
@@ -75,13 +126,64 @@ async fn handler_404() -> impl IntoResponse {
 
 static STATIC_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/static");
 
-impl<'a> Rhombus<'a> {
-    pub fn new(config: Config) -> Self {
+impl<'a> Builder<'a> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn load_env(self) -> Self {
+        let database = if let Ok(database_url) = env::var("DATABASE_URL") {
+            Some(database_url.into())
+        } else if let (Ok(libsql_url), Ok(libsql_auth_token)) =
+            (env::var("LIBSQL_URL"), env::var("LIBSQL_AUTH_TOKEN"))
+        {
+            Some((libsql_url, libsql_auth_token).into())
+        } else {
+            self.database
+        };
+
         Self {
-            config,
-            database_url: None,
-            plugins: Vec::new(),
-            pgpool: None,
+            location_url: env::var("LOCATION_URL")
+                .map(|x| Some(x))
+                .unwrap_or(self.location_url),
+            discord_client_id: env::var("DISCORD_CLIENT_ID")
+                .map(|x| Some(x))
+                .unwrap_or(self.discord_client_id),
+            discord_client_secret: env::var("DISCORD_CLIENT_SECRET")
+                .map(|x| Some(x))
+                .unwrap_or(self.discord_client_secret),
+            discord_bot_token: env::var("DISCORD_TOKEN")
+                .map(|x| Some(x))
+                .unwrap_or(self.discord_bot_token),
+            discord_guild_id: env::var("DISCORD_GUILD_ID")
+                .map(|x| Some(x))
+                .unwrap_or(self.discord_guild_id),
+            jwt_secret: env::var("JWT_SECRET")
+                .map(|x| Some(x))
+                .unwrap_or(self.jwt_secret),
+            database,
+            ..self
+        }
+    }
+
+    pub fn jwt_secret(self, jwt_secret: impl Into<String>) -> Self {
+        Self {
+            jwt_secret: Some(jwt_secret.into()),
+            ..self
+        }
+    }
+
+    pub fn location_url(self, location_url: impl Into<String>) -> Self {
+        Self {
+            location_url: Some(location_url.into()),
+            ..self
+        }
+    }
+
+    pub fn database(self, database: DbConfig) -> Self {
+        Self {
+            database: Some(database),
+            ..self
         }
     }
 
@@ -92,63 +194,109 @@ impl<'a> Rhombus<'a> {
         Self { plugins, ..self }
     }
 
-    pub fn connect_from_url(self, url: &str) -> Self {
-        Self {
-            database_url: Some(url.to_owned()),
-            ..self
-        }
-    }
-
-    pub fn pgpool(self, pool: sqlx::PgPool) -> Self {
-        Self {
-            pgpool: Some(pool),
-            ..self
-        }
-    }
-
     async fn build_database(&self) -> anyhow::Result<Connection> {
-        // The user may have provided a raw sqlx PgPool
-        if let Some(pool) = self.pgpool.clone() {
-            let postgres = Postgres::new(pool);
-            postgres.migrate().await?;
+        if let Some(database_config) = &self.database {
+            match database_config {
+                DbConfig::LibSQL(url, auth_token) => {
+                    let database = LibSQL::new_remote(url, auth_token).await?;
+                    database.migrate().await?;
+
+                    for plugin in self.plugins.clone().iter() {
+                        plugin.migrate_libsql(database.clone()).await?;
+                    }
+
+                    Ok(Arc::new(database))
+                }
+                DbConfig::RawPostgres(pool) => {
+                    let database = Postgres::new(pool.to_owned());
+                    database.migrate().await?;
+
+                    for plugin in self.plugins.clone().iter() {
+                        plugin.migrate_postgresql(database.clone()).await?;
+                    }
+
+                    Ok(Arc::new(database))
+                }
+                DbConfig::RawLibSQL(connection) => {
+                    let database: LibSQL = connection.to_owned().into();
+                    database.migrate().await?;
+
+                    for plugin in self.plugins.clone().iter() {
+                        plugin.migrate_libsql(database.clone()).await?;
+                    }
+
+                    Ok(Arc::new(database))
+                }
+                DbConfig::Url(database_url) => {
+                    if database_url.starts_with("postgres://") {
+                        let pool = PgPoolOptions::new().connect(&database_url).await?;
+                        let database = Postgres::new(pool);
+                        database.migrate().await?;
+
+                        for plugin in self.plugins.clone().iter() {
+                            plugin.migrate_postgresql(database.clone()).await?;
+                        }
+
+                        return Ok(Arc::new(database));
+                    }
+
+                    if database_url.starts_with("file://") {
+                        let (_, path) = database_url.split_at(7);
+                        let database = LibSQL::new_local(path).await?;
+                        database.migrate().await?;
+
+                        for plugin in self.plugins.clone().iter() {
+                            plugin.migrate_libsql(database.clone()).await?;
+                        }
+
+                        return Ok(Arc::new(database));
+                    }
+
+                    Err(anyhow!("Unkown database scheme in url {database_url}"))
+                }
+            }
+        } else {
+            info!("Falling back to in memory database");
+
+            let database = LibSQL::new_memory().await?;
+            database.migrate().await?;
 
             for plugin in self.plugins.clone().iter() {
-                plugin.migrate_postgresql(postgres.clone()).await?;
+                plugin.migrate_libsql(database.clone()).await?;
             }
 
-            return Ok(Arc::new(postgres));
+            Ok(Arc::new(database))
         }
-
-        // A plugin may have a complete database override. We should take
-        // the last one implements one.
-        for plugin in self.plugins.clone().iter().rev() {
-            if let Ok(Some(db)) = plugin.database().await {
-                debug!(plugin_name = plugin.name(), "Using plugin database backend");
-                return Ok(db);
-            }
-        }
-
-        // Otherwise, try to figure out the database from the url
-        let Some(database_url) = &self.database_url else {
-            bail!("Database needs to be set");
-        };
-
-        if database_url.starts_with("postgres://") {
-            let pool = PgPoolOptions::new().connect(database_url).await?;
-            let postgres = Postgres::new(pool);
-            postgres.migrate().await?;
-
-            for plugin in self.plugins.clone().iter() {
-                plugin.migrate_postgresql(postgres.clone()).await?;
-            }
-
-            return Ok(Arc::new(postgres));
-        }
-
-        bail!("Unkown database scheme in url {database_url}");
     }
 
     pub async fn build(&self) -> anyhow::Result<Router> {
+        let config = Config {
+            jwt_secret: self
+                .jwt_secret
+                .clone()
+                .ok_or(anyhow!("JWT Secret is required!"))?,
+            discord_client_id: self
+                .discord_client_id
+                .clone()
+                .ok_or(anyhow!("Discord Client ID is required!"))?,
+            discord_client_secret: self
+                .discord_client_secret
+                .clone()
+                .ok_or(anyhow!("Discord Client Secret is required!"))?,
+            discord_bot_token: self
+                .discord_bot_token
+                .clone()
+                .ok_or(anyhow!("Discord Bot Token is required!"))?,
+            discord_guild_id: self
+                .discord_guild_id
+                .clone()
+                .ok_or(anyhow!("Discord Guild ID is required!"))?,
+            location_url: self
+                .location_url
+                .clone()
+                .ok_or(anyhow!("Location URL is required!"))?,
+        };
+
         let db = self.build_database().await?;
 
         let mut localizer = Localizations::new();
@@ -174,11 +322,11 @@ impl<'a> Rhombus<'a> {
         let router_state = Arc::new(RhombusRouterStateInner {
             db,
             jinja: env,
-            config: self.config.clone(),
+            config: config.clone(),
             discord_signin_url: format!(
                 "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}&response_type=code&scope=identify+guilds.join",
-                self.config.discord_client_id,
-                format!("{}/signin/discord", self.config.location_url)
+                config.discord_client_id,
+                format!("{}/signin/discord", config.location_url)
             ),
         });
 
