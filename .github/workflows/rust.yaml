@@ -46,7 +46,7 @@ jobs:
 
       - name: Test
         run: |
-          cargo test --verbose --all-features
+          cargo test --all-features
 
   check:
     name: Check
@@ -68,11 +68,11 @@ jobs:
 
       - name: Run cargo check (all features)
         run: |
-          cargo check --benches --examples --tests --verbose --all-features
+          cargo check --benches --examples --tests --all-features
 
       - name: Run cargo check (no features)
         run: |
-          cargo check --benches --examples --tests --verbose --no-default-features
+          cargo check --benches --examples --tests --no-default-features
 
   clippy:
     name: Clippy
@@ -94,7 +94,7 @@ jobs:
 
       - name: Run cargo clippy
         run: |
-          cargo clippy --benches --examples --tests --verbose --all-features -- -D warnings
+          cargo clippy --benches --examples --tests --all-features -- -D warnings
 
   format:
     name: Check Format
@@ -129,4 +129,4 @@ jobs:
 
       - name: Test
         run: |
-          cross test --verbose --all-features
+          cross test --all-features
