@@ -31,7 +31,7 @@ impl Localizations {
             let bytes = Locales::get(&file).unwrap();
             let source = std::str::from_utf8(bytes.data.as_ref()).unwrap();
 
-            let (lang, _) = file.split_once("/").unwrap();
+            let (lang, _) = file.split_once('/').unwrap();
             let lang = lang.parse::<LanguageIdentifier>().unwrap();
 
             let resource = FluentResource::try_new(source.to_owned()).unwrap();
@@ -58,7 +58,7 @@ impl Localizations {
         let default = ENGLISH;
         let languages = negotiate_languages(&languages, &available_languages, Some(&default));
         for lang in languages {
-            let bundle = self.bundles.get(&lang)?;
+            let bundle = self.bundles.get(lang)?;
             let pattern = || -> Option<_> {
                 if let Some((msg, attr)) = msg_id.split_once('.') {
                     Some(
@@ -90,6 +90,12 @@ impl Localizations {
         }
 
         None
+    }
+}
+
+impl Default for Localizations {
+    fn default() -> Self {
+        Localizations::new()
     }
 }
 
@@ -140,8 +146,7 @@ fn parse_languages(raw_languages: &str) -> Vec<String> {
         .iter()
         .map(|l| {
             let tag_parts: Vec<&str> = l.split(';').collect();
-            let name = tag_parts[0].to_string();
-            name
+            tag_parts[0].to_owned()
         })
         .filter(|l| !l.is_empty())
         .collect();

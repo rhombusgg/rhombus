@@ -124,3 +124,14 @@ impl Database for LibSQL {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[tokio::test]
+    async fn migrate_libsql() {
+        let database = LibSQL::new_memory().await.unwrap();
+        database.migrate().await.unwrap();
+    }
+}

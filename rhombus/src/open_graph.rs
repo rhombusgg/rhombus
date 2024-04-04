@@ -7,7 +7,7 @@ use resvg::usvg;
 
 use crate::RhombusRouterState;
 
-static INTER_FONT: &'static [u8] = include_bytes!(concat!(
+static INTER_FONT: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/fonts/inter/Inter.ttc"
 ));
@@ -25,7 +25,7 @@ fn convert_svg_to_png(svg: &str) -> Vec<u8> {
     let opt = usvg::Options::default();
     let tree = {
         let fontdb = GLOBAL_FONTDB.lock().unwrap();
-        usvg::Tree::from_str(&svg, &opt, &fontdb).unwrap()
+        usvg::Tree::from_str(svg, &opt, &fontdb).unwrap()
     };
     let zoom = 2.0;
     let pixmap_size = tree.size().to_int_size().scale_by(zoom).unwrap();

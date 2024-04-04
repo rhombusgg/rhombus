@@ -144,23 +144,21 @@ impl<'a> Builder<'a> {
 
         Self {
             location_url: env::var("LOCATION_URL")
-                .map(|x| Some(x))
+                .map(Some)
                 .unwrap_or(self.location_url),
             discord_client_id: env::var("DISCORD_CLIENT_ID")
-                .map(|x| Some(x))
+                .map(Some)
                 .unwrap_or(self.discord_client_id),
             discord_client_secret: env::var("DISCORD_CLIENT_SECRET")
-                .map(|x| Some(x))
+                .map(Some)
                 .unwrap_or(self.discord_client_secret),
             discord_bot_token: env::var("DISCORD_TOKEN")
-                .map(|x| Some(x))
+                .map(Some)
                 .unwrap_or(self.discord_bot_token),
             discord_guild_id: env::var("DISCORD_GUILD_ID")
-                .map(|x| Some(x))
+                .map(Some)
                 .unwrap_or(self.discord_guild_id),
-            jwt_secret: env::var("JWT_SECRET")
-                .map(|x| Some(x))
-                .unwrap_or(self.jwt_secret),
+            jwt_secret: env::var("JWT_SECRET").map(Some).unwrap_or(self.jwt_secret),
             database,
             ..self
         }
@@ -229,7 +227,7 @@ impl<'a> Builder<'a> {
                 }
                 DbConfig::Url(database_url) => {
                     if database_url.starts_with("postgres://") {
-                        let pool = PgPoolOptions::new().connect(&database_url).await?;
+                        let pool = PgPoolOptions::new().connect(database_url).await?;
                         let database = Postgres::new(pool);
                         database.migrate().await?;
 
@@ -324,9 +322,9 @@ impl<'a> Builder<'a> {
             jinja: env,
             config: config.clone(),
             discord_signin_url: format!(
-                "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}&response_type=code&scope=identify+guilds.join",
+                "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}/signin/discord&response_type=code&scope=identify+guilds.join",
                 config.discord_client_id,
-                format!("{}/signin/discord", config.location_url)
+                config.location_url,
             ),
         });
 
