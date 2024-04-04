@@ -1,11 +1,15 @@
 [[language]]
 name = "jinja"
-language-servers = [ "vscode-html-language-server", "tailwindcss-ls" ]
+language-servers = ["vscode-html-language-server", "tailwindcss-ls"]
 file-types = ["html"]
 
 [[language]]
 name = "css"
-language-servers = [ "vscode-css-language-server", "tailwindcss-ls" ]
+language-servers = ["vscode-css-language-server", "tailwindcss-ls"]
 
 [language-server.tailwindcss-ls]
 config = { userLanguages = { jinja = "html" } }
+
+[language-server.rust-analyzer.config]
+diagnostics.disabled = ["inactive-code"]
+rust-analyzer.cargo.features = ["all"]

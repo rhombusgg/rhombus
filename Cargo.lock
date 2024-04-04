@@ -2933,6 +2933,7 @@ dependencies = [
  "axum-extra",
  "cached",
  "chrono",
+ "dotenvy",
  "fluent",
  "futures",
  "intl-memoizer",
@@ -3898,7 +3899,6 @@ dependencies = [
 name = "standalone"
 version = "0.1.0"
 dependencies = [
- "dotenvy",
  "rhombus",
  "tokio",
  "tracing",

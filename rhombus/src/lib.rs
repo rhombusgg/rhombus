@@ -2,8 +2,6 @@
 
 mod account;
 pub mod auth;
-pub mod backend_libsql;
-pub mod backend_postgres;
 mod challenges;
 mod command_palette;
 pub mod database;
@@ -11,6 +9,12 @@ pub mod locales;
 mod open_graph;
 pub mod plugin;
 mod track;
+
+#[cfg(feature = "libsql")]
+pub mod backend_libsql;
+
+#[cfg(feature = "postgres")]
+pub mod backend_postgres;
 
 use anyhow::anyhow;
 use axum::{
@@ -21,9 +25,8 @@ use axum::{
     routing::get,
     Extension, Router,
 };
-use database::Connection;
+use database::{Connection, Database};
 use minijinja::{context, Environment};
-use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::{env, net::SocketAddr, sync::Arc};
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
@@ -42,9 +45,8 @@ use open_graph::route_default_og_image;
 use plugin::Plugin;
 use track::track;
 
-use crate::{
-    backend_libsql::LibSQL, backend_postgres::Postgres, database::Database, locales::Localizations,
-};
+#[cfg(feature = "postgres")]
+use sqlx::{postgres::PgPoolOptions, PgPool};
 
 #[derive(Default)]
 pub struct Builder<'a> {
@@ -60,8 +62,14 @@ pub struct Builder<'a> {
 
 pub enum DbConfig {
     Url(String),
-    LibSQL(String, String),
+
+    #[cfg(feature = "postgres")]
     RawPostgres(PgPool),
+
+    #[cfg(feature = "libsql")]
+    LibSQL(String, String),
+
+    #[cfg(feature = "libsql")]
     RawLibSQL(libsql::Connection),
 }
 
@@ -77,24 +85,28 @@ impl From<&str> for DbConfig {
     }
 }
 
+#[cfg(feature = "postgres")]
 impl From<PgPool> for DbConfig {
     fn from(value: PgPool) -> Self {
         Self::RawPostgres(value)
     }
 }
 
+#[cfg(feature = "libsql")]
 impl From<libsql::Connection> for DbConfig {
     fn from(value: libsql::Connection) -> Self {
         Self::RawLibSQL(value)
     }
 }
 
+#[cfg(feature = "libsql")]
 impl From<(&str, &str)> for DbConfig {
     fn from(value: (&str, &str)) -> Self {
         Self::LibSQL(value.0.to_owned(), value.1.to_owned())
     }
 }
 
+#[cfg(feature = "libsql")]
 impl From<(String, String)> for DbConfig {
     fn from(value: (String, String)) -> Self {
         Self::LibSQL(value.0, value.1)
@@ -132,14 +144,26 @@ impl<'a> Builder<'a> {
     }
 
     pub fn load_env(self) -> Self {
-        let database = if let Ok(database_url) = env::var("DATABASE_URL") {
-            Some(database_url.into())
-        } else if let (Ok(libsql_url), Ok(libsql_auth_token)) =
+        #[cfg(feature = "dotenv")]
+        {
+            _ = dotenvy::dotenv();
+        }
+
+        let database = self.database;
+
+        #[cfg(feature = "libsql")]
+        let database = if let (Ok(libsql_url), Ok(libsql_auth_token)) =
             (env::var("LIBSQL_URL"), env::var("LIBSQL_AUTH_TOKEN"))
         {
             Some((libsql_url, libsql_auth_token).into())
         } else {
-            self.database
+            database
+        };
+
+        let database = if let Ok(database_url) = env::var("DATABASE_URL") {
+            Some(database_url.into())
+        } else {
+            database
         };
 
         Self {
@@ -195,18 +219,9 @@ impl<'a> Builder<'a> {
     async fn build_database(&self) -> anyhow::Result<Connection> {
         if let Some(database_config) = &self.database {
             match database_config {
-                DbConfig::LibSQL(url, auth_token) => {
-                    let database = LibSQL::new_remote(url, auth_token).await?;
-                    database.migrate().await?;
-
-                    for plugin in self.plugins.clone().iter() {
-                        plugin.migrate_libsql(database.clone()).await?;
-                    }
-
-                    Ok(Arc::new(database))
-                }
+                #[cfg(feature = "postgres")]
                 DbConfig::RawPostgres(pool) => {
-                    let database = Postgres::new(pool.to_owned());
+                    let database = backend_postgres::Postgres::new(pool.to_owned());
                     database.migrate().await?;
 
                     for plugin in self.plugins.clone().iter() {
@@ -215,8 +230,10 @@ impl<'a> Builder<'a> {
 
                     Ok(Arc::new(database))
                 }
-                DbConfig::RawLibSQL(connection) => {
-                    let database: LibSQL = connection.to_owned().into();
+
+                #[cfg(feature = "libsql")]
+                DbConfig::LibSQL(url, auth_token) => {
+                    let database = backend_libsql::LibSQL::new_remote(url, auth_token).await?;
                     database.migrate().await?;
 
                     for plugin in self.plugins.clone().iter() {
@@ -225,45 +242,80 @@ impl<'a> Builder<'a> {
 
                     Ok(Arc::new(database))
                 }
-                DbConfig::Url(database_url) => {
-                    if database_url.starts_with("postgres://") {
-                        let pool = PgPoolOptions::new().connect(database_url).await?;
-                        let database = Postgres::new(pool);
-                        database.migrate().await?;
 
-                        for plugin in self.plugins.clone().iter() {
-                            plugin.migrate_postgresql(database.clone()).await?;
-                        }
+                #[cfg(feature = "libsql")]
+                DbConfig::RawLibSQL(connection) => {
+                    let database: backend_libsql::LibSQL = connection.to_owned().into();
+                    database.migrate().await?;
 
-                        return Ok(Arc::new(database));
+                    for plugin in self.plugins.clone().iter() {
+                        plugin.migrate_libsql(database.clone()).await?;
                     }
 
-                    if database_url.starts_with("file://") {
-                        let (_, path) = database_url.split_at(7);
-                        let database = LibSQL::new_local(path).await?;
-                        database.migrate().await?;
+                    Ok(Arc::new(database))
+                }
 
-                        for plugin in self.plugins.clone().iter() {
-                            plugin.migrate_libsql(database.clone()).await?;
+                DbConfig::Url(database_url) => {
+                    if database_url.starts_with("postgres://") {
+                        #[cfg(not(feature = "postgres"))]
+                        return Err(anyhow!(
+                            "Feature \"postgres\" must be enabled for database url {database_url}"
+                        ));
+
+                        #[cfg(feature = "postgres")]
+                        {
+                            let pool = PgPoolOptions::new().connect(database_url).await?;
+                            let database = backend_postgres::Postgres::new(pool);
+                            database.migrate().await?;
+
+                            for plugin in self.plugins.clone().iter() {
+                                plugin.migrate_postgresql(database.clone()).await?;
+                            }
+
+                            return Ok(Arc::new(database));
+                        }
+                    }
+
+                    if let Some(path) = database_url.strip_prefix("file://") {
+                        #[cfg(not(feature = "libsql"))]
+                        {
+                            _ = path;
+                            return Err(anyhow!("Feature \"libsql\" must be enabled for database url {database_url}"));
                         }
 
-                        return Ok(Arc::new(database));
+                        #[cfg(feature = "libsql")]
+                        {
+                            let database = backend_libsql::LibSQL::new_local(path).await?;
+                            database.migrate().await?;
+
+                            for plugin in self.plugins.clone().iter() {
+                                plugin.migrate_libsql(database.clone()).await?;
+                            }
+
+                            return Ok(Arc::new(database));
+                        }
                     }
 
                     Err(anyhow!("Unkown database scheme in url {database_url}"))
                 }
             }
         } else {
-            info!("Falling back to in memory database");
+            #[cfg(feature = "libsql")]
+            {
+                info!("Falling back to in memory database");
+                let database = backend_libsql::LibSQL::new_memory().await?;
+                database.migrate().await?;
 
-            let database = LibSQL::new_memory().await?;
-            database.migrate().await?;
-
-            for plugin in self.plugins.clone().iter() {
-                plugin.migrate_libsql(database.clone()).await?;
+                for plugin in self.plugins.clone().iter() {
+                    plugin.migrate_libsql(database.clone()).await?;
+                }
+                Ok(Arc::new(database))
             }
 
-            Ok(Arc::new(database))
+            #[cfg(not(feature = "libsql"))]
+            Err(anyhow!(
+                "Cannot fall back to in memory database because feature \"libsql\" is not enabled"
+            ))
         }
     }
 
@@ -297,7 +349,7 @@ impl<'a> Builder<'a> {
 
         let db = self.build_database().await?;
 
-        let mut localizer = Localizations::new();
+        let mut localizer = locales::Localizations::new();
         for plugin in self.plugins.clone().iter() {
             debug!(plugin_name = plugin.name(), "Loading");
             plugin.localize(&mut localizer.bundles)?;

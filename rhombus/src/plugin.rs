@@ -3,10 +3,7 @@ use async_trait::async_trait;
 use axum::Router;
 use minijinja::Environment;
 
-use crate::{
-    backend_libsql::LibSQL, backend_postgres::Postgres, database::Connection, locales::BundleMap,
-    RhombusRouterState,
-};
+use crate::{database::Connection, locales::BundleMap, RhombusRouterState};
 
 #[async_trait]
 pub trait Plugin {
@@ -26,12 +23,14 @@ pub trait Plugin {
         Ok(())
     }
 
-    async fn migrate_postgresql(&self, db: Postgres) -> Result<()> {
+    #[cfg(feature = "postgres")]
+    async fn migrate_postgresql(&self, db: crate::backend_postgres::Postgres) -> Result<()> {
         _ = db;
         Ok(())
     }
 
-    async fn migrate_libsql(&self, db: LibSQL) -> Result<()> {
+    #[cfg(feature = "libsql")]
+    async fn migrate_libsql(&self, db: crate::backend_libsql::LibSQL) -> Result<()> {
         _ = db;
         Ok(())
     }
