@@ -2121,9 +2121,9 @@ dependencies = [
 
 [[package]]
 name = "minijinja"
-version = "1.0.12"
+version = "1.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6fe0ff215195a22884d867b547c70a0c4815cbbcc70991f281dca604b20d10ce"
+checksum = "3fb3bf58a1ec4f3f228bec851a2066c7717ad308817cd8a08f67c10660c6ff7b"
 dependencies = [
  "memo-map",
  "self_cell 1.0.3",
@@ -2943,6 +2943,7 @@ dependencies = [
  "listenfd",
  "minijinja",
  "minijinja-embed",
+ "rand",
  "reqwest",
  "resvg",
  "rust-embed",

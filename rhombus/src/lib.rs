@@ -8,6 +8,7 @@ pub mod database;
 pub mod locales;
 mod open_graph;
 pub mod plugin;
+mod team;
 mod track;
 
 #[cfg(feature = "libsql")]
@@ -47,6 +48,8 @@ use track::track;
 
 #[cfg(feature = "postgres")]
 use sqlx::{postgres::PgPoolOptions, PgPool};
+
+use crate::team::route_team;
 
 #[derive(Default)]
 pub struct Builder<'a> {
@@ -388,6 +391,7 @@ impl<'a> Builder<'a> {
         let rhombus_router = Router::new()
             .fallback(handler_404)
             .route("/account", get(route_account))
+            .route("/team", get(route_team))
             .route_layer(middleware::from_fn(enforce_auth_middleware))
             .nest_service("/static", ServeDir::new(STATIC_DIR))
             .route("/", get(route_home))

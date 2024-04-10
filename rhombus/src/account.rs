@@ -45,9 +45,9 @@ pub async fn route_account(
                 lang => lang,
                 user => user,
                 uri => uri.to_string(),
+                in_server => in_server,
                 location_url => state.config.location_url,
                 og_image => format!("{}/og-image.png", state.config.location_url),
-                in_server => in_server
             })
             .unwrap(),
     )

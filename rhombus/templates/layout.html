@@ -16,6 +16,7 @@
           >
         </a>
         {% if user %}
+          {{ navbarItem(label=_("team"), href="/team", uri=uri) }}
           {{ navbarItem(label=_("account"), href="/account", uri=uri) }}
         {% else %}
           {{ navbarItem(label=_("sign-in"), href="/signin", uri=uri) }}

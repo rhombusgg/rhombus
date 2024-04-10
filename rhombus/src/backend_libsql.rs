@@ -5,7 +5,10 @@ use futures::stream::StreamExt;
 use libsql::{de, params, Builder};
 use serde::Deserialize;
 
-use crate::database::{Challenge, Database};
+use crate::{
+    database::{Challenge, Database},
+    team::create_team_invite_token,
+};
 
 #[derive(Clone)]
 pub struct LibSQL {
@@ -49,15 +52,59 @@ impl Database for LibSQL {
     }
 
     async fn upsert_user(&self, name: &str, email: &str, avatar: &str, discord_id: &str) -> i64 {
-        let mut rows = self.db.query(
-            r#"
-            INSERT INTO "User" (name, email, avatar, discord_id) VALUES (?1, ?2, ?3, ?4)
-            ON CONFLICT (discord_id) DO UPDATE SET name = ?1, email = ?2, avatar = ?3, updated_at = CURRENT_TIMESTAMP
-            RETURNING id
-            "#
-            , [name, email, avatar, discord_id]).await.unwrap();
-        let row = rows.next().await.unwrap().unwrap();
-        row.get::<i64>(0).unwrap()
+        let team_name = format!("{}'s team", name);
+
+        let tx = self.db.transaction().await.unwrap();
+        let mut rows = tx
+            .query("SELECT id FROM user WHERE discord_id = ?", [discord_id])
+            .await
+            .unwrap();
+        let user_id = rows
+            .next()
+            .await
+            .unwrap()
+            .map(|row| row.get::<i64>(0).unwrap());
+        if let Some(user_id) = user_id {
+            return user_id;
+        }
+
+        let team_invite_token = create_team_invite_token();
+
+        let team_id = tx
+            .query(
+                "INSERT INTO team (name, invite_token) VALUES (?1, ?2) RETURNING id",
+                [team_name, team_invite_token],
+            )
+            .await
+            .unwrap()
+            .next()
+            .await
+            .unwrap()
+            .unwrap()
+            .get::<i64>(0)
+            .unwrap();
+
+        tx.execute("INSERT INTO email (email) VALUES (?1)", [email])
+            .await
+            .unwrap();
+
+        let user_id = tx
+            .query(
+                "INSERT INTO user (name, avatar, discord_id, team_id) VALUES (?1, ?2, ?3, ?4) RETURNING id",
+                params!(name, avatar, discord_id, team_id),
+            )
+            .await
+            .unwrap()
+            .next()
+            .await
+            .unwrap()
+            .unwrap()
+            .get::<i64>(0)
+            .unwrap();
+
+        tx.commit().await.unwrap();
+
+        return user_id;
     }
 
     async fn insert_track(&self, ip: &str, user_agent: Option<&str>, now: DateTime<Utc>) {

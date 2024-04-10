@@ -9,11 +9,25 @@ CREATE TABLE IF NOT EXISTS challenge (
 CREATE TABLE IF NOT EXISTS user (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
-    email TEXT NOT NULL UNIQUE,
     avatar TEXT NOT NULL UNIQUE,
     discord_id TEXT NOT NULL UNIQUE,
+    team_id INTEGER,
+    is_team_owner BOOLEAN DEFAULT(TRUE),
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (team_id) REFERENCES team(id)
+);
+
+CREATE TABLE IF NOT EXISTS email (
+    email TEXT PRIMARY KEY,
+    user_id INTEGER,
+    FOREIGN KEY (user_id) REFERENCES user(id)
+);
+
+CREATE TABLE IF NOT EXISTS team (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    invite_token TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS track (

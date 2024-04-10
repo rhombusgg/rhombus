@@ -24,8 +24,9 @@ jsonwebtoken = "9.2.0"
 lazy_static = "1.4.0"
 libsql = { version = "0.3.2", optional = true }
 listenfd = "1.0.1"
-minijinja = { version = "1.0.12", features = ["loader"] }
+minijinja = { version = "1.0.16", features = ["loader"] }
 minijinja-embed = "1.0.15"
+rand = "0.8.5"
 reqwest = { version = "0.11.24", default-features = false, features = [
   "rustls-tls",
   "json",
