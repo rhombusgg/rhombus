@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = "0.7.4"
+axum = "0.7.5"
 fluent = "0.16.0"
-minijinja = "1.0.12"
+minijinja = "1.0.20"
 rhombus = { path = "../../rhombus", features = ["postgres"] }
-sqlx = { version = "0.7.3", features = [
+sqlx = { version = "0.7.4", features = [
     "tls-rustls",
     "runtime-tokio",
     "postgres",
