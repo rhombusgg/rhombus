@@ -1,0 +1,58 @@
+- [x] Sign in with Discord
+- [x] Open Graph images
+- [x] Fluent translations
+- [x] Shuttle hosting
+- [x] Testcontainer tests
+- [x] IP tracking
+- [ ] Teams
+  - [ ] Invites
+  - [ ] Renaming
+- [ ] Custom IP Middleware https://adam-p.ca/blog/2022/03/x-forwarded-for
+- [ ] Configuration
+  - [ ] YAML
+  - [ ] JSON Schema
+  - [ ] Environment variables
+- [ ] Faster minijinja dev compilation
+- [ ] Challenges
+  - [ ] Categories
+  - [ ] Healthchecks
+  - [ ] Writeups
+  - [ ] Dynamic scoring
+  - [ ] Markdown rendering
+  - [ ] Raw html rendering
+  - [ ] Authors without accounts
+- [ ] Single static binary
+- [ ] User pages
+  - [ ] Admin geoip view
+- [ ] Team pages
+  - [ ] Admin geoip view
+- [ ] Homepage/countdown (plugin integration)
+- [ ] Divisions
+- [ ] Scoreboard
+  - [ ] Snapshots
+- [ ] Tickets
+  - [ ] From site (markdown editor)
+  - [ ] From discord
+  - [ ] Email-only
+- [ ] Email-only accounts
+  - [ ] Email confirmation
+  - [ ] Gravatar lookup
+- [ ] Challenge loader plugin
+- [ ] API
+  - [ ] Access tokens
+- [ ] Documentation/marketing site
+- [ ] Admin challenges
+  - [ ] Creation
+  - [ ] List
+  - [ ] Writeups
+- [ ] Admin users
+  - [ ] Ban users
+  - [ ] List
+  - [ ] Make admin
+- [ ] Admin divisions
+- [ ] Certificate (pdf) generations
+- [ ] CLI hosting templating
+- [ ] CLI challenge templating
+- [ ] CLI api integration
+- [ ] Serverless mode
+- [ ] WASM compilation
