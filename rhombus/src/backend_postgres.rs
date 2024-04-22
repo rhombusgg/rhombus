@@ -114,3 +114,26 @@ impl Database for Postgres {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use sqlx::postgres::PgPoolOptions;
+    use testcontainers::clients;
+    use testcontainers_modules::postgres::Postgres;
+
+    use crate::database::Database;
+
+    #[tokio::test]
+    async fn migrate_postgres() {
+        let docker = clients::Cli::default();
+        let postgres_instance = docker.run(Postgres::default());
+        let database_url = format!(
+            "postgres://postgres:postgres@127.0.0.1:{}/postgres",
+            postgres_instance.get_host_port_ipv4(5432)
+        );
+
+        let pool = PgPoolOptions::new().connect(&database_url).await.unwrap();
+        let database = crate::backend_postgres::Postgres::new(pool);
+        database.migrate().await.unwrap();
+    }
+}

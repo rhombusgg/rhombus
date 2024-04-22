@@ -60,3 +60,7 @@ postgres = ["dep:sqlx"]
 libsql = ["dep:libsql", "dep:futures"]
 dotenv = ["dep:dotenvy"]
 all = ["dotenv", "postgres", "libsql"]
+
+[dev-dependencies]
+testcontainers = "0.15.0"
+testcontainers-modules = { version = "0.3.7", features = ["postgres"] }
