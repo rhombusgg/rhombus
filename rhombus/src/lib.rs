@@ -411,7 +411,7 @@ impl<'a> Builder<'a> {
                 .nest("/", plugin_router)
         };
 
-        let governor_conf = Box::new(
+        let governor_conf = Arc::new(
             GovernorConfigBuilder::default()
                 .per_second(1)
                 .burst_size(50)
@@ -428,7 +428,7 @@ impl<'a> Builder<'a> {
                 auth_injector_middleware,
             ))
             .layer(GovernorLayer {
-                config: Box::leak(governor_conf),
+                config: governor_conf,
             });
 
         #[cfg(debug_assertions)]

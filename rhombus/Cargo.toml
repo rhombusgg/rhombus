@@ -10,49 +10,49 @@ homepage = "https://rhombus.gg"
 keywords = ["web", "ctf"]
 
 [dependencies]
-anyhow = "1.0.81"
-async-trait = "0.1.79"
-axum = "0.7.4"
-axum-extra = { version = "0.9.2", features = ["cookie"] }
-cached = { version = "0.49.2", features = ["async"] }
-chrono = { version = "0.4.34", features = ["serde"] }
+anyhow = "1.0.82"
+async-trait = "0.1.80"
+axum = "0.7.5"
+axum-extra = { version = "0.9.3", features = ["cookie"] }
+cached = { version = "0.49.3", features = ["async"] }
+chrono = { version = "0.4.38", features = ["serde"] }
 dotenvy = { version = "0.15.7", optional = true }
 fluent = "0.16.0"
 futures = { version = "0.3.30", optional = true }
 intl-memoizer = "0.5.1"
-jsonwebtoken = "9.2.0"
+jsonwebtoken = "9.3.0"
 lazy_static = "1.4.0"
-libsql = { version = "0.3.2", optional = true }
+libsql = { version = "0.3.5", optional = true }
 listenfd = "1.0.1"
-minijinja = { version = "1.0.16", features = ["loader"] }
-minijinja-embed = "1.0.15"
+minijinja = { version = "1.0.20", features = ["loader"] }
+minijinja-embed = "1.0.20"
 rand = "0.8.5"
-reqwest = { version = "0.11.24", default-features = false, features = [
+reqwest = { version = "0.12.4", default-features = false, features = [
   "rustls-tls",
   "json",
 ] }
-resvg = "0.40.0"
+resvg = "0.41.0"
 rust-embed = "8.3.0"
-serde = { version = "1.0.196", features = ["derive"] }
-serde_json = "1.0.114"
-sqlx = { version = "0.7.3", optional = true, features = [
+serde = { version = "1.0.198", features = ["derive"] }
+serde_json = "1.0.116"
+sqlx = { version = "0.7.4", optional = true, features = [
   "tls-rustls",
   "runtime-tokio",
   "postgres",
   "chrono",
   "macros",
 ] }
-time = "0.3.34"
-tokio = { version = "1.36.0", features = ["full"] }
+time = "0.3.36"
+tokio = { version = "1.37.0", features = ["full"] }
 tower = "0.4.13"
-tower-http = { version = "0.5.1", features = ["compression-full", "fs"] }
+tower-http = { version = "0.5.2", features = ["compression-full", "fs"] }
 tower-livereload = "0.9.2"
-tower_governor = { version = "0.3.2", features = ["tracing"] }
+tower_governor = { version = "0.4.2", features = ["tracing"] }
 tracing = "0.1.40"
 unic-langid = { version = "0.9.4", features = ["unic-langid-macros"] }
 
 [build-dependencies]
-minijinja-embed = "1.0.15"
+minijinja-embed = "1.0.20"
 
 [features]
 default = ["dotenv"]
