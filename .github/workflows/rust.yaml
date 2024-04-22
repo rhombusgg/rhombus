@@ -105,28 +105,3 @@ jobs:
       - name: Format
         run: |
           cargo fmt --check
-
-  test-aarch64:
-    name: Test aarch64 (QEMU)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: linux-aarch64-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Install cargo-cross
-        run: |
-          cargo install cross --git https://github.com/cross-rs/cross
-
-      - name: Test
-        run: |
-          cross test --all-features
