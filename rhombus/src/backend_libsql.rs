@@ -124,7 +124,13 @@ impl Database for LibSQL {
         return (user_id, team_id);
     }
 
-    async fn insert_track(&self, ip: &str, user_agent: Option<&str>, now: DateTime<Utc>, user_id: Option<i64>) {
+    async fn insert_track(
+        &self,
+        ip: &str,
+        user_agent: Option<&str>,
+        now: DateTime<Utc>,
+        user_id: Option<i64>,
+    ) {
         self.db
             .execute(
                 r#"
