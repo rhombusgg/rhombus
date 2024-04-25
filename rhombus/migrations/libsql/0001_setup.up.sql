@@ -35,19 +35,10 @@ CREATE TABLE IF NOT EXISTS track (
     ip TEXT, -- 39 is the max length of an IPv6 address
     user_agent TEXT,
     last_seen_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    requests INT default(0),
-    PRIMARY KEY (ip, user_agent)
-);
-
-CREATE TABLE IF NOT EXISTS track_connection (
-    ip TEXT,
-    user_agent TEXT,
-    user_id BIGINT,
-    last_seen_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    requests INT default(0),
-    FOREIGN KEY (ip, user_agent) REFERENCES track(ip, user_agent),
+    requests INTEGER default(0),
+    user_id INTEGER,
     FOREIGN KEY (user_id) REFERENCES user(id),
-    PRIMARY KEY (ip, user_agent, user_id)
+    PRIMARY KEY (ip, user_agent)
 );
 
 COMMIT;

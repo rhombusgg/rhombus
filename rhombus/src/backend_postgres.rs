@@ -56,12 +56,19 @@ impl Database for Postgres {
         (user.id, 1)
     }
 
-    async fn insert_track(&self, ip: &str, user_agent: Option<&str>, now: DateTime<Utc>) {
+    async fn insert_track(
+        &self,
+        ip: &str,
+        user_agent: Option<&str>,
+        now: DateTime<Utc>,
+        user_id: Option<i64>,
+    ) {
         sqlx::query(
             r#"
-            INSERT INTO Track (ip, user_agent, last_seen_at) VALUES ($1, $2, $3)
+            INSERT INTO Track (ip, user_agent, last_seen_at, user_id) VALUES ($1, $2, $3, $4)
             ON CONFLICT (ip, user_agent) DO
                 UPDATE SET
+                    user_id = ?4,
                     last_seen_at = $3,
                     requests = Track.requests + 1
             "#,
@@ -69,31 +76,7 @@ impl Database for Postgres {
         .bind(ip)
         .bind(user_agent)
         .bind(now)
-        .execute(&self.pool)
-        .await
-        .unwrap();
-    }
-
-    async fn insert_track_user(
-        &self,
-        ip: &str,
-        user_agent: Option<&str>,
-        user_id: i64,
-        now: DateTime<Utc>,
-    ) {
-        sqlx::query(
-            r#"
-            INSERT INTO TrackConnection (ip, user_agent, user_id, last_seen_at) VALUES ($1, $2, $3, $4)
-            ON CONFLICT (ip, user_agent, user_id) DO
-                UPDATE SET
-                    last_seen_at = $4,
-                    requests = TrackConnection.requests + 1
-            "#,
-        )
-        .bind(ip)
-        .bind(user_agent)
         .bind(user_id)
-        .bind(now)
         .execute(&self.pool)
         .await
         .unwrap();
@@ -122,15 +105,15 @@ impl Database for Postgres {
             .collect()
     }
 
-    async fn get_team_from_invite_token(&self, invite_token: &str) -> Result<Option<Team>> {
+    async fn get_team_from_invite_token(&self, _invite_token: &str) -> Result<Option<Team>> {
         todo!()
     }
 
-    async fn get_team_from_user_id(&self, user_id: i64) -> Result<Team> {
+    async fn get_team_from_user_id(&self, _user_id: i64) -> Result<Team> {
         todo!()
     }
 
-    async fn add_user_to_team(&self, user_id: i64, team_id: i64) -> Result<()> {
+    async fn add_user_to_team(&self, _user_id: i64, _team_id: i64) -> Result<()> {
         todo!()
     }
 }

@@ -124,39 +124,18 @@ impl Database for LibSQL {
         return (user_id, team_id);
     }
 
-    async fn insert_track(&self, ip: &str, user_agent: Option<&str>, now: DateTime<Utc>) {
+    async fn insert_track(&self, ip: &str, user_agent: Option<&str>, now: DateTime<Utc>, user_id: Option<i64>) {
         self.db
             .execute(
                 r#"
-            INSERT INTO track (ip, user_agent, last_seen_at) VALUES (?1, ?2, ?3)
+            INSERT INTO track (ip, user_agent, last_seen_at, user_id) VALUES (?1, ?2, ?3, ?4)
             ON CONFLICT (ip, user_agent) DO
                 UPDATE SET
+                    user_id = ?4,
                     last_seen_at = ?3,
                     requests = track.requests + 1
             "#,
-                params!(ip, user_agent, now.to_string()),
-            )
-            .await
-            .unwrap();
-    }
-
-    async fn insert_track_user(
-        &self,
-        ip: &str,
-        user_agent: Option<&str>,
-        user_id: i64,
-        now: DateTime<Utc>,
-    ) {
-        self.db
-            .execute(
-                r#"
-            INSERT INTO track_connection (ip, user_agent, user_id, last_seen_at) VALUES (?1, ?2, ?3, ?4)
-            ON CONFLICT (ip, user_agent, user_id) DO
-                UPDATE SET
-                    last_seen_at = ?4,
-                    requests = track_connection.requests + 1
-            "#,
-                params!(ip, user_agent, user_id, now.to_string()),
+                params!(ip, user_agent, now.to_string(), user_id),
             )
             .await
             .unwrap();

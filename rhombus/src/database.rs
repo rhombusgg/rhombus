@@ -31,13 +31,12 @@ pub trait Database {
         avatar: &str,
         discord_id: &str,
     ) -> (i64, i64);
-    async fn insert_track(&self, ip: &str, user_agent: Option<&str>, now: DateTime<Utc>);
-    async fn insert_track_user(
+    async fn insert_track(
         &self,
         ip: &str,
         user_agent: Option<&str>,
-        user_id: i64,
         now: DateTime<Utc>,
+        user_id: Option<i64>,
     );
     async fn get_challenges(&self) -> Vec<Challenge>;
     async fn get_team_from_invite_token(&self, invite_token: &str) -> Result<Option<Team>>;

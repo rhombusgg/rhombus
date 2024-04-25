@@ -33,17 +33,10 @@ pub async fn track(
 
     tokio::spawn(async move {
         let now = chrono::Utc::now();
-        state.db.insert_track(&ip, user_agent.as_deref(), now).await;
-
-        // this query does not need to be a part of a transaction because we
-        // never expect ips to be deleted, so at this point the foriegn key
-        // constraint will never fail.
-        if let Some(user_id) = user_id {
-            state
-                .db
-                .insert_track_user(&ip, user_agent.as_deref(), user_id, now)
-                .await;
-        }
+        state
+            .db
+            .insert_track(&ip, user_agent.as_deref(), now, user_id)
+            .await;
     });
 
     next.run(req).await
