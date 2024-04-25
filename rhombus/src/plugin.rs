@@ -1,9 +1,8 @@
-pub use anyhow::Result;
 use async_trait::async_trait;
 use axum::Router;
 use minijinja::Environment;
 
-use crate::{database::Connection, locales::BundleMap, RhombusRouterState};
+use crate::{database::Connection, locales::BundleMap, Result, RhombusRouterState};
 
 #[async_trait]
 pub trait Plugin {

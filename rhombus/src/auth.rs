@@ -1,13 +1,12 @@
-use crate::{locales::Lang, RhombusRouterState};
 use axum::{
     body::Body,
     extract::{Query, State},
     http::{
         header::{self, AUTHORIZATION},
-        Request, StatusCode, Uri,
+        Request, Response, StatusCode, Uri,
     },
     middleware::Next,
-    response::{Html, IntoResponse, Redirect, Response},
+    response::{IntoResponse, Redirect},
     Extension, Json,
 };
 use axum_extra::extract::{
@@ -20,6 +19,8 @@ use minijinja::context;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+
+use crate::{locales::Lang, RhombusRouterState};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct User {
@@ -131,27 +132,69 @@ pub async fn auth_injector_middleware(
     next.run(req).await
 }
 
+#[derive(Deserialize)]
+pub struct SignInParams {
+    token: Option<String>,
+}
+
 pub async fn route_signin(
     state: State<RhombusRouterState>,
     Extension(user): Extension<MaybeClientUser>,
     Extension(lang): Extension<Lang>,
     uri: Uri,
-) -> impl IntoResponse {
-    Html(
-        state
-            .jinja
-            .get_template("signin.html")
-            .unwrap()
-            .render(context! {
-                lang => lang,
-                user => user,
-                uri => uri.to_string(),
-                location_url => state.config.location_url,
-                discord_signin_url => &state.discord_signin_url,
-                og_image => format!("{}/og-image.png", state.config.location_url)
-            })
-            .unwrap(),
-    )
+    params: Query<SignInParams>,
+) -> Response<Body> {
+    let (invite_token_cookie, team_name) = if let Some(url_invite_token) = &params.token {
+        let team = state
+            .db
+            .get_team_from_invite_token(url_invite_token)
+            .await
+            .unwrap_or(None);
+
+        if let (Some(team), Some(user)) = (&team, &user) {
+            state.db.add_user_to_team(user.id, team.id).await.unwrap();
+            return Redirect::to("/team").into_response();
+        }
+
+        (
+            Cookie::build(("rhombus-invite-token", url_invite_token))
+                .path("/")
+                .max_age(time::Duration::hours(1))
+                .same_site(SameSite::Lax)
+                .http_only(true),
+            team.map(|t| t.name),
+        )
+    } else {
+        (
+            Cookie::build(("rhombus-invite-token", ""))
+                .path("/")
+                .max_age(time::Duration::hours(-1))
+                .same_site(SameSite::Lax)
+                .http_only(true),
+            None,
+        )
+    };
+
+    let html = state
+        .jinja
+        .get_template("signin.html")
+        .unwrap()
+        .render(context! {
+            lang => lang,
+            user => user,
+            uri => uri.to_string(),
+            location_url => state.config.location_url,
+            discord_signin_url => &state.discord_signin_url,
+            og_image => format!("{}/og-image.png", state.config.location_url),
+            team_name => team_name
+        })
+        .unwrap();
+
+    Response::builder()
+        .header("content-type", "text/html")
+        .header("set-cookie", invite_token_cookie.to_string())
+        .body(html.into())
+        .unwrap()
 }
 
 #[derive(Deserialize)]
@@ -184,7 +227,8 @@ struct DiscordProfile {
 pub async fn route_discord_callback(
     state: State<RhombusRouterState>,
     params: Query<DiscordCallback>,
-) -> Response {
+    cookie_jar: CookieJar,
+) -> impl IntoResponse {
     if let Some(error) = &params.error {
         tracing::error!("Discord returned an error: {}", error);
         let json_error = ErrorResponse {
@@ -293,7 +337,7 @@ pub async fn route_discord_callback(
         )
     };
 
-    let id = state
+    let (user_id, _) = state
         .db
         .upsert_user(&profile.global_name, &profile.email, &avatar, &profile.id)
         .await;
@@ -302,7 +346,7 @@ pub async fn route_discord_callback(
     let iat = now.timestamp() as usize;
     let exp = (now + chrono::Duration::try_minutes(60).unwrap()).timestamp() as usize;
     let claims = TokenClaims {
-        sub: id,
+        sub: user_id,
         name: profile.global_name,
         email: profile.email,
         avatar,
@@ -310,6 +354,31 @@ pub async fn route_discord_callback(
         exp,
         iat,
     };
+
+    let mut response = Redirect::permanent("/team").into_response();
+    let headers = response.headers_mut();
+
+    if let Some(cookie_invite_token) = cookie_jar.get("rhombus-invite-token").map(|c| c.value()) {
+        if let Some(team) = state
+            .db
+            .get_team_from_invite_token(cookie_invite_token)
+            .await
+            .unwrap_or(None)
+        {
+            _ = state.db.add_user_to_team(user_id, team.id).await;
+        }
+
+        let delete_cookie = Cookie::build(("rhombus-invite-token", ""))
+            .path("/")
+            .max_age(time::Duration::hours(-1))
+            .same_site(SameSite::Lax)
+            .http_only(true);
+
+        headers.append(
+            header::SET_COOKIE,
+            delete_cookie.to_string().parse().unwrap(),
+        );
+    }
 
     let token = encode(
         &Header::default(),
@@ -324,10 +393,8 @@ pub async fn route_discord_callback(
         .same_site(SameSite::Lax)
         .http_only(true);
 
-    let mut response = Redirect::permanent("/account").into_response();
-    response
-        .headers_mut()
-        .insert(header::SET_COOKIE, cookie.to_string().parse().unwrap());
+    headers.append(header::SET_COOKIE, cookie.to_string().parse().unwrap());
+
     response
 }
 

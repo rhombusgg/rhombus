@@ -12,16 +12,17 @@ CREATE TABLE IF NOT EXISTS user (
     avatar TEXT NOT NULL UNIQUE,
     discord_id TEXT NOT NULL UNIQUE,
     team_id INTEGER,
-    is_team_owner BOOLEAN DEFAULT(TRUE),
+    owner_team_id INTEGER,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (team_id) REFERENCES team(id)
+    FOREIGN KEY (team_id) REFERENCES team(id),
+    FOREIGN KEY (owner_team_id) REFERENCES team(id)
 );
 
 CREATE TABLE IF NOT EXISTS email (
     email TEXT PRIMARY KEY,
     user_id INTEGER,
-    FOREIGN KEY (user_id) REFERENCES user(id)
+    FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS team (

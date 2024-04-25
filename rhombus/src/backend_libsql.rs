@@ -1,4 +1,3 @@
-use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use futures::stream::StreamExt;
@@ -6,8 +5,9 @@ use libsql::{de, params, Builder};
 use serde::Deserialize;
 
 use crate::{
-    database::{Challenge, Database},
+    database::{Challenge, Database, Team},
     team::create_team_invite_token,
+    Result,
 };
 
 #[derive(Clone)]
@@ -51,21 +51,35 @@ impl Database for LibSQL {
         Ok(())
     }
 
-    async fn upsert_user(&self, name: &str, email: &str, avatar: &str, discord_id: &str) -> i64 {
+    async fn upsert_user(
+        &self,
+        name: &str,
+        email: &str,
+        avatar: &str,
+        discord_id: &str,
+    ) -> (i64, i64) {
         let team_name = format!("{}'s team", name);
 
+        #[derive(Debug, Deserialize)]
+        struct ExistingUser {
+            id: i64,
+            team_id: i64,
+        }
         let tx = self.db.transaction().await.unwrap();
         let mut rows = tx
-            .query("SELECT id FROM user WHERE discord_id = ?", [discord_id])
+            .query(
+                "SELECT id, team_id FROM user WHERE discord_id = ?",
+                [discord_id],
+            )
             .await
             .unwrap();
-        let user_id = rows
+        let existing_user = rows
             .next()
             .await
             .unwrap()
-            .map(|row| row.get::<i64>(0).unwrap());
-        if let Some(user_id) = user_id {
-            return user_id;
+            .map(|row| de::from_row::<ExistingUser>(&row).unwrap());
+        if let Some(existing_user) = existing_user {
+            return (existing_user.id, existing_user.team_id);
         }
 
         let team_invite_token = create_team_invite_token();
@@ -84,13 +98,9 @@ impl Database for LibSQL {
             .get::<i64>(0)
             .unwrap();
 
-        tx.execute("INSERT INTO email (email) VALUES (?1)", [email])
-            .await
-            .unwrap();
-
         let user_id = tx
             .query(
-                "INSERT INTO user (name, avatar, discord_id, team_id) VALUES (?1, ?2, ?3, ?4) RETURNING id",
+                "INSERT INTO user (name, avatar, discord_id, team_id, owner_team_id) VALUES (?1, ?2, ?3, ?4, ?4) RETURNING id",
                 params!(name, avatar, discord_id, team_id),
             )
             .await
@@ -102,9 +112,16 @@ impl Database for LibSQL {
             .get::<i64>(0)
             .unwrap();
 
+        tx.execute(
+            "INSERT INTO email (email, user_id) VALUES (?1, ?2)",
+            params!(email, user_id),
+        )
+        .await
+        .unwrap();
+
         tx.commit().await.unwrap();
 
-        return user_id;
+        return (user_id, team_id);
     }
 
     async fn insert_track(&self, ip: &str, user_agent: Option<&str>, now: DateTime<Utc>) {
@@ -169,6 +186,72 @@ impl Database for LibSQL {
                 description: challenge.description,
             })
             .collect()
+    }
+
+    async fn get_team_from_invite_token(&self, invite_token: &str) -> Result<Option<Team>> {
+        #[derive(Debug, Deserialize)]
+        struct DbTeam {
+            id: i64,
+            name: String,
+        }
+        let team = self
+            .db
+            .query(
+                "SELECT id, name FROM team WHERE invite_token = ?",
+                [invite_token],
+            )
+            .await?
+            .next()
+            .await?;
+
+        if let Some(row) = &team {
+            let team = de::from_row::<DbTeam>(row).unwrap();
+            Ok(Some(Team {
+                id: team.id,
+                name: team.name,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn get_team_from_user_id(&self, user_id: i64) -> Result<Team> {
+        #[derive(Debug, Deserialize)]
+        struct DbTeam {
+            id: i64,
+            name: String,
+        }
+        let row = self
+            .db
+            .query("
+                SELECT team.id, team.name
+                FROM team JOIN user ON user.team_id = team.id
+                WHERE user.id = ?1
+            ", [user_id])
+            .await?
+            .next()
+            .await?
+            .ok_or(libsql::Error::QueryReturnedNoRows)?;
+
+        let team = de::from_row::<DbTeam>(&row).unwrap();
+        Ok(Team {
+            id: team.id,
+            name: team.name,
+        })
+    }
+
+    async fn add_user_to_team(&self, user_id: i64, team_id: i64) -> Result<()> {
+        self.db
+            .execute(
+                r#"
+                UPDATE user
+                SET team_id = ?2
+                WHERE id = ?1
+            "#,
+                [user_id, team_id],
+            )
+            .await?;
+        Ok(())
     }
 }
 

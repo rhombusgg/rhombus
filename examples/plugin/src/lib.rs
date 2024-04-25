@@ -57,12 +57,12 @@ impl Plugin for MyPlugin {
             })
     }
 
-    fn theme(&self, jinja: &mut Environment<'static>) -> rhombus::plugin::Result<()> {
+    fn theme(&self, jinja: &mut Environment<'static>) -> rhombus::Result<()> {
         jinja.add_template("home.html", include_str!("../templates/home.html"))?;
         Ok(())
     }
 
-    fn localize(&self, bundlemap: &mut BundleMap) -> rhombus::plugin::Result<()> {
+    fn localize(&self, bundlemap: &mut BundleMap) -> rhombus::Result<()> {
         let lang = "en".parse::<LanguageIdentifier>().unwrap();
         let res = FluentResource::try_new("test1 = Hello there\nho = Hol".to_string()).unwrap();
         let bundle = bundlemap.get_mut(&lang).unwrap();
@@ -71,7 +71,7 @@ impl Plugin for MyPlugin {
         Ok(())
     }
 
-    async fn migrate_postgresql(&self, db: Postgres) -> rhombus::plugin::Result<()> {
+    async fn migrate_postgresql(&self, db: Postgres) -> rhombus::Result<()> {
         db.pool
             .execute(include_str!("../migrations/standalone.sql"))
             .await?;

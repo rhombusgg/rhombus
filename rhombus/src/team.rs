@@ -17,6 +17,7 @@ pub async fn route_team(
     Extension(lang): Extension<Lang>,
     uri: Uri,
 ) -> Html<String> {
+    let team = state.db.get_team_from_user_id(user.id).await.unwrap();
     Html(
         state
             .jinja
@@ -25,7 +26,7 @@ pub async fn route_team(
             .render(context! {
                 lang => lang,
                 user => user,
-                team_name => "thanos",
+                team_name => team.name,
                 uri => uri.to_string(),
                 location_url => state.config.location_url,
                 og_image => format!("{}/og-image.png", state.config.location_url),

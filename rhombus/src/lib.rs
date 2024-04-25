@@ -1,15 +1,18 @@
 #![forbid(unsafe_code)]
 
-mod account;
+pub mod account;
 pub mod auth;
-mod challenges;
-mod command_palette;
+pub mod challenges;
+pub mod command_palette;
 pub mod database;
+pub mod errors;
 pub mod locales;
-mod open_graph;
+pub mod open_graph;
 pub mod plugin;
-mod team;
-mod track;
+pub mod team;
+pub mod track;
+
+pub type Result<T> = std::result::Result<T, RhombusError>;
 
 #[cfg(feature = "libsql")]
 pub mod backend_libsql;
@@ -17,7 +20,6 @@ pub mod backend_libsql;
 #[cfg(feature = "postgres")]
 pub mod backend_postgres;
 
-use anyhow::anyhow;
 use axum::{
     extract::State,
     http::{StatusCode, Uri},
@@ -41,15 +43,15 @@ use auth::{
 };
 use challenges::route_challenges;
 use command_palette::route_command_palette;
+use errors::{DatabaseConfigurationError, RhombusError};
 use locales::{translate, Lang};
 use open_graph::route_default_og_image;
 use plugin::Plugin;
+use team::route_team;
 use track::track;
 
 #[cfg(feature = "postgres")]
 use sqlx::{postgres::PgPoolOptions, PgPool};
-
-use crate::team::route_team;
 
 #[derive(Default)]
 pub struct Builder<'a> {
@@ -219,7 +221,7 @@ impl<'a> Builder<'a> {
         Self { plugins, ..self }
     }
 
-    async fn build_database(&self) -> anyhow::Result<Connection> {
+    async fn build_database(&self) -> Result<Connection> {
         if let Some(database_config) = &self.database {
             match database_config {
                 #[cfg(feature = "postgres")]
@@ -261,9 +263,11 @@ impl<'a> Builder<'a> {
                 DbConfig::Url(database_url) => {
                     if database_url.starts_with("postgres://") {
                         #[cfg(not(feature = "postgres"))]
-                        return Err(anyhow!(
-                            "Feature \"postgres\" must be enabled for database url {database_url}"
-                        ));
+                        return Err(DatabaseConfigurationError::MissingFeature(
+                            "postgres".to_owned(),
+                            database_url.to_owned(),
+                        )
+                        .into());
 
                         #[cfg(feature = "postgres")]
                         {
@@ -283,7 +287,11 @@ impl<'a> Builder<'a> {
                         #[cfg(not(feature = "libsql"))]
                         {
                             _ = path;
-                            return Err(anyhow!("Feature \"libsql\" must be enabled for database url {database_url}"));
+                            return Err(DatabaseConfigurationError::MissingFeature(
+                                "libsql".to_owned(),
+                                database_url.to_owned(),
+                            )
+                            .into());
                         }
 
                         #[cfg(feature = "libsql")]
@@ -299,7 +307,10 @@ impl<'a> Builder<'a> {
                         }
                     }
 
-                    Err(anyhow!("Unkown database scheme in url {database_url}"))
+                    Err(
+                        DatabaseConfigurationError::UnknownUrlScheme(database_url.to_owned())
+                            .into(),
+                    )
                 }
             }
         } else {
@@ -316,39 +327,35 @@ impl<'a> Builder<'a> {
             }
 
             #[cfg(not(feature = "libsql"))]
-            Err(anyhow!(
-                "Cannot fall back to in memory database because feature \"libsql\" is not enabled"
+            Err(RhombusError::DatabaseConfiguration(
+                "Cannot fall back to in memory database because feature \"libsql\" is not enabled",
             ))
         }
     }
 
-    pub async fn build(&self) -> anyhow::Result<Router> {
-        let config = Config {
-            jwt_secret: self
-                .jwt_secret
-                .clone()
-                .ok_or(anyhow!("JWT Secret is required!"))?,
-            discord_client_id: self
-                .discord_client_id
-                .clone()
-                .ok_or(anyhow!("Discord Client ID is required!"))?,
-            discord_client_secret: self
-                .discord_client_secret
-                .clone()
-                .ok_or(anyhow!("Discord Client Secret is required!"))?,
-            discord_bot_token: self
-                .discord_bot_token
-                .clone()
-                .ok_or(anyhow!("Discord Bot Token is required!"))?,
-            discord_guild_id: self
-                .discord_guild_id
-                .clone()
-                .ok_or(anyhow!("Discord Guild ID is required!"))?,
-            location_url: self
-                .location_url
-                .clone()
-                .ok_or(anyhow!("Location URL is required!"))?,
-        };
+    pub async fn build(&self) -> Result<Router> {
+        let config =
+            Config {
+                jwt_secret: self
+                    .jwt_secret
+                    .clone()
+                    .ok_or(RhombusError::MissingConfiguration("JWT Secret".to_owned()))?,
+                discord_client_id: self.discord_client_id.clone().ok_or(
+                    RhombusError::MissingConfiguration("Discord Client ID".to_owned()),
+                )?,
+                discord_client_secret: self.discord_client_secret.clone().ok_or(
+                    RhombusError::MissingConfiguration("Discord Client Secret".to_owned()),
+                )?,
+                discord_bot_token: self.discord_bot_token.clone().ok_or(
+                    RhombusError::MissingConfiguration("Discord Bot Token".to_owned()),
+                )?,
+                discord_guild_id: self.discord_guild_id.clone().ok_or(
+                    RhombusError::MissingConfiguration("Discord Guild ID".to_owned()),
+                )?,
+                location_url: self.location_url.clone().ok_or(
+                    RhombusError::MissingConfiguration("Location URL".to_owned()),
+                )?,
+            };
 
         let db = self.build_database().await?;
 
@@ -446,7 +453,10 @@ fn not_htmx_predicate<T>(req: &axum::http::Request<T>) -> bool {
     !req.headers().contains_key("hx-request")
 }
 
-pub async fn serve(router: Router, address: impl ToSocketAddrs) -> Result<(), std::io::Error> {
+pub async fn serve(
+    router: Router,
+    address: impl ToSocketAddrs,
+) -> std::result::Result<(), std::io::Error> {
     #[cfg(debug_assertions)]
     let listener = match listenfd::ListenFd::from_env().take_tcp_listener(0).unwrap() {
         Some(listener) => {

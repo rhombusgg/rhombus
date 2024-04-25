@@ -1,9 +1,11 @@
-use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 
-use crate::database::{Challenge, Database};
+use crate::{
+    database::{Challenge, Database, Team},
+    Result,
+};
 
 #[derive(Clone)]
 pub struct Postgres {
@@ -24,7 +26,13 @@ impl Database for Postgres {
             .await?)
     }
 
-    async fn upsert_user(&self, name: &str, email: &str, avatar: &str, discord_id: &str) -> i64 {
+    async fn upsert_user(
+        &self,
+        name: &str,
+        email: &str,
+        avatar: &str,
+        discord_id: &str,
+    ) -> (i64, i64) {
         #[derive(FromRow)]
         struct InsertUserResult {
             id: i64,
@@ -45,7 +53,7 @@ impl Database for Postgres {
         .await
         .unwrap();
 
-        user.id
+        (user.id, 1)
     }
 
     async fn insert_track(&self, ip: &str, user_agent: Option<&str>, now: DateTime<Utc>) {
@@ -112,6 +120,18 @@ impl Database for Postgres {
                 description: challenge.description,
             })
             .collect()
+    }
+
+    async fn get_team_from_invite_token(&self, invite_token: &str) -> Result<Option<Team>> {
+        todo!()
+    }
+
+    async fn get_team_from_user_id(&self, user_id: i64) -> Result<Team> {
+        todo!()
+    }
+
+    async fn add_user_to_team(&self, user_id: i64, team_id: i64) -> Result<()> {
+        todo!()
     }
 }
 

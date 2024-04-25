@@ -5,7 +5,7 @@
 - [x] Testcontainer tests
 - [x] IP tracking
 - [ ] Teams
-  - [ ] Invites
+  - [x] Invites
   - [ ] Renaming
 - [ ] Custom IP Middleware https://adam-p.ca/blog/2022/03/x-forwarded-for
 - [ ] Configuration
@@ -28,6 +28,7 @@
   - [ ] Admin geoip view
 - [ ] Homepage/countdown (plugin integration)
 - [ ] Divisions
+- [ ] First blood webhooks (per division)
 - [ ] Scoreboard
   - [ ] Snapshots
 - [ ] Tickets
