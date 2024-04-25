@@ -223,11 +223,14 @@ impl Database for LibSQL {
         }
         let row = self
             .db
-            .query("
+            .query(
+                "
                 SELECT team.id, team.name
                 FROM team JOIN user ON user.team_id = team.id
                 WHERE user.id = ?1
-            ", [user_id])
+            ",
+                [user_id],
+            )
             .await?
             .next()
             .await?
