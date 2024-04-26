@@ -15,6 +15,7 @@ axum = "0.7.5"
 axum-extra = { version = "0.9.3", features = ["cookie"] }
 cached = { version = "0.49.3", features = ["async"] }
 chrono = { version = "0.4.38", features = ["serde"] }
+config = "0.14.0"
 dotenvy = { version = "0.15.7", optional = true }
 fluent = "0.16.0"
 futures = { version = "0.3.30", optional = true }

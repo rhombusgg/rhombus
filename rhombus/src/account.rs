@@ -29,9 +29,9 @@ pub async fn route_account(
     uri: Uri,
 ) -> Html<String> {
     let in_server = is_in_server(
-        &state.config.discord_guild_id,
+        &state.settings.discord.guild_id,
         &user.discord_id,
-        &state.config.discord_bot_token,
+        &state.settings.discord.bot_token,
     )
     .await;
     debug!(user_id = user.id, in_server, "Discord");
@@ -46,8 +46,8 @@ pub async fn route_account(
                 user => user,
                 uri => uri.to_string(),
                 in_server => in_server,
-                location_url => state.config.location_url,
-                og_image => format!("{}/og-image.png", state.config.location_url),
+                location_url => state.settings.location_url,
+                og_image => format!("{}/og-image.png", state.settings.location_url),
             })
             .unwrap(),
     )

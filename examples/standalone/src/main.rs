@@ -12,8 +12,9 @@ async fn main() {
 
     let app = rhombus::Builder::new()
         .load_env()
-        .location_url("http://localhost:3000")
+        .config_override("location_url", "http://localhost:3000")
         .database("file://rhombus.db".into())
+        .config_source(rhombus::config::File::with_name("config"))
         // .database("postgres://postgres:password@localhost".into())
         .build()
         .await

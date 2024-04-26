@@ -8,10 +8,10 @@
   - [x] Invites
   - [ ] Renaming
 - [ ] Custom IP Middleware https://adam-p.ca/blog/2022/03/x-forwarded-for
-- [ ] Configuration
-  - [ ] YAML
-  - [ ] JSON Schema
-  - [ ] Environment variables
+- [x] Configuration
+  - [x] YAML
+  - [x] JSON Schema
+  - [x] Environment variables
 - [ ] Faster minijinja dev compilation
 - [ ] Challenges
   - [ ] Categories

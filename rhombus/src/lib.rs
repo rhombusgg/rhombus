@@ -28,8 +28,11 @@ use axum::{
     routing::get,
     Extension, Router,
 };
+pub use config;
+use config::{builder::DefaultState, ConfigBuilder};
 use database::{Connection, Database};
 use minijinja::{context, Environment};
+use serde::Deserialize;
 use std::{env, net::SocketAddr, sync::Arc};
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
@@ -57,12 +60,7 @@ use sqlx::{postgres::PgPoolOptions, PgPool};
 pub struct Builder<'a> {
     plugins: Vec<&'a (dyn Plugin + Sync)>,
     database: Option<DbConfig>,
-    jwt_secret: Option<String>,
-    discord_client_id: Option<String>,
-    discord_client_secret: Option<String>,
-    discord_bot_token: Option<String>,
-    discord_guild_id: Option<String>,
-    location_url: Option<String>,
+    config_builder: ConfigBuilder<DefaultState>,
 }
 
 pub enum DbConfig {
@@ -118,14 +116,22 @@ impl From<(String, String)> for DbConfig {
     }
 }
 
-#[derive(Clone)]
-pub struct Config {
-    pub jwt_secret: String,
-    pub discord_client_id: String,
-    pub discord_client_secret: String,
-    pub discord_bot_token: String,
-    pub discord_guild_id: String,
+#[derive(Debug, Deserialize)]
+#[allow(unused)]
+pub struct DiscordSettings {
+    pub client_id: String,
+    pub client_secret: String,
+    pub bot_token: String,
+    pub guild_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(unused)]
+pub struct Settings {
     pub location_url: String,
+    pub jwt_secret: String,
+    pub database_url: Option<String>,
+    pub discord: DiscordSettings,
 }
 
 pub type RhombusRouterState = Arc<RhombusRouterStateInner>;
@@ -133,8 +139,7 @@ pub type RhombusRouterState = Arc<RhombusRouterStateInner>;
 pub struct RhombusRouterStateInner {
     pub db: Connection,
     pub jinja: Environment<'static>,
-    pub config: Config,
-    pub discord_signin_url: String,
+    pub settings: Arc<Settings>,
 }
 
 async fn handler_404() -> impl IntoResponse {
@@ -171,38 +176,26 @@ impl<'a> Builder<'a> {
             database
         };
 
+        Self { database, ..self }
+    }
+
+    pub fn config_source<T>(self, source: T) -> Self
+    where
+        T: config::Source + Send + Sync + 'static,
+    {
         Self {
-            location_url: env::var("LOCATION_URL")
-                .map(Some)
-                .unwrap_or(self.location_url),
-            discord_client_id: env::var("DISCORD_CLIENT_ID")
-                .map(Some)
-                .unwrap_or(self.discord_client_id),
-            discord_client_secret: env::var("DISCORD_CLIENT_SECRET")
-                .map(Some)
-                .unwrap_or(self.discord_client_secret),
-            discord_bot_token: env::var("DISCORD_TOKEN")
-                .map(Some)
-                .unwrap_or(self.discord_bot_token),
-            discord_guild_id: env::var("DISCORD_GUILD_ID")
-                .map(Some)
-                .unwrap_or(self.discord_guild_id),
-            jwt_secret: env::var("JWT_SECRET").map(Some).unwrap_or(self.jwt_secret),
-            database,
+            config_builder: self.config_builder.add_source(source),
             ..self
         }
     }
 
-    pub fn jwt_secret(self, jwt_secret: impl Into<String>) -> Self {
+    pub fn config_override<S, T>(self, key: S, value: T) -> Self
+    where
+        S: AsRef<str>,
+        T: Into<config::Value>,
+    {
         Self {
-            jwt_secret: Some(jwt_secret.into()),
-            ..self
-        }
-    }
-
-    pub fn location_url(self, location_url: impl Into<String>) -> Self {
-        Self {
-            location_url: Some(location_url.into()),
+            config_builder: self.config_builder.set_override(key, value).unwrap(),
             ..self
         }
     }
@@ -334,28 +327,12 @@ impl<'a> Builder<'a> {
     }
 
     pub async fn build(&self) -> Result<Router> {
-        let config =
-            Config {
-                jwt_secret: self
-                    .jwt_secret
-                    .clone()
-                    .ok_or(RhombusError::MissingConfiguration("JWT Secret".to_owned()))?,
-                discord_client_id: self.discord_client_id.clone().ok_or(
-                    RhombusError::MissingConfiguration("Discord Client ID".to_owned()),
-                )?,
-                discord_client_secret: self.discord_client_secret.clone().ok_or(
-                    RhombusError::MissingConfiguration("Discord Client Secret".to_owned()),
-                )?,
-                discord_bot_token: self.discord_bot_token.clone().ok_or(
-                    RhombusError::MissingConfiguration("Discord Bot Token".to_owned()),
-                )?,
-                discord_guild_id: self.discord_guild_id.clone().ok_or(
-                    RhombusError::MissingConfiguration("Discord Guild ID".to_owned()),
-                )?,
-                location_url: self.location_url.clone().ok_or(
-                    RhombusError::MissingConfiguration("Location URL".to_owned()),
-                )?,
-            };
+        let settings: Settings = self
+            .config_builder
+            .clone()
+            .add_source(config::Environment::with_prefix("rhombus").separator("__"))
+            .build()?
+            .try_deserialize()?;
 
         let db = self.build_database().await?;
 
@@ -382,12 +359,7 @@ impl<'a> Builder<'a> {
         let router_state = Arc::new(RhombusRouterStateInner {
             db,
             jinja: env,
-            config: config.clone(),
-            discord_signin_url: format!(
-                "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}/signin/discord&response_type=code&scope=identify+guilds.join",
-                config.discord_client_id,
-                config.location_url,
-            ),
+            settings: Arc::new(settings),
         });
 
         let mut plugin_router = Router::new();
@@ -498,9 +470,8 @@ async fn route_home(
                 lang => lang,
                 user => user,
                 uri => uri.to_string(),
-                location_url => state.config.location_url,
-                discord_signin_url => &state.discord_signin_url,
-                og_image => format!("{}/og-image.png", state.config.location_url)
+                location_url => state.settings.location_url,
+                og_image => format!("{}/og-image.png", state.settings.location_url)
             })
             .unwrap(),
     )

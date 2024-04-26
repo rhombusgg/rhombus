@@ -1,0 +1,82 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/product.schema.json",
+    "title": "Rhombus Configuration",
+    "description": "Configuration format for the Rhombus CTF platform",
+    "type": "object",
+    "properties": {
+        "location_url": {
+            "title": "Location URL",
+            "description": "Base URL where the site is hosted at",
+            "type": "string",
+            "pattern": "^https?:\/\/.*",
+            "examples": [
+                "https://demo.rhombus.gg",
+                "http://localhost:3000"
+            ]
+        },
+        "jwt_secret": {
+            "title": "JWT Secret",
+            "description": "Secret (ideally random) value to sign and verify JWTs. Generate with\nopenssl rand -hex 16",
+            "type": "string",
+            "examples": [
+                "long_random_value"
+            ]
+        },
+        "database_url": {
+            "title": "Database URL",
+            "description": "Database connection url. Will automatically detect ",
+            "type": "string",
+            "examples": [
+                "file://rhombus.db",
+                "postgres://postgres:password@localhost"
+            ]
+        },
+        "discord": {
+            "title": "Discord",
+            "description": "Discord configuration properties",
+            "type": "object",
+            "properties": {
+                "guild_id": {
+                    "title": "Guild ID",
+                    "description": "Snowflake developer discord ID of guild (server) for support",
+                    "type": [
+                        "string",
+                        "number"
+                    ],
+                    "pattern": "^\\d{19}$",
+                    "minimum": 1000000000000000000,
+                    "maximum": 9999999999999999999,
+                    "examples": [
+                        "1160610137703186636"
+                    ]
+                },
+                "client_id": {
+                    "title": "Client ID",
+                    "description": "OAuth2 Client ID (discord snowflake)",
+                    "type": [
+                        "string",
+                        "number"
+                    ],
+                    "pattern": "^\\d{19}$",
+                    "minimum": 1000000000000000000,
+                    "maximum": 9999999999999999999,
+                    "examples": [
+                        "1160076447977848945"
+                    ]
+                },
+                "client_secret": {
+                    "title": "Client Secret",
+                    "description": "OAuth2 Client Secret",
+                    "type": "string"
+                },
+                "bot_token": {
+                    "title": "Bot Token",
+                    "description": "Bot token",
+                    "type": "string",
+                    "pattern": ".+\\..+\\..+"
+                }
+            }
+        }
+    }
+}

@@ -28,8 +28,8 @@ pub async fn route_team(
                 user => user,
                 team_name => team.name,
                 uri => uri.to_string(),
-                location_url => state.config.location_url,
-                og_image => format!("{}/og-image.png", state.config.location_url),
+                location_url => state.settings.location_url,
+                og_image => format!("{}/og-image.png", state.settings.location_url),
             })
             .unwrap(),
     )

@@ -1,3 +1,4 @@
+use config::ConfigError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -19,6 +20,9 @@ pub enum RhombusError {
 
     #[error("Required configuration: {0}")]
     MissingConfiguration(String),
+
+    #[error("Configuration")]
+    Configuration(#[from] ConfigError),
 
     #[error("Database configuration error: {0}")]
     DatabaseConfiguration(#[from] DatabaseConfigurationError),

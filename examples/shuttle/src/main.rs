@@ -5,8 +5,7 @@ async fn main(
 ) -> shuttle_axum::ShuttleAxum {
     let app = rhombus::Builder::new()
         .load_env()
-        .location_url("http://localhost:3001")
-        .jwt_secret(secrets.get("JWT_SECRET").unwrap())
+        .config_override("jwt_secret", secrets.get("JWT_SECRET").unwrap())
         .database(pool.into())
         .build()
         .await

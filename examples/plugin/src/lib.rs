@@ -95,10 +95,9 @@ async fn route_home(
                 lang => lang,
                 user => user,
                 uri => uri.to_string(),
-                location_url => rhombus.config.location_url,
-                discord_signin_url => &rhombus.discord_signin_url,
+                location_url => rhombus.settings.location_url,
                 a => &plugin.a,
-                og_image => format!("{}/og-image.png", rhombus.config.location_url)
+                og_image => format!("{}/og-image.png", rhombus.settings.location_url)
             })
             .unwrap(),
     )

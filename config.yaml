@@ -1,0 +1,6 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/rhombusgg/rhombus-rs/main/schema.json
+location_url: http://localhost:3000
+database_url: file://rhombus.db
+discord:
+  guild_id: "1160610137703186636"
+  client_id: "1160076447977848945"

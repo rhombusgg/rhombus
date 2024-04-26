@@ -111,7 +111,7 @@ pub async fn auth_injector_middleware(
 
     let claims = decode::<TokenClaims>(
         &token,
-        &DecodingKey::from_secret(data.config.jwt_secret.as_ref()),
+        &DecodingKey::from_secret(data.settings.jwt_secret.as_ref()),
         &Validation::default(),
     );
     if claims.is_err() {
@@ -175,6 +175,12 @@ pub async fn route_signin(
         )
     };
 
+    let discord_signin_url = format!(
+        "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}/signin/discord&response_type=code&scope=identify+guilds.join",
+        state.settings.discord.client_id,
+        state.settings.location_url,
+    );
+
     let html = state
         .jinja
         .get_template("signin.html")
@@ -183,9 +189,9 @@ pub async fn route_signin(
             lang => lang,
             user => user,
             uri => uri.to_string(),
-            location_url => state.config.location_url,
-            discord_signin_url => &state.discord_signin_url,
-            og_image => format!("{}/og-image.png", state.config.location_url),
+            location_url => state.settings.location_url,
+            discord_signin_url => discord_signin_url,
+            og_image => format!("{}/og-image.png", state.settings.location_url),
             team_name => team_name
         })
         .unwrap();
@@ -254,15 +260,15 @@ pub async fn route_discord_callback(
             "application/x-www-form-urlencoded",
         )
         .basic_auth(
-            state.config.discord_client_id.clone(),
-            Some(state.config.discord_client_secret.clone()),
+            &state.settings.discord.client_id,
+            Some(&state.settings.discord.client_secret),
         )
         .form(&[
             ("grant_type", "authorization_code"),
             ("code", code),
             (
                 "redirect_uri",
-                &format!("{}/signin/discord", state.config.location_url),
+                &format!("{}/signin/discord", state.settings.location_url),
             ),
         ])
         .send()
@@ -280,7 +286,7 @@ pub async fn route_discord_callback(
 
     let res = client
         .get("https://discord.com/api/users/@me")
-        .bearer_auth(oauth_token.access_token.clone())
+        .bearer_auth(&oauth_token.access_token)
         .send()
         .await
         .unwrap();
@@ -298,11 +304,11 @@ pub async fn route_discord_callback(
     let res = client
         .put(format!(
             "https://discord.com/api/guilds/{}/members/{}",
-            state.config.discord_guild_id, profile.id
+            state.settings.discord.guild_id, profile.id
         ))
         .header(
             "Authorization",
-            format!("Bot {}", state.config.discord_bot_token),
+            format!("Bot {}", state.settings.discord.bot_token),
         )
         .json(&json!({
             "access_token": oauth_token.access_token,
@@ -383,7 +389,7 @@ pub async fn route_discord_callback(
     let token = encode(
         &Header::default(),
         &claims,
-        &EncodingKey::from_secret(state.config.jwt_secret.as_ref()),
+        &EncodingKey::from_secret(state.settings.jwt_secret.as_ref()),
     )
     .unwrap();
 

@@ -14,7 +14,6 @@ async fn main() {
 
     let app = rhombus::Builder::new()
         .load_env()
-        .location_url("http://localhost:3000")
         .database("postgres://postgres:password@localhost".into())
         .plugin(&plugin::MyPlugin::new(3))
         .build()
