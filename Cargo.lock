@@ -3994,6 +3994,7 @@ dependencies = [
 name = "standalone"
 version = "0.1.0"
 dependencies = [
+ "http 1.1.0",
  "rhombus",
  "tokio",
  "tracing",

@@ -15,14 +15,15 @@ use crate::{auth::MaybeClientUser, RhombusRouterState};
 /// Associates the track with the user if the user is logged in. Runs asynchronously,
 /// so it does not block the request and passes on to the next middleware immediately.
 pub async fn track(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    // ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Extension(user): Extension<MaybeClientUser>,
     State(state): State<RhombusRouterState>,
     uri: Uri,
     req: Request<Body>,
     next: Next,
 ) -> impl IntoResponse {
-    let ip = addr.ip().to_string();
+    // let ip = addr.ip().to_string();
+    let ip = "ho";
     let user_id = user.as_ref().map(|u| u.id);
     let user_agent = req
         .headers()

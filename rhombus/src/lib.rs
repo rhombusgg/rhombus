@@ -21,8 +21,9 @@ pub mod backend_libsql;
 pub mod backend_postgres;
 
 use axum::{
+    body::Body,
     extract::State,
-    http::{StatusCode, Uri},
+    http::{HeaderMap, Request, StatusCode, Uri},
     middleware,
     response::{Html, IntoResponse},
     routing::get,
@@ -33,9 +34,15 @@ use config::{builder::DefaultState, ConfigBuilder};
 use database::{Connection, Database};
 use minijinja::{context, Environment};
 use serde::Deserialize;
-use std::{env, net::SocketAddr, sync::Arc};
+use std::{
+    env,
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+};
 use tokio::net::{TcpListener, ToSocketAddrs};
-use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
+use tower_governor::{
+    governor::GovernorConfigBuilder, key_extractor::KeyExtractor, GovernorError, GovernorLayer,
+};
 use tower_http::{compression::CompressionLayer, services::ServeDir};
 use tracing::{debug, info};
 
@@ -56,11 +63,42 @@ use track::track;
 #[cfg(feature = "postgres")]
 use sqlx::{postgres::PgPoolOptions, PgPool};
 
-#[derive(Default)]
-pub struct Builder<'a> {
+pub struct Builder<'a, I: IpExtractor + Clone> {
     plugins: Vec<&'a (dyn Plugin + Sync)>,
     database: Option<DbConfig>,
     config_builder: ConfigBuilder<DefaultState>,
+    ip_extractor: I,
+}
+
+pub trait IpExtractor {
+    fn extract<T>(&self, req: &Request<T>) -> Option<IpAddr>;
+}
+
+#[derive(Clone)]
+struct KeyExtractorShim<I: IpExtractor> {
+    ip_extractor: I,
+}
+impl<I: IpExtractor + Clone> KeyExtractorShim<I> {
+    pub fn new(ip_extractor: I) -> KeyExtractorShim<I> {
+        KeyExtractorShim { ip_extractor }
+    }
+}
+impl<I: IpExtractor + Clone> KeyExtractor for KeyExtractorShim<I> {
+    type Key = IpAddr;
+
+    fn extract<T>(&self, req: &Request<T>) -> std::result::Result<Self::Key, GovernorError> {
+        self.ip_extractor
+            .extract(req)
+            .ok_or(GovernorError::UnableToExtractKey)
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct DefaultIpExtractor;
+impl IpExtractor for DefaultIpExtractor {
+    fn extract<T>(&self, _: &Request<T>) -> Option<IpAddr> {
+        None
+    }
 }
 
 pub enum DbConfig {
@@ -148,11 +186,18 @@ async fn handler_404() -> impl IntoResponse {
 
 static STATIC_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/static");
 
-impl<'a> Builder<'a> {
-    pub fn new() -> Self {
-        Self::default()
+impl<'a> Default for Builder<'a, DefaultIpExtractor> {
+    fn default() -> Self {
+        Self {
+            plugins: Vec::<&'a (dyn Plugin + Sync)>::default(),
+            database: None,
+            config_builder: ConfigBuilder::default(),
+            ip_extractor: DefaultIpExtractor,
+        }
     }
+}
 
+impl<'a, I: IpExtractor + Clone + Send + Sync + 'static> Builder<'a, I> {
     pub fn load_env(self) -> Self {
         #[cfg(feature = "dotenv")]
         {
@@ -177,6 +222,20 @@ impl<'a> Builder<'a> {
         };
 
         Self { database, ..self }
+    }
+
+    // pub fn extract<T>(extract_function: Box<dyn Fn(&Request<T>) -> Option<IpAddr>>) {}
+
+    pub fn extractor<I2: IpExtractor + Clone + Send + Sync + 'static>(
+        self,
+        ip_extractor: I2,
+    ) -> Builder<'a, I2> {
+        Builder {
+            ip_extractor,
+            plugins: self.plugins,
+            database: self.database,
+            config_builder: self.config_builder,
+        }
     }
 
     pub fn config_source<T>(self, source: T) -> Self
@@ -390,10 +449,11 @@ impl<'a> Builder<'a> {
                 .nest("/", plugin_router)
         };
 
+        let extr = KeyExtractorShim::new(self.ip_extractor.clone());
+
         let governor_conf = Arc::new(
             GovernorConfigBuilder::default()
-                .per_second(1)
-                .burst_size(50)
+                .key_extractor(extr)
                 .use_headers()
                 .finish()
                 .unwrap(),
@@ -418,6 +478,26 @@ impl<'a> Builder<'a> {
 
         Ok(router)
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MyKeyExtracter;
+
+impl KeyExtractor for MyKeyExtracter {
+    type Key = IpAddr;
+
+    fn extract<T>(&self, req: &Request<T>) -> std::result::Result<Self::Key, GovernorError> {
+        let headers = req.headers();
+
+        maybe_x_real_ip(headers).ok_or(GovernorError::UnableToExtractKey)
+    }
+}
+
+fn maybe_x_real_ip(headers: &HeaderMap) -> Option<IpAddr> {
+    headers
+        .get("x-real-ip")
+        .and_then(|hv| hv.to_str().ok())
+        .and_then(|s| s.parse::<IpAddr>().ok())
 }
 
 #[cfg(debug_assertions)]
@@ -446,11 +526,7 @@ pub async fn serve(
         address = listener.local_addr().unwrap().to_string(),
         "listening on"
     );
-    axum::serve(
-        listener,
-        router.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .await?;
+    axum::serve(listener, router).await?;
 
     Ok(())
 }
