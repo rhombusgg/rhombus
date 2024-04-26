@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 
 use crate::{
@@ -56,26 +55,19 @@ impl Database for Postgres {
         (user.id, 1)
     }
 
-    async fn insert_track(
-        &self,
-        ip: &str,
-        user_agent: Option<&str>,
-        now: DateTime<Utc>,
-        user_id: Option<i64>,
-    ) {
+    async fn insert_track(&self, ip: &str, user_agent: Option<&str>, user_id: Option<i64>) {
         sqlx::query(
             r#"
-            INSERT INTO Track (ip, user_agent, last_seen_at, user_id) VALUES ($1, $2, $3, $4)
+            INSERT INTO Track (ip, user_agent, last_seen_at, user_id) VALUES ($1, $2, now(), $3)
             ON CONFLICT (ip, user_agent) DO
                 UPDATE SET
-                    user_id = ?4,
-                    last_seen_at = $3,
+                    user_id = ?3,
+                    last_seen_at = now(),
                     requests = Track.requests + 1
             "#,
         )
         .bind(ip)
         .bind(user_agent)
-        .bind(now)
         .bind(user_id)
         .execute(&self.pool)
         .await

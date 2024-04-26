@@ -32,10 +32,9 @@ pub async fn track(
     trace!(user_id, user_agent, uri = uri.to_string(), "Request");
 
     tokio::spawn(async move {
-        let now = chrono::Utc::now();
         state
             .db
-            .insert_track(&ip, user_agent.as_deref(), now, user_id)
+            .insert_track(&ip, user_agent.as_deref(), user_id)
             .await;
     });
 

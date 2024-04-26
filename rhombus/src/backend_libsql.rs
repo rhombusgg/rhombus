@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use futures::stream::StreamExt;
 use libsql::{de, params, Builder};
 use serde::Deserialize;
@@ -68,7 +67,7 @@ impl Database for LibSQL {
         let tx = self.db.transaction().await.unwrap();
         let mut rows = tx
             .query(
-                "SELECT id, team_id FROM user WHERE discord_id = ?",
+                "SELECT id, team_id FROM rhombus_user WHERE discord_id = ?",
                 [discord_id],
             )
             .await
@@ -86,7 +85,7 @@ impl Database for LibSQL {
 
         let team_id = tx
             .query(
-                "INSERT INTO team (name, invite_token) VALUES (?1, ?2) RETURNING id",
+                "INSERT INTO rhombus_team (name, invite_token) VALUES (?1, ?2) RETURNING id",
                 [team_name, team_invite_token],
             )
             .await
@@ -100,7 +99,7 @@ impl Database for LibSQL {
 
         let user_id = tx
             .query(
-                "INSERT INTO user (name, avatar, discord_id, team_id, owner_team_id) VALUES (?1, ?2, ?3, ?4, ?4) RETURNING id",
+                "INSERT INTO rhombus_user (name, avatar, discord_id, team_id, owner_team_id) VALUES (?1, ?2, ?3, ?4, ?4) RETURNING id",
                 params!(name, avatar, discord_id, team_id),
             )
             .await
@@ -113,7 +112,7 @@ impl Database for LibSQL {
             .unwrap();
 
         tx.execute(
-            "INSERT INTO email (email, user_id) VALUES (?1, ?2)",
+            "INSERT INTO rhombus_email (email, user_id) VALUES (?1, ?2)",
             params!(email, user_id),
         )
         .await
@@ -124,31 +123,29 @@ impl Database for LibSQL {
         return (user_id, team_id);
     }
 
-    async fn insert_track(
-        &self,
-        ip: &str,
-        user_agent: Option<&str>,
-        now: DateTime<Utc>,
-        user_id: Option<i64>,
-    ) {
+    async fn insert_track(&self, ip: &str, user_agent: Option<&str>, user_id: Option<i64>) {
         self.db
             .execute(
                 r#"
-            INSERT INTO track (ip, user_agent, last_seen_at, user_id) VALUES (?1, ?2, ?3, ?4)
+            INSERT INTO rhombus_track (ip, user_agent, last_seen_at, user_id) VALUES (?1, ?2, strftime('%s', 'now'), ?3)
             ON CONFLICT (ip, user_agent) DO
                 UPDATE SET
-                    user_id = ?4,
-                    last_seen_at = ?3,
-                    requests = track.requests + 1
+                    user_id = ?3,
+                    last_seen_at = strftime('%s', 'now'),
+                    requests = rhombus_track.requests + 1
             "#,
-                params!(ip, user_agent, now.to_string(), user_id),
+                params!(ip, user_agent, user_id),
             )
             .await
             .unwrap();
     }
 
     async fn get_challenges(&self) -> Vec<Challenge> {
-        let rows = self.db.query("SELECT * FROM challenge", ()).await.unwrap();
+        let rows = self
+            .db
+            .query("SELECT * FROM rhombus_challenge", ())
+            .await
+            .unwrap();
 
         #[derive(Debug, Deserialize)]
         struct DbChallenge {
@@ -182,7 +179,7 @@ impl Database for LibSQL {
         let team = self
             .db
             .query(
-                "SELECT id, name FROM team WHERE invite_token = ?",
+                "SELECT id, name FROM rhombus_team WHERE invite_token = ?",
                 [invite_token],
             )
             .await?
@@ -210,9 +207,9 @@ impl Database for LibSQL {
             .db
             .query(
                 "
-                SELECT team.id, team.name
-                FROM team JOIN user ON user.team_id = team.id
-                WHERE user.id = ?1
+                SELECT rhombus_team.id, rhombus_team.name
+                FROM rhombus_team JOIN rhombus_user ON rhombus_user.team_id = rhombus_team.id
+                WHERE rhombus_user.id = ?1
             ",
                 [user_id],
             )
@@ -232,7 +229,7 @@ impl Database for LibSQL {
         self.db
             .execute(
                 r#"
-                UPDATE user
+                UPDATE rhombus_user
                 SET team_id = ?2
                 WHERE id = ?1
             "#,
