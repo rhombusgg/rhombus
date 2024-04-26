@@ -4,18 +4,18 @@ use lazy_static::lazy_static;
 use minijinja::context;
 use resvg::tiny_skia;
 use resvg::usvg;
+use rust_embed::RustEmbed;
 
 use crate::RhombusRouterState;
 
-static INTER_FONT: &[u8] = include_bytes!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/fonts/inter/Inter.ttc"
-));
+#[derive(RustEmbed)]
+#[folder = "fonts"]
+struct Fonts;
 
 lazy_static! {
     static ref GLOBAL_FONTDB: std::sync::Mutex<usvg::fontdb::Database> = {
         let mut fontdb = usvg::fontdb::Database::new();
-        fontdb.load_font_data(INTER_FONT.to_vec());
+        fontdb.load_font_data(Fonts::get("inter/Inter.ttc").unwrap().data.to_vec());
         std::sync::Mutex::new(fontdb)
     };
 }

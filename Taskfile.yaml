@@ -10,7 +10,7 @@ tasks:
   watch-standalone:
     desc: Start cargo watch
     cmds:
-      - cargo watch -x 'run -p standalone'
+      - mold -run cargo watch -x 'run -p standalone'
 
   watch-standalone-systemfd:
     desc: Start cargo watch using systemfd to not drop connections on restart

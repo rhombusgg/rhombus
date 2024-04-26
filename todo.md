@@ -12,7 +12,6 @@
   - [x] YAML
   - [x] JSON Schema
   - [x] Environment variables
-- [ ] Faster minijinja dev compilation
 - [ ] Challenges
   - [ ] Categories
   - [ ] Healthchecks

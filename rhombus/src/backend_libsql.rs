@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use futures::stream::StreamExt;
 use libsql::{de, params, Builder};
+use rust_embed::RustEmbed;
 use serde::Deserialize;
 
 use crate::{
@@ -40,12 +41,18 @@ impl From<libsql::Connection> for LibSQL {
     }
 }
 
+#[derive(RustEmbed)]
+#[folder = "migrations/libsql"]
+struct Migrations;
+
 #[async_trait]
 impl Database for LibSQL {
     async fn migrate(&self) -> Result<()> {
-        _ = self
-            .db
-            .execute_batch(include_str!("../migrations/libsql/0001_setup.up.sql"))
+        self.db
+            .execute_batch(
+                std::str::from_utf8(Migrations::get("0001_setup.up.sql").unwrap().data.as_ref())
+                    .unwrap(),
+            )
             .await?;
         Ok(())
     }

@@ -56,6 +56,7 @@
             vscode-langservers-extracted
             alejandra
 
+            mold
             rustup
             cargo-cross
             go-task
