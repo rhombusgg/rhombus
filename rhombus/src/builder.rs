@@ -23,9 +23,10 @@ use crate::{
     errors::DatabaseConfigurationError,
     home::route_home,
     ip::{
-        default_ip_extractor, ip_insert_middleware, maybe_cf_connecting_ip, maybe_fly_client_ip,
-        maybe_peer_ip, maybe_rightmost_x_forwarded_for, maybe_true_client_ip, maybe_x_real_ip,
-        track_middleware, IpExtractorFn, KeyExtractorShim,
+        default_ip_extractor, ip_insert_blank_middleware, ip_insert_middleware,
+        maybe_cf_connecting_ip, maybe_fly_client_ip, maybe_peer_ip,
+        maybe_rightmost_x_forwarded_for, maybe_true_client_ip, maybe_x_real_ip, track_middleware,
+        IpExtractorFn, KeyExtractorShim,
     },
     locales::{self, translate},
     open_graph::route_default_og_image,
@@ -234,9 +235,11 @@ impl Builder {
             }
 
             #[cfg(not(feature = "libsql"))]
-            Err(RhombusError::DatabaseConfiguration(
-                "Cannot fall back to in memory database because feature \"libsql\" is not enabled",
-            ))
+            Err(DatabaseConfigurationError::MissingFeature(
+                "libsql".to_owned(),
+                ":memory:".to_owned(),
+            )
+            .into())
         }
     }
 
@@ -352,7 +355,7 @@ impl Builder {
                 ip_insert_middleware,
             ))
         } else {
-            router
+            router.layer(middleware::from_fn(ip_insert_blank_middleware))
         };
 
         let router =

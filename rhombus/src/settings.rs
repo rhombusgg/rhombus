@@ -1,8 +1,5 @@
 use serde::Deserialize;
 
-#[cfg(feature = "postgres")]
-use sqlx::PgPool;
-
 #[derive(Debug, Deserialize, Clone)]
 pub struct DiscordSettings {
     pub client_id: String,
@@ -57,7 +54,7 @@ pub enum DbConfig {
     Url(String),
 
     #[cfg(feature = "postgres")]
-    RawPostgres(PgPool),
+    RawPostgres(sqlx::PgPool),
 
     #[cfg(feature = "libsql")]
     LibSQL(String, String),
@@ -79,8 +76,8 @@ impl From<&str> for DbConfig {
 }
 
 #[cfg(feature = "postgres")]
-impl From<PgPool> for DbConfig {
-    fn from(value: PgPool) -> Self {
+impl From<sqlx::PgPool> for DbConfig {
+    fn from(value: sqlx::PgPool) -> Self {
         Self::RawPostgres(value)
     }
 }

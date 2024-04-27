@@ -118,6 +118,7 @@ mod test {
 
     use crate::database::Database;
 
+    #[cfg_attr(not(feature = "testcontainers"), ignore)]
     #[tokio::test]
     async fn migrate_postgres() {
         let docker = clients::Cli::default();

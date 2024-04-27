@@ -55,6 +55,15 @@ pub async fn ip_insert_middleware(
     next.run(req).await
 }
 
+pub(crate) async fn ip_insert_blank_middleware(
+    mut req: Request<Body>,
+    next: Next,
+) -> impl IntoResponse {
+    let ip: Option<IpAddr> = None;
+    req.extensions_mut().insert(ip);
+    next.run(req).await
+}
+
 pub fn maybe_rightmost_x_forwarded_for(headers: &HeaderMap, _: &Extensions) -> Option<IpAddr> {
     headers
         .get_all("X-Forwarded-For")
