@@ -83,12 +83,36 @@ impl Builder {
     }
 
     /// Choose a client IP extractor for your environment
-    /// Read more about doing this securely: https://adam-p.ca/blog/2022/03/x-forwarded-for
+    /// Read more about doing this securely: <https://adam-p.ca/blog/2022/03/x-forwarded-for>
     pub fn extractor(self, ip_extractor: IpExtractorFn) -> Self {
         Self {
             ip_extractor: Some(ip_extractor),
             ..self
         }
+    }
+
+    #[cfg(feature = "shuttle")]
+    /// Treat Shuttle's secrets as environment variables to configure Rhombus with.
+    ///
+    /// ```ignore
+    /// #[shuttle_runtime::main]
+    /// async fn main(
+    ///     #[shuttle_runtime::Secrets] secrets: shuttle_runtime::SecretStore,
+    /// ) -> shuttle_axum::ShuttleAxum {
+    ///     let app = rhombus::Builder::default()
+    ///         .config_from_shuttle(secrets.into_iter())
+    ///         // continue configuring rhombus...
+    /// }
+    /// ```
+    pub fn config_from_shuttle(self, secrets_iter: impl Iterator<Item = (String, String)>) -> Self {
+        for item in secrets_iter {
+            let (key, value) = item;
+            if env::var(&key).is_err() {
+                env::set_var(&key, value);
+            }
+        }
+
+        self
     }
 
     pub fn config_source<T>(self, source: T) -> Self
@@ -101,6 +125,13 @@ impl Builder {
         }
     }
 
+    /// Override a specific config value programatically.
+    ///
+    /// ```
+    /// rhombus::Builder::default()
+    ///    .config_override("location_url", "http://localhost:3000")
+    ///     # ;
+    /// ```
     pub fn config_override<S, T>(self, key: S, value: T) -> Self
     where
         S: AsRef<str>,

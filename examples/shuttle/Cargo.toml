@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 dotenvy = "0.15.7"
-rhombus = { path = "../../rhombus", features = ["postgres"] }
+rhombus = { path = "../../rhombus", features = ["postgres", "shuttle"] }
 shuttle-axum = "0.44.0"
 shuttle-runtime = "0.44.0"
 shuttle-shared-db = { version = "0.44.0", features = ["postgres", "sqlx"] }
