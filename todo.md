@@ -7,7 +7,7 @@
 - [ ] Teams
   - [x] Invites
   - [ ] Renaming
-- [ ] Custom IP Middleware https://adam-p.ca/blog/2022/03/x-forwarded-for
+- [x] Custom IP Middleware
 - [x] Configuration
   - [x] YAML
   - [x] JSON Schema

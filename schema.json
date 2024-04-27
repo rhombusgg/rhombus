@@ -25,12 +25,62 @@
         },
         "database_url": {
             "title": "Database URL",
-            "description": "Database connection url. Will automatically detect ",
+            "description": "Database connection url. Will automatically detect from scheme",
             "type": "string",
+            "pattern": "^(postgres|file):\/\/.*",
             "examples": [
                 "file://rhombus.db",
                 "postgres://postgres:password@localhost"
             ]
+        },
+        "ip_preset": {
+            "title": "IP Preset",
+            "description": "Choose from a few default ways to extract the client IP address. For more advanced configuration, omit this option and write a custom function in Rust",
+            "type": "string",
+            "default": "peer-ip",
+            "enum": [
+                "rightmost-x-forwarded-for",
+                "x-real-ip",
+                "fly-client-ip",
+                "true-client-ip",
+                "cf-connecting-ip",
+                "peer-ip"
+            ],
+            "examples": [
+                "rightmost-x-forwarded-for",
+                "x-real-ip",
+                "fly-client-ip",
+                "true-client-ip",
+                "cf-connecting-ip",
+                "peer-ip"
+            ]
+        },
+        "ratelimit": {
+            "title": "Rate limit",
+            "description": "Configuration related to built in rate limiting",
+            "type": "object",
+            "properties": {
+                "per_millisecond": {
+                    "title": "Per Millisecond",
+                    "description": "Set the interval after which one element of the quota is replenished in milliseconds",
+                    "type": "number",
+                    "minimum": 1,
+                    "default": 500,
+                    "examples": [
+                        500
+                    ]
+                },
+                "burst_size": {
+                    "title": "Burst Size",
+                    "description": "Set quota size that defines how many requests can occur before the governor middleware starts blocking requests from an IP address and clients have to wait until the elements of the quota are replenished",
+                    "type": "number",
+                    "minimum": 1,
+                    "default": 8,
+                    "examples": [
+                        8
+                    ]
+                }
+            }
         },
         "discord": {
             "title": "Discord",

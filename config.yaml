@@ -4,3 +4,6 @@ database_url: file://rhombus.db
 discord:
   guild_id: "1160610137703186636"
   client_id: "1160076447977848945"
+ratelimit:
+  per_millisecond: 500
+  burst_size: 8

@@ -12,10 +12,10 @@ async fn main() {
         )
         .init();
 
-    let app = rhombus::Builder::new()
+    let app = rhombus::Builder::default()
         .load_env()
         .database("postgres://postgres:password@localhost".into())
-        .plugin(&plugin::MyPlugin::new(3))
+        .plugin(plugin::MyPlugin::new(3))
         .build()
         .await
         .unwrap();

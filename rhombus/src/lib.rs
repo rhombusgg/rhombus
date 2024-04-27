@@ -6,11 +6,12 @@ pub mod challenges;
 pub mod command_palette;
 pub mod database;
 pub mod errors;
+pub mod ip;
 pub mod locales;
 pub mod open_graph;
 pub mod plugin;
+pub mod settings;
 pub mod team;
-pub mod track;
 
 pub type Result<T> = std::result::Result<T, RhombusError>;
 
@@ -20,29 +21,23 @@ pub mod backend_libsql;
 #[cfg(feature = "postgres")]
 pub mod backend_postgres;
 
+pub use axum;
+pub use config;
+
 use axum::{
-    body::Body,
     extract::State,
-    http::{HeaderMap, Request, StatusCode, Uri},
+    http::{StatusCode, Uri},
     middleware,
     response::{Html, IntoResponse},
     routing::get,
     Extension, Router,
 };
-pub use config;
 use config::{builder::DefaultState, ConfigBuilder};
 use database::{Connection, Database};
 use minijinja::{context, Environment};
-use serde::Deserialize;
-use std::{
-    env,
-    net::{IpAddr, SocketAddr},
-    sync::Arc,
-};
+use std::{env, net::SocketAddr, sync::Arc};
 use tokio::net::{TcpListener, ToSocketAddrs};
-use tower_governor::{
-    governor::GovernorConfigBuilder, key_extractor::KeyExtractor, GovernorError, GovernorLayer,
-};
+use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::{compression::CompressionLayer, services::ServeDir};
 use tracing::{debug, info};
 
@@ -54,122 +49,26 @@ use auth::{
 use challenges::route_challenges;
 use command_palette::route_command_palette;
 use errors::{DatabaseConfigurationError, RhombusError};
+use ip::{
+    default_ip_extractor, ip_insert, maybe_cf_connecting_ip, maybe_fly_client_ip, maybe_peer_ip,
+    maybe_rightmost_x_forwarded_for, maybe_true_client_ip, maybe_x_real_ip, track, IpExtractorFn,
+    KeyExtractorShim,
+};
 use locales::{translate, Lang};
 use open_graph::route_default_og_image;
 use plugin::Plugin;
+use settings::{DbConfig, IpPreset, Settings};
 use team::route_team;
-use track::track;
 
 #[cfg(feature = "postgres")]
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use sqlx::postgres::PgPoolOptions;
 
-pub struct Builder<'a, I: IpExtractor + Clone> {
-    plugins: Vec<&'a (dyn Plugin + Sync)>,
+#[derive(Default)]
+pub struct Builder {
+    plugins: Vec<Box<dyn Plugin + Send + Sync>>,
     database: Option<DbConfig>,
     config_builder: ConfigBuilder<DefaultState>,
-    ip_extractor: I,
-}
-
-pub trait IpExtractor {
-    fn extract<T>(&self, req: &Request<T>) -> Option<IpAddr>;
-}
-
-#[derive(Clone)]
-struct KeyExtractorShim<I: IpExtractor> {
-    ip_extractor: I,
-}
-impl<I: IpExtractor + Clone> KeyExtractorShim<I> {
-    pub fn new(ip_extractor: I) -> KeyExtractorShim<I> {
-        KeyExtractorShim { ip_extractor }
-    }
-}
-impl<I: IpExtractor + Clone> KeyExtractor for KeyExtractorShim<I> {
-    type Key = IpAddr;
-
-    fn extract<T>(&self, req: &Request<T>) -> std::result::Result<Self::Key, GovernorError> {
-        self.ip_extractor
-            .extract(req)
-            .ok_or(GovernorError::UnableToExtractKey)
-    }
-}
-
-#[derive(Default, Clone)]
-pub struct DefaultIpExtractor;
-impl IpExtractor for DefaultIpExtractor {
-    fn extract<T>(&self, _: &Request<T>) -> Option<IpAddr> {
-        None
-    }
-}
-
-pub enum DbConfig {
-    Url(String),
-
-    #[cfg(feature = "postgres")]
-    RawPostgres(PgPool),
-
-    #[cfg(feature = "libsql")]
-    LibSQL(String, String),
-
-    #[cfg(feature = "libsql")]
-    RawLibSQL(libsql::Connection),
-}
-
-impl From<String> for DbConfig {
-    fn from(value: String) -> Self {
-        Self::Url(value)
-    }
-}
-
-impl From<&str> for DbConfig {
-    fn from(value: &str) -> Self {
-        Self::Url(value.to_owned())
-    }
-}
-
-#[cfg(feature = "postgres")]
-impl From<PgPool> for DbConfig {
-    fn from(value: PgPool) -> Self {
-        Self::RawPostgres(value)
-    }
-}
-
-#[cfg(feature = "libsql")]
-impl From<libsql::Connection> for DbConfig {
-    fn from(value: libsql::Connection) -> Self {
-        Self::RawLibSQL(value)
-    }
-}
-
-#[cfg(feature = "libsql")]
-impl From<(&str, &str)> for DbConfig {
-    fn from(value: (&str, &str)) -> Self {
-        Self::LibSQL(value.0.to_owned(), value.1.to_owned())
-    }
-}
-
-#[cfg(feature = "libsql")]
-impl From<(String, String)> for DbConfig {
-    fn from(value: (String, String)) -> Self {
-        Self::LibSQL(value.0, value.1)
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[allow(unused)]
-pub struct DiscordSettings {
-    pub client_id: String,
-    pub client_secret: String,
-    pub bot_token: String,
-    pub guild_id: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[allow(unused)]
-pub struct Settings {
-    pub location_url: String,
-    pub jwt_secret: String,
-    pub database_url: Option<String>,
-    pub discord: DiscordSettings,
+    ip_extractor: Option<IpExtractorFn>,
 }
 
 pub type RhombusRouterState = Arc<RhombusRouterStateInner>;
@@ -178,6 +77,7 @@ pub struct RhombusRouterStateInner {
     pub db: Connection,
     pub jinja: Environment<'static>,
     pub settings: Arc<Settings>,
+    ip_extractor: IpExtractorFn,
 }
 
 async fn handler_404() -> impl IntoResponse {
@@ -186,18 +86,7 @@ async fn handler_404() -> impl IntoResponse {
 
 static STATIC_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/static");
 
-impl<'a> Default for Builder<'a, DefaultIpExtractor> {
-    fn default() -> Self {
-        Self {
-            plugins: Vec::<&'a (dyn Plugin + Sync)>::default(),
-            database: None,
-            config_builder: ConfigBuilder::default(),
-            ip_extractor: DefaultIpExtractor,
-        }
-    }
-}
-
-impl<'a, I: IpExtractor + Clone + Send + Sync + 'static> Builder<'a, I> {
+impl Builder {
     pub fn load_env(self) -> Self {
         #[cfg(feature = "dotenv")]
         {
@@ -224,17 +113,12 @@ impl<'a, I: IpExtractor + Clone + Send + Sync + 'static> Builder<'a, I> {
         Self { database, ..self }
     }
 
-    // pub fn extract<T>(extract_function: Box<dyn Fn(&Request<T>) -> Option<IpAddr>>) {}
-
-    pub fn extractor<I2: IpExtractor + Clone + Send + Sync + 'static>(
-        self,
-        ip_extractor: I2,
-    ) -> Builder<'a, I2> {
-        Builder {
-            ip_extractor,
-            plugins: self.plugins,
-            database: self.database,
-            config_builder: self.config_builder,
+    /// Choose a client IP extractor for your environment
+    /// Read more about doing this securely: https://adam-p.ca/blog/2022/03/x-forwarded-for
+    pub fn extractor(self, ip_extractor: IpExtractorFn) -> Self {
+        Self {
+            ip_extractor: Some(ip_extractor),
+            ..self
         }
     }
 
@@ -266,9 +150,9 @@ impl<'a, I: IpExtractor + Clone + Send + Sync + 'static> Builder<'a, I> {
         }
     }
 
-    pub fn plugin(self, plugin: &'a (impl Plugin + Sync)) -> Self {
+    pub fn plugin(self, plugin: impl Plugin + Send + Sync + 'static) -> Self {
         let mut plugins = self.plugins;
-        plugins.push(plugin);
+        plugins.push(Box::new(plugin));
 
         Self { plugins, ..self }
     }
@@ -281,7 +165,7 @@ impl<'a, I: IpExtractor + Clone + Send + Sync + 'static> Builder<'a, I> {
                     let database = backend_postgres::Postgres::new(pool.to_owned());
                     database.migrate().await?;
 
-                    for plugin in self.plugins.clone().iter() {
+                    for plugin in self.plugins.iter() {
                         plugin.migrate_postgresql(database.clone()).await?;
                     }
 
@@ -293,7 +177,7 @@ impl<'a, I: IpExtractor + Clone + Send + Sync + 'static> Builder<'a, I> {
                     let database = backend_libsql::LibSQL::new_remote(url, auth_token).await?;
                     database.migrate().await?;
 
-                    for plugin in self.plugins.clone().iter() {
+                    for plugin in self.plugins.iter() {
                         plugin.migrate_libsql(database.clone()).await?;
                     }
 
@@ -305,7 +189,7 @@ impl<'a, I: IpExtractor + Clone + Send + Sync + 'static> Builder<'a, I> {
                     let database: backend_libsql::LibSQL = connection.to_owned().into();
                     database.migrate().await?;
 
-                    for plugin in self.plugins.clone().iter() {
+                    for plugin in self.plugins.iter() {
                         plugin.migrate_libsql(database.clone()).await?;
                     }
 
@@ -327,7 +211,7 @@ impl<'a, I: IpExtractor + Clone + Send + Sync + 'static> Builder<'a, I> {
                             let database = backend_postgres::Postgres::new(pool);
                             database.migrate().await?;
 
-                            for plugin in self.plugins.clone().iter() {
+                            for plugin in self.plugins.iter() {
                                 plugin.migrate_postgresql(database.clone()).await?;
                             }
 
@@ -351,7 +235,7 @@ impl<'a, I: IpExtractor + Clone + Send + Sync + 'static> Builder<'a, I> {
                             let database = backend_libsql::LibSQL::new_local(path).await?;
                             database.migrate().await?;
 
-                            for plugin in self.plugins.clone().iter() {
+                            for plugin in self.plugins.iter() {
                                 plugin.migrate_libsql(database.clone()).await?;
                             }
 
@@ -372,7 +256,7 @@ impl<'a, I: IpExtractor + Clone + Send + Sync + 'static> Builder<'a, I> {
                 let database = backend_libsql::LibSQL::new_memory().await?;
                 database.migrate().await?;
 
-                for plugin in self.plugins.clone().iter() {
+                for plugin in self.plugins.iter() {
                     plugin.migrate_libsql(database.clone()).await?;
                 }
                 Ok(Arc::new(database))
@@ -396,7 +280,7 @@ impl<'a, I: IpExtractor + Clone + Send + Sync + 'static> Builder<'a, I> {
         let db = self.build_database().await?;
 
         let mut localizer = locales::Localizations::new();
-        for plugin in self.plugins.clone().iter() {
+        for plugin in self.plugins.iter() {
             debug!(plugin_name = plugin.name(), "Loading");
             plugin.localize(&mut localizer.bundles)?;
         }
@@ -415,10 +299,40 @@ impl<'a, I: IpExtractor + Clone + Send + Sync + 'static> Builder<'a, I> {
             plugin.theme(&mut env)?;
         }
 
+        let ip_extractor = self.ip_extractor.or_else(|| {
+            settings.ip_preset.clone().map(|preset| match preset {
+                IpPreset::RightmostXForwardedFor => {
+                    info!("Selecting preset Rightmost X-Forwarded-For");
+                    maybe_rightmost_x_forwarded_for
+                }
+                IpPreset::XRealIp => {
+                    info!("Selecting preset X-Real-Ip");
+                    maybe_x_real_ip
+                }
+                IpPreset::FlyClientIp => {
+                    info!("Selecting preset Fly-Client-Ip");
+                    maybe_fly_client_ip
+                }
+                IpPreset::TrueClientIp => {
+                    info!("Selecting preset True-Client-Ip");
+                    maybe_true_client_ip
+                }
+                IpPreset::CFConnectingIp => {
+                    info!("Selecting preset CF-Connecting-IP");
+                    maybe_cf_connecting_ip
+                }
+                IpPreset::PeerIp => {
+                    info!("Selecting preset peer ip");
+                    maybe_peer_ip
+                }
+            })
+        });
+
         let router_state = Arc::new(RhombusRouterStateInner {
             db,
             jinja: env,
-            settings: Arc::new(settings),
+            settings: Arc::new(settings.clone()),
+            ip_extractor: ip_extractor.unwrap_or(default_ip_extractor),
         });
 
         let mut plugin_router = Router::new();
@@ -441,23 +355,13 @@ impl<'a, I: IpExtractor + Clone + Send + Sync + 'static> Builder<'a, I> {
             .route("/og-image.png", get(route_default_og_image))
             .with_state(router_state.clone());
 
-        let router = if self.plugins.is_empty() {
-            rhombus_router
-        } else {
+        let router = if !self.plugins.is_empty() {
             Router::new()
                 .fallback_service(rhombus_router)
                 .nest("/", plugin_router)
+        } else {
+            rhombus_router
         };
-
-        let extr = KeyExtractorShim::new(self.ip_extractor.clone());
-
-        let governor_conf = Arc::new(
-            GovernorConfigBuilder::default()
-                .key_extractor(extr)
-                .use_headers()
-                .finish()
-                .unwrap(),
-        );
 
         let router = router
             .layer(middleware::from_fn(locales::locale))
@@ -465,10 +369,39 @@ impl<'a, I: IpExtractor + Clone + Send + Sync + 'static> Builder<'a, I> {
             .layer(middleware::from_fn_with_state(
                 router_state.clone(),
                 auth_injector_middleware,
+            ));
+
+        let router = if ip_extractor.is_some() {
+            router.layer(middleware::from_fn_with_state(
+                router_state.clone(),
+                ip_insert,
             ))
-            .layer(GovernorLayer {
-                config: governor_conf,
-            });
+        } else {
+            router
+        };
+
+        let router =
+            if let (Some(ip_extractor), Some(ratelimit)) = (ip_extractor, settings.ratelimit) {
+                let per_millisecond = ratelimit.per_millisecond.unwrap_or(500);
+                let burst_size = ratelimit.burst_size.unwrap_or(8);
+                info!(per_millisecond, burst_size, "Setting ratelimit");
+
+                let governor_conf = Arc::new(
+                    GovernorConfigBuilder::default()
+                        .per_millisecond(per_millisecond)
+                        .burst_size(burst_size)
+                        .key_extractor(KeyExtractorShim::new(ip_extractor))
+                        .use_headers()
+                        .finish()
+                        .unwrap(),
+                );
+
+                router.layer(GovernorLayer {
+                    config: governor_conf,
+                })
+            } else {
+                router
+            };
 
         #[cfg(debug_assertions)]
         let router = router
@@ -478,26 +411,6 @@ impl<'a, I: IpExtractor + Clone + Send + Sync + 'static> Builder<'a, I> {
 
         Ok(router)
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MyKeyExtracter;
-
-impl KeyExtractor for MyKeyExtracter {
-    type Key = IpAddr;
-
-    fn extract<T>(&self, req: &Request<T>) -> std::result::Result<Self::Key, GovernorError> {
-        let headers = req.headers();
-
-        maybe_x_real_ip(headers).ok_or(GovernorError::UnableToExtractKey)
-    }
-}
-
-fn maybe_x_real_ip(headers: &HeaderMap) -> Option<IpAddr> {
-    headers
-        .get("x-real-ip")
-        .and_then(|hv| hv.to_str().ok())
-        .and_then(|s| s.parse::<IpAddr>().ok())
 }
 
 #[cfg(debug_assertions)]
@@ -526,7 +439,11 @@ pub async fn serve(
         address = listener.local_addr().unwrap().to_string(),
         "listening on"
     );
-    axum::serve(listener, router).await?;
+    axum::serve(
+        listener,
+        router.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
 
     Ok(())
 }
