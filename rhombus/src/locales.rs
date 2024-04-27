@@ -124,33 +124,35 @@ pub fn translate(localizer: &Localizations, msg_id: &str, kwargs: Kwargs, state:
 
     let text = localizer.localize(langs, msg_id, Some(&args));
 
-    text.unwrap_or(format!("Translation not found for {}", msg_id).to_owned())
+    text.unwrap_or(format!("Translation not found for {}", msg_id))
 }
 
-pub type Lang = Option<Vec<String>>;
+pub type Lang = Vec<String>;
 
 pub async fn locale(mut req: Request<Body>, next: Next) -> impl IntoResponse {
-    let lang = req
+    let langs = req
         .headers()
         .get(&ACCEPT_LANGUAGE)
-        .map(|header| parse_languages(header.to_str().unwrap()));
-
-    req.extensions_mut().insert(lang);
+        .map(|header| parse_languages(header.to_str().unwrap()))
+        .unwrap_or(vec!["en".to_owned()]);
+    req.extensions_mut().insert(langs);
     next.run(req).await
 }
 
-fn parse_languages(raw_languages: &str) -> Vec<String> {
+fn parse_languages(raw_languages: &str) -> Lang {
     let stripped_languages = raw_languages.to_owned().replace(' ', "");
     let language_strings: Vec<&str> = stripped_languages.split(',').collect();
-    let languages: Vec<String> = language_strings
+    language_strings
         .iter()
         .map(|l| {
             let tag_parts: Vec<&str> = l.split(';').collect();
             tag_parts[0].to_owned()
         })
         .filter(|l| !l.is_empty())
-        .collect();
-    languages
+        .map(|l| l.parse::<LanguageIdentifier>())
+        .filter_map(Result::ok)
+        .map(|l| l.to_string())
+        .collect()
 }
 
 fn filter_matches<'a, R: 'a + AsRef<LanguageIdentifier>, A: 'a + AsRef<LanguageIdentifier>>(
