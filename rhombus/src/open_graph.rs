@@ -6,7 +6,7 @@ use resvg::tiny_skia;
 use resvg::usvg;
 use rust_embed::RustEmbed;
 
-use crate::RhombusRouterState;
+use crate::RouterState;
 
 #[derive(RustEmbed)]
 #[folder = "fonts"]
@@ -35,7 +35,7 @@ fn convert_svg_to_png(svg: &str) -> Vec<u8> {
     pixmap.encode_png().unwrap()
 }
 
-pub async fn route_default_og_image(State(state): State<RhombusRouterState>) -> impl IntoResponse {
+pub async fn route_default_og_image(State(state): State<RouterState>) -> impl IntoResponse {
     let svg = state
         .jinja
         .get_template("og.svg")

@@ -10,15 +10,15 @@ use std::net::{IpAddr, SocketAddr};
 use tower_governor::{key_extractor::KeyExtractor, GovernorError};
 use tracing::trace;
 
-use crate::{auth::MaybeClientUser, RhombusRouterState};
+use crate::{auth::MaybeClientUser, RouterState};
 
 /// Middleware to log the IP and user agent of the client in the database as track.
 /// Associates the track with the user if the user is logged in. Runs asynchronously,
 /// so it does not block the request and passes on to the next middleware immediately.
-pub async fn track(
+pub async fn track_middleware(
     Extension(ip): Extension<Option<IpAddr>>,
     Extension(user): Extension<MaybeClientUser>,
-    State(state): State<RhombusRouterState>,
+    State(state): State<RouterState>,
     uri: Uri,
     req: Request<Body>,
     next: Next,
@@ -45,8 +45,8 @@ pub async fn track(
 }
 
 /// Only add the `ip_insert` middleware if the `ip_extractor` is not the `default_ip_extractor`
-pub async fn ip_insert(
-    State(data): State<RhombusRouterState>,
+pub async fn ip_insert_middleware(
+    State(data): State<RouterState>,
     mut req: Request<Body>,
     next: Next,
 ) -> impl IntoResponse {

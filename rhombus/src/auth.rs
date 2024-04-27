@@ -20,7 +20,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::{locales::Lang, RhombusRouterState};
+use crate::{locales::Lang, RouterState};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct User {
@@ -84,7 +84,7 @@ pub async fn enforce_auth_middleware(
 
 pub async fn auth_injector_middleware(
     cookie_jar: CookieJar,
-    State(data): State<RhombusRouterState>,
+    State(data): State<RouterState>,
     mut req: Request<Body>,
     next: Next,
 ) -> impl IntoResponse {
@@ -138,7 +138,7 @@ pub struct SignInParams {
 }
 
 pub async fn route_signin(
-    state: State<RhombusRouterState>,
+    state: State<RouterState>,
     Extension(user): Extension<MaybeClientUser>,
     Extension(lang): Extension<Lang>,
     uri: Uri,
@@ -231,7 +231,7 @@ struct DiscordProfile {
 }
 
 pub async fn route_discord_callback(
-    state: State<RhombusRouterState>,
+    state: State<RouterState>,
     params: Query<DiscordCallback>,
     cookie_jar: CookieJar,
 ) -> impl IntoResponse {

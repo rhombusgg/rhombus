@@ -50,6 +50,7 @@ pub struct Settings {
     pub discord: DiscordSettings,
     pub ratelimit: Option<RateLimitSettings>,
     pub ip_preset: Option<IpPreset>,
+    pub live_reload: bool,
 }
 
 pub enum DbConfig {

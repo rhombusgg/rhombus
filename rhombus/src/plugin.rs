@@ -2,13 +2,13 @@ use async_trait::async_trait;
 use axum::Router;
 use minijinja::Environment;
 
-use crate::{database::Connection, locales::BundleMap, Result, RhombusRouterState};
+use crate::{database::Connection, locales::BundleMap, Result, RouterState};
 
 #[async_trait]
 pub trait Plugin {
     fn name(&self) -> String;
 
-    fn routes(&self, state: RhombusRouterState) -> Router {
+    fn routes(&self, state: RouterState) -> Router {
         Router::new().with_state(state)
     }
 

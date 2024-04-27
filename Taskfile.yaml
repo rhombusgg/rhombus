@@ -15,7 +15,7 @@ tasks:
   watch-standalone-systemfd:
     desc: Start cargo watch using systemfd to not drop connections on restart
     cmds:
-      - systemfd --no-pid -s http::3000 -- cargo watch -x 'run -p standalone'
+      - systemfd --no-pid -s http::3000 -- mold -run cargo watch -x 'run -p standalone'
 
   watch-tailwindcss:
     desc: Start Tailwind CSS in watch mode

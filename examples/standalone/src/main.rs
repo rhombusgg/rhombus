@@ -20,5 +20,11 @@ async fn main() {
         .await
         .unwrap();
 
-    rhombus::serve(app, "0.0.0.0:3000").await.unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    rhombus::axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .await
+    .unwrap();
 }

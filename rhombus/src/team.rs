@@ -5,14 +5,14 @@ use rand::{
     thread_rng,
 };
 
-use crate::{auth::ClientUser, locales::Lang, RhombusRouterState};
+use crate::{auth::ClientUser, locales::Lang, RouterState};
 
 pub fn create_team_invite_token() -> String {
     Alphanumeric.sample_string(&mut thread_rng(), 16)
 }
 
 pub async fn route_team(
-    State(state): State<RhombusRouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<ClientUser>,
     Extension(lang): Extension<Lang>,
     uri: Uri,

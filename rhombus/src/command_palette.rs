@@ -1,9 +1,9 @@
 use axum::{extract::State, response::Html};
 use minijinja::context;
 
-use crate::RhombusRouterState;
+use crate::RouterState;
 
-pub async fn route_command_palette(State(state): State<RhombusRouterState>) -> Html<String> {
+pub async fn route_command_palette(State(state): State<RouterState>) -> Html<String> {
     Html(
         state
             .jinja

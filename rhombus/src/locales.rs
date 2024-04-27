@@ -129,7 +129,7 @@ pub fn translate(localizer: &Localizations, msg_id: &str, kwargs: Kwargs, state:
 
 pub type Lang = Vec<String>;
 
-pub async fn locale(mut req: Request<Body>, next: Next) -> impl IntoResponse {
+pub async fn locale_middleware(mut req: Request<Body>, next: Next) -> impl IntoResponse {
     let langs = req
         .headers()
         .get(&ACCEPT_LANGUAGE)

@@ -12,7 +12,7 @@ use rhombus::{
     backend_postgres::Postgres,
     locales::{BundleMap, Lang},
     plugin::Plugin,
-    RhombusRouterState,
+    RouterState,
 };
 use sqlx::Executor;
 use unic_langid::LanguageIdentifier;
@@ -25,11 +25,11 @@ pub struct MyPlugin {
 #[derive(Clone)]
 struct MyPluginRouterState {
     a: i32,
-    rhombus: Option<RhombusRouterState>,
+    rhombus: Option<RouterState>,
 }
 
-impl FromRef<MyPluginRouterState> for RhombusRouterState {
-    fn from_ref(plugin_state: &MyPluginRouterState) -> RhombusRouterState {
+impl FromRef<MyPluginRouterState> for RouterState {
+    fn from_ref(plugin_state: &MyPluginRouterState) -> RouterState {
         plugin_state.rhombus.clone().unwrap()
     }
 }
@@ -48,7 +48,7 @@ impl Plugin for MyPlugin {
         "MyPlugin".to_owned()
     }
 
-    fn routes(&self, state: RhombusRouterState) -> Router {
+    fn routes(&self, state: RouterState) -> Router {
         Router::new()
             .route("/", routing::get(route_home))
             .with_state(MyPluginRouterState {
@@ -80,7 +80,7 @@ impl Plugin for MyPlugin {
 }
 
 async fn route_home(
-    State(rhombus): State<RhombusRouterState>,
+    State(rhombus): State<RouterState>,
     State(plugin): State<MyPluginRouterState>,
     Extension(user): Extension<MaybeClientUser>,
     Extension(lang): Extension<Lang>,

@@ -4,7 +4,7 @@ use minijinja::context;
 use reqwest::Client;
 use tracing::debug;
 
-use crate::{auth::ClientUser, locales::Lang, RhombusRouterState};
+use crate::{auth::ClientUser, locales::Lang, RouterState};
 
 #[cached(time = 10, key = "String", convert = "{ discord_id.to_string() }")]
 async fn is_in_server(discord_guild_id: &str, discord_id: &str, discord_bot_token: &str) -> bool {
@@ -23,7 +23,7 @@ async fn is_in_server(discord_guild_id: &str, discord_id: &str, discord_bot_toke
 }
 
 pub async fn route_account(
-    State(state): State<RhombusRouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<ClientUser>,
     Extension(lang): Extension<Lang>,
     uri: Uri,

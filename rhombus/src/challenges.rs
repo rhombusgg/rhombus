@@ -4,9 +4,9 @@ use axum::{
 };
 use minijinja::context;
 
-use crate::RhombusRouterState;
+use crate::RouterState;
 
-pub async fn route_challenges(state: State<RhombusRouterState>) -> impl IntoResponse {
+pub async fn route_challenges(state: State<RouterState>) -> impl IntoResponse {
     let challenges = state.db.get_challenges().await;
 
     Html(

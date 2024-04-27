@@ -7,7 +7,7 @@ authors = ["Mark Bundschuh <mark@mbund.dev>"]
 license = "GPL-3.0-only"
 repository = "https://github.com/rhombusgg/rhombus-rs"
 homepage = "https://rhombus.gg"
-keywords = ["web", "ctf"]
+keywords = ["web", "ctf", "http"]
 
 [dependencies]
 async-trait = "0.1.80"
@@ -55,13 +55,13 @@ unic-langid = { version = "0.9.4", features = ["unic-langid-macros"] }
 [build-dependencies]
 minijinja-embed = "1.0.20"
 
+[dev-dependencies]
+testcontainers = "0.15.0"
+testcontainers-modules = { version = "0.3.7", features = ["postgres"] }
+
 [features]
 default = ["dotenv"]
 postgres = ["dep:sqlx"]
 libsql = ["dep:libsql", "dep:futures"]
 dotenv = ["dep:dotenvy"]
 all = ["dotenv", "postgres", "libsql"]
-
-[dev-dependencies]
-testcontainers = "0.15.0"
-testcontainers-modules = { version = "0.3.7", features = ["postgres"] }

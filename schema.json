@@ -33,6 +33,15 @@
                 "postgres://postgres:password@localhost"
             ]
         },
+        "live_reload": {
+            "title": "Live Reload",
+            "description": "Automatically inject javascript to reload the page on save. Defaults to `true` when compiled in debug mode",
+            "type": "boolean",
+            "default": true,
+            "examples": [
+                true
+            ]
+        },
         "ip_preset": {
             "title": "IP Preset",
             "description": "Choose from a few default ways to extract the client IP address. For more advanced configuration, omit this option and write a custom function in Rust",

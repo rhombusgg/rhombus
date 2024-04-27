@@ -1,6 +1,8 @@
 use config::ConfigError;
 use thiserror::Error;
 
+pub type Result<T> = std::result::Result<T, RhombusError>;
+
 #[derive(Error, Debug)]
 pub enum RhombusError {
     #[cfg(feature = "libsql")]
