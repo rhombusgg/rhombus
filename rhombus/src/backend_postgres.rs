@@ -34,7 +34,7 @@ impl Database for Postgres {
         email: &str,
         avatar: &str,
         discord_id: &str,
-    ) -> (i64, i64) {
+    ) -> Result<i64> {
         #[derive(FromRow)]
         struct InsertUserResult {
             id: i64,
@@ -52,13 +52,17 @@ impl Database for Postgres {
         .bind(avatar)
         .bind(discord_id)
         .fetch_one(&self.pool)
-        .await
-        .unwrap();
+        .await?;
 
-        (user.id, 1)
+        Ok(user.id)
     }
 
-    async fn insert_track(&self, ip: IpAddr, user_agent: Option<&str>, user_id: Option<i64>) {
+    async fn insert_track(
+        &self,
+        ip: IpAddr,
+        user_agent: Option<&str>,
+        user_id: Option<i64>,
+    ) -> Result<()> {
         sqlx::query(
             r#"
             INSERT INTO Track (ip, user_agent, last_seen_at, user_id) VALUES ($1, $2, now(), $3)
@@ -73,11 +77,11 @@ impl Database for Postgres {
         .bind(user_agent)
         .bind(user_id)
         .execute(&self.pool)
-        .await
-        .unwrap();
+        .await?;
+        Ok(())
     }
 
-    async fn get_challenges(&self) -> Vec<Challenge> {
+    async fn get_challenges(&self) -> Result<Vec<Challenge>> {
         #[derive(FromRow)]
         struct DBChallenge {
             id: i64,
@@ -87,17 +91,16 @@ impl Database for Postgres {
 
         let challenges = sqlx::query_as::<_, DBChallenge>("SELECT * FROM challenge")
             .fetch_all(&self.pool)
-            .await
-            .unwrap();
+            .await?;
 
-        challenges
+        Ok(challenges
             .into_iter()
             .map(|challenge| Challenge {
                 id: challenge.id,
                 name: challenge.name,
                 description: challenge.description,
             })
-            .collect()
+            .collect())
     }
 
     async fn get_team_from_invite_token(&self, _invite_token: &str) -> Result<Option<Team>> {

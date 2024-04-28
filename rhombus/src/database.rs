@@ -29,9 +29,14 @@ pub trait Database {
         email: &str,
         avatar: &str,
         discord_id: &str,
-    ) -> (i64, i64);
-    async fn insert_track(&self, ip: IpAddr, user_agent: Option<&str>, user_id: Option<i64>);
-    async fn get_challenges(&self) -> Vec<Challenge>;
+    ) -> Result<i64>;
+    async fn insert_track(
+        &self,
+        ip: IpAddr,
+        user_agent: Option<&str>,
+        user_id: Option<i64>,
+    ) -> Result<()>;
+    async fn get_challenges(&self) -> Result<Vec<Challenge>>;
     async fn get_team_from_invite_token(&self, invite_token: &str) -> Result<Option<Team>>;
     async fn get_team_from_user_id(&self, user_id: i64) -> Result<Team>;
     async fn add_user_to_team(&self, user_id: i64, team_id: i64) -> Result<()>;

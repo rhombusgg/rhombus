@@ -342,10 +342,11 @@ pub async fn route_discord_callback(
         )
     };
 
-    let (user_id, _) = state
+    let user_id = state
         .db
         .upsert_user(&profile.global_name, &profile.email, &avatar, &profile.id)
-        .await;
+        .await
+        .unwrap();
 
     let now = chrono::Utc::now();
     let iat = now.timestamp() as usize;

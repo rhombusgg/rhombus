@@ -7,7 +7,7 @@ use minijinja::context;
 use crate::RouterState;
 
 pub async fn route_challenges(state: State<RouterState>) -> impl IntoResponse {
-    let challenges = state.db.get_challenges().await;
+    let challenges = state.db.get_challenges().await.unwrap();
 
     Html(
         state

@@ -79,29 +79,21 @@ impl Database for LibSQL {
         email: &str,
         avatar: &str,
         discord_id: &str,
-    ) -> (i64, i64) {
+    ) -> Result<i64> {
         let team_name = format!("{}'s team", name);
 
-        #[derive(Debug, Deserialize)]
-        struct ExistingUser {
-            id: i64,
-            team_id: i64,
-        }
         let tx = self.db.transaction().await.unwrap();
-        let mut rows = tx
+        let existing_user_id = tx
             .query(
-                "SELECT id, team_id FROM rhombus_user WHERE discord_id = ?",
+                "SELECT id FROM rhombus_user WHERE discord_id = ?",
                 [discord_id],
             )
-            .await
-            .unwrap();
-        let existing_user = rows
+            .await?
             .next()
-            .await
-            .unwrap()
-            .map(|row| de::from_row::<ExistingUser>(&row).unwrap());
-        if let Some(existing_user) = existing_user {
-            return (existing_user.id, existing_user.team_id);
+            .await?;
+        if let Some(existing_user_id) = existing_user_id {
+            let existing_user_id = existing_user_id.get::<i64>(0).unwrap();
+            return Ok(existing_user_id);
         }
 
         let team_invite_token = create_team_invite_token();
@@ -111,11 +103,9 @@ impl Database for LibSQL {
                 "INSERT INTO rhombus_team (name, invite_token) VALUES (?1, ?2) RETURNING id",
                 [team_name, team_invite_token],
             )
-            .await
-            .unwrap()
+            .await?
             .next()
-            .await
-            .unwrap()
+            .await?
             .unwrap()
             .get::<i64>(0)
             .unwrap();
@@ -125,11 +115,9 @@ impl Database for LibSQL {
                 "INSERT INTO rhombus_user (name, avatar, discord_id, team_id, owner_team_id) VALUES (?1, ?2, ?3, ?4, ?4) RETURNING id",
                 params!(name, avatar, discord_id, team_id),
             )
-            .await
-            .unwrap()
+            .await?
             .next()
-            .await
-            .unwrap()
+            .await?
             .unwrap()
             .get::<i64>(0)
             .unwrap();
@@ -143,10 +131,15 @@ impl Database for LibSQL {
 
         tx.commit().await.unwrap();
 
-        return (user_id, team_id);
+        return Ok(user_id);
     }
 
-    async fn insert_track(&self, ip: IpAddr, user_agent: Option<&str>, user_id: Option<i64>) {
+    async fn insert_track(
+        &self,
+        ip: IpAddr,
+        user_agent: Option<&str>,
+        user_id: Option<i64>,
+    ) -> Result<()> {
         let ip = match ip {
             IpAddr::V4(ip) => ip.to_ipv6_mapped(),
             IpAddr::V6(ip) => ip,
@@ -166,11 +159,9 @@ impl Database for LibSQL {
             ",
                 params!(ip, user_agent.map(truncate_to_256_chars).unwrap_or("")),
             )
-            .await
-            .unwrap()
+            .await?
             .next()
-            .await
-            .unwrap()
+            .await?
             .unwrap()
             .get::<i64>(0)
             .unwrap();
@@ -187,14 +178,12 @@ impl Database for LibSQL {
                 .await
                 .unwrap();
         }
+
+        Ok(())
     }
 
-    async fn get_challenges(&self) -> Vec<Challenge> {
-        let rows = self
-            .db
-            .query("SELECT * FROM rhombus_challenge", ())
-            .await
-            .unwrap();
+    async fn get_challenges(&self) -> Result<Vec<Challenge>> {
+        let rows = self.db.query("SELECT * FROM rhombus_challenge", ()).await?;
 
         #[derive(Debug, Deserialize)]
         struct DbChallenge {
@@ -209,14 +198,14 @@ impl Database for LibSQL {
             .collect::<Vec<DbChallenge>>()
             .await;
 
-        challenges
+        Ok(challenges
             .into_iter()
             .map(|challenge| Challenge {
                 id: challenge.id,
                 name: challenge.name,
                 description: challenge.description,
             })
-            .collect()
+            .collect())
     }
 
     async fn get_team_from_invite_token(&self, invite_token: &str) -> Result<Option<Team>> {
@@ -347,7 +336,8 @@ mod test {
             let user_agent = i.to_string();
             database
                 .insert_track(ip, Some(user_agent.as_str()), None)
-                .await;
+                .await
+                .unwrap();
         }
 
         let num_tracks = database
