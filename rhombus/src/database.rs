@@ -14,7 +14,7 @@ pub struct Challenge {
     pub description: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Team {
     pub id: i64,
     pub name: String,

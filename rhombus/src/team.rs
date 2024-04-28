@@ -5,7 +5,11 @@ use rand::{
     thread_rng,
 };
 
-use crate::{auth::User, locales::Lang, RouterState};
+use crate::{
+    auth::{get_team_from_user_id, User},
+    locales::Lang,
+    RouterState,
+};
 
 pub fn create_team_invite_token() -> String {
     Alphanumeric.sample_string(&mut thread_rng(), 16)
@@ -17,7 +21,9 @@ pub async fn route_team(
     Extension(lang): Extension<Lang>,
     uri: Uri,
 ) -> Html<String> {
-    let team = state.db.get_team_from_user_id(user.id).await.unwrap();
+    let team = get_team_from_user_id(state.db.clone(), user.id)
+        .await
+        .unwrap();
     Html(
         state
             .jinja
