@@ -262,15 +262,14 @@ impl Builder {
             for plugin in self.plugins.iter() {
                 plugin.migrate_libsql(database.clone()).await?;
             }
-            return Ok(Arc::new(database));
+            Ok(Arc::new(database))
         }
 
         #[cfg(not(feature = "libsql"))]
-        return Err(DatabaseConfigurationError::MissingFeature(
-            "libsql".to_owned(),
-            ":memory:".to_owned(),
+        Err(
+            DatabaseConfigurationError::MissingFeature("libsql".to_owned(), ":memory:".to_owned())
+                .into(),
         )
-        .into());
     }
 
     pub async fn build(&self) -> Result<Router> {
