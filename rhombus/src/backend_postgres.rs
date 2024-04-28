@@ -1,3 +1,5 @@
+use std::net::IpAddr;
+
 use async_trait::async_trait;
 use sqlx::{FromRow, PgPool};
 
@@ -55,7 +57,7 @@ impl Database for Postgres {
         (user.id, 1)
     }
 
-    async fn insert_track(&self, ip: &str, user_agent: Option<&str>, user_id: Option<i64>) {
+    async fn insert_track(&self, ip: IpAddr, user_agent: Option<&str>, user_id: Option<i64>) {
         sqlx::query(
             r#"
             INSERT INTO Track (ip, user_agent, last_seen_at, user_id) VALUES ($1, $2, now(), $3)
@@ -66,7 +68,7 @@ impl Database for Postgres {
                     requests = Track.requests + 1
             "#,
         )
-        .bind(ip)
+        .bind(ip.to_string())
         .bind(user_agent)
         .bind(user_id)
         .execute(&self.pool)

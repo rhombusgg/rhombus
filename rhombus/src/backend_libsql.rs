@@ -1,3 +1,5 @@
+use std::net::IpAddr;
+
 use async_trait::async_trait;
 use futures::stream::StreamExt;
 use libsql::{de, params, Builder};
@@ -130,21 +132,47 @@ impl Database for LibSQL {
         return (user_id, team_id);
     }
 
-    async fn insert_track(&self, ip: &str, user_agent: Option<&str>, user_id: Option<i64>) {
-        self.db
-            .execute(
-                r#"
-            INSERT INTO rhombus_track (ip, user_agent, last_seen_at, user_id) VALUES (?1, ?2, strftime('%s', 'now'), ?3)
+    async fn insert_track(&self, ip: IpAddr, user_agent: Option<&str>, user_id: Option<i64>) {
+        let ip = match ip {
+            IpAddr::V4(ip) => ip.to_ipv6_mapped(),
+            IpAddr::V6(ip) => ip,
+        }
+        .octets();
+
+        let track_id = self
+            .db
+            .query(
+                "
+            INSERT INTO rhombus_track (ip, user_agent) VALUES (?1, ?2)
             ON CONFLICT (ip, user_agent) DO
                 UPDATE SET
-                    user_id = ?3,
                     last_seen_at = strftime('%s', 'now'),
                     requests = rhombus_track.requests + 1
-            "#,
-                params!(ip, user_agent, user_id),
+            RETURNING id
+            ",
+                params!(ip, user_agent.unwrap_or("")),
             )
             .await
+            .unwrap()
+            .next()
+            .await
+            .unwrap()
+            .unwrap()
+            .get::<i64>(0)
             .unwrap();
+
+        if let Some(user_id) = user_id {
+            self.db
+                .execute(
+                    "
+                    INSERT INTO rhombus_track_ip (user_id, track_id) VALUES (?1, ?2)
+                    ON CONFLICT (user_id, track_id) DO NOTHING
+                ",
+                    [user_id, track_id],
+                )
+                .await
+                .unwrap();
+        }
     }
 
     async fn get_challenges(&self) -> Vec<Challenge> {
@@ -255,5 +283,33 @@ mod test {
     async fn migrate_libsql() {
         let database = LibSQL::new_memory().await.unwrap();
         database.migrate().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn track_load() {
+        let database = LibSQL::new_memory().await.unwrap();
+        database.migrate().await.unwrap();
+
+        let ip: IpAddr = "1.2.3.4".parse().unwrap();
+        for i in 0..1000 {
+            let user_agent = i.to_string();
+            database
+                .insert_track(ip, Some(user_agent.as_str()), None)
+                .await;
+        }
+
+        let num_tracks = database
+            .db
+            .query("SELECT COUNT(*) FROM rhombus_track", params!())
+            .await
+            .unwrap()
+            .next()
+            .await
+            .unwrap()
+            .unwrap()
+            .get::<i64>(0)
+            .unwrap();
+
+        assert_eq!(32, num_tracks);
     }
 }

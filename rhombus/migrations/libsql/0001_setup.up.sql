@@ -30,13 +30,34 @@ CREATE TABLE IF NOT EXISTS rhombus_team (
 );
 
 CREATE TABLE IF NOT EXISTS rhombus_track (
-    ip TEXT NOT NULL, -- 39 is the max length of an IPv6 address
+    id INTEGER PRIMARY KEY NOT NULL,
+    ip BLOB NOT NULL,
     user_agent TEXT NOT NULL,
     last_seen_at INTEGER(4) NOT NULL DEFAULT(strftime('%s', 'now')),
     requests INTEGER NOT NULL DEFAULT(1),
-    user_id INTEGER,
-    FOREIGN KEY (user_id) REFERENCES rhombus_user(id),
-    PRIMARY KEY (ip, user_agent)
+    UNIQUE(ip, user_agent)
 );
+
+CREATE TABLE IF NOT EXISTS rhombus_track_ip (
+    user_id INTEGER NOT NULL,
+    track_id INTEGER NOT NULL,
+    PRIMARY KEY (user_id, track_id),
+    FOREIGN KEY (track_id) REFERENCES rhombus_track(id) ON DELETE CASCADE
+);
+
+-- Enforce a maximum number of `user_agent`s per ip, to make it less trivial for someone
+-- to fill up our db by simply spamming us with requests from different user agents
+CREATE TRIGGER IF NOT EXISTS rhombus_track_autodelete
+    AFTER INSERT ON rhombus_track
+BEGIN
+    DELETE FROM rhombus_track
+    WHERE rowid = (
+        SELECT rowid
+        FROM rhombus_track
+        WHERE ip = NEW.ip AND rowid != NEW.rowid
+        ORDER BY requests DESC
+        LIMIT 1 OFFSET 31
+    );
+END;
 
 COMMIT;

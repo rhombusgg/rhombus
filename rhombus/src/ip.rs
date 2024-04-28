@@ -24,7 +24,6 @@ pub async fn track_middleware(
     next: Next,
 ) -> impl IntoResponse {
     if let Some(ip) = ip {
-        let ip = ip.to_string();
         let user_id = user.as_ref().map(|u| u.id);
         let user_agent = req
             .headers()
@@ -36,7 +35,7 @@ pub async fn track_middleware(
         tokio::spawn(async move {
             state
                 .db
-                .insert_track(&ip, user_agent.as_deref(), user_id)
+                .insert_track(ip, user_agent.as_deref(), user_id)
                 .await;
         });
     }
@@ -140,17 +139,22 @@ impl KeyExtractor for KeyExtractorShim {
     }
 }
 
-fn canonicalize_ip(ip: IpAddr) -> IpAddr {
+pub(crate) fn canonicalize_ip(ip: IpAddr) -> IpAddr {
     match ip {
         IpAddr::V4(_) => ip,
         IpAddr::V6(ip) => {
-            // Mask IPv6 to the nearest /64
-            let mut segments = ip.segments();
-            segments[4] = 0;
-            segments[5] = 0;
-            segments[6] = 0;
-            segments[7] = 0;
-            IpAddr::from(segments)
+            if ip.to_ipv4_mapped().is_some() {
+                IpAddr::V6(ip)
+            } else {
+                // Mask IPv6 to the nearest /64
+                let mut segments = ip.segments();
+                segments[4] = 0;
+                segments[5] = 0;
+                segments[6] = 0;
+                segments[7] = 0;
+
+                IpAddr::from(segments)
+            }
         }
     }
 }
@@ -246,6 +250,14 @@ mod test {
     fn canonicalize_ipv6_1() {
         let ip: IpAddr = "2001:DB8::21f:5bff:febf:ce22:8a2e".parse().unwrap();
         let ip_want: IpAddr = "2001:db8:0:21f::".parse().unwrap();
+        let result = canonicalize_ip(ip);
+        assert_eq!(ip_want, result);
+    }
+
+    #[test]
+    fn canonicalize_ipv6_ipv4() {
+        let ip: IpAddr = "::ffff:1.2.3.4".parse().unwrap();
+        let ip_want: IpAddr = "::ffff:1.2.3.4".parse().unwrap();
         let result = canonicalize_ip(ip);
         assert_eq!(ip_want, result);
     }
