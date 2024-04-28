@@ -3,4 +3,4 @@
 /result
 
 *.env
-*.db
+*.db*

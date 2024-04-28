@@ -43,6 +43,7 @@ pub enum IpPreset {
 #[cfg(feature = "libsql")]
 pub struct Turso {
     pub auth_token: String,
+    pub local_replica_path: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

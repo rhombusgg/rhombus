@@ -142,6 +142,7 @@ impl Builder {
             match database_config {
                 #[cfg(feature = "postgres")]
                 DbConfig::RawPostgres(pool) => {
+                    info!("Using user preconfigured postgres");
                     let database = crate::backend_postgres::Postgres::new(pool.to_owned());
                     database.migrate().await?;
 
@@ -154,6 +155,7 @@ impl Builder {
 
                 #[cfg(feature = "libsql")]
                 DbConfig::RawLibSQL(connection) => {
+                    info!("Using user preconfigured libsql connection");
                     let database: crate::backend_libsql::LibSQL = connection.to_owned().into();
                     database.migrate().await?;
 
@@ -177,6 +179,7 @@ impl Builder {
 
                 #[cfg(feature = "postgres")]
                 {
+                    info!("Connecting to postgres database from database url");
                     let pool = sqlx::postgres::PgPoolOptions::new()
                         .connect(database_url)
                         .await?;
@@ -204,6 +207,7 @@ impl Builder {
 
                 #[cfg(feature = "libsql")]
                 {
+                    info!("Connecting to local file libsql database from database url");
                     let database = crate::backend_libsql::LibSQL::new_local(path).await?;
                     database.migrate().await?;
 
@@ -215,7 +219,7 @@ impl Builder {
                 }
             }
 
-            if let Some(path) = database_url.strip_prefix("libsql://") {
+            if database_url.strip_prefix("libsql://").is_some() {
                 #[cfg(not(feature = "libsql"))]
                 {
                     _ = path;
@@ -229,9 +233,22 @@ impl Builder {
                 if let Some(turso) = &settings.turso {
                     #[cfg(feature = "libsql")]
                     {
-                        let database =
-                            crate::backend_libsql::LibSQL::new_remote(path, &turso.auth_token)
-                                .await?;
+                        let database = if let Some(local_replica_path) = &turso.local_replica_path {
+                            info!("Connecting to remote libsql database with local replica from database url");
+                            crate::backend_libsql::LibSQL::new_remote_replica(
+                                local_replica_path,
+                                database_url.to_owned(),
+                                turso.auth_token.to_owned(),
+                            )
+                            .await?
+                        } else {
+                            info!("Connecting to remote libsql database from database url");
+                            crate::backend_libsql::LibSQL::new_remote(
+                                database_url.to_owned(),
+                                turso.auth_token.to_owned(),
+                            )
+                            .await?
+                        };
                         database.migrate().await?;
 
                         for plugin in self.plugins.iter() {

@@ -70,7 +70,7 @@ pub async fn enforce_auth_middleware(
 
 #[cached(time = 30, key = "i64", convert = "{ user_id }")]
 async fn get_user_from_id(db: Connection, user_id: i64) -> Option<User> {
-    tracing::trace!("user id cache miss");
+    tracing::trace!(user_id, "cache miss");
     db.get_user_from_id(user_id).await.ok()
 }
 

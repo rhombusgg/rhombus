@@ -1,4 +1,4 @@
-use std::{net::IpAddr, sync::Arc};
+use std::{net::IpAddr, path::Path, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use futures::stream::StreamExt;
@@ -19,7 +19,7 @@ pub struct LibSQL {
 }
 
 impl LibSQL {
-    pub async fn new_local(path: &str) -> Result<LibSQL> {
+    pub async fn new_local(path: impl AsRef<Path>) -> Result<LibSQL> {
         let db = Builder::new_local(path).build().await?.connect()?;
         Ok(LibSQL { db })
     }
@@ -29,8 +29,21 @@ impl LibSQL {
         Ok(LibSQL { db })
     }
 
-    pub async fn new_remote(url: &str, auth_token: &str) -> Result<LibSQL> {
-        let db = Builder::new_remote(url.to_string(), auth_token.to_string())
+    pub async fn new_remote(url: String, auth_token: String) -> Result<LibSQL> {
+        let db = Builder::new_remote(url, auth_token)
+            .build()
+            .await?
+            .connect()?;
+        Ok(LibSQL { db })
+    }
+
+    pub async fn new_remote_replica(
+        path: impl AsRef<Path>,
+        url: String,
+        auth_token: String,
+    ) -> Result<LibSQL> {
+        let db = Builder::new_remote_replica(path, url, auth_token)
+            .sync_interval(Duration::from_secs(60))
             .build()
             .await?
             .connect()?;
@@ -151,7 +164,7 @@ impl Database for LibSQL {
                     requests = rhombus_track.requests + 1
             RETURNING id
             ",
-                params!(ip, user_agent.map(|agent| &agent[..256]).unwrap_or("")),
+                params!(ip, user_agent.map(truncate_to_256_chars).unwrap_or("")),
             )
             .await
             .unwrap()
@@ -303,6 +316,14 @@ impl Database for LibSQL {
             disabled: user.disabled,
             is_admin: user.is_admin,
         }))
+    }
+}
+
+fn truncate_to_256_chars(s: &str) -> &str {
+    if s.len() <= 256 {
+        s
+    } else {
+        &s[..256]
     }
 }
 
