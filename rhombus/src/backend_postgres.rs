@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use sqlx::{FromRow, PgPool};
 
 use crate::{
+    auth::User,
     database::{Challenge, Database, Team},
     Result,
 };
@@ -108,6 +109,10 @@ impl Database for Postgres {
     }
 
     async fn add_user_to_team(&self, _user_id: i64, _team_id: i64) -> Result<()> {
+        todo!()
+    }
+
+    async fn get_user_from_id(&self, _user_id: i64) -> Result<User> {
         todo!()
     }
 }

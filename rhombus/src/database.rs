@@ -3,7 +3,7 @@ use std::{net::IpAddr, sync::Arc};
 use async_trait::async_trait;
 use serde::Serialize;
 
-use crate::Result;
+use crate::{auth::User, Result};
 
 pub type Connection = Arc<dyn Database + Send + Sync>;
 
@@ -35,4 +35,5 @@ pub trait Database {
     async fn get_team_from_invite_token(&self, invite_token: &str) -> Result<Option<Team>>;
     async fn get_team_from_user_id(&self, user_id: i64) -> Result<Team>;
     async fn add_user_to_team(&self, user_id: i64, team_id: i64) -> Result<()>;
+    async fn get_user_from_id(&self, user_id: i64) -> Result<User>;
 }

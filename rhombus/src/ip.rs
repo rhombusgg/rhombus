@@ -8,16 +8,15 @@ use axum::{
 };
 use std::net::{IpAddr, SocketAddr};
 use tower_governor::{key_extractor::KeyExtractor, GovernorError};
-use tracing::trace;
 
-use crate::{auth::MaybeClientUser, RouterState};
+use crate::{auth::MaybeUser, RouterState};
 
 /// Middleware to log the IP and user agent of the client in the database as track.
 /// Associates the track with the user if the user is logged in. Runs asynchronously,
 /// so it does not block the request and passes on to the next middleware immediately.
 pub async fn track_middleware(
     Extension(ip): Extension<Option<IpAddr>>,
-    Extension(user): Extension<MaybeClientUser>,
+    Extension(user): Extension<MaybeUser>,
     State(state): State<RouterState>,
     uri: Uri,
     req: Request<Body>,
@@ -30,9 +29,9 @@ pub async fn track_middleware(
             .get(&USER_AGENT)
             .map(|header| header.to_str().unwrap().to_string());
 
-        trace!(user_id, user_agent, uri = uri.to_string(), "Request");
+        tracing::trace!(user_id, user_agent, uri = uri.to_string(), "Request");
 
-        tokio::spawn(async move {
+        tokio::task::spawn(async move {
             state
                 .db
                 .insert_track(ip, user_agent.as_deref(), user_id)

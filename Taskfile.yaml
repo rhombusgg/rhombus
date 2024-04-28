@@ -12,6 +12,11 @@ tasks:
     cmds:
       - mold -run cargo watch -x 'run -p standalone'
 
+  watch-standalone-release:
+    desc: Start cargo watch
+    cmds:
+      - mold -run cargo watch -x 'run -p standalone --release'
+
   watch-standalone-systemfd:
     desc: Start cargo watch using systemfd to not drop connections on restart
     cmds:

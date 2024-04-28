@@ -6,11 +6,11 @@ use axum::{
 };
 use minijinja::context;
 
-use crate::{auth::MaybeClientUser, locales::Lang, RouterState};
+use crate::{auth::MaybeUser, locales::Lang, RouterState};
 
 pub async fn route_home(
     State(state): State<RouterState>,
-    Extension(user): Extension<MaybeClientUser>,
+    Extension(user): Extension<MaybeUser>,
     Extension(lang): Extension<Lang>,
     uri: Uri,
 ) -> impl IntoResponse {

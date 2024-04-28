@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS rhombus_user (
     discord_id TEXT NOT NULL UNIQUE,
     team_id INTEGER NOT NULL,
     owner_team_id INTEGER NOT NULL,
+    disabled BOOLEAN NOT NULL DEFAULT(FALSE),
+    is_admin BOOLEAN NOT NULL DEFAULT(FALSE),
     FOREIGN KEY (team_id) REFERENCES rhombus_team(id),
     FOREIGN KEY (owner_team_id) REFERENCES rhombus_team(id) ON DELETE CASCADE
 );
@@ -37,6 +39,8 @@ CREATE TABLE IF NOT EXISTS rhombus_track (
     requests INTEGER NOT NULL DEFAULT(1),
     UNIQUE(ip, user_agent)
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS rhombus_track_ip_user_agent ON rhombus_track(ip, user_agent);
 
 CREATE TABLE IF NOT EXISTS rhombus_track_ip (
     user_id INTEGER NOT NULL,

@@ -8,7 +8,7 @@ use axum::{
 use fluent::FluentResource;
 use minijinja::{context, Environment};
 use rhombus::{
-    auth::MaybeClientUser,
+    auth::MaybeTokenClaims,
     backend_postgres::Postgres,
     locales::{BundleMap, Lang},
     plugin::Plugin,
@@ -82,7 +82,7 @@ impl Plugin for MyPlugin {
 async fn route_home(
     State(rhombus): State<RouterState>,
     State(plugin): State<MyPluginRouterState>,
-    Extension(user): Extension<MaybeClientUser>,
+    Extension(user): Extension<MaybeTokenClaims>,
     Extension(lang): Extension<Lang>,
     uri: Uri,
 ) -> Html<String> {

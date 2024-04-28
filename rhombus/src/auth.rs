@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::{
     body::Body,
     extract::{Query, State},
@@ -13,49 +15,35 @@ use axum_extra::extract::{
     cookie::{Cookie, SameSite},
     CookieJar,
 };
-use chrono::{DateTime, Utc};
+use cached::{proc_macro::cached, Cached};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use minijinja::context;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::{locales::Lang, RouterState};
+use crate::{database::Connection, locales::Lang, RouterState};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct User {
+pub struct UserInner {
     pub id: i64,
     pub name: String,
-    pub email: String,
     pub avatar: String,
     pub discord_id: String,
-    #[serde(rename = "createdAt")]
-    pub created_at: Option<DateTime<Utc>>,
-    #[serde(rename = "updatedAt")]
-    pub updated_at: Option<DateTime<Utc>>,
+    pub disabled: bool,
+    pub is_admin: bool,
 }
+pub type User = Arc<UserInner>;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TokenClaims {
     pub sub: i64,
-    pub name: String,
-    pub email: String,
-    pub avatar: String,
-    pub discord_id: String,
     pub iat: usize,
     pub exp: usize,
 }
 
-#[derive(Debug, Serialize, Clone)]
-pub struct ClientUser {
-    pub id: i64,
-    pub name: String,
-    pub email: String,
-    pub avatar: String,
-    pub discord_id: String,
-}
-
-pub type MaybeClientUser = Option<ClientUser>;
+pub type MaybeTokenClaims = Option<TokenClaims>;
+pub type MaybeUser = Option<User>;
 
 #[derive(Debug, Serialize, Clone)]
 pub struct ErrorResponse {
@@ -63,11 +51,12 @@ pub struct ErrorResponse {
 }
 
 pub async fn enforce_auth_middleware(
-    Extension(user): Extension<MaybeClientUser>,
-    mut req: Request<Body>,
+    Extension(maybe_user): Extension<MaybeUser>,
+    Extension(maybe_token_claims): Extension<MaybeTokenClaims>,
+    req: Request<Body>,
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
-    if user.is_none() {
+    if maybe_user.is_none() || maybe_token_claims.is_none() {
         return Err((
             StatusCode::UNAUTHORIZED,
             Json(ErrorResponse {
@@ -75,11 +64,14 @@ pub async fn enforce_auth_middleware(
             }),
         ));
     }
-    let user = user.unwrap();
-
-    req.extensions_mut().insert(user);
 
     Ok(next.run(req).await)
+}
+
+#[cached(time = 30, key = "i64", convert = "{ user_id }")]
+async fn get_user_from_id(db: Connection, user_id: i64) -> Option<User> {
+    tracing::trace!("user id cache miss");
+    db.get_user_from_id(user_id).await.ok()
 }
 
 pub async fn auth_injector_middleware(
@@ -88,6 +80,12 @@ pub async fn auth_injector_middleware(
     mut req: Request<Body>,
     next: Next,
 ) -> impl IntoResponse {
+    let maybe_token_claims: MaybeTokenClaims = None;
+    req.extensions_mut().insert(maybe_token_claims);
+
+    let maybe_user: MaybeUser = None;
+    req.extensions_mut().insert(maybe_user);
+
     let token = cookie_jar
         .get("rhombus-token")
         .map(|cookie| cookie.value().to_string())
@@ -102,33 +100,21 @@ pub async fn auth_injector_middleware(
                 })
         });
 
-    if token.is_none() {
-        let client_user: MaybeClientUser = None;
-        req.extensions_mut().insert(client_user);
-        return next.run(req).await;
+    if let Some(token) = token {
+        if let Ok(token_data) = decode::<TokenClaims>(
+            &token,
+            &DecodingKey::from_secret(data.settings.jwt_secret.as_ref()),
+            &Validation::default(),
+        ) {
+            req.extensions_mut().insert(Some(token_data.claims.clone()));
+            req.extensions_mut().insert(token_data.claims.clone());
+            if let Some(user) = get_user_from_id(data.db.clone(), token_data.claims.sub).await {
+                req.extensions_mut().insert(Some(user.clone()));
+                req.extensions_mut().insert(user);
+            }
+        }
     }
-    let token = token.unwrap();
 
-    let claims = decode::<TokenClaims>(
-        &token,
-        &DecodingKey::from_secret(data.settings.jwt_secret.as_ref()),
-        &Validation::default(),
-    );
-    if claims.is_err() {
-        let client_user: MaybeClientUser = None;
-        req.extensions_mut().insert(client_user);
-        return next.run(req).await;
-    }
-    let claims = claims.unwrap().claims;
-
-    let client_user: MaybeClientUser = Some(ClientUser {
-        id: claims.sub,
-        name: claims.name,
-        email: claims.email,
-        avatar: claims.avatar,
-        discord_id: claims.discord_id,
-    });
-    req.extensions_mut().insert(client_user);
     next.run(req).await
 }
 
@@ -139,7 +125,7 @@ pub struct SignInParams {
 
 pub async fn route_signin(
     state: State<RouterState>,
-    Extension(user): Extension<MaybeClientUser>,
+    Extension(user): Extension<MaybeUser>,
     Extension(lang): Extension<Lang>,
     uri: Uri,
     params: Query<SignInParams>,
@@ -353,10 +339,6 @@ pub async fn route_discord_callback(
     let exp = (now + chrono::Duration::try_minutes(60).unwrap()).timestamp() as usize;
     let claims = TokenClaims {
         sub: user_id,
-        name: profile.global_name,
-        email: profile.email,
-        avatar,
-        discord_id: profile.id,
         exp,
         iat,
     };
@@ -400,6 +382,11 @@ pub async fn route_discord_callback(
         .http_only(true);
 
     headers.append(header::SET_COOKIE, cookie.to_string().parse().unwrap());
+
+    {
+        let mut user_id_cache = GET_USER_FROM_ID.lock().await;
+        user_id_cache.cache_remove(&user_id);
+    }
 
     response
 }

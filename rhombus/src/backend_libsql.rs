@@ -1,4 +1,4 @@
-use std::net::IpAddr;
+use std::{net::IpAddr, sync::Arc};
 
 use async_trait::async_trait;
 use futures::stream::StreamExt;
@@ -7,6 +7,7 @@ use rust_embed::RustEmbed;
 use serde::Deserialize;
 
 use crate::{
+    auth::{User, UserInner},
     database::{Challenge, Database, Team},
     team::create_team_invite_token,
     Result,
@@ -272,6 +273,36 @@ impl Database for LibSQL {
             )
             .await?;
         Ok(())
+    }
+
+    async fn get_user_from_id(&self, user_id: i64) -> Result<User> {
+        #[derive(Debug, Deserialize)]
+        struct DbUser {
+            id: i64,
+            name: String,
+            avatar: String,
+            discord_id: String,
+            disabled: bool,
+            is_admin: bool,
+        }
+
+        let row = self
+            .db
+            .query("SELECT * FROM rhombus_user WHERE id = ?1", [user_id])
+            .await?
+            .next()
+            .await?
+            .ok_or(libsql::Error::QueryReturnedNoRows)?;
+
+        let user = de::from_row::<DbUser>(&row).unwrap();
+        Ok(Arc::new(UserInner {
+            id: user.id,
+            name: user.name,
+            avatar: user.avatar,
+            discord_id: user.discord_id,
+            disabled: user.disabled,
+            is_admin: user.is_admin,
+        }))
     }
 }
 
