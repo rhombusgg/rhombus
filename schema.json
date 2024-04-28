@@ -64,6 +64,19 @@
                 "peer-ip"
             ]
         },
+        "turso": {
+            "title": "Turso",
+            "description": "Configuration for 3rd party database provider https://turso.tech",
+            "type": "object",
+            "properties": {
+                "auth_token": {
+                    "title": "Auth Token",
+                    "description": "Authentication token to access the database",
+                    "type": "string",
+                    "pattern": ".+\\..+\\..+"
+                }
+            }
+        },
         "ratelimit": {
             "title": "Rate limit",
             "description": "Configuration related to built in rate limiting",

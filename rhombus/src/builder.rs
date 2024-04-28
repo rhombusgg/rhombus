@@ -20,7 +20,7 @@ use crate::{
     challenges::route_challenges,
     command_palette::route_command_palette,
     database::Database,
-    errors::DatabaseConfigurationError,
+    errors::{DatabaseConfigurationError, RhombusError},
     home::route_home,
     ip::{
         default_ip_extractor, ip_insert_blank_middleware, ip_insert_middleware,
@@ -56,30 +56,10 @@ pub struct Builder {
 }
 
 impl Builder {
+    #[cfg(feature = "dotenv")]
     pub fn load_env(self) -> Self {
-        #[cfg(feature = "dotenv")]
-        {
-            _ = dotenvy::dotenv();
-        }
-
-        let database = self.database;
-
-        #[cfg(feature = "libsql")]
-        let database = if let (Ok(libsql_url), Ok(libsql_auth_token)) =
-            (env::var("LIBSQL_URL"), env::var("LIBSQL_AUTH_TOKEN"))
-        {
-            Some((libsql_url, libsql_auth_token).into())
-        } else {
-            database
-        };
-
-        let database = if let Ok(database_url) = env::var("DATABASE_URL") {
-            Some(database_url.into())
-        } else {
-            database
-        };
-
-        Self { database, ..self }
+        _ = dotenvy::dotenv();
+        self
     }
 
     /// Choose a client IP extractor for your environment
@@ -157,7 +137,7 @@ impl Builder {
         Self { plugins, ..self }
     }
 
-    async fn build_database(&self) -> Result<crate::database::Connection> {
+    async fn build_database(&self, settings: &Settings) -> Result<crate::database::Connection> {
         if let Some(database_config) = &self.database {
             match database_config {
                 #[cfg(feature = "postgres")]
@@ -169,20 +149,7 @@ impl Builder {
                         plugin.migrate_postgresql(database.clone()).await?;
                     }
 
-                    Ok(Arc::new(database))
-                }
-
-                #[cfg(feature = "libsql")]
-                DbConfig::LibSQL(url, auth_token) => {
-                    let database =
-                        crate::backend_libsql::LibSQL::new_remote(url, auth_token).await?;
-                    database.migrate().await?;
-
-                    for plugin in self.plugins.iter() {
-                        plugin.migrate_libsql(database.clone()).await?;
-                    }
-
-                    Ok(Arc::new(database))
+                    return Ok(Arc::new(database));
                 }
 
                 #[cfg(feature = "libsql")]
@@ -194,84 +161,116 @@ impl Builder {
                         plugin.migrate_libsql(database.clone()).await?;
                     }
 
-                    Ok(Arc::new(database))
-                }
-
-                DbConfig::Url(database_url) => {
-                    if database_url.starts_with("postgres://") {
-                        #[cfg(not(feature = "postgres"))]
-                        return Err(DatabaseConfigurationError::MissingFeature(
-                            "postgres".to_owned(),
-                            database_url.to_owned(),
-                        )
-                        .into());
-
-                        #[cfg(feature = "postgres")]
-                        {
-                            let pool = sqlx::postgres::PgPoolOptions::new()
-                                .connect(database_url)
-                                .await?;
-                            let database = crate::backend_postgres::Postgres::new(pool);
-                            database.migrate().await?;
-
-                            for plugin in self.plugins.iter() {
-                                plugin.migrate_postgresql(database.clone()).await?;
-                            }
-
-                            return Ok(Arc::new(database));
-                        }
-                    }
-
-                    if let Some(path) = database_url.strip_prefix("file://") {
-                        #[cfg(not(feature = "libsql"))]
-                        {
-                            _ = path;
-                            return Err(DatabaseConfigurationError::MissingFeature(
-                                "libsql".to_owned(),
-                                database_url.to_owned(),
-                            )
-                            .into());
-                        }
-
-                        #[cfg(feature = "libsql")]
-                        {
-                            let database = crate::backend_libsql::LibSQL::new_local(path).await?;
-                            database.migrate().await?;
-
-                            for plugin in self.plugins.iter() {
-                                plugin.migrate_libsql(database.clone()).await?;
-                            }
-
-                            return Ok(Arc::new(database));
-                        }
-                    }
-
-                    Err(
-                        DatabaseConfigurationError::UnknownUrlScheme(database_url.to_owned())
-                            .into(),
-                    )
+                    return Ok(Arc::new(database));
                 }
             }
-        } else {
-            #[cfg(feature = "libsql")]
-            {
-                info!("Falling back to in memory database");
-                let database = crate::backend_libsql::LibSQL::new_memory().await?;
-                database.migrate().await?;
-
-                for plugin in self.plugins.iter() {
-                    plugin.migrate_libsql(database.clone()).await?;
-                }
-                Ok(Arc::new(database))
-            }
-
-            #[cfg(not(feature = "libsql"))]
-            Err(DatabaseConfigurationError::MissingFeature(
-                "libsql".to_owned(),
-                ":memory:".to_owned(),
-            )
-            .into())
         }
+
+        if let Some(database_url) = &settings.database_url {
+            if database_url.starts_with("postgres://") {
+                #[cfg(not(feature = "postgres"))]
+                return Err(DatabaseConfigurationError::MissingFeature(
+                    "postgres".to_owned(),
+                    database_url.to_owned(),
+                )
+                .into());
+
+                #[cfg(feature = "postgres")]
+                {
+                    let pool = sqlx::postgres::PgPoolOptions::new()
+                        .connect(database_url)
+                        .await?;
+                    let database = crate::backend_postgres::Postgres::new(pool);
+                    database.migrate().await?;
+
+                    for plugin in self.plugins.iter() {
+                        plugin.migrate_postgresql(database.clone()).await?;
+                    }
+
+                    return Ok(Arc::new(database));
+                }
+            }
+
+            if let Some(path) = database_url.strip_prefix("file://") {
+                #[cfg(not(feature = "libsql"))]
+                {
+                    _ = path;
+                    return Err(DatabaseConfigurationError::MissingFeature(
+                        "libsql".to_owned(),
+                        database_url.to_owned(),
+                    )
+                    .into());
+                }
+
+                #[cfg(feature = "libsql")]
+                {
+                    let database = crate::backend_libsql::LibSQL::new_local(path).await?;
+                    database.migrate().await?;
+
+                    for plugin in self.plugins.iter() {
+                        plugin.migrate_libsql(database.clone()).await?;
+                    }
+
+                    return Ok(Arc::new(database));
+                }
+            }
+
+            if let Some(path) = database_url.strip_prefix("libsql://") {
+                #[cfg(not(feature = "libsql"))]
+                {
+                    _ = path;
+                    return Err(DatabaseConfigurationError::MissingFeature(
+                        "libsql".to_owned(),
+                        database_url.to_owned(),
+                    )
+                    .into());
+                }
+
+                if let Some(turso) = &settings.turso {
+                    #[cfg(feature = "libsql")]
+                    {
+                        let database =
+                            crate::backend_libsql::LibSQL::new_remote(path, &turso.auth_token)
+                                .await?;
+                        database.migrate().await?;
+
+                        for plugin in self.plugins.iter() {
+                            plugin.migrate_libsql(database.clone()).await?;
+                        }
+
+                        return Ok(Arc::new(database));
+                    }
+                } else {
+                    return Err(RhombusError::MissingConfiguration(format!(
+                        "libsql.auth_token must be set for url {}",
+                        database_url
+                    )));
+                }
+            }
+
+            return Err(
+                DatabaseConfigurationError::UnknownUrlScheme(database_url.to_owned()).into(),
+            );
+        }
+
+        #[cfg(feature = "libsql")]
+        {
+            tracing::warn!("Falling back to in memory database");
+            let database = crate::backend_libsql::LibSQL::new_memory().await?;
+            database.migrate().await?;
+
+            for plugin in self.plugins.iter() {
+                plugin.migrate_libsql(database.clone()).await?;
+            }
+            return Ok(Arc::new(database));
+        }
+
+        #[cfg(not(feature = "libsql"))]
+        return Err(DatabaseConfigurationError::MissingFeature(
+            "libsql".to_owned(),
+            ":memory:".to_owned(),
+        )
+        .into());
     }
 
     pub async fn build(&self) -> Result<Router> {
@@ -283,7 +282,7 @@ impl Builder {
             .build()?
             .try_deserialize()?;
 
-        let db = self.build_database().await?;
+        let db = self.build_database(&settings).await?;
 
         let mut localizer = locales::Localizations::new();
         for plugin in self.plugins.iter() {

@@ -40,6 +40,12 @@ pub enum IpPreset {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[cfg(feature = "libsql")]
+pub struct Turso {
+    pub auth_token: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct Settings {
     pub location_url: String,
     pub jwt_secret: String,
@@ -48,31 +54,17 @@ pub struct Settings {
     pub ratelimit: Option<RateLimitSettings>,
     pub ip_preset: Option<IpPreset>,
     pub live_reload: bool,
+
+    #[cfg(feature = "libsql")]
+    pub turso: Option<Turso>,
 }
 
 pub enum DbConfig {
-    Url(String),
-
     #[cfg(feature = "postgres")]
     RawPostgres(sqlx::PgPool),
 
     #[cfg(feature = "libsql")]
-    LibSQL(String, String),
-
-    #[cfg(feature = "libsql")]
     RawLibSQL(libsql::Connection),
-}
-
-impl From<String> for DbConfig {
-    fn from(value: String) -> Self {
-        Self::Url(value)
-    }
-}
-
-impl From<&str> for DbConfig {
-    fn from(value: &str) -> Self {
-        Self::Url(value.to_owned())
-    }
 }
 
 #[cfg(feature = "postgres")]
@@ -86,19 +78,5 @@ impl From<sqlx::PgPool> for DbConfig {
 impl From<libsql::Connection> for DbConfig {
     fn from(value: libsql::Connection) -> Self {
         Self::RawLibSQL(value)
-    }
-}
-
-#[cfg(feature = "libsql")]
-impl From<(&str, &str)> for DbConfig {
-    fn from(value: (&str, &str)) -> Self {
-        Self::LibSQL(value.0.to_owned(), value.1.to_owned())
-    }
-}
-
-#[cfg(feature = "libsql")]
-impl From<(String, String)> for DbConfig {
-    fn from(value: (String, String)) -> Self {
-        Self::LibSQL(value.0, value.1)
     }
 }
