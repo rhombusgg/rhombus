@@ -151,7 +151,7 @@ impl Database for LibSQL {
                     requests = rhombus_track.requests + 1
             RETURNING id
             ",
-                params!(ip, user_agent.unwrap_or("")),
+                params!(ip, user_agent.map(|agent| &agent[..256]).unwrap_or("")),
             )
             .await
             .unwrap()
