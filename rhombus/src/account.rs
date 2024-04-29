@@ -8,6 +8,8 @@ use crate::{auth::User, locales::Lang, RouterState};
 
 #[cached(time = 10, key = "String", convert = "{ discord_id.to_string() }")]
 async fn is_in_server(discord_guild_id: &str, discord_id: &str, discord_bot_token: &str) -> bool {
+    tracing::trace!(discord_id, "cache miss: is_in_server");
+
     let client = Client::new();
     let res = client
         .get(format!(

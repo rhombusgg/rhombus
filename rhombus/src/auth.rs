@@ -15,18 +15,13 @@ use axum_extra::extract::{
     cookie::{Cookie, SameSite},
     CookieJar,
 };
-use cached::{proc_macro::cached, Cached};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use minijinja::context;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::{
-    database::{Connection, Team},
-    locales::Lang,
-    RouterState,
-};
+use crate::{locales::Lang, RouterState};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct UserInner {
@@ -74,18 +69,6 @@ pub async fn enforce_auth_middleware(
     Ok(next.run(req).await)
 }
 
-#[cached(time = 30, key = "i64", convert = "{ user_id }")]
-pub async fn get_team_from_user_id(db: Connection, user_id: i64) -> Option<Team> {
-    tracing::trace!(user_id, "cache miss: get_team_from_user_id");
-    db.get_team_from_user_id(user_id).await.ok()
-}
-
-#[cached(time = 30, key = "i64", convert = "{ user_id }")]
-async fn get_user_from_id(db: Connection, user_id: i64) -> Option<User> {
-    tracing::trace!(user_id, "cache miss: get_user_from_id");
-    db.get_user_from_id(user_id).await.ok()
-}
-
 pub async fn auth_injector_middleware(
     cookie_jar: CookieJar,
     State(data): State<RouterState>,
@@ -120,7 +103,7 @@ pub async fn auth_injector_middleware(
         ) {
             req.extensions_mut().insert(Some(token_data.claims.clone()));
             req.extensions_mut().insert(token_data.claims.clone());
-            if let Some(user) = get_user_from_id(data.db.clone(), token_data.claims.sub).await {
+            if let Ok(user) = data.db.get_user_from_id(token_data.claims.sub).await {
                 req.extensions_mut().insert(Some(user.clone()));
                 req.extensions_mut().insert(user);
             }
@@ -151,9 +134,6 @@ pub async fn route_signin(
 
         if let (Some(team), Some(user)) = (&team, &user) {
             state.db.add_user_to_team(user.id, team.id).await.unwrap();
-            {
-                GET_TEAM_FROM_USER_ID.lock().await.cache_remove(&user.id);
-            }
             return Redirect::to("/team").into_response();
         }
 
@@ -370,9 +350,6 @@ pub async fn route_discord_callback(
             .unwrap_or(None)
         {
             _ = state.db.add_user_to_team(user_id, team.id).await;
-            {
-                GET_TEAM_FROM_USER_ID.lock().await.cache_remove(&user_id);
-            }
         }
 
         let delete_cookie = Cookie::build(("rhombus-invite-token", ""))
@@ -401,10 +378,6 @@ pub async fn route_discord_callback(
         .http_only(true);
 
     headers.append(header::SET_COOKIE, cookie.to_string().parse().unwrap());
-
-    {
-        GET_USER_FROM_ID.lock().await.cache_remove(&user_id);
-    }
 
     response
 }

@@ -110,7 +110,7 @@ impl Database for Postgres {
         todo!()
     }
 
-    async fn get_team_from_user_id(&self, _user_id: i64) -> Result<Team> {
+    async fn get_team_from_id(&self, _user_id: i64) -> Result<Team> {
         todo!()
     }
 

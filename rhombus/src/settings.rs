@@ -55,6 +55,7 @@ pub struct Settings {
     pub ratelimit: Option<RateLimitSettings>,
     pub ip_preset: Option<IpPreset>,
     pub live_reload: bool,
+    pub in_memory_cache: bool,
 
     #[cfg(feature = "libsql")]
     pub turso: Option<Turso>,

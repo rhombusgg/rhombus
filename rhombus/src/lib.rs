@@ -3,6 +3,7 @@
 pub mod account;
 pub mod auth;
 pub mod builder;
+pub mod cache_layer;
 pub mod challenges;
 pub mod command_palette;
 pub mod database;

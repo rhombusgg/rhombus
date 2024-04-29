@@ -42,6 +42,15 @@
                 true
             ]
         },
+        "in_memory_cache": {
+            "title": "In Memory Cache",
+            "description": "Cache results from the database in memory for short periods of time to reduce load on database (recommended)",
+            "type": "boolean",
+            "default": true,
+            "examples": [
+                true
+            ]
+        },
         "ip_preset": {
             "title": "IP Preset",
             "description": "Choose from a few default ways to extract the client IP address. For more advanced configuration, omit this option and write a custom function in Rust",

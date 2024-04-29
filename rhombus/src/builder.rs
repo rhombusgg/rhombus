@@ -17,6 +17,7 @@ use crate::{
         auth_injector_middleware, enforce_auth_middleware, route_discord_callback, route_signin,
         route_signout,
     },
+    cache_layer::DbCache,
     challenges::route_challenges,
     command_palette::route_command_palette,
     database::Database,
@@ -294,11 +295,19 @@ impl Builder {
             .config_builder
             .clone()
             .add_source(config::Environment::with_prefix("rhombus").separator("__"))
-            .set_default("live_reload", cfg!(debug_assertions))?
+            .set_default("live_reload", cfg!(debug_assertions))
+            .unwrap()
+            .set_default("in_memory_cache", true)
+            .unwrap()
             .build()?
             .try_deserialize()?;
 
         let db = self.build_database(&settings).await?;
+        let db = if settings.in_memory_cache {
+            Arc::new(DbCache::new(db))
+        } else {
+            db
+        };
 
         let mut localizer = locales::Localizations::new();
         for plugin in self.plugins.iter() {

@@ -58,7 +58,7 @@ pub trait Database {
     async fn get_challenges(&self) -> Result<Vec<Challenge>>;
     async fn get_team_meta_from_invite_token(&self, invite_token: &str)
         -> Result<Option<TeamMeta>>;
-    async fn get_team_from_user_id(&self, user_id: i64) -> Result<Team>;
+    async fn get_team_from_id(&self, team_id: i64) -> Result<Team>;
     async fn add_user_to_team(&self, user_id: i64, team_id: i64) -> Result<()>;
     async fn get_user_from_id(&self, user_id: i64) -> Result<User>;
 }

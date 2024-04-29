@@ -237,23 +237,15 @@ impl Database for LibSQL {
         }
     }
 
-    async fn get_team_from_user_id(&self, user_id: i64) -> Result<Team> {
+    async fn get_team_from_id(&self, team_id: i64) -> Result<Team> {
         let tx = self.db.transaction().await?;
 
         #[derive(Debug, Deserialize)]
         struct QueryTeam {
-            id: i64,
             name: String,
         }
         let query_team_row = tx
-            .query(
-                "
-                SELECT rhombus_team.id, rhombus_team.name
-                FROM rhombus_team JOIN rhombus_user ON rhombus_user.team_id = rhombus_team.id
-                WHERE rhombus_user.id = ?1
-            ",
-                [user_id],
-            )
+            .query("SELECT name FROM rhombus_team WHERE id = ?1", [team_id])
             .await?
             .next()
             .await?
@@ -271,7 +263,7 @@ impl Database for LibSQL {
         let query_user_rows = tx
             .query(
                 "SELECT id, name, avatar, owner_team_id FROM rhombus_user WHERE team_id = ?1",
-                [query_team.id],
+                [team_id],
             )
             .await?;
         let users = query_user_rows
@@ -282,7 +274,7 @@ impl Database for LibSQL {
                     id: query_user.id,
                     name: query_user.name,
                     avatar_url: query_user.avatar,
-                    is_team_owner: query_user.owner_team_id == query_team.id,
+                    is_team_owner: query_user.owner_team_id == team_id,
                 }
             })
             .collect::<Vec<TeamUser>>()
@@ -291,7 +283,7 @@ impl Database for LibSQL {
         tx.commit().await?;
 
         Ok(Arc::new(TeamInner {
-            id: query_team.id,
+            id: team_id,
             name: query_team.name,
             users,
         }))
