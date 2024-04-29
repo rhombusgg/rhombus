@@ -5,7 +5,7 @@ use sqlx::{FromRow, PgPool};
 
 use crate::{
     auth::User,
-    database::{Challenge, Database, Team},
+    database::{Challenge, Database, Team, TeamMeta},
     Result,
 };
 
@@ -103,7 +103,10 @@ impl Database for Postgres {
             .collect())
     }
 
-    async fn get_team_from_invite_token(&self, _invite_token: &str) -> Result<Option<Team>> {
+    async fn get_team_meta_from_invite_token(
+        &self,
+        _invite_token: &str,
+    ) -> Result<Option<TeamMeta>> {
         todo!()
     }
 

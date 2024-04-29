@@ -34,6 +34,8 @@ pub struct UserInner {
     pub name: String,
     pub avatar: String,
     pub discord_id: String,
+    pub team_id: i64,
+    pub is_team_owner: bool,
     pub disabled: bool,
     pub is_admin: bool,
 }
@@ -143,7 +145,7 @@ pub async fn route_signin(
     let (invite_token_cookie, team_name) = if let Some(url_invite_token) = &params.token {
         let team = state
             .db
-            .get_team_from_invite_token(url_invite_token)
+            .get_team_meta_from_invite_token(url_invite_token)
             .await
             .unwrap_or(None);
 
@@ -161,7 +163,7 @@ pub async fn route_signin(
                 .max_age(time::Duration::hours(1))
                 .same_site(SameSite::Lax)
                 .http_only(true),
-            team.map(|t| t.name),
+            team.map(|t| t.name.clone()),
         )
     } else {
         (
@@ -363,7 +365,7 @@ pub async fn route_discord_callback(
     if let Some(cookie_invite_token) = cookie_jar.get("rhombus-invite-token").map(|c| c.value()) {
         if let Some(team) = state
             .db
-            .get_team_from_invite_token(cookie_invite_token)
+            .get_team_meta_from_invite_token(cookie_invite_token)
             .await
             .unwrap_or(None)
         {

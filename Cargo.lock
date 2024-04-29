@@ -506,7 +506,7 @@ dependencies = [
  "cached_proc_macro",
  "cached_proc_macro_types",
  "futures",
- "hashbrown 0.14.3",
+ "hashbrown 0.14.5",
  "instant",
  "once_cell",
  "thiserror",
@@ -949,7 +949,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "978747c1d849a7d2ee5e8adc0159961c48fb7e5db2f06af6723b80123bb53856"
 dependencies = [
  "cfg-if",
- "hashbrown 0.14.3",
+ "hashbrown 0.14.5",
  "lock_api",
  "once_cell",
  "parking_lot_core",
@@ -1140,9 +1140,9 @@ checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
 
 [[package]]
 name = "fastrand"
-version = "2.0.2"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "658bd65b1cf4c852a3cc96f18a8ce7b5640f6b703f905c7d74532294c2a63984"
+checksum = "9fc0510504f03c51ada170672ac806f1f105a88aa97a5281117e1ddc3368e51a"
 
 [[package]]
 name = "fdeflate"
@@ -1161,9 +1161,9 @@ checksum = "8fcfdc7a0362c9f4444381a9e697c79d435fe65b52a37466fc2c1184cee9edc6"
 
 [[package]]
 name = "flate2"
-version = "1.0.29"
+version = "1.0.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4556222738635b7a3417ae6130d8f52201e45a0c4d1a907f0826383adb5f85e7"
+checksum = "5f54427cfd1c7829e2a139fcefea601bf088ebca651d2bf53ebc600eac295dae"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
@@ -1482,9 +1482,9 @@ checksum = "43a3c133739dddd0d2990f9a4bdf8eb4b21ef50e4851ca85ab661199821d510e"
 
 [[package]]
 name = "hashbrown"
-version = "0.14.3"
+version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
+checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 dependencies = [
  "ahash",
  "allocator-api2",
@@ -1496,7 +1496,7 @@ version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8094feaf31ff591f651a2664fb9cfd92bba7a60ce3197265e9482ebe753c8f7"
 dependencies = [
- "hashbrown 0.14.3",
+ "hashbrown 0.14.5",
 ]
 
 [[package]]
@@ -1806,7 +1806,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "168fb715dda47215e360912c096649d23d58bf392ac62f73919e831745e40f26"
 dependencies = [
  "equivalent",
- "hashbrown 0.14.3",
+ "hashbrown 0.14.5",
 ]
 
 [[package]]
@@ -1968,8 +1968,7 @@ checksum = "4ec2a862134d2a7d32d7983ddcdd1c4923530833c9f2ea1a44fc5fa473989058"
 [[package]]
 name = "libsql"
 version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bd17bcc143f2a5be449680dc63b91327d953bcabebe34a69c549fca8934ec9d"
+source = "git+https://github.com/tursodatabase/libsql.git#5ef7ab78522b9d4efecd85d492ffe0d07a9fbd32"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -2006,8 +2005,7 @@ dependencies = [
 [[package]]
 name = "libsql-ffi"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f67a0b0c6585ed06d48bfb2fd702a826065420e602fa34f8eb6e3a44e26520b9"
+source = "git+https://github.com/tursodatabase/libsql.git#5ef7ab78522b9d4efecd85d492ffe0d07a9fbd32"
 dependencies = [
  "bindgen",
  "cc",
@@ -2016,8 +2014,7 @@ dependencies = [
 [[package]]
 name = "libsql-hrana"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "220a925fe6d49dbfa7523b20f5a5391f579b5d9dcf9dd1225606d00929fcab3a"
+source = "git+https://github.com/tursodatabase/libsql.git#5ef7ab78522b9d4efecd85d492ffe0d07a9fbd32"
 dependencies = [
  "base64 0.21.7",
  "bytes",
@@ -2028,8 +2025,7 @@ dependencies = [
 [[package]]
 name = "libsql-rusqlite"
 version = "0.30.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6227e9be9b8cb061692babbcdc7ab268a8df3517d5b377f1d603cfdc9cafe12a"
+source = "git+https://github.com/tursodatabase/libsql.git#5ef7ab78522b9d4efecd85d492ffe0d07a9fbd32"
 dependencies = [
  "bitflags 2.5.0",
  "fallible-iterator 0.2.0",
@@ -2042,8 +2038,7 @@ dependencies = [
 [[package]]
 name = "libsql-sqlite3-parser"
 version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "095d2cf702a5c9c152e48b369f69da30cc44351fa9432621dd8976834abc1752"
+source = "git+https://github.com/tursodatabase/libsql.git#5ef7ab78522b9d4efecd85d492ffe0d07a9fbd32"
 dependencies = [
  "bitflags 2.5.0",
  "cc",
@@ -2061,8 +2056,7 @@ dependencies = [
 [[package]]
 name = "libsql-sys"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5829f758a82418429de6cb0eb310502de78d0908efc3fe2f84b6a41f2f6bebd1"
+source = "git+https://github.com/tursodatabase/libsql.git#5ef7ab78522b9d4efecd85d492ffe0d07a9fbd32"
 dependencies = [
  "bytes",
  "libsql-ffi",
@@ -2075,8 +2069,7 @@ dependencies = [
 [[package]]
 name = "libsql_replication"
 version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef903dda0e85af2224e7454380e59d9602738a5041546a4807438951ad0d5b25"
+source = "git+https://github.com/tursodatabase/libsql.git#5ef7ab78522b9d4efecd85d492ffe0d07a9fbd32"
 dependencies = [
  "aes",
  "async-stream",
@@ -3396,18 +3389,18 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.198"
+version = "1.0.199"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9846a40c979031340571da2545a4e5b7c4163bdae79b301d5f86d03979451fcc"
+checksum = "0c9f6e76df036c77cd94996771fb40db98187f096dd0b9af39c6c6e452ba966a"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.198"
+version = "1.0.199"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e88edab869b01783ba905e7d0153f9fc1a6505a96e4ad3018011eedb838566d9"
+checksum = "11bd257a6541e141e42ca6d24ae26f7714887b47e89aa739099104c7e4d3b7fc"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3745,9 +3738,9 @@ checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
 
 [[package]]
 name = "socket2"
-version = "0.5.6"
+version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05ffd9c0a93b7543e062e759284fcf5f5e3b098501104bfbdde4d404db792871"
+checksum = "ce305eb0b4296696835b71df73eb912e0f1ffd2556a501fcede6e0c50349191c"
 dependencies = [
  "libc",
  "windows-sys 0.52.0",

@@ -8,7 +8,7 @@ use serde::Deserialize;
 
 use crate::{
     auth::{User, UserInner},
-    database::{Challenge, Database, Team},
+    database::{Challenge, Database, Team, TeamInner, TeamMeta, TeamMetaInner, TeamUser},
     team::create_team_invite_token,
     Result,
 };
@@ -82,7 +82,7 @@ impl Database for LibSQL {
     ) -> Result<i64> {
         let team_name = format!("{}'s team", name);
 
-        let tx = self.db.transaction().await.unwrap();
+        let tx = self.db.transaction().await?;
         let existing_user_id = tx
             .query(
                 "SELECT id FROM rhombus_user WHERE discord_id = ?",
@@ -126,10 +126,9 @@ impl Database for LibSQL {
             "INSERT INTO rhombus_email (email, user_id) VALUES (?1, ?2)",
             params!(email, user_id),
         )
-        .await
-        .unwrap();
+        .await?;
 
-        tx.commit().await.unwrap();
+        tx.commit().await?;
 
         return Ok(user_id);
     }
@@ -208,7 +207,10 @@ impl Database for LibSQL {
             .collect())
     }
 
-    async fn get_team_from_invite_token(&self, invite_token: &str) -> Result<Option<Team>> {
+    async fn get_team_meta_from_invite_token(
+        &self,
+        invite_token: &str,
+    ) -> Result<Option<TeamMeta>> {
         #[derive(Debug, Deserialize)]
         struct DbTeam {
             id: i64,
@@ -226,23 +228,24 @@ impl Database for LibSQL {
 
         if let Some(row) = &team {
             let team = de::from_row::<DbTeam>(row).unwrap();
-            Ok(Some(Team {
+            Ok(Some(Arc::new(TeamMetaInner {
                 id: team.id,
                 name: team.name,
-            }))
+            })))
         } else {
             Ok(None)
         }
     }
 
     async fn get_team_from_user_id(&self, user_id: i64) -> Result<Team> {
+        let tx = self.db.transaction().await?;
+
         #[derive(Debug, Deserialize)]
-        struct DbTeam {
+        struct QueryTeam {
             id: i64,
             name: String,
         }
-        let row = self
-            .db
+        let query_team_row = tx
             .query(
                 "
                 SELECT rhombus_team.id, rhombus_team.name
@@ -255,12 +258,43 @@ impl Database for LibSQL {
             .next()
             .await?
             .ok_or(libsql::Error::QueryReturnedNoRows)?;
+        let query_team = de::from_row::<QueryTeam>(&query_team_row).unwrap();
 
-        let team = de::from_row::<DbTeam>(&row).unwrap();
-        Ok(Team {
-            id: team.id,
-            name: team.name,
-        })
+        #[derive(Debug, Deserialize)]
+        struct QueryTeamUser {
+            id: i64,
+            name: String,
+            avatar: String,
+            owner_team_id: i64,
+        }
+
+        let query_user_rows = tx
+            .query(
+                "SELECT id, name, avatar, owner_team_id FROM rhombus_user WHERE team_id = ?1",
+                [query_team.id],
+            )
+            .await?;
+        let users = query_user_rows
+            .into_stream()
+            .map(|row| {
+                let query_user = de::from_row::<QueryTeamUser>(&row.unwrap()).unwrap();
+                TeamUser {
+                    id: query_user.id,
+                    name: query_user.name,
+                    avatar_url: query_user.avatar,
+                    is_team_owner: query_user.owner_team_id == query_team.id,
+                }
+            })
+            .collect::<Vec<TeamUser>>()
+            .await;
+
+        tx.commit().await?;
+
+        Ok(Arc::new(TeamInner {
+            id: query_team.id,
+            name: query_team.name,
+            users,
+        }))
     }
 
     async fn add_user_to_team(&self, user_id: i64, team_id: i64) -> Result<()> {
@@ -284,6 +318,8 @@ impl Database for LibSQL {
             name: String,
             avatar: String,
             discord_id: String,
+            team_id: i64,
+            owner_team_id: i64,
             disabled: bool,
             is_admin: bool,
         }
@@ -304,6 +340,8 @@ impl Database for LibSQL {
             discord_id: user.discord_id,
             disabled: user.disabled,
             is_admin: user.is_admin,
+            team_id: user.team_id,
+            is_team_owner: user.team_id == user.owner_team_id,
         }))
     }
 }
