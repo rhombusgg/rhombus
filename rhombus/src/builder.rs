@@ -9,7 +9,7 @@ use axum::{
 };
 use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::{compression::CompressionLayer, services::ServeDir};
-use tracing::{debug, info};
+use tracing::info;
 
 use crate::{
     errors::{DatabaseConfigurationError, RhombusError},
@@ -49,16 +49,32 @@ use crate::{
 
 static STATIC_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/static");
 
-/// A builder to make an axum router
-#[derive(Default)]
-pub struct Builder {
-    pub plugins: Vec<Box<dyn Plugin + Send + Sync>>,
-    pub database: Option<DbConfig>,
-    pub config_builder: config::ConfigBuilder<config::builder::DefaultState>,
-    pub ip_extractor: Option<IpExtractorFn>,
+pub fn builder() -> Builder<()> {
+    Builder::default()
 }
 
-impl Builder {
+/// A builder to make an axum router
+pub struct Builder<P: Plugin> {
+    plugins: P,
+    num_plugins: u32,
+    database: Option<DbConfig>,
+    config_builder: config::ConfigBuilder<config::builder::DefaultState>,
+    ip_extractor: Option<IpExtractorFn>,
+}
+
+impl Default for Builder<()> {
+    fn default() -> Builder<()> {
+        Builder {
+            plugins: (),
+            num_plugins: 0,
+            database: None,
+            config_builder: config::ConfigBuilder::<config::builder::DefaultState>::default(),
+            ip_extractor: None,
+        }
+    }
+}
+
+impl<P: Plugin> Builder<P> {
     pub fn load_env(self) -> Self {
         _ = dotenvy::dotenv();
         self
@@ -132,11 +148,14 @@ impl Builder {
         }
     }
 
-    pub fn plugin(self, plugin: impl Plugin + Send + Sync + 'static) -> Self {
-        let mut plugins = self.plugins;
-        plugins.push(Box::new(plugin));
-
-        Self { plugins, ..self }
+    pub fn plugin<Pn: Plugin>(self, plugin: Pn) -> Builder<(Pn, P)> {
+        Builder {
+            plugins: (plugin, self.plugins),
+            num_plugins: self.num_plugins + 1,
+            config_builder: self.config_builder,
+            database: self.database,
+            ip_extractor: self.ip_extractor,
+        }
     }
 
     async fn build_database(&self, settings: &Settings) -> Result<Connection> {
@@ -148,10 +167,7 @@ impl Builder {
                     let database =
                         crate::internal::backend_postgres::Postgres::new(pool.to_owned());
                     database.migrate().await?;
-
-                    for plugin in self.plugins.iter() {
-                        plugin.migrate_postgresql(database.clone()).await?;
-                    }
+                    self.plugins.migrate_postgresql(database.clone()).await?;
 
                     return Ok(Arc::new(database));
                 }
@@ -162,10 +178,7 @@ impl Builder {
                     let database: crate::internal::backend_libsql::LibSQL =
                         connection.to_owned().into();
                     database.migrate().await?;
-
-                    for plugin in self.plugins.iter() {
-                        plugin.migrate_libsql(database.clone()).await?;
-                    }
+                    self.plugins.migrate_libsql(database.clone()).await?;
 
                     return Ok(Arc::new(database));
                 }
@@ -189,10 +202,7 @@ impl Builder {
                         .await?;
                     let database = crate::internal::backend_postgres::Postgres::new(pool);
                     database.migrate().await?;
-
-                    for plugin in self.plugins.iter() {
-                        plugin.migrate_postgresql(database.clone()).await?;
-                    }
+                    self.plugins.migrate_postgresql(database.clone()).await?;
 
                     return Ok(Arc::new(database));
                 }
@@ -214,10 +224,7 @@ impl Builder {
                     info!("Connecting to local file libsql database from database url");
                     let database = crate::internal::backend_libsql::LibSQL::new_local(path).await?;
                     database.migrate().await?;
-
-                    for plugin in self.plugins.iter() {
-                        plugin.migrate_libsql(database.clone()).await?;
-                    }
+                    self.plugins.migrate_libsql(database.clone()).await?;
 
                     return Ok(Arc::new(database));
                 }
@@ -254,10 +261,7 @@ impl Builder {
                             .await?
                         };
                         database.migrate().await?;
-
-                        for plugin in self.plugins.iter() {
-                            plugin.migrate_libsql(database.clone()).await?;
-                        }
+                        self.plugins.migrate_libsql(database.clone()).await?;
 
                         return Ok(Arc::new(database));
                     }
@@ -279,10 +283,8 @@ impl Builder {
             tracing::warn!("Falling back to in memory database");
             let database = crate::internal::backend_libsql::LibSQL::new_memory().await?;
             database.migrate().await?;
+            self.plugins.migrate_libsql(database.clone()).await?;
 
-            for plugin in self.plugins.iter() {
-                plugin.migrate_libsql(database.clone()).await?;
-            }
             Ok(Arc::new(database))
         }
 
@@ -305,6 +307,8 @@ impl Builder {
             .build()?
             .try_deserialize()?;
 
+        self.plugins.name();
+
         let db = self.build_database(&settings).await?;
         let db = if settings.in_memory_cache {
             Arc::new(DbCache::new(db))
@@ -313,10 +317,7 @@ impl Builder {
         };
 
         let mut localizer = locales::Localizations::new();
-        for plugin in self.plugins.iter() {
-            debug!(plugin_name = plugin.name(), "Loading");
-            plugin.localize(&mut localizer.bundles)?;
-        }
+        self.plugins.localize(&mut localizer.bundles)?;
 
         let mut env = minijinja::Environment::new();
         minijinja_embed::load_templates!(&mut env);
@@ -328,9 +329,7 @@ impl Builder {
             },
         );
 
-        for plugin in self.plugins.iter() {
-            plugin.theme(&mut env)?;
-        }
+        self.plugins.theme(&mut env)?;
 
         let ip_extractor = self.ip_extractor.or_else(|| {
             settings.ip_preset.clone().map(|preset| match preset {
@@ -368,10 +367,7 @@ impl Builder {
             ip_extractor: ip_extractor.unwrap_or(default_ip_extractor),
         });
 
-        let mut plugin_router = Router::new();
-        for plugin in self.plugins.iter() {
-            plugin_router = plugin_router.merge(plugin.routes(router_state.clone()));
-        }
+        let plugin_router = self.plugins.routes(router_state.clone());
 
         let rhombus_router = Router::new()
             .fallback(handler_404)
@@ -387,7 +383,7 @@ impl Builder {
             .route("/og-image.png", get(route_default_og_image))
             .with_state(router_state.clone());
 
-        let router = if !self.plugins.is_empty() {
+        let router = if self.num_plugins > 0 {
             Router::new()
                 .fallback_service(rhombus_router)
                 .nest("/", plugin_router)

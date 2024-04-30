@@ -1,5 +1,4 @@
 use axum::{
-    async_trait,
     extract::{FromRef, State},
     http::Uri,
     response::Html,
@@ -44,7 +43,6 @@ impl MyPlugin {
     }
 }
 
-#[async_trait]
 impl Plugin for MyPlugin {
     fn name(&self) -> String {
         "MyPlugin".to_owned()

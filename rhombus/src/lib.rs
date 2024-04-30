@@ -28,6 +28,7 @@ pub mod errors;
 #[doc(inline)]
 pub use crate::errors::Result;
 
+pub use builder::builder;
 pub use builder::Builder;
 
 #[doc(inline)]
