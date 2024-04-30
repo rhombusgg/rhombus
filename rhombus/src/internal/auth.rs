@@ -21,7 +21,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::{locales::Lang, RouterState};
+use super::{locales::Lang, router::RouterState};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct UserInner {
@@ -71,7 +71,7 @@ pub async fn enforce_auth_middleware(
 
 pub async fn auth_injector_middleware(
     cookie_jar: CookieJar,
-    State(data): State<RouterState>,
+    state: State<RouterState>,
     mut req: Request<Body>,
     next: Next,
 ) -> impl IntoResponse {
@@ -98,12 +98,12 @@ pub async fn auth_injector_middleware(
     if let Some(token) = token {
         if let Ok(token_data) = decode::<TokenClaims>(
             &token,
-            &DecodingKey::from_secret(data.settings.jwt_secret.as_ref()),
+            &DecodingKey::from_secret(state.settings.jwt_secret.as_ref()),
             &Validation::default(),
         ) {
             req.extensions_mut().insert(Some(token_data.claims.clone()));
             req.extensions_mut().insert(token_data.claims.clone());
-            if let Ok(user) = data.db.get_user_from_id(token_data.claims.sub).await {
+            if let Ok(user) = state.db.get_user_from_id(token_data.claims.sub).await {
                 req.extensions_mut().insert(Some(user.clone()));
                 req.extensions_mut().insert(user);
             }

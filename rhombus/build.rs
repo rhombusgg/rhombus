@@ -1,3 +1,5 @@
+use rustc_version::{version_meta, Channel};
+
 fn main() {
     // trigger recompilation when a new migration is added
     println!("cargo:rerun-if-changed=fonts");
@@ -6,4 +8,12 @@ fn main() {
     println!("cargo:rerun-if-changed=static");
 
     minijinja_embed::embed_templates!("templates");
+
+    let channel = match version_meta().unwrap().channel {
+        Channel::Stable => "CHANNEL_STABLE",
+        Channel::Beta => "CHANNEL_BETA",
+        Channel::Nightly => "CHANNEL_NIGHTLY",
+        Channel::Dev => "CHANNEL_DEV",
+    };
+    println!("cargo:rustc-cfg={}", channel)
 }

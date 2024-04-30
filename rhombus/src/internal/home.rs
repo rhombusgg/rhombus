@@ -6,10 +6,10 @@ use axum::{
 };
 use minijinja::context;
 
-use crate::{auth::MaybeUser, locales::Lang, RouterState};
+use super::{auth::MaybeUser, locales::Lang, router::RouterState};
 
 pub async fn route_home(
-    State(state): State<RouterState>,
+    state: State<RouterState>,
     Extension(user): Extension<MaybeUser>,
     Extension(lang): Extension<Lang>,
     uri: Uri,

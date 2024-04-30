@@ -1,57 +1,45 @@
+//! Host a CTF
 #![forbid(unsafe_code)]
+#![cfg_attr(all(doc, CHANNEL_NIGHTLY), feature(doc_auto_cfg))]
 
-pub mod account;
-pub mod auth;
-pub mod builder;
-pub mod cache_layer;
-pub mod challenges;
-pub mod command_palette;
-pub mod database;
-pub mod errors;
-pub mod home;
-pub mod ip;
-pub mod locales;
-pub mod open_graph;
-pub mod plugin;
-pub mod settings;
-pub mod team;
+#[cfg(feature = "internal")]
+pub mod internal;
 
-#[cfg(feature = "libsql")]
-pub mod backend_libsql;
+#[cfg(not(feature = "internal"))]
+mod internal;
 
-#[cfg(feature = "postgres")]
-pub mod backend_postgres;
-
+/// Known compatible version of the axum web framework
 pub use axum;
 pub use config;
+pub use minijinja;
+
+/// Builder module
+mod builder;
+
+#[cfg(feature = "systemfd")]
+mod systemfd;
+
+mod plugin;
+
+/// Common error type for Rhombus
+pub mod errors;
+
+/// Simplified error type
+#[doc(inline)]
+pub use crate::errors::Result;
 
 pub use builder::Builder;
-pub use builder::RouterState;
-pub use errors::Result;
 
-use axum::Router;
+#[doc(inline)]
+pub use plugin::Plugin;
 
-use std::net::SocketAddr;
-use tokio::net::TcpListener;
-use tracing::info;
+#[cfg(feature = "systemfd")]
+pub use systemfd::serve_systemfd;
 
-pub async fn serve_systemfd(router: Router) -> std::result::Result<(), std::io::Error> {
-    let listener = listenfd::ListenFd::from_env()
-        .take_tcp_listener(0)?
-        .unwrap();
-    tracing::debug!("restored socket from listenfd");
-    listener.set_nonblocking(true).unwrap();
-    let listener = TcpListener::from_std(listener).unwrap();
-
-    info!(
-        address = listener.local_addr().unwrap().to_string(),
-        "listening on"
-    );
-    axum::serve(
-        listener,
-        router.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .await?;
-
-    Ok(())
+/// Utils for extracting ip address from request
+pub mod ip {
+    pub use crate::internal::ip::{
+        maybe_cf_connecting_ip, maybe_fly_client_ip, maybe_peer_ip,
+        maybe_rightmost_x_forwarded_for, maybe_true_client_ip, maybe_x_real_ip,
+    };
 }

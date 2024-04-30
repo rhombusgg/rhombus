@@ -3,7 +3,7 @@ use std::{net::IpAddr, sync::Arc};
 use async_trait::async_trait;
 use serde::Serialize;
 
-use crate::{auth::User, Result};
+use crate::{internal::auth::User, Result};
 
 pub type Connection = Arc<dyn Database + Send + Sync>;
 

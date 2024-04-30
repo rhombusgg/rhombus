@@ -9,7 +9,7 @@ use axum::{
 use std::net::{IpAddr, SocketAddr};
 use tower_governor::{key_extractor::KeyExtractor, GovernorError};
 
-use crate::{auth::MaybeUser, RouterState};
+use super::{auth::MaybeUser, router::RouterState};
 
 /// Middleware to log the IP and user agent of the client in the database as track.
 /// Associates the track with the user if the user is logged in. Runs asynchronously,
@@ -17,7 +17,7 @@ use crate::{auth::MaybeUser, RouterState};
 pub async fn track_middleware(
     Extension(ip): Extension<Option<IpAddr>>,
     Extension(user): Extension<MaybeUser>,
-    State(state): State<RouterState>,
+    state: State<RouterState>,
     uri: Uri,
     req: Request<Body>,
     next: Next,
@@ -43,19 +43,16 @@ pub async fn track_middleware(
 
 /// Only add the `ip_insert` middleware if the `ip_extractor` is not the `default_ip_extractor`
 pub async fn ip_insert_middleware(
-    State(data): State<RouterState>,
+    state: State<RouterState>,
     mut req: Request<Body>,
     next: Next,
 ) -> impl IntoResponse {
-    let ip = (data.ip_extractor)(req.headers(), req.extensions());
+    let ip = (state.ip_extractor)(req.headers(), req.extensions());
     req.extensions_mut().insert(ip);
     next.run(req).await
 }
 
-pub(crate) async fn ip_insert_blank_middleware(
-    mut req: Request<Body>,
-    next: Next,
-) -> impl IntoResponse {
+pub async fn ip_insert_blank_middleware(mut req: Request<Body>, next: Next) -> impl IntoResponse {
     let ip: Option<IpAddr> = None;
     req.extensions_mut().insert(ip);
     next.run(req).await
@@ -137,7 +134,7 @@ impl KeyExtractor for KeyExtractorShim {
     }
 }
 
-pub(crate) fn canonicalize_ip(ip: IpAddr) -> IpAddr {
+pub fn canonicalize_ip(ip: IpAddr) -> IpAddr {
     match ip {
         IpAddr::V4(_) => ip,
         IpAddr::V6(ip) => {
@@ -163,9 +160,10 @@ mod test {
 
     use axum::{body::Body, http::Request};
 
-    use crate::ip::{maybe_cf_connecting_ip, maybe_fly_client_ip, maybe_true_client_ip};
-
-    use super::{canonicalize_ip, maybe_rightmost_x_forwarded_for, maybe_x_real_ip};
+    use crate::internal::ip::{
+        canonicalize_ip, maybe_cf_connecting_ip, maybe_fly_client_ip,
+        maybe_rightmost_x_forwarded_for, maybe_true_client_ip, maybe_x_real_ip,
+    };
 
     #[test]
     fn rightmost_x_forwarded_for() {

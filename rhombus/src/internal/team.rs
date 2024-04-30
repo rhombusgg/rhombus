@@ -5,14 +5,14 @@ use rand::{
     thread_rng,
 };
 
-use crate::{auth::User, locales::Lang, RouterState};
+use super::{auth::User, locales::Lang, router::RouterState};
 
 pub fn create_team_invite_token() -> String {
     Alphanumeric.sample_string(&mut thread_rng(), 16)
 }
 
 pub async fn route_team(
-    State(state): State<RouterState>,
+    state: State<RouterState>,
     Extension(user): Extension<User>,
     Extension(lang): Extension<Lang>,
     uri: Uri,

@@ -3,12 +3,9 @@ use std::net::IpAddr;
 use async_trait::async_trait;
 use cached::{proc_macro::cached, Cached};
 
-use crate::{
-    auth::User,
-    database::{Challenge, Connection, Database, Team, TeamMeta},
-    errors::RhombusError::UnknownDatabase,
-    Result,
-};
+use crate::{errors::RhombusError::UnknownDatabase, internal::auth::User, Result};
+
+use super::database::{Challenge, Connection, Database, Team, TeamMeta};
 
 #[derive(Clone)]
 pub struct DbCache {

@@ -3,11 +3,11 @@ use std::net::IpAddr;
 use async_trait::async_trait;
 use sqlx::{FromRow, PgPool};
 
-use crate::{
+use super::{
     auth::User,
     database::{Challenge, Database, Team, TeamMeta},
-    Result,
 };
+use crate::Result;
 
 #[derive(Clone)]
 pub struct Postgres {
@@ -129,7 +129,7 @@ mod test {
     use testcontainers::clients;
     use testcontainers_modules::postgres::Postgres;
 
-    use crate::database::Database;
+    use crate::internal::database::Database;
 
     #[cfg_attr(not(feature = "testcontainers"), ignore)]
     #[tokio::test]
@@ -142,7 +142,7 @@ mod test {
         );
 
         let pool = PgPoolOptions::new().connect(&database_url).await.unwrap();
-        let database = crate::backend_postgres::Postgres::new(pool);
+        let database = crate::internal::backend_postgres::Postgres::new(pool);
         database.migrate().await.unwrap();
     }
 }

@@ -4,7 +4,7 @@ use axum::{
 };
 use minijinja::context;
 
-use crate::RouterState;
+use super::router::RouterState;
 
 pub async fn route_challenges(state: State<RouterState>) -> impl IntoResponse {
     let challenges = state.db.get_challenges().await.unwrap();

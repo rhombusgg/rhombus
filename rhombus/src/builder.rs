@@ -12,52 +12,53 @@ use tower_http::{compression::CompressionLayer, services::ServeDir};
 use tracing::{debug, info};
 
 use crate::{
-    account::route_account,
-    auth::{
-        auth_injector_middleware, enforce_auth_middleware, route_discord_callback, route_signin,
-        route_signout,
-    },
-    cache_layer::DbCache,
-    challenges::route_challenges,
-    command_palette::route_command_palette,
-    database::Database,
     errors::{DatabaseConfigurationError, RhombusError},
-    home::route_home,
-    ip::{
-        default_ip_extractor, ip_insert_blank_middleware, ip_insert_middleware,
-        maybe_cf_connecting_ip, maybe_fly_client_ip, maybe_peer_ip,
-        maybe_rightmost_x_forwarded_for, maybe_true_client_ip, maybe_x_real_ip, track_middleware,
-        IpExtractorFn, KeyExtractorShim,
+    internal::{
+        account::route_account,
+        auth::{
+            auth_injector_middleware, enforce_auth_middleware, route_discord_callback,
+            route_signin, route_signout,
+        },
+        cache_layer::DbCache,
+        challenges::route_challenges,
+        database::Database,
+        home::route_home,
+        ip::{
+            default_ip_extractor, ip_insert_blank_middleware, ip_insert_middleware,
+            maybe_cf_connecting_ip, maybe_fly_client_ip, maybe_peer_ip,
+            maybe_rightmost_x_forwarded_for, maybe_true_client_ip, maybe_x_real_ip,
+            track_middleware, KeyExtractorShim,
+        },
+        locales::{self, translate},
+        open_graph::route_default_og_image,
+        router::RouterStateInner,
+        settings::IpPreset,
+        team::route_team,
     },
-    locales::{self, translate},
-    open_graph::route_default_og_image,
-    plugin::Plugin,
-    settings::{DbConfig, IpPreset, Settings},
-    team::route_team,
+    Plugin,
+};
+
+use crate::{
+    internal::{
+        database::Connection,
+        ip::IpExtractorFn,
+        settings::{DbConfig, Settings},
+    },
     Result,
 };
 
 static STATIC_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/static");
 
-pub type RouterState = Arc<RouterStateInner>;
-
-pub struct RouterStateInner {
-    pub db: crate::database::Connection,
-    pub jinja: minijinja::Environment<'static>,
-    pub settings: Arc<Settings>,
-    pub ip_extractor: IpExtractorFn,
-}
-
+/// A builder to make an axum router
 #[derive(Default)]
 pub struct Builder {
-    plugins: Vec<Box<dyn Plugin + Send + Sync>>,
-    database: Option<DbConfig>,
-    config_builder: config::ConfigBuilder<config::builder::DefaultState>,
-    ip_extractor: Option<IpExtractorFn>,
+    pub plugins: Vec<Box<dyn Plugin + Send + Sync>>,
+    pub database: Option<DbConfig>,
+    pub config_builder: config::ConfigBuilder<config::builder::DefaultState>,
+    pub ip_extractor: Option<IpExtractorFn>,
 }
 
 impl Builder {
-    #[cfg(feature = "dotenv")]
     pub fn load_env(self) -> Self {
         _ = dotenvy::dotenv();
         self
@@ -138,13 +139,14 @@ impl Builder {
         Self { plugins, ..self }
     }
 
-    async fn build_database(&self, settings: &Settings) -> Result<crate::database::Connection> {
+    async fn build_database(&self, settings: &Settings) -> Result<Connection> {
         if let Some(database_config) = &self.database {
             match database_config {
                 #[cfg(feature = "postgres")]
                 DbConfig::RawPostgres(pool) => {
                     info!("Using user preconfigured postgres");
-                    let database = crate::backend_postgres::Postgres::new(pool.to_owned());
+                    let database =
+                        crate::internal::backend_postgres::Postgres::new(pool.to_owned());
                     database.migrate().await?;
 
                     for plugin in self.plugins.iter() {
@@ -157,7 +159,8 @@ impl Builder {
                 #[cfg(feature = "libsql")]
                 DbConfig::RawLibSQL(connection) => {
                     info!("Using user preconfigured libsql connection");
-                    let database: crate::backend_libsql::LibSQL = connection.to_owned().into();
+                    let database: crate::internal::backend_libsql::LibSQL =
+                        connection.to_owned().into();
                     database.migrate().await?;
 
                     for plugin in self.plugins.iter() {
@@ -184,7 +187,7 @@ impl Builder {
                     let pool = sqlx::postgres::PgPoolOptions::new()
                         .connect(database_url)
                         .await?;
-                    let database = crate::backend_postgres::Postgres::new(pool);
+                    let database = crate::internal::backend_postgres::Postgres::new(pool);
                     database.migrate().await?;
 
                     for plugin in self.plugins.iter() {
@@ -209,7 +212,7 @@ impl Builder {
                 #[cfg(feature = "libsql")]
                 {
                     info!("Connecting to local file libsql database from database url");
-                    let database = crate::backend_libsql::LibSQL::new_local(path).await?;
+                    let database = crate::internal::backend_libsql::LibSQL::new_local(path).await?;
                     database.migrate().await?;
 
                     for plugin in self.plugins.iter() {
@@ -236,7 +239,7 @@ impl Builder {
                     {
                         let database = if let Some(local_replica_path) = &turso.local_replica_path {
                             info!("Connecting to remote libsql database with local replica from database url");
-                            crate::backend_libsql::LibSQL::new_remote_replica(
+                            crate::internal::backend_libsql::LibSQL::new_remote_replica(
                                 local_replica_path,
                                 database_url.to_owned(),
                                 turso.auth_token.to_owned(),
@@ -244,7 +247,7 @@ impl Builder {
                             .await?
                         } else {
                             info!("Connecting to remote libsql database from database url");
-                            crate::backend_libsql::LibSQL::new_remote(
+                            crate::internal::backend_libsql::LibSQL::new_remote(
                                 database_url.to_owned(),
                                 turso.auth_token.to_owned(),
                             )
@@ -274,7 +277,7 @@ impl Builder {
         #[cfg(feature = "libsql")]
         {
             tracing::warn!("Falling back to in memory database");
-            let database = crate::backend_libsql::LibSQL::new_memory().await?;
+            let database = crate::internal::backend_libsql::LibSQL::new_memory().await?;
             database.migrate().await?;
 
             for plugin in self.plugins.iter() {
@@ -378,7 +381,6 @@ impl Builder {
             .nest_service("/static", ServeDir::new(STATIC_DIR))
             .route("/", get(route_home))
             .route("/challenges", get(route_challenges))
-            .route("/modal", get(route_command_palette))
             .route("/signout", get(route_signout))
             .route("/signin", get(route_signin))
             .route("/signin/discord", get(route_discord_callback))

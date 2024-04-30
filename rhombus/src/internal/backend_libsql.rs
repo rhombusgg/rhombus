@@ -6,12 +6,12 @@ use libsql::{de, params, Builder};
 use rust_embed::RustEmbed;
 use serde::Deserialize;
 
-use crate::{
+use super::{
     auth::{User, UserInner},
     database::{Challenge, Database, Team, TeamInner, TeamMeta, TeamMetaInner, TeamUser},
     team::create_team_invite_token,
-    Result,
 };
+use crate::Result;
 
 #[derive(Clone)]
 pub struct LibSQL {
@@ -348,7 +348,11 @@ fn truncate_to_256_chars(s: &str) -> &str {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use std::net::IpAddr;
+
+    use libsql::params;
+
+    use crate::internal::{backend_libsql::LibSQL, database::Database};
 
     #[tokio::test]
     async fn migrate_libsql() {

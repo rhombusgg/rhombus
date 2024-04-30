@@ -8,11 +8,13 @@ use axum::{
 use fluent::FluentResource;
 use minijinja::{context, Environment};
 use rhombus::{
-    auth::MaybeTokenClaims,
-    backend_postgres::Postgres,
-    locales::{BundleMap, Lang},
-    plugin::Plugin,
-    RouterState,
+    internal::{
+        auth::MaybeTokenClaims,
+        backend_postgres::Postgres,
+        locales::{BundleMap, Lang},
+        router::RouterState,
+    },
+    Plugin,
 };
 use sqlx::Executor;
 use unic_langid::LanguageIdentifier;
@@ -80,8 +82,8 @@ impl Plugin for MyPlugin {
 }
 
 async fn route_home(
-    State(rhombus): State<RouterState>,
-    State(plugin): State<MyPluginRouterState>,
+    rhombus: State<RouterState>,
+    plugin: State<MyPluginRouterState>,
     Extension(user): Extension<MaybeTokenClaims>,
     Extension(lang): Extension<Lang>,
     uri: Uri,
