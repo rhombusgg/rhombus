@@ -1,46 +1,48 @@
 {% extends "layout.html" %}
 {% import "card.html" as card %}
 
-{% block title %}{{ super() }} - Account{% endblock %}
+{% block title %}{{ super() }} - {{ t("account") }}{% endblock %}
 
 {% block content %}
-<div class="container">
-  <div class="mb-4 mt-4 space-y-0.5">
-	  <h2 class="text-2xl font-bold tracking-tight">Account</h2>
-		<p class="text-muted-foreground">Manage your individual account settings.</p>
-	</div>
-	<div class="grid h-fit gap-6 md:grid-cols-2 lg:grid-cols-3">
-  {% call card.root() %}
-    {% call card.header() %}
-      {% call card.title() %}
-        Discord Integration
+  <div class="container">
+    <div class="mb-4 mt-4 space-y-0.5">
+      <h2 class="text-2xl font-bold tracking-tight">{{ t("account") }}</h2>
+      <p class="text-muted-foreground">
+        Manage your individual account settings.
+      </p>
+    </div>
+    <div class="grid h-fit gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {% call card.root() %}
+        {% call card.header() %}
+          {% call card.title() %}
+            Discord Integration
+          {% endcall %}
+          {% call card.description() %}
+            Link your Discord account to get rich feature integrations
+          {% endcall %}
+        {% endcall %}
+        {% call card.content() %}
+          {% if in_server %}
+            :check: You are in the server!
+          {% else %}
+            Join the server at https://
+          {% endif %}
+        {% endcall %}
       {% endcall %}
-      {% call card.description() %}
-        Link your Discord account to get rich feature integrations
-      {% endcall %}
-    {% endcall %}
-    {% call card.content() %}
-      {% if in_server %}
-        :check: You are in the server!
-      {% else %}
-        Join the server at https://
-      {% endif %}
-    {% endcall %}
-  {% endcall %}
 
-  {% call card.root() %}
-    {% call card.header() %}
-      {% call card.title() %}
-        Emails
+      {% call card.root() %}
+        {% call card.header() %}
+          {% call card.title() %}
+            Emails
+          {% endcall %}
+          {% call card.description() %}
+            Manage connected emails to qualify for certain divisions
+          {% endcall %}
+        {% endcall %}
+        {% call card.content() %}
+          content
+        {% endcall %}
       {% endcall %}
-      {% call card.description() %}
-        Manage connected emails to qualify for certain divisions
-      {% endcall %}
-    {% endcall %}
-    {% call card.content() %}
-      content
-    {% endcall %}
-  {% endcall %}
+    </div>
   </div>
-</div>
 {% endblock %}

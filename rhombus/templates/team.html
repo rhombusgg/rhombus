@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 {% import "card.html" as card %}
 
-{% block title %}{{ super() }} - Team{% endblock %}
+{% block title %}{{ super() }} - {{ t("team") }}{% endblock %}
 
 {% block content %}
   <div class="container">
@@ -13,6 +13,7 @@
     </div>
     <div class="grid h-fit gap-6 md:grid-cols-2 lg:grid-cols-3">
       {% call card.root() %}
+
         {% call card.header() %}
           {% call card.title() %}
             Members
@@ -22,6 +23,8 @@
           {% endcall %}
         {% endcall %}
         {% call card.content() %}
+          {% with x=team_invite_url %}
+          {% endwith %}
           <ul>
             <div>
               {% if user.is_team_owner %}
@@ -34,8 +37,6 @@
                 </button>
               {% endif %}
               {% include "team-token.html" %}
-              {% with x=team_invite_url %}
-              {% endwith %}
             </div>
             {% for player in team.users %}
               <li>

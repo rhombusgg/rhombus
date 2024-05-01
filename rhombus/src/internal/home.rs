@@ -6,12 +6,12 @@ use axum::{
 };
 use minijinja::context;
 
-use super::{auth::MaybeUser, locales::Lang, router::RouterState};
+use super::{auth::MaybeUser, locales::Languages, router::RouterState};
 
 pub async fn route_home(
     state: State<RouterState>,
     Extension(user): Extension<MaybeUser>,
-    Extension(lang): Extension<Lang>,
+    Extension(lang): Extension<Languages>,
     uri: Uri,
 ) -> impl IntoResponse {
     Html(

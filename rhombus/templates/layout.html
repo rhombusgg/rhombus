@@ -16,10 +16,10 @@
           >
         </a>
         {% if user %}
-          {{ navbarItem(label=_("team"), href="/team", uri=uri) }}
-          {{ navbarItem(label=_("account"), href="/account", uri=uri) }}
+          {{ navbarItem(label=t("team"), href="/team", uri=uri) }}
+          {{ navbarItem(label=t("account"), href="/account", uri=uri) }}
         {% else %}
-          {{ navbarItem(label=_("sign-in"), href="/signin", uri=uri) }}
+          {{ navbarItem(label=t("sign-in"), href="/signin", uri=uri) }}
         {% endif %}
       </nav>
       {% include "command-palette.html" %}

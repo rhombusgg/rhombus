@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 axum = "0.7.5"
 fluent = "0.16.0"
-minijinja = "1.0.20"
+minijinja = "2.0.1"
 rhombus = { path = "../../rhombus", features = ["postgres", "internal"] }
 sqlx = { version = "0.7.4", features = [
     "tls-rustls",
@@ -15,4 +15,3 @@ sqlx = { version = "0.7.4", features = [
     "chrono",
 ] }
 tracing = "0.1.40"
-unic-langid = "0.9.4"

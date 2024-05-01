@@ -10,13 +10,12 @@ use rhombus::{
     internal::{
         auth::MaybeTokenClaims,
         backend_postgres::Postgres,
-        locales::{BundleMap, Lang},
+        locales::{Languages, Localizations},
         router::RouterState,
     },
     Plugin,
 };
 use sqlx::Executor;
-use unic_langid::LanguageIdentifier;
 
 #[derive(Clone)]
 pub struct MyPlugin {
@@ -48,6 +47,11 @@ impl Plugin for MyPlugin {
         "MyPlugin".to_owned()
     }
 
+    fn theme(&self, jinja: &mut Environment<'static>) -> rhombus::Result<()> {
+        jinja.add_template("home.html", include_str!("../templates/home.html"))?;
+        Ok(())
+    }
+
     fn routes(&self, state: RouterState) -> Router {
         Router::new()
             .route("/", routing::get(route_home))
@@ -57,15 +61,9 @@ impl Plugin for MyPlugin {
             })
     }
 
-    fn theme(&self, jinja: &mut Environment<'static>) -> rhombus::Result<()> {
-        jinja.add_template("home.html", include_str!("../templates/home.html"))?;
-        Ok(())
-    }
-
-    fn localize(&self, bundlemap: &mut BundleMap) -> rhombus::Result<()> {
-        let lang = "en".parse::<LanguageIdentifier>().unwrap();
+    fn localize(&self, localizations: &mut Localizations) -> rhombus::Result<()> {
         let res = FluentResource::try_new("test1 = Hello there\nho = Hol".to_string()).unwrap();
-        let bundle = bundlemap.get_mut(&lang).unwrap();
+        let bundle = localizations.bundles.get_mut("en").unwrap();
 
         bundle.add_resource_overriding(res);
         Ok(())
@@ -83,7 +81,7 @@ async fn route_home(
     rhombus: State<RouterState>,
     plugin: State<MyPluginRouterState>,
     Extension(user): Extension<MaybeTokenClaims>,
-    Extension(lang): Extension<Lang>,
+    Extension(lang): Extension<Languages>,
     uri: Uri,
 ) -> Html<String> {
     Html(

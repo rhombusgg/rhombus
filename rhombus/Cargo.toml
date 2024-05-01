@@ -21,8 +21,8 @@ fluent = "0.16.0"
 intl-memoizer = "0.5.1"
 jsonwebtoken = "9.3.0"
 lazy_static = "1.4.0"
-minijinja = "1.0.21"
-minijinja-embed = "1.0.21"
+minijinja = "2.0.1"
+minijinja-embed = "2.0.1"
 rand = "0.8.5"
 reqwest = { version = "0.12.4", default-features = false, features = [
   "rustls-tls",

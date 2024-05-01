@@ -19,8 +19,8 @@ pub trait Plugin {
     }
 
     #[cfg_attr(all(doc, CHANNEL_NIGHTLY), doc(cfg(feature = "internal")))]
-    fn localize(&self, bundlemap: &mut crate::internal::locales::BundleMap) -> Result<()> {
-        _ = bundlemap;
+    fn localize(&self, localizations: &mut crate::internal::locales::Localizations) -> Result<()> {
+        _ = localizations;
         Ok(())
     }
 
@@ -74,8 +74,8 @@ impl<P: Plugin> Plugin for (P,) {
         self.0.routes(state)
     }
 
-    fn localize(&self, bundlemap: &mut crate::internal::locales::BundleMap) -> Result<()> {
-        self.0.localize(bundlemap)
+    fn localize(&self, localizations: &mut crate::internal::locales::Localizations) -> Result<()> {
+        self.0.localize(localizations)
     }
 
     #[cfg(feature = "postgres")]
@@ -115,9 +115,9 @@ where
         self.1.routes(state.clone()).merge(self.0.routes(state))
     }
 
-    fn localize(&self, bundlemap: &mut crate::internal::locales::BundleMap) -> Result<()> {
-        self.1.localize(bundlemap)?;
-        self.0.localize(bundlemap)
+    fn localize(&self, localizations: &mut crate::internal::locales::Localizations) -> Result<()> {
+        self.1.localize(localizations)?;
+        self.0.localize(localizations)
     }
 
     #[cfg(feature = "postgres")]

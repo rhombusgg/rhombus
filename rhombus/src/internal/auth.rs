@@ -21,7 +21,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use super::{locales::Lang, router::RouterState};
+use super::{locales::Languages, router::RouterState};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct UserInner {
@@ -121,7 +121,7 @@ pub struct SignInParams {
 pub async fn route_signin(
     state: State<RouterState>,
     Extension(user): Extension<MaybeUser>,
-    Extension(lang): Extension<Lang>,
+    Extension(lang): Extension<Languages>,
     uri: Uri,
     params: Query<SignInParams>,
 ) -> Response<Body> {

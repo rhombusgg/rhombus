@@ -11,7 +11,7 @@ use rand::{
 };
 use reqwest::StatusCode;
 
-use super::{auth::User, locales::Lang, router::RouterState};
+use super::{auth::User, locales::Languages, router::RouterState};
 
 pub fn create_team_invite_token() -> String {
     Alphanumeric.sample_string(&mut thread_rng(), 16)
@@ -20,7 +20,7 @@ pub fn create_team_invite_token() -> String {
 pub async fn route_team(
     state: State<RouterState>,
     Extension(user): Extension<User>,
-    Extension(lang): Extension<Lang>,
+    Extension(lang): Extension<Languages>,
     uri: Uri,
 ) -> impl IntoResponse {
     let team = state.db.get_team_from_id(user.team_id).await.unwrap();
@@ -29,7 +29,6 @@ pub async fn route_team(
         "{}/signin?token={}",
         state.settings.location_url, team.invite_token
     );
-    tracing::info!(team_invite_url);
 
     Html(
         state
@@ -52,7 +51,7 @@ pub async fn route_team(
 pub async fn route_team_roll_token(
     state: State<RouterState>,
     Extension(user): Extension<User>,
-    Extension(lang): Extension<Lang>,
+    Extension(lang): Extension<Languages>,
 ) -> Result<impl IntoResponse, StatusCode> {
     if !user.is_team_owner {
         return Err(StatusCode::UNAUTHORIZED);

@@ -29,7 +29,7 @@ use crate::{
             maybe_rightmost_x_forwarded_for, maybe_true_client_ip, maybe_x_real_ip,
             track_middleware, KeyExtractorShim,
         },
-        locales::{self, translate},
+        locales::{self, locale_middleware, translate},
         open_graph::route_default_og_image,
         router::RouterStateInner,
         settings::IpPreset,
@@ -317,15 +317,17 @@ impl<P: Plugin> Builder<P> {
         };
 
         let mut localizer = locales::Localizations::new();
-        self.plugins.localize(&mut localizer.bundles)?;
+        self.plugins.localize(&mut localizer)?;
+        let localizer = Arc::new(localizer);
 
         let mut env = minijinja::Environment::new();
         minijinja_embed::load_templates!(&mut env);
 
+        let l = localizer.clone();
         env.add_function(
-            "_",
+            "t",
             move |msg_id: &str, kwargs: minijinja::value::Kwargs, state: &minijinja::State| {
-                translate(&localizer, msg_id, kwargs, state)
+                translate(l.clone(), msg_id, kwargs, state)
             },
         );
 
@@ -363,6 +365,7 @@ impl<P: Plugin> Builder<P> {
         let router_state = Arc::new(RouterStateInner {
             db,
             jinja: env,
+            localizer: localizer.clone(),
             settings: Arc::new(settings.clone()),
             ip_extractor: ip_extractor.unwrap_or(default_ip_extractor),
         });
@@ -393,7 +396,10 @@ impl<P: Plugin> Builder<P> {
         };
 
         let router = router
-            .layer(middleware::from_fn(locales::locale_middleware))
+            .layer(middleware::from_fn_with_state(
+                router_state.clone(),
+                locale_middleware,
+            ))
             .layer(middleware::from_fn_with_state(
                 router_state.clone(),
                 track_middleware,
