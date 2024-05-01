@@ -100,8 +100,11 @@ impl Default for Localizations {
 }
 
 pub fn translate(localizer: &Localizations, msg_id: &str, kwargs: Kwargs, state: &State) -> String {
-    let langs = state
-        .lookup("lang")
+    let langs = state.lookup("lang");
+    if langs.is_none() {
+        return "Must specify `lang` in template".to_owned();
+    }
+    let langs = langs
         .unwrap()
         .as_seq()
         .unwrap()
@@ -113,7 +116,7 @@ pub fn translate(localizer: &Localizations, msg_id: &str, kwargs: Kwargs, state:
                 .parse::<LanguageIdentifier>()
                 .unwrap()
         })
-        .collect::<Vec<LanguageIdentifier>>();
+        .collect::<Vec<_>>();
 
     let mut args = HashMap::new();
     for key in kwargs.args() {

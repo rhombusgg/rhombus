@@ -26,6 +26,7 @@ pub struct TeamUser {
 pub struct TeamInner {
     pub id: i64,
     pub name: String,
+    pub invite_token: String,
     pub users: Vec<TeamUser>,
 }
 
@@ -61,4 +62,5 @@ pub trait Database {
     async fn get_team_from_id(&self, team_id: i64) -> Result<Team>;
     async fn add_user_to_team(&self, user_id: i64, team_id: i64) -> Result<()>;
     async fn get_user_from_id(&self, user_id: i64) -> Result<User>;
+    async fn roll_invite_token(&self, team_id: i64) -> Result<String>;
 }

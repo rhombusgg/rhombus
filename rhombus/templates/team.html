@@ -4,29 +4,50 @@
 {% block title %}{{ super() }} - Team{% endblock %}
 
 {% block content %}
-<div class="container">
-  <div class="mb-4 mt-4 space-y-0.5">
-	  <h2 class="text-2xl font-bold tracking-tight">Team {{ team.name }}</h2>
-		<p class="text-muted-foreground">Manage your individual account settings.</p>
-	</div>
-	<div class="grid h-fit gap-6 md:grid-cols-2 lg:grid-cols-3">
-  {% call card.root() %}
-    {% call card.header() %}
-      {% call card.title() %}
-        Members
+  <div class="container">
+    <div class="mb-4 mt-4 space-y-0.5">
+      <h2 class="text-2xl font-bold tracking-tight">Team {{ team.name }}</h2>
+      <p class="text-muted-foreground">
+        Manage your individual account settings.
+      </p>
+    </div>
+    <div class="grid h-fit gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {% call card.root() %}
+        {% call card.header() %}
+          {% call card.title() %}
+            Members
+          {% endcall %}
+          {% call card.description() %}
+            Players on your team
+          {% endcall %}
+        {% endcall %}
+        {% call card.content() %}
+          <ul>
+            <div>
+              {% if user.is_team_owner %}
+                <button
+                  hx-post="/team/roll-token"
+                  hx-target="next"
+                  hx-swap="outerHTML"
+                >
+                  Roll token
+                </button>
+              {% endif %}
+              {% include "team-token.html" %}
+              {% with x=team_invite_url %}
+              {% endwith %}
+            </div>
+            {% for player in team.users %}
+              <li>
+                <a href="{{ player.id }}">{{ player.name }}</a>
+                {% if user.id == player.id %}(You){% endif %}
+                {% if player.is_team_owner %}(Owner){% endif %}
+                <img src="{{ player.avatar_url }}" />
+              </li>
+            {% endfor %}
+          </ul>
+        {% endcall %}
       {% endcall %}
-      {% call card.description() %}
-        Players on your team
-      {% endcall %}
-    {% endcall %}
-    {% call card.content() %}
-      <ul>
-        {% for player in team.users %}
-          <li><a href="{{ player.id }}">{{ player.name }}</a> {% if user.id == player.id %}(You){% endif %} {% if player.is_team_owner %}(Owner){% endif %} <img src="{{ player.avatar_url }}"></li>
-        {% endfor %}
-      </ul>
-    {% endcall %}
-  {% endcall %}
+    </div>
   </div>
-</div>
 {% endblock %}

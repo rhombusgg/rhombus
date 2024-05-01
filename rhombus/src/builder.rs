@@ -4,7 +4,7 @@ use axum::{
     http::StatusCode,
     middleware,
     response::{Html, IntoResponse},
-    routing::get,
+    routing::{get, post},
     Router,
 };
 use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
@@ -33,7 +33,7 @@ use crate::{
         open_graph::route_default_og_image,
         router::RouterStateInner,
         settings::IpPreset,
-        team::route_team,
+        team::{route_team, route_team_roll_token},
     },
     Plugin,
 };
@@ -373,6 +373,7 @@ impl<P: Plugin> Builder<P> {
             .fallback(handler_404)
             .route("/account", get(route_account))
             .route("/team", get(route_team))
+            .route("/team/roll-token", post(route_team_roll_token))
             .route_layer(middleware::from_fn(enforce_auth_middleware))
             .nest_service("/static", ServeDir::new(STATIC_DIR))
             .route("/", get(route_home))

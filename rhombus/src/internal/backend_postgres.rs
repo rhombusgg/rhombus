@@ -121,6 +121,10 @@ impl Database for Postgres {
     async fn get_user_from_id(&self, _user_id: i64) -> Result<User> {
         todo!()
     }
+
+    async fn roll_invite_token(&self, _team_id: i64) -> Result<String> {
+        todo!()
+    }
 }
 
 #[cfg(test)]

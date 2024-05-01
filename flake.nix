@@ -64,6 +64,7 @@
             cargo-watch
             systemfd
             rust-toolchain
+            nodePackages.pnpm
           ];
         };
       }

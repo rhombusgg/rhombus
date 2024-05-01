@@ -243,9 +243,13 @@ impl Database for LibSQL {
         #[derive(Debug, Deserialize)]
         struct QueryTeam {
             name: String,
+            invite_token: String,
         }
         let query_team_row = tx
-            .query("SELECT name FROM rhombus_team WHERE id = ?1", [team_id])
+            .query(
+                "SELECT name, invite_token FROM rhombus_team WHERE id = ?1",
+                [team_id],
+            )
             .await?
             .next()
             .await?
@@ -285,6 +289,7 @@ impl Database for LibSQL {
         Ok(Arc::new(TeamInner {
             id: team_id,
             name: query_team.name,
+            invite_token: query_team.invite_token,
             users,
         }))
     }
@@ -335,6 +340,19 @@ impl Database for LibSQL {
             team_id: user.team_id,
             is_team_owner: user.team_id == user.owner_team_id,
         }))
+    }
+
+    async fn roll_invite_token(&self, team_id: i64) -> Result<String> {
+        let new_invite_token = create_team_invite_token();
+
+        self.db
+            .execute(
+                "UPDATE rhombus_team SET invite_token = ?2 WHERE id = ?1",
+                params!(team_id, new_invite_token.clone()),
+            )
+            .await?;
+
+        Ok(new_invite_token)
     }
 }
 

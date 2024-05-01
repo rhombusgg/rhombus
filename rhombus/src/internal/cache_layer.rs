@@ -69,8 +69,8 @@ impl Database for DbCache {
             .await
     }
 
-    async fn get_team_from_id(&self, user_id: i64) -> Result<Team> {
-        get_team_from_id(&self.inner, user_id)
+    async fn get_team_from_id(&self, team_id: i64) -> Result<Team> {
+        get_team_from_id(&self.inner, team_id)
             .await
             .ok_or(UnknownDatabase())
     }
@@ -78,7 +78,10 @@ impl Database for DbCache {
     async fn add_user_to_team(&self, user_id: i64, team_id: i64) -> Result<()> {
         let result = self.inner.add_user_to_team(user_id, team_id).await;
         {
-            GET_TEAM_FROM_ID.lock().await.cache_remove(&user_id);
+            GET_TEAM_FROM_ID.lock().await.cache_remove(&team_id);
+        }
+        {
+            GET_USER_FROM_ID.lock().await.cache_remove(&user_id);
         }
         result
     }
@@ -87,6 +90,14 @@ impl Database for DbCache {
         get_user_from_id(&self.inner, user_id)
             .await
             .ok_or(UnknownDatabase())
+    }
+
+    async fn roll_invite_token(&self, team_id: i64) -> Result<String> {
+        let new_invite_token = self.inner.roll_invite_token(team_id).await;
+        {
+            GET_TEAM_FROM_ID.lock().await.cache_remove(&team_id);
+        }
+        new_invite_token
     }
 }
 
