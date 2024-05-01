@@ -2,7 +2,7 @@ use axum::{
     extract::State,
     http::Uri,
     response::{Html, IntoResponse},
-    Extension,
+    Extension, Form,
 };
 use minijinja::context;
 use rand::{
@@ -10,6 +10,8 @@ use rand::{
     thread_rng,
 };
 use reqwest::StatusCode;
+use serde::Deserialize;
+use unicode_segmentation::UnicodeSegmentation;
 
 use super::{auth::User, locales::Languages, router::RouterState};
 
@@ -75,4 +77,55 @@ pub async fn route_team_roll_token(
             })
             .unwrap(),
     ))
+}
+
+#[derive(Deserialize)]
+pub struct SetTeamName {
+    name: String,
+}
+
+pub async fn route_team_set_name(
+    state: State<RouterState>,
+    Extension(user): Extension<User>,
+    Extension(lang): Extension<Languages>,
+    Form(form): Form<SetTeamName>,
+) -> Result<impl IntoResponse, StatusCode> {
+    if !user.is_team_owner {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    let mut errors = vec![];
+    let graphemes = form.name.graphemes(true).count();
+    if !(3..=30).contains(&graphemes) {
+        errors.push("Team name must be between 3 and 30 characters");
+    } else if state
+        .db
+        .set_team_name(user.team_id, &form.name)
+        .await
+        .is_err()
+    {
+        errors.push("Team name already taken");
+    }
+
+    let team_name_template = state.jinja.get_template("team-set-name.html").unwrap();
+
+    if errors.is_empty() {
+        Ok(Html(
+            team_name_template
+                .render(context! {
+                    lang => lang,
+                    new_team_name => &form.name,
+                })
+                .unwrap(),
+        ))
+    } else {
+        Ok(Html(
+            team_name_template
+                .render(context! {
+                    lang => lang,
+                    errors => errors,
+                })
+                .unwrap(),
+        ))
+    }
 }

@@ -354,6 +354,16 @@ impl Database for LibSQL {
 
         Ok(new_invite_token)
     }
+
+    async fn set_team_name(&self, team_id: i64, new_team_name: &str) -> Result<()> {
+        self.db
+            .execute(
+                "UPDATE rhombus_team SET name = ?2 WHERE id = ?1",
+                params!(team_id, new_team_name),
+            )
+            .await?;
+        Ok(())
+    }
 }
 
 fn truncate_to_256_chars(s: &str) -> &str {

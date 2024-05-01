@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS rhombus_email (
 
 CREATE TABLE IF NOT EXISTS rhombus_team (
     id INTEGER PRIMARY KEY NOT NULL,
-    name TEXT NOT NULL,
+    name TEXT NOT NULL UNIQUE,
     invite_token TEXT NOT NULL
 );
 

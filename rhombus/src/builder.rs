@@ -33,7 +33,7 @@ use crate::{
         open_graph::route_default_og_image,
         router::RouterStateInner,
         settings::IpPreset,
-        team::{route_team, route_team_roll_token},
+        team::{route_team, route_team_roll_token, route_team_set_name},
     },
     Plugin,
 };
@@ -377,6 +377,7 @@ impl<P: Plugin> Builder<P> {
             .route("/account", get(route_account))
             .route("/team", get(route_team))
             .route("/team/roll-token", post(route_team_roll_token))
+            .route("/team/name", post(route_team_set_name))
             .route_layer(middleware::from_fn(enforce_auth_middleware))
             .nest_service("/static", ServeDir::new(STATIC_DIR))
             .route("/", get(route_home))

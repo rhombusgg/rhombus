@@ -63,4 +63,5 @@ pub trait Database {
     async fn add_user_to_team(&self, user_id: i64, team_id: i64) -> Result<()>;
     async fn get_user_from_id(&self, user_id: i64) -> Result<User>;
     async fn roll_invite_token(&self, team_id: i64) -> Result<String>;
+    async fn set_team_name(&self, team_id: i64, new_team_name: &str) -> Result<()>;
 }

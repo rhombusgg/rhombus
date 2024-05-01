@@ -125,6 +125,10 @@ impl Database for Postgres {
     async fn roll_invite_token(&self, _team_id: i64) -> Result<String> {
         todo!()
     }
+
+    async fn set_team_name(&self, _team_id: i64, _new_team_name: &str) -> Result<()> {
+        todo!()
+    }
 }
 
 #[cfg(test)]

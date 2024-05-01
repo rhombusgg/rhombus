@@ -29,7 +29,7 @@ pub async fn track_middleware(
             .get(&USER_AGENT)
             .map(|header| header.to_str().unwrap().to_string());
 
-        tracing::trace!(user_id, user_agent, uri = uri.to_string(), "Request");
+        tracing::trace!(user_id, uri = uri.to_string(), "Request");
         tokio::task::spawn(async move {
             _ = state
                 .db

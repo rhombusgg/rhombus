@@ -77,11 +77,13 @@ impl Database for DbCache {
 
     async fn add_user_to_team(&self, user_id: i64, team_id: i64) -> Result<()> {
         let result = self.inner.add_user_to_team(user_id, team_id).await;
-        {
-            GET_TEAM_FROM_ID.lock().await.cache_remove(&team_id);
-        }
-        {
-            GET_USER_FROM_ID.lock().await.cache_remove(&user_id);
+        if result.is_ok() {
+            {
+                GET_TEAM_FROM_ID.lock().await.cache_remove(&team_id);
+            }
+            {
+                GET_USER_FROM_ID.lock().await.cache_remove(&user_id);
+            }
         }
         result
     }
@@ -94,10 +96,18 @@ impl Database for DbCache {
 
     async fn roll_invite_token(&self, team_id: i64) -> Result<String> {
         let new_invite_token = self.inner.roll_invite_token(team_id).await;
-        {
+        if new_invite_token.is_ok() {
             GET_TEAM_FROM_ID.lock().await.cache_remove(&team_id);
         }
         new_invite_token
+    }
+
+    async fn set_team_name(&self, team_id: i64, new_team_name: &str) -> Result<()> {
+        let result = self.inner.set_team_name(team_id, new_team_name).await;
+        if result.is_ok() {
+            GET_TEAM_FROM_ID.lock().await.cache_remove(&team_id);
+        }
+        result
     }
 }
 

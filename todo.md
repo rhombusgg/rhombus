@@ -4,9 +4,9 @@
 - [x] Shuttle hosting
 - [x] Testcontainer tests
 - [x] IP tracking
-- [ ] Teams
+- [x] Teams
   - [x] Invites
-  - [ ] Renaming
+  - [x] Renaming
 - [x] Custom IP Middleware
 - [x] Configuration
   - [x] YAML

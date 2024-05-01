@@ -3052,6 +3052,7 @@ dependencies = [
  "tower_governor",
  "tracing",
  "unic-langid",
+ "unicode-segmentation",
 ]
 
 [[package]]
