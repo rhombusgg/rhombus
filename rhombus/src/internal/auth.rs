@@ -336,7 +336,7 @@ pub async fn route_discord_callback(
 
     let now = chrono::Utc::now();
     let iat = now.timestamp() as usize;
-    let exp = (now + chrono::Duration::try_minutes(60).unwrap()).timestamp() as usize;
+    let exp = (now + chrono::Duration::try_minutes(60 * 72).unwrap()).timestamp() as usize;
     let claims = TokenClaims {
         sub: user_id,
         exp,
