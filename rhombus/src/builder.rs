@@ -14,12 +14,12 @@ use tracing::info;
 use crate::{
     errors::{DatabaseConfigurationError, RhombusError},
     internal::{
-        account::route_account,
+        account::{discord_cache_evictor, route_account},
         auth::{
             auth_injector_middleware, enforce_auth_middleware, route_discord_callback,
             route_signin, route_signout,
         },
-        cache_layer::DbCache,
+        cache_layer::{database_cache_evictor, DbCache},
         challenges::route_challenges,
         database::Database,
         home::route_home,
@@ -221,7 +221,7 @@ impl<P: Plugin> Builder<P> {
 
                 #[cfg(feature = "libsql")]
                 {
-                    info!("Connecting to local file libsql database from database url");
+                    info!(database_url, "Connecting to local file libsql database");
                     let database = crate::internal::backend_libsql::LibSQL::new_local(path).await?;
                     database.migrate().await?;
                     self.plugins.migrate_libsql(database.clone()).await?;
@@ -245,7 +245,10 @@ impl<P: Plugin> Builder<P> {
                     #[cfg(feature = "libsql")]
                     {
                         let database = if let Some(local_replica_path) = &turso.local_replica_path {
-                            info!("Connecting to remote libsql database with local replica from database url");
+                            info!(
+                                database_url,
+                                "Connecting to remote libsql database with local replica"
+                            );
                             crate::internal::backend_libsql::LibSQL::new_remote_replica(
                                 local_replica_path,
                                 database_url.to_owned(),
@@ -253,7 +256,7 @@ impl<P: Plugin> Builder<P> {
                             )
                             .await?
                         } else {
-                            info!("Connecting to remote libsql database from database url");
+                            info!(database_url, "Connecting to remote libsql database");
                             crate::internal::backend_libsql::LibSQL::new_remote(
                                 database_url.to_owned(),
                                 turso.auth_token.to_owned(),
@@ -310,11 +313,41 @@ impl<P: Plugin> Builder<P> {
         self.plugins.name();
 
         let db = self.build_database(&settings).await?;
-        let db = if settings.in_memory_cache {
-            Arc::new(DbCache::new(db))
-        } else {
-            db
+        let db = match settings.in_memory_cache.as_str() {
+            "false" => {
+                info!("Disabling in memory cache");
+                db
+            }
+            "true" => {
+                let duration = 360;
+                info!(duration, "Enabling default in memory cache");
+                database_cache_evictor(duration);
+                Arc::new(DbCache::new(db))
+            }
+            duration => {
+                if let Ok(duration) = duration.parse::<u64>() {
+                    if duration >= 5 {
+                        info!(duration, "Enabling default in memory cache");
+                        database_cache_evictor(duration);
+                        Arc::new(DbCache::new(db))
+                    } else {
+                        info!(
+                            duration,
+                            "Invalid in memory cache duration value, disabling in memory cache"
+                        );
+                        db
+                    }
+                } else {
+                    info!(
+                        duration,
+                        "Invalid in memory cache duration value, disabling in memory cache"
+                    );
+                    db
+                }
+            }
         };
+
+        discord_cache_evictor();
 
         let mut localizer = locales::Localizations::new();
         self.plugins.localize(&mut localizer)?;

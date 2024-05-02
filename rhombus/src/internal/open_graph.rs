@@ -1,5 +1,4 @@
 use axum::{body::Body, extract::State, http::Response, response::IntoResponse};
-use cached::proc_macro::cached;
 use lazy_static::lazy_static;
 use minijinja::context;
 use resvg::tiny_skia;
@@ -20,7 +19,7 @@ lazy_static! {
     };
 }
 
-#[cached(time = 120, key = "String", convert = "{ svg.to_string() }")]
+// todo: cache between requests
 fn convert_svg_to_png(svg: &str) -> Vec<u8> {
     let opt = usvg::Options::default();
     let tree = {

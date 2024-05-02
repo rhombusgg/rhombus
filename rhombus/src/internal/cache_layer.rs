@@ -1,14 +1,12 @@
-use std::net::IpAddr;
+use std::{net::IpAddr, time::Duration};
 
 use async_trait::async_trait;
-use cached::{
-    proc_macro::{cached, once},
-    Cached,
-};
+use dashmap::DashMap;
+use tokio::sync::RwLock;
 
-use crate::{errors::RhombusError::UnknownDatabase, internal::auth::User, Result};
+use crate::{internal::auth::User, Result};
 
-use super::database::{Challenge, Connection, Database, Team, TeamMeta};
+use super::database::{Challenges, Connection, Database, Team, TeamMeta};
 
 #[derive(Clone)]
 pub struct DbCache {
@@ -45,7 +43,8 @@ impl Database for DbCache {
             .upsert_user(name, email, avatar, discord_id)
             .await;
         if let Ok(result) = result {
-            GET_USER_FROM_ID.lock().await.cache_remove(&result);
+            // GET_USER_FROM_ID.lock().await.cache_remove(&result);
+            USER_CACHE.remove(&result);
         }
         result
     }
@@ -59,8 +58,8 @@ impl Database for DbCache {
         self.inner.insert_track(ip, user_agent, user_id).await
     }
 
-    async fn get_challenges(&self) -> Result<Vec<Challenge>> {
-        get_challenges(&self.inner).await.ok_or(UnknownDatabase())
+    async fn get_challenges(&self) -> Result<Challenges> {
+        get_challenges(&self.inner).await
     }
 
     async fn get_team_meta_from_invite_token(
@@ -73,9 +72,7 @@ impl Database for DbCache {
     }
 
     async fn get_team_from_id(&self, team_id: i64) -> Result<Team> {
-        get_team_from_id(&self.inner, team_id)
-            .await
-            .ok_or(UnknownDatabase())
+        get_team_from_id(&self.inner, team_id).await
     }
 
     async fn add_user_to_team(
@@ -89,29 +86,23 @@ impl Database for DbCache {
             .add_user_to_team(user_id, team_id, old_team_id)
             .await;
         if result.is_ok() {
-            {
-                GET_TEAM_FROM_ID.lock().await.cache_remove(&team_id);
-            }
-            {
-                GET_USER_FROM_ID.lock().await.cache_remove(&user_id);
-            }
+            TEAM_CACHE.remove(&team_id);
+            USER_CACHE.remove(&user_id);
             if let Some(old_team_id) = old_team_id {
-                GET_TEAM_FROM_ID.lock().await.cache_remove(&old_team_id);
+                TEAM_CACHE.remove(&old_team_id);
             }
         }
         result
     }
 
     async fn get_user_from_id(&self, user_id: i64) -> Result<User> {
-        get_user_from_id(&self.inner, user_id)
-            .await
-            .ok_or(UnknownDatabase())
+        get_user_from_id(&self.inner, user_id).await
     }
 
     async fn roll_invite_token(&self, team_id: i64) -> Result<String> {
         let new_invite_token = self.inner.roll_invite_token(team_id).await;
         if new_invite_token.is_ok() {
-            GET_TEAM_FROM_ID.lock().await.cache_remove(&team_id);
+            TEAM_CACHE.remove(&team_id);
         }
         new_invite_token
     }
@@ -119,26 +110,104 @@ impl Database for DbCache {
     async fn set_team_name(&self, team_id: i64, new_team_name: &str) -> Result<()> {
         let result = self.inner.set_team_name(team_id, new_team_name).await;
         if result.is_ok() {
-            GET_TEAM_FROM_ID.lock().await.cache_remove(&team_id);
+            TEAM_CACHE.remove(&team_id);
         }
         result
     }
 }
 
-#[once(time = 30, sync_writes = true)]
-async fn get_challenges(db: &Connection) -> Option<Vec<Challenge>> {
+lazy_static::lazy_static! {
+    pub static ref CHALLENGES_CACHE: RwLock<Option<Challenges>> = None.into();
+}
+
+pub async fn get_challenges(db: &Connection) -> Result<Challenges> {
+    if let Some(challenges) = &*CHALLENGES_CACHE.read().await {
+        return Ok(challenges.clone());
+    }
     tracing::trace!("cache miss: challenges");
-    db.get_challenges().await.ok()
+
+    let challenges = db.get_challenges().await;
+
+    if let Ok(challenges) = &challenges {
+        let mut cache = CHALLENGES_CACHE.write().await;
+        *cache = Some(challenges.clone());
+    }
+
+    challenges
 }
 
-#[cached(time = 30, key = "i64", convert = "{ team_id }", sync_writes = true)]
-async fn get_team_from_id(db: &Connection, team_id: i64) -> Option<Team> {
+lazy_static::lazy_static! {
+    pub static ref TEAM_CACHE: DashMap<i64, TimedCache<Team>> = DashMap::new();
+}
+
+pub async fn get_team_from_id(db: &Connection, team_id: i64) -> Result<Team> {
+    if let Some(team) = TEAM_CACHE.get(&team_id) {
+        return Ok(team.value.clone());
+    }
     tracing::trace!(team_id, "cache miss: get_team_from_id");
-    db.get_team_from_id(team_id).await.ok()
+
+    let team = db.get_team_from_id(team_id).await;
+
+    if let Ok(team) = &team {
+        TEAM_CACHE.insert(team_id, TimedCache::new(team.clone()));
+    }
+    team
 }
 
-#[cached(time = 30, key = "i64", convert = "{ user_id }", sync_writes = true)]
-async fn get_user_from_id(db: &Connection, user_id: i64) -> Option<User> {
+pub struct TimedCache<T> {
+    pub value: T,
+    pub insert_timestamp: i64,
+}
+
+impl<T> TimedCache<T> {
+    #[inline(always)]
+    pub fn new(value: T) -> Self {
+        TimedCache {
+            value,
+            insert_timestamp: chrono::Utc::now().timestamp(),
+        }
+    }
+}
+
+lazy_static::lazy_static! {
+    pub static ref USER_CACHE: DashMap<i64, TimedCache<User>> = DashMap::new();
+}
+
+pub async fn get_user_from_id(db: &Connection, user_id: i64) -> Result<User> {
+    if let Some(user) = USER_CACHE.get(&user_id) {
+        return Ok(user.value.clone());
+    }
     tracing::trace!(user_id, "cache miss: get_user_from_id");
-    db.get_user_from_id(user_id).await.ok()
+
+    let user = db.get_user_from_id(user_id).await;
+
+    if let Ok(user) = &user {
+        USER_CACHE.insert(user_id, TimedCache::new(user.clone()));
+    }
+    user
+}
+
+pub fn database_cache_evictor(seconds: u64) {
+    tokio::task::spawn(async move {
+        let duration = Duration::from_secs(seconds);
+        let interval = duration / 3;
+        tokio::time::sleep(duration).await;
+        loop {
+            tracing::trace!("Evicting user cache");
+            let evict_threshold = (chrono::Utc::now() - duration).timestamp();
+            USER_CACHE.retain(|_, v| v.insert_timestamp > evict_threshold);
+            tokio::time::sleep(interval).await;
+
+            tracing::trace!("Evicting team cache");
+            let evict_threshold = (chrono::Utc::now() - duration).timestamp();
+            TEAM_CACHE.retain(|_, v| v.insert_timestamp > evict_threshold);
+            tokio::time::sleep(interval).await;
+
+            tracing::trace!("Evicting challenges cache");
+            {
+                *CHALLENGES_CACHE.write().await = None
+            }
+            tokio::time::sleep(interval).await;
+        }
+    });
 }

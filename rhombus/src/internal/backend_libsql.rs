@@ -16,7 +16,8 @@ use serde::Deserialize;
 use super::{
     auth::{User, UserInner},
     database::{
-        Challenge, ChallengeSolve, Database, Team, TeamInner, TeamMeta, TeamMetaInner, TeamUser,
+        Challenge, ChallengeSolve, Challenges, Database, Team, TeamInner, TeamMeta, TeamMetaInner,
+        TeamUser,
     },
     team::create_team_invite_token,
 };
@@ -190,7 +191,7 @@ impl Database for LibSQL {
         Ok(())
     }
 
-    async fn get_challenges(&self) -> Result<Vec<Challenge>> {
+    async fn get_challenges(&self) -> Result<Challenges> {
         let rows = self.db.query("SELECT * FROM rhombus_challenge", ()).await?;
 
         #[derive(Debug, Deserialize)]
@@ -206,14 +207,16 @@ impl Database for LibSQL {
             .collect::<Vec<DbChallenge>>()
             .await;
 
-        Ok(challenges
-            .into_iter()
-            .map(|challenge| Challenge {
-                id: challenge.id,
-                name: challenge.name,
-                description: challenge.description,
-            })
-            .collect())
+        Ok(Arc::new(
+            challenges
+                .into_iter()
+                .map(|challenge| Challenge {
+                    id: challenge.id,
+                    name: challenge.name,
+                    description: challenge.description,
+                })
+                .collect(),
+        ))
     }
 
     async fn get_team_meta_from_invite_token(

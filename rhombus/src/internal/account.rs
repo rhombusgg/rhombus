@@ -1,13 +1,21 @@
+use std::time::Duration;
+
 use axum::{extract::State, http::Uri, response::Html, Extension};
-use cached::proc_macro::cached;
+use dashmap::DashMap;
 use minijinja::context;
 use reqwest::Client;
 use tracing::debug;
 
-use super::{auth::User, locales::Languages, router::RouterState};
+use super::{auth::User, cache_layer::TimedCache, locales::Languages, router::RouterState};
 
-#[cached(time = 10, key = "String", convert = "{ discord_id.to_string() }")]
+lazy_static::lazy_static! {
+    pub static ref IS_IN_SERVER_CACHE: DashMap<String, TimedCache<bool>> = DashMap::new();
+}
+
 async fn is_in_server(discord_guild_id: &str, discord_id: &str, discord_bot_token: &str) -> bool {
+    if let Some(team) = IS_IN_SERVER_CACHE.get(discord_id) {
+        return team.value;
+    }
     tracing::trace!(discord_id, "cache miss: is_in_server");
 
     let client = Client::new();
@@ -21,7 +29,9 @@ async fn is_in_server(discord_guild_id: &str, discord_id: &str, discord_bot_toke
         .await
         .unwrap();
 
-    res.status().is_success()
+    let is_in = res.status().is_success();
+    IS_IN_SERVER_CACHE.insert(discord_id.to_owned(), TimedCache::new(is_in));
+    is_in
 }
 
 pub async fn route_account(
@@ -53,4 +63,16 @@ pub async fn route_account(
             })
             .unwrap(),
     )
+}
+
+pub fn discord_cache_evictor() {
+    tokio::task::spawn(async {
+        let interval = Duration::from_secs(10);
+        loop {
+            tokio::time::sleep(interval).await;
+            // tracing::trace!("Evicting discord id cache");
+            let evict_threshold = (chrono::Utc::now() - interval).timestamp();
+            IS_IN_SERVER_CACHE.retain(|_, v| v.insert_timestamp > evict_threshold);
+        }
+    });
 }

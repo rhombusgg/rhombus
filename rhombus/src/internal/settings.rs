@@ -55,7 +55,15 @@ pub struct Settings {
     pub ratelimit: Option<RateLimitSettings>,
     pub ip_preset: Option<IpPreset>,
     pub live_reload: bool,
-    pub in_memory_cache: bool,
+
+    /// `false` will disable the in memory cache.
+    ///
+    /// `true` will enable the in memory cache with default 360 second interval.
+    ///
+    /// Integers above `5` will be the number in seconds that values are
+    /// considered valid for. Other values are invalid and will disable the in
+    /// memory cache.
+    pub in_memory_cache: String,
 
     #[cfg(feature = "libsql")]
     pub turso: Option<Turso>,

@@ -44,11 +44,13 @@
         },
         "in_memory_cache": {
             "title": "In Memory Cache",
-            "description": "Cache results from the database in memory for short periods of time to reduce load on database (recommended)",
-            "type": "boolean",
+            "description": "Cache results from the database in memory for short periods of time to reduce load on database (recommended). false will disable the in memory cache. true will enable the in memory cache with default 360 second interval. Integers above 5 will be the number in seconds that values are considered valid for. Other values are invalid and will disable the in memory cache.",
+            "type": ["boolean", "number"],
+            "minimum": 5,
             "default": true,
             "examples": [
-                true
+                false,
+                120
             ]
         },
         "ip_preset": {

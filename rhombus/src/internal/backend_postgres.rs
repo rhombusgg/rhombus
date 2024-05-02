@@ -1,11 +1,11 @@
-use std::net::IpAddr;
+use std::{net::IpAddr, sync::Arc};
 
 use async_trait::async_trait;
 use sqlx::{FromRow, PgPool};
 
 use super::{
     auth::User,
-    database::{Challenge, Database, Team, TeamMeta},
+    database::{Challenge, Challenges, Database, Team, TeamMeta},
 };
 use crate::Result;
 
@@ -81,7 +81,7 @@ impl Database for Postgres {
         Ok(())
     }
 
-    async fn get_challenges(&self) -> Result<Vec<Challenge>> {
+    async fn get_challenges(&self) -> Result<Challenges> {
         #[derive(FromRow)]
         struct DBChallenge {
             id: i64,
@@ -93,14 +93,16 @@ impl Database for Postgres {
             .fetch_all(&self.pool)
             .await?;
 
-        Ok(challenges
-            .into_iter()
-            .map(|challenge| Challenge {
-                id: challenge.id,
-                name: challenge.name,
-                description: challenge.description,
-            })
-            .collect())
+        Ok(Arc::new(
+            challenges
+                .into_iter()
+                .map(|challenge| Challenge {
+                    id: challenge.id,
+                    name: challenge.name,
+                    description: challenge.description,
+                })
+                .collect(),
+        ))
     }
 
     async fn get_team_meta_from_invite_token(

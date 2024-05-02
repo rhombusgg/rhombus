@@ -15,6 +15,8 @@ pub struct Challenge {
     pub description: String,
 }
 
+pub type Challenges = Arc<Vec<Challenge>>;
+
 #[derive(Debug, Serialize, Clone, PartialEq, PartialOrd)]
 pub struct ChallengeSolve {
     pub solved_at: DateTime<Utc>,
@@ -63,7 +65,7 @@ pub trait Database {
         user_agent: Option<&str>,
         user_id: Option<i64>,
     ) -> Result<()>;
-    async fn get_challenges(&self) -> Result<Vec<Challenge>>;
+    async fn get_challenges(&self) -> Result<Challenges>;
     async fn get_team_meta_from_invite_token(&self, invite_token: &str)
         -> Result<Option<TeamMeta>>;
     async fn get_team_from_id(&self, team_id: i64) -> Result<Team>;
