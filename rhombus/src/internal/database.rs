@@ -15,10 +15,10 @@ pub struct Challenge {
     pub description: String,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, PartialEq, PartialOrd)]
 pub struct ChallengeSolve {
-    pub user_id: i64,
     pub solved_at: DateTime<Utc>,
+    pub user_id: i64,
 }
 
 #[derive(Debug, Serialize, Clone)]

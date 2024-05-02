@@ -1,4 +1,10 @@
-use std::{collections::HashMap, net::IpAddr, path::Path, sync::Arc, time::Duration};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    net::IpAddr,
+    path::Path,
+    sync::Arc,
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -300,13 +306,18 @@ impl Database for LibSQL {
         let mut solves: HashMap<i64, ChallengeSolve> = Default::default();
         while let Some(row) = query_solves.next().await? {
             let query_solve = de::from_row::<QuerySolve>(&row).unwrap();
-            solves.insert(
-                query_solve.challenge_id,
-                ChallengeSolve {
-                    user_id: query_solve.user_id,
-                    solved_at: DateTime::<Utc>::from_timestamp(query_solve.solved_at, 0).unwrap(),
-                },
-            );
+            let solve = ChallengeSolve {
+                user_id: query_solve.user_id,
+                solved_at: DateTime::<Utc>::from_timestamp(query_solve.solved_at, 0).unwrap(),
+            };
+
+            // favor the earliest solve
+            if match solves.entry(query_solve.challenge_id) {
+                Entry::Occupied(old) => solve < *old.get(),
+                Entry::Vacant(_) => true,
+            } {
+                solves.insert(query_solve.challenge_id, solve);
+            }
         }
 
         tx.commit().await?;
