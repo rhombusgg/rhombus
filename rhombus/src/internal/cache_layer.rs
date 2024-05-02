@@ -125,19 +125,19 @@ impl Database for DbCache {
     }
 }
 
-#[once(time = 30)]
+#[once(time = 30, sync_writes = true)]
 async fn get_challenges(db: &Connection) -> Option<Vec<Challenge>> {
     tracing::trace!("cache miss: challenges");
     db.get_challenges().await.ok()
 }
 
-#[cached(time = 30, key = "i64", convert = "{ team_id }")]
+#[cached(time = 30, key = "i64", convert = "{ team_id }", sync_writes = true)]
 async fn get_team_from_id(db: &Connection, team_id: i64) -> Option<Team> {
     tracing::trace!(team_id, "cache miss: get_team_from_id");
     db.get_team_from_id(team_id).await.ok()
 }
 
-#[cached(time = 30, key = "i64", convert = "{ user_id }")]
+#[cached(time = 30, key = "i64", convert = "{ user_id }", sync_writes = true)]
 async fn get_user_from_id(db: &Connection, user_id: i64) -> Option<User> {
     tracing::trace!(user_id, "cache miss: get_user_from_id");
     db.get_user_from_id(user_id).await.ok()
