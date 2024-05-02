@@ -6,6 +6,13 @@ CREATE TABLE IF NOT EXISTS rhombus_challenge (
     description TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS rhombus_solve (
+    challenge_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    solved_at INTEGER NOT NULL DEFAULT(strftime('%s', 'now')),
+    PRIMARY KEY (challenge_id, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS rhombus_user (
     id INTEGER PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
@@ -35,7 +42,7 @@ CREATE TABLE IF NOT EXISTS rhombus_track (
     id INTEGER PRIMARY KEY NOT NULL,
     ip BLOB NOT NULL,
     user_agent TEXT NOT NULL,
-    last_seen_at INTEGER(4) NOT NULL DEFAULT(strftime('%s', 'now')),
+    last_seen_at INTEGER NOT NULL DEFAULT(strftime('%s', 'now')),
     requests INTEGER NOT NULL DEFAULT(1),
     UNIQUE(ip, user_agent)
 );

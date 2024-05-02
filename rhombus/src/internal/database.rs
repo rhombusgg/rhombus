@@ -1,13 +1,14 @@
-use std::{net::IpAddr, sync::Arc};
+use std::{collections::HashMap, net::IpAddr, sync::Arc};
 
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use serde::Serialize;
 
 use crate::{internal::auth::User, Result};
 
 pub type Connection = Arc<dyn Database + Send + Sync>;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Challenge {
     pub id: i64,
     pub name: String,
@@ -15,8 +16,13 @@ pub struct Challenge {
 }
 
 #[derive(Debug, Serialize, Clone)]
+pub struct ChallengeSolve {
+    pub user_id: i64,
+    pub solved_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Clone)]
 pub struct TeamUser {
-    pub id: i64,
     pub name: String,
     pub avatar_url: String,
     pub is_team_owner: bool,
@@ -27,7 +33,8 @@ pub struct TeamInner {
     pub id: i64,
     pub name: String,
     pub invite_token: String,
-    pub users: Vec<TeamUser>,
+    pub users: HashMap<i64, TeamUser>,
+    pub solves: HashMap<i64, ChallengeSolve>,
 }
 
 pub type Team = Arc<TeamInner>;
@@ -60,7 +67,12 @@ pub trait Database {
     async fn get_team_meta_from_invite_token(&self, invite_token: &str)
         -> Result<Option<TeamMeta>>;
     async fn get_team_from_id(&self, team_id: i64) -> Result<Team>;
-    async fn add_user_to_team(&self, user_id: i64, team_id: i64) -> Result<()>;
+    async fn add_user_to_team(
+        &self,
+        user_id: i64,
+        team_id: i64,
+        old_team_id: Option<i64>,
+    ) -> Result<()>;
     async fn get_user_from_id(&self, user_id: i64) -> Result<User>;
     async fn roll_invite_token(&self, team_id: i64) -> Result<String>;
     async fn set_team_name(&self, team_id: i64, new_team_name: &str) -> Result<()>;

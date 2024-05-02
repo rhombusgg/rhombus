@@ -1,5 +1,6 @@
 sign-in = Sign In
 team = Team
 account = Account
+challenges = Challenges
 command-palette = Command Palette...
     .hint = Type a command...

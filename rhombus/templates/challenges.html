@@ -1,10 +1,20 @@
 {% extends "layout.html" %}
+
+{% block title %}{{ super() }} - {{ t("challenges") }}{% endblock %}
+
 {% block content %}
   <ul class="list-disc">
     {% for challenge in challenges %}
       <li>
         <span>
           {{ challenge.id }} {{ challenge.name }} / {{ challenge.description }}
+          {% with solve=team.solves[challenge.id] %}
+            {% if solve %}
+              {% with user=team.users[solve.user_id] %}
+                / solved by {{ user.name }}
+              {% endwith %}
+            {% endif %}
+          {% endwith %}
         </span>
       </li>
     {% endfor %}

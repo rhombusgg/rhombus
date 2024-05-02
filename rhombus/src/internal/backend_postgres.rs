@@ -114,7 +114,12 @@ impl Database for Postgres {
         todo!()
     }
 
-    async fn add_user_to_team(&self, _user_id: i64, _team_id: i64) -> Result<()> {
+    async fn add_user_to_team(
+        &self,
+        _user_id: i64,
+        _team_id: i64,
+        _old_team_id: Option<i64>,
+    ) -> Result<()> {
         todo!()
     }
 

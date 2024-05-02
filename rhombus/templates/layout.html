@@ -16,6 +16,7 @@
           >
         </a>
         {% if user %}
+          {{ navbarItem(label=t("challenges"), href="/challenges", uri=uri) }}
           {{ navbarItem(label=t("team"), href="/team", uri=uri) }}
           {{ navbarItem(label=t("account"), href="/account", uri=uri) }}
         {% else %}

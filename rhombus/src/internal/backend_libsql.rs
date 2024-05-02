@@ -1,6 +1,7 @@
-use std::{net::IpAddr, path::Path, sync::Arc, time::Duration};
+use std::{collections::HashMap, net::IpAddr, path::Path, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use futures::stream::StreamExt;
 use libsql::{de, params, Builder};
 use rust_embed::RustEmbed;
@@ -8,7 +9,9 @@ use serde::Deserialize;
 
 use super::{
     auth::{User, UserInner},
-    database::{Challenge, Database, Team, TeamInner, TeamMeta, TeamMetaInner, TeamUser},
+    database::{
+        Challenge, ChallengeSolve, Database, Team, TeamInner, TeamMeta, TeamMetaInner, TeamUser,
+    },
     team::create_team_invite_token,
 };
 use crate::Result;
@@ -263,26 +266,48 @@ impl Database for LibSQL {
             avatar: String,
             owner_team_id: i64,
         }
-
-        let query_user_rows = tx
+        let mut query_user_rows = tx
             .query(
                 "SELECT id, name, avatar, owner_team_id FROM rhombus_user WHERE team_id = ?1",
                 [team_id],
             )
             .await?;
-        let users = query_user_rows
-            .into_stream()
-            .map(|row| {
-                let query_user = de::from_row::<QueryTeamUser>(&row.unwrap()).unwrap();
+        let mut users: HashMap<i64, TeamUser> = Default::default();
+        while let Some(row) = query_user_rows.next().await? {
+            let query_user = de::from_row::<QueryTeamUser>(&row).unwrap();
+            users.insert(
+                query_user.id,
                 TeamUser {
-                    id: query_user.id,
                     name: query_user.name,
                     avatar_url: query_user.avatar,
                     is_team_owner: query_user.owner_team_id == team_id,
-                }
-            })
-            .collect::<Vec<TeamUser>>()
-            .await;
+                },
+            );
+        }
+
+        #[derive(Debug, Deserialize)]
+        struct QuerySolve {
+            pub challenge_id: i64,
+            pub user_id: i64,
+            pub solved_at: i64,
+        }
+        let mut query_solves = tx
+            .query(
+                "SELECT challenge_id, user_id, solved_at FROM rhombus_solve JOIN rhombus_user ON rhombus_solve.user_id = rhombus_user.id WHERE team_id = ?1",
+                [team_id],
+            )
+            .await?;
+        let mut solves: HashMap<i64, ChallengeSolve> = Default::default();
+        while let Some(row) = query_solves.next().await? {
+            let query_solve = de::from_row::<QuerySolve>(&row).unwrap();
+            solves.insert(
+                query_solve.challenge_id,
+                ChallengeSolve {
+                    user_id: query_solve.user_id,
+                    solved_at: DateTime::<Utc>::from_timestamp(query_solve.solved_at, 0).unwrap(),
+                },
+            );
+        }
 
         tx.commit().await?;
 
@@ -291,10 +316,16 @@ impl Database for LibSQL {
             name: query_team.name,
             invite_token: query_team.invite_token,
             users,
+            solves,
         }))
     }
 
-    async fn add_user_to_team(&self, user_id: i64, team_id: i64) -> Result<()> {
+    async fn add_user_to_team(
+        &self,
+        user_id: i64,
+        team_id: i64,
+        _old_team_id: Option<i64>,
+    ) -> Result<()> {
         self.db
             .execute(
                 r#"
@@ -305,6 +336,7 @@ impl Database for LibSQL {
                 [user_id, team_id],
             )
             .await?;
+
         Ok(())
     }
 

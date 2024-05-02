@@ -133,7 +133,11 @@ pub async fn route_signin(
             .unwrap_or(None);
 
         if let (Some(team), Some(user)) = (&team, &user) {
-            state.db.add_user_to_team(user.id, team.id).await.unwrap();
+            state
+                .db
+                .add_user_to_team(user.id, team.id, Some(user.team_id))
+                .await
+                .unwrap();
             return Redirect::to("/team").into_response();
         }
 
@@ -349,7 +353,11 @@ pub async fn route_discord_callback(
             .await
             .unwrap_or(None)
         {
-            _ = state.db.add_user_to_team(user_id, team.id).await;
+            state
+                .db
+                .add_user_to_team(user_id, team.id, None)
+                .await
+                .unwrap();
         }
 
         let delete_cookie = Cookie::build(("rhombus-invite-token", ""))

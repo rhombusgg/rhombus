@@ -1,7 +1,10 @@
 use std::net::IpAddr;
 
 use async_trait::async_trait;
-use cached::{proc_macro::cached, Cached};
+use cached::{
+    proc_macro::{cached, once},
+    Cached,
+};
 
 use crate::{errors::RhombusError::UnknownDatabase, internal::auth::User, Result};
 
@@ -57,7 +60,7 @@ impl Database for DbCache {
     }
 
     async fn get_challenges(&self) -> Result<Vec<Challenge>> {
-        self.inner.get_challenges().await
+        get_challenges(&self.inner).await.ok_or(UnknownDatabase())
     }
 
     async fn get_team_meta_from_invite_token(
@@ -75,14 +78,25 @@ impl Database for DbCache {
             .ok_or(UnknownDatabase())
     }
 
-    async fn add_user_to_team(&self, user_id: i64, team_id: i64) -> Result<()> {
-        let result = self.inner.add_user_to_team(user_id, team_id).await;
+    async fn add_user_to_team(
+        &self,
+        user_id: i64,
+        team_id: i64,
+        old_team_id: Option<i64>,
+    ) -> Result<()> {
+        let result = self
+            .inner
+            .add_user_to_team(user_id, team_id, old_team_id)
+            .await;
         if result.is_ok() {
             {
                 GET_TEAM_FROM_ID.lock().await.cache_remove(&team_id);
             }
             {
                 GET_USER_FROM_ID.lock().await.cache_remove(&user_id);
+            }
+            if let Some(old_team_id) = old_team_id {
+                GET_TEAM_FROM_ID.lock().await.cache_remove(&old_team_id);
             }
         }
         result
@@ -109,6 +123,12 @@ impl Database for DbCache {
         }
         result
     }
+}
+
+#[once(time = 30)]
+async fn get_challenges(db: &Connection) -> Option<Vec<Challenge>> {
+    tracing::trace!("cache miss: challenges");
+    db.get_challenges().await.ok()
 }
 
 #[cached(time = 30, key = "i64", convert = "{ team_id }")]

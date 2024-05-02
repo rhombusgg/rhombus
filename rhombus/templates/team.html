@@ -39,10 +39,10 @@
               {% endif %}
               {% include "team-token.html" %}
             </div>
-            {% for player in team.users %}
+            {% for player_id, player in team.users | items %}
               <li>
-                <a href="{{ player.id }}">{{ player.name }}</a>
-                {% if user.id == player.id %}(You){% endif %}
+                <a href="{{ player_id }}">{{ player.name }}</a>
+                {% if user.id == player_id %}(You){% endif %}
                 {% if player.is_team_owner %}(Owner){% endif %}
                 <img src="{{ player.avatar_url }}" />
               </li>
