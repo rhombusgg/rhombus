@@ -190,24 +190,43 @@ pub async fn get_user_from_id(db: &Connection, user_id: i64) -> Result<User> {
 pub fn database_cache_evictor(seconds: u64) {
     tokio::task::spawn(async move {
         let duration = Duration::from_secs(seconds);
-        let interval = duration / 3;
-        tokio::time::sleep(duration).await;
         loop {
-            tracing::trace!("Evicting user cache");
+            tokio::time::sleep(duration).await;
             let evict_threshold = (chrono::Utc::now() - duration).timestamp();
-            USER_CACHE.retain(|_, v| v.insert_timestamp > evict_threshold);
-            tokio::time::sleep(interval).await;
 
-            tracing::trace!("Evicting team cache");
-            let evict_threshold = (chrono::Utc::now() - duration).timestamp();
-            TEAM_CACHE.retain(|_, v| v.insert_timestamp > evict_threshold);
-            tokio::time::sleep(interval).await;
-
-            tracing::trace!("Evicting challenges cache");
-            {
-                *CHALLENGES_CACHE.write().await = None
+            let mut count: i64 = 0;
+            USER_CACHE.retain(|_, v| {
+                if v.insert_timestamp > evict_threshold {
+                    true
+                } else {
+                    count += 1;
+                    false
+                }
+            });
+            if count > 0 {
+                tracing::trace!(count, "Evicted user cache");
             }
-            tokio::time::sleep(interval).await;
+
+            let mut count: i64 = 0;
+            TEAM_CACHE.retain(|_, v| {
+                if v.insert_timestamp > evict_threshold {
+                    true
+                } else {
+                    count += 1;
+                    false
+                }
+            });
+            if count > 0 {
+                tracing::trace!(count, "Evicted team cache");
+            }
+
+            {
+                let mut challenges = CHALLENGES_CACHE.write().await;
+                if challenges.is_some() {
+                    tracing::trace!("Evicted challenges cache");
+                    *challenges = None
+                }
+            }
         }
     });
 }
