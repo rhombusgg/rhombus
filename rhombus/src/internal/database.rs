@@ -64,6 +64,7 @@ pub trait Database {
         ip: IpAddr,
         user_agent: Option<&str>,
         user_id: Option<i64>,
+        requests: u64,
     ) -> Result<()>;
     async fn get_challenges(&self) -> Result<Challenges>;
     async fn get_team_meta_from_invite_token(&self, invite_token: &str)

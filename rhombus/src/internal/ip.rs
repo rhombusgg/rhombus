@@ -6,10 +6,46 @@ use axum::{
     response::IntoResponse,
     Extension,
 };
-use std::net::{IpAddr, SocketAddr};
+use dashmap::DashMap;
+use std::{
+    net::{IpAddr, SocketAddr},
+    time::Duration,
+};
 use tower_governor::{key_extractor::KeyExtractor, GovernorError};
 
-use super::{auth::MaybeUser, router::RouterState};
+use super::{auth::MaybeUser, database::Connection, router::RouterState};
+
+pub fn track_flusher(db: Connection) {
+    tokio::task::spawn(async move {
+        let duration = Duration::from_secs(30);
+        loop {
+            tokio::time::sleep(duration).await;
+            let mut total_count = 0;
+            for mut track in TRACK_CACHE.iter_mut() {
+                let key = track.key();
+                let count = *track;
+                if db
+                    .insert_track(key.0, key.1.as_deref(), key.2, count)
+                    .await
+                    .is_ok()
+                {
+                    *track -= count;
+                    total_count += 1;
+                }
+            }
+            TRACK_CACHE.retain(|_, v| *v > 0);
+            TRACK_CACHE.shrink_to_fit();
+
+            if total_count > 0 {
+                tracing::info!(count = total_count, "Flushed tracks");
+            }
+        }
+    });
+}
+
+lazy_static::lazy_static! {
+    pub static ref TRACK_CACHE: DashMap<(IpAddr, Option<String>, Option<i64>), u64> = DashMap::new();
+}
 
 /// Middleware to log the IP and user agent of the client in the database as track.
 /// Associates the track with the user if the user is logged in. Runs asynchronously,
@@ -17,7 +53,6 @@ use super::{auth::MaybeUser, router::RouterState};
 pub async fn track_middleware(
     Extension(ip): Extension<Option<IpAddr>>,
     Extension(user): Extension<MaybeUser>,
-    state: State<RouterState>,
     uri: Uri,
     req: Request<Body>,
     next: Next,
@@ -31,10 +66,10 @@ pub async fn track_middleware(
 
         tracing::trace!(user_id, uri = uri.to_string(), "Request");
         tokio::task::spawn(async move {
-            _ = state
-                .db
-                .insert_track(ip, user_agent.as_deref(), user_id)
-                .await;
+            let mut v = TRACK_CACHE
+                .entry((ip, user_agent, user_id))
+                .or_insert_with(|| 0);
+            *v += 1;
         });
     }
 

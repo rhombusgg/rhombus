@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS rhombus_track (
     ip BLOB NOT NULL,
     user_agent TEXT NOT NULL,
     last_seen_at INTEGER NOT NULL DEFAULT(strftime('%s', 'now')),
-    requests INTEGER NOT NULL DEFAULT(1),
+    requests INTEGER NOT NULL,
     UNIQUE(ip, user_agent)
 );
 

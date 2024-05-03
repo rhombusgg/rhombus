@@ -148,6 +148,7 @@ impl Database for LibSQL {
         ip: IpAddr,
         user_agent: Option<&str>,
         user_id: Option<i64>,
+        requests: u64,
     ) -> Result<()> {
         let ip = match ip {
             IpAddr::V4(ip) => ip.to_ipv6_mapped(),
@@ -159,14 +160,18 @@ impl Database for LibSQL {
             .db
             .query(
                 "
-            INSERT INTO rhombus_track (ip, user_agent) VALUES (?1, ?2)
+            INSERT INTO rhombus_track (ip, user_agent, requests) VALUES (?1, ?2, ?3)
             ON CONFLICT (ip, user_agent) DO
                 UPDATE SET
                     last_seen_at = strftime('%s', 'now'),
-                    requests = rhombus_track.requests + 1
+                    requests = rhombus_track.requests + ?3
             RETURNING id
             ",
-                params!(ip, user_agent.map(truncate_to_256_chars).unwrap_or("")),
+                params!(
+                    ip,
+                    user_agent.map(truncate_to_256_chars).unwrap_or(""),
+                    requests
+                ),
             )
             .await?
             .next()
@@ -443,7 +448,7 @@ mod test {
         for i in 0..1000 {
             let user_agent = i.to_string();
             database
-                .insert_track(ip, Some(user_agent.as_str()), None)
+                .insert_track(ip, Some(user_agent.as_str()), None, 1)
                 .await
                 .unwrap();
         }

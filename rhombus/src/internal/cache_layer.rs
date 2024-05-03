@@ -54,8 +54,11 @@ impl Database for DbCache {
         ip: IpAddr,
         user_agent: Option<&str>,
         user_id: Option<i64>,
+        requests: u64,
     ) -> Result<()> {
-        self.inner.insert_track(ip, user_agent, user_id).await
+        self.inner
+            .insert_track(ip, user_agent, user_id, requests)
+            .await
     }
 
     async fn get_challenges(&self) -> Result<Challenges> {

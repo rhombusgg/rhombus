@@ -26,7 +26,7 @@ use crate::{
         ip::{
             default_ip_extractor, ip_insert_blank_middleware, ip_insert_middleware,
             maybe_cf_connecting_ip, maybe_fly_client_ip, maybe_peer_ip,
-            maybe_rightmost_x_forwarded_for, maybe_true_client_ip, maybe_x_real_ip,
+            maybe_rightmost_x_forwarded_for, maybe_true_client_ip, maybe_x_real_ip, track_flusher,
             track_middleware, KeyExtractorShim,
         },
         locales::{self, locale_middleware, translate},
@@ -396,7 +396,7 @@ impl<P: Plugin> Builder<P> {
         });
 
         let router_state = Arc::new(RouterStateInner {
-            db,
+            db: db.clone(),
             jinja: env,
             localizer: localizer.clone(),
             settings: Arc::new(settings.clone()),
@@ -429,15 +429,14 @@ impl<P: Plugin> Builder<P> {
             rhombus_router
         };
 
+        track_flusher(db);
+
         let router = router
             .layer(middleware::from_fn_with_state(
                 router_state.clone(),
                 locale_middleware,
             ))
-            .layer(middleware::from_fn_with_state(
-                router_state.clone(),
-                track_middleware,
-            ))
+            .layer(middleware::from_fn(track_middleware))
             .layer(middleware::from_fn_with_state(
                 router_state.clone(),
                 auth_injector_middleware,

@@ -62,6 +62,7 @@ impl Database for Postgres {
         ip: IpAddr,
         user_agent: Option<&str>,
         user_id: Option<i64>,
+        _requests: u64,
     ) -> Result<()> {
         sqlx::query(
             r#"
