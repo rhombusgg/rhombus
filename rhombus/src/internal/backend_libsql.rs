@@ -16,8 +16,8 @@ use serde::Deserialize;
 use super::{
     auth::{User, UserInner},
     database::{
-        Challenge, ChallengeSolve, Challenges, Database, Team, TeamInner, TeamMeta, TeamMetaInner,
-        TeamUser,
+        Category, Challenge, ChallengeData, ChallengeSolve, Challenges, Database, Team, TeamInner,
+        TeamMeta, TeamMetaInner, TeamUser,
     },
     team::create_team_invite_token,
 };
@@ -197,31 +197,48 @@ impl Database for LibSQL {
     }
 
     async fn get_challenges(&self) -> Result<Challenges> {
-        let rows = self.db.query("SELECT * FROM rhombus_challenge", ()).await?;
-
+        let challenge_rows = self.db.query("SELECT * FROM rhombus_challenge", ()).await?;
         #[derive(Debug, Deserialize)]
         struct DbChallenge {
             id: i64,
             name: String,
             description: String,
+            category_id: i64,
         }
-
-        let challenges = rows
+        let challenges = challenge_rows
             .into_stream()
             .map(|row| de::from_row::<DbChallenge>(&row.unwrap()).unwrap())
-            .collect::<Vec<DbChallenge>>()
+            .map(|challenge| Challenge {
+                id: challenge.id,
+                name: challenge.name,
+                description: challenge.description,
+                category_id: challenge.category_id,
+            })
+            .collect::<Vec<Challenge>>()
             .await;
 
-        Ok(Arc::new(
-            challenges
-                .into_iter()
-                .map(|challenge| Challenge {
-                    id: challenge.id,
-                    name: challenge.name,
-                    description: challenge.description,
-                })
-                .collect(),
-        ))
+        let category_rows = self.db.query("SELECT * FROM rhombus_category", ()).await?;
+        #[derive(Debug, Deserialize)]
+        struct DbCategory {
+            id: i64,
+            name: String,
+            color: String,
+        }
+        let categories = category_rows
+            .into_stream()
+            .map(|row| de::from_row::<DbCategory>(&row.unwrap()).unwrap())
+            .map(|category| Category {
+                id: category.id,
+                name: category.name,
+                color: category.color,
+            })
+            .collect::<Vec<Category>>()
+            .await;
+
+        Ok(Arc::new(ChallengeData {
+            challenges,
+            categories,
+        }))
     }
 
     async fn get_team_meta_from_invite_token(

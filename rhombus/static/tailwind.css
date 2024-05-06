@@ -698,6 +698,10 @@ body {
   margin-right: 1rem;
 }
 
+.mb-2 {
+  margin-bottom: 0.5rem;
+}
+
 .mb-4 {
   margin-bottom: 1rem;
 }
@@ -787,10 +791,6 @@ body {
           user-select: none;
 }
 
-.list-disc {
-  list-style-type: disc;
-}
-
 .flex-col {
   flex-direction: column;
 }
@@ -813,6 +813,14 @@ body {
 
 .gap-1 {
   gap: 0.25rem;
+}
+
+.gap-2 {
+  gap: 0.5rem;
+}
+
+.gap-4 {
+  gap: 1rem;
 }
 
 .gap-6 {
@@ -885,6 +893,10 @@ body {
   border-bottom-width: 1px;
 }
 
+.border-l-4 {
+  border-left-width: 4px;
+}
+
 .border-input {
   --tw-border-opacity: 1;
   border-color: hsl(var(--input) / var(--tw-border-opacity));
@@ -923,6 +935,10 @@ body {
 
 .p-2 {
   padding: 0.5rem;
+}
+
+.p-4 {
+  padding: 1rem;
 }
 
 .p-6 {

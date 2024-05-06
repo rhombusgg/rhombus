@@ -3,7 +3,15 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS rhombus_challenge (
     id INTEGER PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
-    description TEXT NOT NULL
+    description TEXT NOT NULL,
+    category_id INTEGER NOT NULL,
+    FOREIGN KEY (category_id) REFERENCES rhombus_category(id)
+);
+
+CREATE TABLE IF NOT EXISTS rhombus_category (
+    id INTEGER PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    color TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS rhombus_solve (

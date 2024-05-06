@@ -14,10 +14,10 @@ pub async fn route_challenges(
     Extension(lang): Extension<Languages>,
     uri: Uri,
 ) -> impl IntoResponse {
-    let challenges = state.db.get_challenges();
+    let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
-    let (challenges, team) = tokio::join!(challenges, team);
-    let challenges = challenges.unwrap();
+    let (challenge_data, team) = tokio::join!(challenge_data, team);
+    let challenge_data = challenge_data.unwrap();
     let team = team.unwrap();
 
     Html(
@@ -29,7 +29,8 @@ pub async fn route_challenges(
                 lang => lang,
                 user => user,
                 uri => uri.to_string(),
-                challenges => challenges,
+                challenges => challenge_data.challenges,
+                categories => challenge_data.categories,
                 team => team,
             })
             .unwrap(),

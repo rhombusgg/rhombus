@@ -13,9 +13,23 @@ pub struct Challenge {
     pub id: i64,
     pub name: String,
     pub description: String,
+    pub category_id: i64,
 }
 
-pub type Challenges = Arc<Vec<Challenge>>;
+#[derive(Debug, Serialize, Clone)]
+pub struct Category {
+    pub id: i64,
+    pub name: String,
+    pub color: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct ChallengeData {
+    pub challenges: Vec<Challenge>,
+    pub categories: Vec<Category>,
+}
+
+pub type Challenges = Arc<ChallengeData>;
 
 #[derive(Debug, Serialize, Clone, PartialEq, PartialOrd)]
 pub struct ChallengeSolve {

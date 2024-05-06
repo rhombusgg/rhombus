@@ -3,20 +3,59 @@
 {% block title %}{{ super() }} - {{ t("challenges") }}{% endblock %}
 
 {% block content %}
-  <ul class="list-disc">
-    {% for challenge in challenges %}
-      <li>
-        <span>
-          {{ challenge.id }} {{ challenge.name }} / {{ challenge.description }}
-          {% with solve=team.solves[challenge.id] %}
-            {% if solve %}
-              {% with user=team.users[solve.user_id] %}
-                / solved by {{ user.name }}
-              {% endwith %}
+  <div
+    class="mt-4 px-4 gap-4 grid"
+    style="grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));"
+  >
+    {% for category in categories %}
+      <div>
+        <div
+          class="flex justify-between rounded-md p-4 font-bold"
+          style="background-color: {{ category.color }}"
+        >
+          <span>{{ category.name }}</span>
+          <span>
+            {% with challenges_in_category=challenges | selectattr("category_id", "==", category.id) %}
+              {{ challenges_in_category | selectattr("id", "in", team.solves) | length }}
+              / {{ challenges_in_category | length }}
+            {%- endwith -%}
+          </span>
+        </div>
+        <ul class="flex flex-col gap-2 p-2">
+          {% for challenge in challenges %}
+            {% if category.id == challenge.category_id %}
+              <li
+                class="border-l-4 bg-card p-4"
+                style="border-color: {{ category.color }}"
+              >
+                <div class="mb-2 flex justify-between">
+                  <div class="font-bold">
+                    <span style="color: {{ category.color }}"
+                      >{{ category.name }} /
+                    </span>
+                    <span>{{ challenge.name }}</span>
+                  </div>
+                  <div>
+                    <span>x points</span>
+                    <a href="">[healthy]</a>
+                    {% with solve=team.solves[challenge.id] %}
+                      {% if solve %}
+                        {% with user=team.users[solve.user_id] %}
+                          <a href="">[solved by {{ user.name }}]</a>
+                        {% endwith %}
+                      {% endif %}
+                    {% endwith %}
+                    <a href="">[ticket]</a>
+                    <a href="">[author]</a>
+                    <a href="">[submit]</a>
+                  </div>
+                </div>
+                <div>{{ challenge.description }}</div>
+              </li>
             {% endif %}
-          {% endwith %}
-        </span>
-      </li>
+          {% endfor %}
+        </ul>
+      </div>
     {% endfor %}
-  </ul>
+  </div>
 {% endblock %}

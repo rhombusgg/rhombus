@@ -5,7 +5,7 @@ use sqlx::{FromRow, PgPool};
 
 use super::{
     auth::User,
-    database::{Challenge, Challenges, Database, Team, TeamMeta},
+    database::{Challenge, ChallengeData, Challenges, Database, Team, TeamMeta},
 };
 use crate::Result;
 
@@ -92,18 +92,20 @@ impl Database for Postgres {
 
         let challenges = sqlx::query_as::<_, DBChallenge>("SELECT * FROM challenge")
             .fetch_all(&self.pool)
-            .await?;
+            .await?
+            .into_iter()
+            .map(|challenge| Challenge {
+                id: challenge.id,
+                name: challenge.name,
+                description: challenge.description,
+                category_id: 1,
+            })
+            .collect();
 
-        Ok(Arc::new(
-            challenges
-                .into_iter()
-                .map(|challenge| Challenge {
-                    id: challenge.id,
-                    name: challenge.name,
-                    description: challenge.description,
-                })
-                .collect(),
-        ))
+        Ok(Arc::new(ChallengeData {
+            challenges,
+            categories: vec![],
+        }))
     }
 
     async fn get_team_meta_from_invite_token(
