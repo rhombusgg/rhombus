@@ -1,3 +1,4 @@
+{% import "icons.html" as icons %}
 {% extends "layout.html" %}
 
 {% block title %}{{ super() }} - {{ t("challenges") }}{% endblock %}
@@ -35,19 +36,37 @@
                     </span>
                     <span>{{ challenge.name }}</span>
                   </div>
-                  <div>
-                    <span>x points</span>
-                    <a href="">[healthy]</a>
+                  <div class="flex items-center gap-4">
+                    <span
+                      >{{ t("solves-points", solves=challenge.solves, points=challenge.points) }}</span
+                    >
+                    <a href="">
+                      {% if challenge.healthy %}
+                        <div class="size-3 rounded-full bg-green-500"></div>
+                      {% else %}
+                        <div class="size-3 rounded-full bg-red-500"></div>
+                      {% endif %}
+                    </a>
                     {% with solve=team.solves[challenge.id] %}
                       {% if solve %}
-                        {% with user=team.users[solve.user_id] %}
-                          <a href="">[solved by {{ user.name }}]</a>
+                        {% with solver=team.users[solve.user_id] %}
+                          <img
+                            class="aspect-square rounded-full size-8"
+                            alt="solved by {{ solver.name }}"
+                            src="{{ solver.avatar_url }}"
+                          />
                         {% endwith %}
                       {% endif %}
                     {% endwith %}
-                    <a href="">[ticket]</a>
-                    <a href="">[author]</a>
-                    <a href="">[submit]</a>
+                    <a class="-rotate-45" href="">{{ icons.ticket() }}</a>
+                    {% with author=authors[challenge.author_id] %}
+                      <img
+                        class="aspect-square rounded-full size-8"
+                        alt="authored by {{ author.name }}"
+                        src="{{ author.avatar_url }}"
+                      />
+                    {% endwith %}
+                    <a href="">{{ icons.submit() }}</a>
                   </div>
                 </div>
                 <div>{{ challenge.description }}</div>

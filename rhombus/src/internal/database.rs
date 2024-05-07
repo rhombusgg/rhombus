@@ -14,6 +14,10 @@ pub struct Challenge {
     pub name: String,
     pub description: String,
     pub category_id: i64,
+    pub healthy: bool,
+    pub points: i64,
+    pub solves: i64,
+    pub author_id: i64,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -24,9 +28,17 @@ pub struct Category {
 }
 
 #[derive(Debug, Serialize, Clone)]
+pub struct Author {
+    pub name: String,
+    pub avatar_url: String,
+    pub discord_id: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
 pub struct ChallengeData {
     pub challenges: Vec<Challenge>,
     pub categories: Vec<Category>,
+    pub authors: HashMap<i64, Author>,
 }
 
 pub type Challenges = Arc<ChallengeData>;

@@ -5,7 +5,19 @@ CREATE TABLE IF NOT EXISTS rhombus_challenge (
     name TEXT NOT NULL,
     description TEXT NOT NULL,
     category_id INTEGER NOT NULL,
-    FOREIGN KEY (category_id) REFERENCES rhombus_category(id)
+    healthy BOOLEAN NOT NULL DEFAULT(TRUE),
+    author_id INTEGER NOT NULL,
+    points INTEGER NOT NULL,
+    score_type INTEGER NOT NULL,
+    FOREIGN KEY (category_id) REFERENCES rhombus_category(id),
+    FOREIGN KEY (author_id) REFERENCES rhombus_author(id)
+);
+
+CREATE TABLE IF NOT EXISTS rhombus_author (
+    id INTEGER PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    avatar TEXT NOT NULL,
+    discord_id TEXT NOT NULL UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS rhombus_category (
@@ -24,7 +36,7 @@ CREATE TABLE IF NOT EXISTS rhombus_solve (
 CREATE TABLE IF NOT EXISTS rhombus_user (
     id INTEGER PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
-    avatar TEXT NOT NULL UNIQUE,
+    avatar TEXT NOT NULL,
     discord_id TEXT NOT NULL UNIQUE,
     team_id INTEGER NOT NULL,
     owner_team_id INTEGER NOT NULL,

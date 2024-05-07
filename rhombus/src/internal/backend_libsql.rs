@@ -16,8 +16,8 @@ use serde::Deserialize;
 use super::{
     auth::{User, UserInner},
     database::{
-        Category, Challenge, ChallengeData, ChallengeSolve, Challenges, Database, Team, TeamInner,
-        TeamMeta, TeamMetaInner, TeamUser,
+        Author, Category, Challenge, ChallengeData, ChallengeSolve, Challenges, Database, Team,
+        TeamInner, TeamMeta, TeamMetaInner, TeamUser,
     },
     team::create_team_invite_token,
 };
@@ -197,13 +197,28 @@ impl Database for LibSQL {
     }
 
     async fn get_challenges(&self) -> Result<Challenges> {
-        let challenge_rows = self.db.query("SELECT * FROM rhombus_challenge", ()).await?;
+        let challenge_rows = self
+            .db
+            .query(
+                "
+                SELECT rhombus_challenge.*, COUNT(rhombus_solve.challenge_id) AS solves_count
+                FROM rhombus_challenge
+                LEFT JOIN rhombus_solve ON rhombus_challenge.id = rhombus_solve.challenge_id
+                GROUP BY rhombus_challenge.id
+            ",
+                (),
+            )
+            .await?;
         #[derive(Debug, Deserialize)]
         struct DbChallenge {
             id: i64,
             name: String,
             description: String,
             category_id: i64,
+            healthy: bool,
+            points: i64,
+            author_id: i64,
+            solves_count: i64,
         }
         let challenges = challenge_rows
             .into_stream()
@@ -213,6 +228,10 @@ impl Database for LibSQL {
                 name: challenge.name,
                 description: challenge.description,
                 category_id: challenge.category_id,
+                healthy: challenge.healthy,
+                points: challenge.points,
+                solves: challenge.solves_count,
+                author_id: challenge.author_id,
             })
             .collect::<Vec<Challenge>>()
             .await;
@@ -235,9 +254,31 @@ impl Database for LibSQL {
             .collect::<Vec<Category>>()
             .await;
 
+        let mut author_rows = self.db.query("SELECT * FROM rhombus_author", ()).await?;
+        #[derive(Debug, Deserialize)]
+        struct DbAuthor {
+            id: i64,
+            name: String,
+            avatar: String,
+            discord_id: String,
+        }
+        let mut authors: HashMap<i64, Author> = Default::default();
+        while let Some(row) = author_rows.next().await? {
+            let query_author = de::from_row::<DbAuthor>(&row).unwrap();
+            authors.insert(
+                query_author.id,
+                Author {
+                    name: query_author.name,
+                    avatar_url: query_author.avatar,
+                    discord_id: query_author.discord_id,
+                },
+            );
+        }
+
         Ok(Arc::new(ChallengeData {
             challenges,
             categories,
+            authors,
         }))
     }
 

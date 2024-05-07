@@ -31,6 +31,7 @@ pub async fn route_challenges(
                 uri => uri.to_string(),
                 challenges => challenge_data.challenges,
                 categories => challenge_data.categories,
+                authors => challenge_data.authors,
                 team => team,
             })
             .unwrap(),

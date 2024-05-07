@@ -1,11 +1,11 @@
-use std::{net::IpAddr, sync::Arc};
+use std::{collections::HashMap, net::IpAddr, sync::Arc};
 
 use async_trait::async_trait;
 use sqlx::{FromRow, PgPool};
 
 use super::{
     auth::User,
-    database::{Challenge, ChallengeData, Challenges, Database, Team, TeamMeta},
+    database::{ChallengeData, Challenges, Database, Team, TeamMeta},
 };
 use crate::Result;
 
@@ -83,28 +83,29 @@ impl Database for Postgres {
     }
 
     async fn get_challenges(&self) -> Result<Challenges> {
-        #[derive(FromRow)]
-        struct DBChallenge {
-            id: i64,
-            name: String,
-            description: String,
-        }
+        // #[derive(FromRow)]
+        // struct DBChallenge {
+        //     id: i64,
+        //     name: String,
+        //     description: String,
+        // }
 
-        let challenges = sqlx::query_as::<_, DBChallenge>("SELECT * FROM challenge")
-            .fetch_all(&self.pool)
-            .await?
-            .into_iter()
-            .map(|challenge| Challenge {
-                id: challenge.id,
-                name: challenge.name,
-                description: challenge.description,
-                category_id: 1,
-            })
-            .collect();
+        // let challenges = sqlx::query_as::<_, DBChallenge>("SELECT * FROM challenge")
+        //     .fetch_all(&self.pool)
+        //     .await?
+        //     .into_iter()
+        //     .map(|challenge| Challenge {
+        //         id: challenge.id,
+        //         name: challenge.name,
+        //         description: challenge.description,
+        //         category_id: 1,
+        //     })
+        //     .collect();
 
         Ok(Arc::new(ChallengeData {
-            challenges,
+            challenges: vec![],
             categories: vec![],
+            authors: HashMap::new(),
         }))
     }
 

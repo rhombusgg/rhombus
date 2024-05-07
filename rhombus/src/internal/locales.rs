@@ -130,8 +130,9 @@ pub fn translate(
 
     let mut args = HashMap::new();
     for key in kwargs.args() {
-        let val: &str = kwargs.get(key).unwrap();
-        args.insert(key, val.into());
+        let maybe_str = kwargs.get::<&str>(key).map(FluentValue::from);
+        let maybe_number = kwargs.get::<i64>(key).map(FluentValue::from);
+        args.insert(key, maybe_str.or(maybe_number).unwrap());
     }
     kwargs.assert_all_used().unwrap();
 
