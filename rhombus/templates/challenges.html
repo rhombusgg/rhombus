@@ -5,8 +5,7 @@
 
 {% block content %}
   <div
-    class="mt-4 px-4 gap-4 grid"
-    style="grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));"
+    class="mt-4 px-4 gap-4 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(600px,1fr))]"
   >
     {% for category in categories %}
       <div>

@@ -13,13 +13,14 @@
   - [x] JSON Schema
   - [x] Environment variables
 - [ ] Challenges
-  - [ ] Categories
+  - [x] Categories
   - [ ] Healthchecks
   - [ ] Writeups
   - [ ] Dynamic scoring
   - [ ] Markdown rendering
   - [ ] Raw html rendering
-  - [ ] Authors without accounts
+  - [x] Authors without accounts
+- [ ] File uploads
 - [ ] Single static binary
 - [ ] User pages
   - [ ] Admin geoip view
