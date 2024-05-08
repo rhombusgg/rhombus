@@ -1,5 +1,5 @@
 use axum::{
-    extract::State,
+    extract::{Path, State},
     http::Uri,
     response::{Html, IntoResponse},
     Extension,
@@ -33,6 +33,41 @@ pub async fn route_challenges(
                 categories => challenge_data.categories,
                 authors => challenge_data.authors,
                 team => team,
+            })
+            .unwrap(),
+    )
+}
+
+pub async fn route_challenge_view(
+    state: State<RouterState>,
+    Extension(user): Extension<User>,
+    Extension(lang): Extension<Languages>,
+    challenge_id: Path<i64>,
+    uri: Uri,
+) -> impl IntoResponse {
+    let challenge_data = state.db.get_challenges().await.unwrap();
+    let challenge = challenge_data
+        .challenges
+        .iter()
+        .find(|c| challenge_id.eq(&c.id))
+        .unwrap();
+    let category = challenge_data
+        .categories
+        .iter()
+        .find(|c| challenge.category_id.eq(&c.id))
+        .unwrap();
+
+    Html(
+        state
+            .jinja
+            .get_template("challenge.html")
+            .unwrap()
+            .render(context! {
+                lang => lang,
+                user => user,
+                uri => uri.to_string(),
+                challenge => challenge,
+                category => category,
             })
             .unwrap(),
     )

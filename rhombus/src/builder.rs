@@ -20,7 +20,7 @@ use crate::{
             route_signin, route_signout,
         },
         cache_layer::{database_cache_evictor, DbCache},
-        challenges::route_challenges,
+        challenges::{route_challenge_view, route_challenges},
         database::Database,
         home::route_home,
         ip::{
@@ -412,6 +412,7 @@ impl<P: Plugin> Builder<P> {
             .route("/team/roll-token", post(route_team_roll_token))
             .route("/team/name", post(route_team_set_name))
             .route("/challenges", get(route_challenges))
+            .route("/challenges/:id", get(route_challenge_view))
             .route_layer(middleware::from_fn(enforce_auth_middleware))
             .nest_service("/static", ServeDir::new(STATIC_DIR))
             .route("/", get(route_home))

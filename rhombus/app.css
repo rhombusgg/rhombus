@@ -57,3 +57,16 @@
     @apply bg-background text-foreground;
   }
 }
+
+dialog {
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  transition: opacity 0.1s;
+  pointer-events: none;
+}
+
+dialog[open] {
+  opacity: 1;
+  pointer-events: inherit;
+}

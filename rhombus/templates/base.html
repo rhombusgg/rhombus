@@ -15,14 +15,14 @@
       content="{% block og_url %}{{ location_url | safe }}{{ uri | safe }}{% endblock %}"
     />
 
-    {% if og_image %}<meta
-      property="og:image"
-      content="{{ og_image | safe }}"
-    />{% endif %}
+    {% if og_image %}
+      <meta property="og:image" content="{{ og_image | safe }}" />
+    {% endif %}
     <meta name="twitter:card" content="summary_large_image" />
 
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://unpkg.com/fuse.js@7.0.0/dist/fuse.js"></script>
+    <script src="https://unpkg.com/alpinejs@3.13.10/dist/cdn.min.js"></script>
     <link rel="stylesheet" href="/static/tailwind.css" />
     {% block head %}{% endblock %}
 

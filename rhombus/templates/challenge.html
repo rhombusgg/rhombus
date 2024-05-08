@@ -1,0 +1,18 @@
+<dialog
+  data-onload-showmodal
+  class="backdrop:bg-background/40 bg-background max-w-prose w-full rounded-lg text-foreground border-4 p-6 shadow-lg"
+  style="border-color: {{ category.color }}"
+>
+  <div class="mb-2 flex justify-between">
+    <div class="font-bold">
+      <span style="color: {{ category.color }}">{{ category.name }} / </span>
+      <span>{{ challenge.name }}</span>
+    </div>
+    <div class="flex items-center gap-4">
+      <span
+        >{{ t("solves-points", solves=challenge.solves, points=challenge.points) }}</span
+      >
+    </div>
+  </div>
+  {{ challenge.description }}
+</dialog>

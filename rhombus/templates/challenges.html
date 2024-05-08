@@ -26,8 +26,9 @@
           {% for challenge in challenges %}
             {% if category.id == challenge.category_id %}
               <li
-                class="border-l-4 bg-card p-4"
-                style="border-color: {{ category.color }}"
+                id="{{ challenge.name }}"
+                class="border-l-4 bg-card p-4 ring-offset-4 ring-offset-background target:ring"
+                style="border-color: {{ category.color }}; --tw-ring-color: {{ category.color }}"
               >
                 <div class="mb-2 flex justify-between">
                   <div class="font-bold">
@@ -40,13 +41,11 @@
                     <span
                       >{{ t("solves-points", solves=challenge.solves, points=challenge.points) }}</span
                     >
-                    <a href="">
-                      {% if challenge.healthy %}
-                        <div class="size-3 rounded-full bg-green-500"></div>
-                      {% else %}
-                        <div class="size-3 rounded-full bg-red-500"></div>
-                      {% endif %}
-                    </a>
+                    {% if challenge.healthy %}
+                      <div class="size-3 rounded-full bg-green-500"></div>
+                    {% else %}
+                      <div class="size-3 rounded-full bg-red-500"></div>
+                    {% endif %}
                     {% with solve=team.solves[challenge.id] %}
                       {% if solve %}
                         {% with solver=team.users[solve.user_id] %}
@@ -58,7 +57,6 @@
                         {% endwith %}
                       {% endif %}
                     {% endwith %}
-                    <a class="-rotate-45" href="">{{ icons.ticket() }}</a>
                     {% with author=authors[challenge.author_id] %}
                       <img
                         class="aspect-square rounded-full size-8"
@@ -66,7 +64,15 @@
                         src="{{ author.avatar_url }}"
                       />
                     {% endwith %}
-                    <a href="">{{ icons.submit() }}</a>
+                    <a class="-rotate-45" href="">{{ icons.ticket() }}</a>
+                    <button
+                      hx-trigger="click"
+                      hx-get="/challenges/{{ challenge.id }}"
+                      hx-target="body"
+                      hx-swap="beforeend"
+                    >
+                      {{ icons.submit() }}
+                    </button>
                   </div>
                 </div>
                 <div>{{ challenge.description }}</div>
@@ -77,4 +83,35 @@
       </div>
     {% endfor %}
   </div>
+  <script>
+    (function () {
+      document.body.addEventListener("htmx:afterSettle", function (detail) {
+        const dialog = detail.target.querySelector(
+          "dialog[data-onload-showmodal]",
+        );
+        if (dialog) {
+          dialog.addEventListener("close", () => {
+            dialog.remove();
+          });
+          dialog.addEventListener("click", (event) => {
+            const rect = event.target.getBoundingClientRect();
+
+            if (
+              event.clientX - rect.left <= 0 ||
+              rect.right - event.clientX <= 0 ||
+              event.clientY - rect.top <= 0 ||
+              rect.bottom - event.clientY <= 0
+            ) {
+              dialog.close();
+            }
+          });
+          dialog.showModal();
+        }
+      });
+
+      document.body.addEventListener("closeModal", function () {
+        document.querySelector("dialog[open]").close();
+      });
+    })();
+  </script>
 {% endblock %}
