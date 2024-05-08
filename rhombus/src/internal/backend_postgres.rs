@@ -140,6 +140,15 @@ impl Database for Postgres {
     async fn set_team_name(&self, _team_id: i64, _new_team_name: &str) -> Result<()> {
         todo!()
     }
+
+    async fn solve_challenge(
+        &self,
+        _user_id: i64,
+        _team_id: i64,
+        _challenge_id: i64,
+    ) -> Result<()> {
+        todo!()
+    }
 }
 
 #[cfg(test)]

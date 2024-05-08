@@ -5,6 +5,11 @@
 
 {% block content %}
   <div
+    hx-get="/challenges"
+    hx-trigger="manualRefresh from:body, every 120s"
+    hx-swap-oob="true"
+    hx-target="#challenges-content"
+    id="challenges-content"
     class="mt-4 px-4 gap-4 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(600px,1fr))]"
   >
     {% for category in categories %}
@@ -104,6 +109,7 @@
                       tippy("#ticket-{{ challenge.id }}", {
                         content: `Submit a new support ticket`,
                         theme: "rhombus",
+                        trigger: "mouseenter",
                       });
                     </script>
                     <button
@@ -119,6 +125,7 @@
                       tippy("#focus-{{ challenge.id }}", {
                         content: `View full challenge`,
                         theme: "rhombus",
+                        trigger: "mouseenter",
                       });
                     </script>
                   </div>
@@ -141,7 +148,7 @@
           dialog.addEventListener("close", () => {
             dialog.remove();
           });
-          dialog.addEventListener("click", (event) => {
+          dialog.addEventListener("mouseup", (event) => {
             const rect = event.target.getBoundingClientRect();
 
             if (

@@ -6,8 +6,8 @@ solves-points = {$solves ->
     [one] {$solves} solve
     *[other] {$solves} solves
 } / {$points -> 
-    [one] {$points} point
-    *[other] {$points} points
+    [one] {$points} pt
+    *[other] {$points} pts
 }
 command-palette = Command Palette...
     .hint = Type a command...

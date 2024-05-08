@@ -804,6 +804,10 @@ body {
   max-width: 65ch;
 }
 
+.grow {
+  flex-grow: 1;
+}
+
 .-rotate-45 {
   --tw-rotate: -45deg;
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
@@ -1257,8 +1261,8 @@ dialog[open] {
   color: hsl(var(--muted-foreground) / var(--tw-text-opacity));
 }
 
-.backdrop\:bg-background\/40::backdrop {
-  background-color: hsl(var(--background) / 0.4);
+.backdrop\:bg-background\/50::backdrop {
+  background-color: hsl(var(--background) / 0.5);
 }
 
 .after\:visible::after {

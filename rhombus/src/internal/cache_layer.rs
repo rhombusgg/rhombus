@@ -117,6 +117,18 @@ impl Database for DbCache {
         }
         result
     }
+
+    async fn solve_challenge(&self, user_id: i64, team_id: i64, challenge_id: i64) -> Result<()> {
+        let result = self
+            .inner
+            .solve_challenge(user_id, team_id, challenge_id)
+            .await;
+        if result.is_ok() {
+            TEAM_CACHE.remove(&team_id);
+            *CHALLENGES_CACHE.write().await = None;
+        }
+        result
+    }
 }
 
 lazy_static::lazy_static! {

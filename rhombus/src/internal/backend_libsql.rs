@@ -219,6 +219,7 @@ impl Database for LibSQL {
             points: i64,
             author_id: i64,
             solves_count: i64,
+            flag: String,
         }
         let challenges = challenge_rows
             .into_stream()
@@ -232,6 +233,7 @@ impl Database for LibSQL {
                 points: challenge.points,
                 solves: challenge.solves_count,
                 author_id: challenge.author_id,
+                flag: challenge.flag,
             })
             .collect::<Vec<Challenge>>()
             .await;
@@ -469,6 +471,16 @@ impl Database for LibSQL {
             .execute(
                 "UPDATE rhombus_team SET name = ?2 WHERE id = ?1",
                 params!(team_id, new_team_name),
+            )
+            .await?;
+        Ok(())
+    }
+
+    async fn solve_challenge(&self, user_id: i64, _team_id: i64, challenge_id: i64) -> Result<()> {
+        self.db
+            .execute(
+                "INSERT INTO rhombus_solve (challenge_id, user_id) VALUES (?1, ?2)",
+                params!(challenge_id, user_id),
             )
             .await?;
         Ok(())

@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS rhombus_challenge (
     id INTEGER PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
     description TEXT NOT NULL,
+    flag TEXT NOT NULL,
     category_id INTEGER NOT NULL,
     healthy BOOLEAN NOT NULL DEFAULT(TRUE),
     author_id INTEGER NOT NULL,

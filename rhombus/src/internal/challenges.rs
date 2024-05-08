@@ -1,10 +1,11 @@
 use axum::{
     extract::{Path, State},
-    http::Uri,
+    http::{Response, Uri},
     response::{Html, IntoResponse},
-    Extension,
+    Extension, Form,
 };
 use minijinja::context;
+use serde::Deserialize;
 
 use super::{auth::User, locales::Languages, router::RouterState};
 
@@ -71,4 +72,83 @@ pub async fn route_challenge_view(
             })
             .unwrap(),
     )
+}
+
+#[derive(Deserialize)]
+pub struct SubmitChallenge {
+    flag: String,
+}
+
+pub async fn route_challenge_submit(
+    state: State<RouterState>,
+    Extension(user): Extension<User>,
+    Extension(lang): Extension<Languages>,
+    challenge_id: Path<i64>,
+    uri: Uri,
+    Form(form): Form<SubmitChallenge>,
+) -> impl IntoResponse {
+    let challenge_data = state.db.get_challenges().await.unwrap();
+    let challenge = challenge_data
+        .challenges
+        .iter()
+        .find(|c| challenge_id.eq(&c.id))
+        .unwrap();
+
+    if challenge.flag != form.flag {
+        let html = state
+            .jinja
+            .get_template("challenge-submit.html")
+            .unwrap()
+            .render(context! {
+                lang => lang,
+                user => user,
+                uri => uri.to_string(),
+                error => "Incorrect flag",
+            })
+            .unwrap();
+        return Response::builder()
+            .header("content-type", "text/html")
+            .body(html)
+            .unwrap();
+    }
+
+    if state
+        .db
+        .solve_challenge(user.id, user.team_id, challenge.id)
+        .await
+        .is_err()
+    {
+        let html = state
+            .jinja
+            .get_template("challenge-submit.html")
+            .unwrap()
+            .render(context! {
+                lang => lang,
+                user => user,
+                uri => uri.to_string(),
+                error => "Unknown database error",
+            })
+            .unwrap();
+        return Response::builder()
+            .header("content-type", "text/html")
+            .body(html)
+            .unwrap();
+    }
+
+    let html = state
+        .jinja
+        .get_template("challenge-submit.html")
+        .unwrap()
+        .render(context! {
+            lang => lang,
+            user => user,
+            uri => uri.to_string(),
+        })
+        .unwrap();
+
+    Response::builder()
+        .header("content-type", "text/html")
+        .header("hx-trigger", "{\"manualRefresh\":true,\"closeModal\":true}")
+        .body(html)
+        .unwrap()
 }
