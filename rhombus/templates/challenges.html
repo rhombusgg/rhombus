@@ -22,7 +22,7 @@
             {%- endwith -%}
           </span>
         </div>
-        <ul class="flex flex-col gap-2 p-2">
+        <ul class="flex flex-col gap-4 px-2 pt-4">
           {% for challenge in challenges %}
             {% if category.id == challenge.category_id %}
               <li
@@ -42,30 +42,73 @@
                       >{{ t("solves-points", solves=challenge.solves, points=challenge.points) }}</span
                     >
                     {% if challenge.healthy %}
-                      <div class="size-3 rounded-full bg-green-500"></div>
+                      <div
+                        id="healthy-{{ challenge.id }}"
+                        class="size-3 rounded-full bg-green-500 cursor-pointer"
+                      ></div>
+                      <script>
+                        tippy("#healthy-{{ challenge.id }}", {
+                          content: `Challenge is <span class="text-green-500">up</span>`,
+                          allowHTML: true,
+                          theme: "rhombus",
+                        });
+                      </script>
                     {% else %}
-                      <div class="size-3 rounded-full bg-red-500"></div>
+                      <div
+                        id="unhealthy-{{ challenge.id }}"
+                        class="size-3 rounded-full bg-red-500 cursor-pointer"
+                      ></div>
+                      <script>
+                        tippy("#unhealthy-{{ challenge.id }}", {
+                          content: `Challenge is <span class="text-red-500">down</span>`,
+                          allowHTML: true,
+                          theme: "rhombus",
+                        });
+                      </script>
                     {% endif %}
                     {% with solve=team.solves[challenge.id] %}
                       {% if solve %}
                         {% with solver=team.users[solve.user_id] %}
                           <img
+                            id="solve-{{ challenge.id }}"
                             class="aspect-square rounded-full size-8"
                             alt="solved by {{ solver.name }}"
                             src="{{ solver.avatar_url }}"
                           />
+                          <script>
+                            tippy("#solve-{{ challenge.id }}", {
+                              content: `Solved by {{ solver.name }}`,
+                              theme: "rhombus",
+                            });
+                          </script>
                         {% endwith %}
                       {% endif %}
                     {% endwith %}
                     {% with author=authors[challenge.author_id] %}
                       <img
+                        id="author-{{ challenge.id }}"
                         class="aspect-square rounded-full size-8"
                         alt="authored by {{ author.name }}"
                         src="{{ author.avatar_url }}"
                       />
+                      <script>
+                        tippy("#author-{{ challenge.id }}", {
+                          content: `Authored by {{ author.name }}`,
+                          theme: "rhombus",
+                        });
+                      </script>
                     {% endwith %}
-                    <a class="-rotate-45" href="">{{ icons.ticket() }}</a>
+                    <a id="ticket-{{ challenge.id }}" class="-rotate-45">
+                      {{ icons.ticket() }}
+                    </a>
+                    <script>
+                      tippy("#ticket-{{ challenge.id }}", {
+                        content: `Submit a new support ticket`,
+                        theme: "rhombus",
+                      });
+                    </script>
                     <button
+                      id="focus-{{ challenge.id }}"
                       hx-trigger="click"
                       hx-get="/challenges/{{ challenge.id }}"
                       hx-target="body"
@@ -73,6 +116,12 @@
                     >
                       {{ icons.submit() }}
                     </button>
+                    <script>
+                      tippy("#focus-{{ challenge.id }}", {
+                        content: `View full challenge`,
+                        theme: "rhombus",
+                      });
+                    </script>
                   </div>
                 </div>
                 <div>{{ challenge.description }}</div>

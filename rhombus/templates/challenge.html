@@ -14,5 +14,12 @@
       >
     </div>
   </div>
-  {{ challenge.description }}
+  <div class="mb-2">{{ challenge.description }}</div>
+  <input
+    type="text"
+    name="flag"
+    placeholder="submit flag"
+    class="bg-background border p-2 rounded-md w-full focus-visible:outline-none"
+    hx-post="/challenges/{{ challenge.id }}"
+  />
 </dialog>

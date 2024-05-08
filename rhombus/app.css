@@ -62,11 +62,32 @@ dialog {
   display: flex;
   flex-direction: column;
   opacity: 0;
-  transition: opacity 0.1s;
+  transition: opacity 0.15s;
   pointer-events: none;
 }
 
 dialog[open] {
   opacity: 1;
   pointer-events: inherit;
+}
+
+.tippy-box[data-theme~='rhombus'] {
+  @apply bg-secondary;
+}
+
+.tippy-box[data-theme~='rhombus'][data-placement^='top'] > .tippy-arrow::before {
+  @apply border-t-secondary;
+}
+
+
+.tippy-box[data-theme~='rhombus'][data-placement^='bottom'] > .tippy-arrow::before {
+  @apply border-b-secondary;
+}
+
+.tippy-box[data-theme~='rhombus'][data-placement^='left'] > .tippy-arrow::before {
+  @apply border-l-secondary;
+}
+
+.tippy-box[data-theme~='rhombus'][data-placement^='right'] > .tippy-arrow::before {
+  @apply border-r-secondary;
 }

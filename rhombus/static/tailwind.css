@@ -838,10 +838,6 @@ body {
   gap: 0.25rem;
 }
 
-.gap-2 {
-  gap: 0.5rem;
-}
-
 .gap-4 {
   gap: 1rem;
 }
@@ -1035,6 +1031,10 @@ body {
   padding-top: 0px;
 }
 
+.pt-4 {
+  padding-top: 1rem;
+}
+
 .font-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
@@ -1090,6 +1090,11 @@ body {
 .text-foreground {
   --tw-text-opacity: 1;
   color: hsl(var(--foreground) / var(--tw-text-opacity));
+}
+
+.text-green-500 {
+  --tw-text-opacity: 1;
+  color: rgb(34 197 94 / var(--tw-text-opacity));
 }
 
 .text-muted-foreground {
@@ -1161,13 +1166,38 @@ dialog {
   display: flex;
   flex-direction: column;
   opacity: 0;
-  transition: opacity 0.1s;
+  transition: opacity 0.15s;
   pointer-events: none;
 }
 
 dialog[open] {
   opacity: 1;
   pointer-events: inherit;
+}
+
+.tippy-box[data-theme~='rhombus'] {
+  --tw-bg-opacity: 1;
+  background-color: hsl(var(--secondary) / var(--tw-bg-opacity));
+}
+
+.tippy-box[data-theme~='rhombus'][data-placement^='top'] > .tippy-arrow::before {
+  --tw-border-opacity: 1;
+  border-top-color: hsl(var(--secondary) / var(--tw-border-opacity));
+}
+
+.tippy-box[data-theme~='rhombus'][data-placement^='bottom'] > .tippy-arrow::before {
+  --tw-border-opacity: 1;
+  border-bottom-color: hsl(var(--secondary) / var(--tw-border-opacity));
+}
+
+.tippy-box[data-theme~='rhombus'][data-placement^='left'] > .tippy-arrow::before {
+  --tw-border-opacity: 1;
+  border-left-color: hsl(var(--secondary) / var(--tw-border-opacity));
+}
+
+.tippy-box[data-theme~='rhombus'][data-placement^='right'] > .tippy-arrow::before {
+  --tw-border-opacity: 1;
+  border-right-color: hsl(var(--secondary) / var(--tw-border-opacity));
 }
 
 @media (min-width: 768px) {
