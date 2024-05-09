@@ -220,6 +220,7 @@ impl Database for LibSQL {
             author_id: i64,
             solves_count: i64,
             flag: String,
+            score_type: i64,
         }
         let challenges = challenge_rows
             .into_stream()
@@ -230,10 +231,23 @@ impl Database for LibSQL {
                 description: challenge.description,
                 category_id: challenge.category_id,
                 healthy: challenge.healthy,
-                points: challenge.points,
                 solves: challenge.solves_count,
                 author_id: challenge.author_id,
                 flag: challenge.flag,
+                points: {
+                    if challenge.score_type == 0 {
+                        let minimum: i64 = 100;
+                        let initial: i64 = 500;
+                        let decay: i64 = 50;
+                        ((((minimum - initial) as f64 / decay.pow(2) as f64)
+                            * challenge.solves_count.pow(2) as f64
+                            + initial as f64)
+                            .ceil() as i64)
+                            .max(minimum)
+                    } else {
+                        challenge.points
+                    }
+                },
             })
             .collect::<Vec<Challenge>>()
             .await;
@@ -367,7 +381,11 @@ impl Database for LibSQL {
         }
         let mut query_solves = tx
             .query(
-                "SELECT challenge_id, user_id, solved_at FROM rhombus_solve JOIN rhombus_user ON rhombus_solve.user_id = rhombus_user.id WHERE team_id = ?1",
+                "
+                SELECT challenge_id, user_id, solved_at
+                FROM rhombus_solve JOIN rhombus_user ON rhombus_solve.user_id = rhombus_user.id
+                WHERE team_id = ?1
+            ",
                 [team_id],
             )
             .await?;
@@ -476,13 +494,29 @@ impl Database for LibSQL {
         Ok(())
     }
 
-    async fn solve_challenge(&self, user_id: i64, _team_id: i64, challenge_id: i64) -> Result<()> {
-        self.db
-            .execute(
-                "INSERT INTO rhombus_solve (challenge_id, user_id) VALUES (?1, ?2)",
-                params!(challenge_id, user_id),
-            )
-            .await?;
+    async fn solve_challenge(
+        &self,
+        user_id: i64,
+        challenge_id: i64,
+        team_id: i64,
+        new_team_score: i64,
+    ) -> Result<()> {
+        let tx = self.db.transaction().await?;
+
+        tx.execute(
+            "INSERT INTO rhombus_solve (challenge_id, user_id) VALUES (?1, ?2)",
+            [challenge_id, user_id],
+        )
+        .await?;
+
+        tx.execute(
+            "INSERT INTO rhombus_score_snapshot (team_id, score) VALUES (?1, ?2)",
+            [team_id, new_team_score],
+        )
+        .await?;
+
+        tx.commit().await?;
+
         Ok(())
     }
 }

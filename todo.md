@@ -16,7 +16,7 @@
   - [x] Categories
   - [ ] Healthchecks
   - [ ] Writeups
-  - [ ] Dynamic scoring
+  - [x] Dynamic scoring
   - [ ] Markdown rendering
   - [ ] Raw html rendering
   - [x] Authors without accounts
@@ -30,7 +30,8 @@
 - [ ] Divisions
 - [ ] First blood webhooks (per division)
 - [ ] Scoreboard
-  - [ ] Snapshots
+  - [x] Snapshots
+  - [ ] UI/page
 - [ ] Tickets
   - [ ] From site (markdown editor)
   - [ ] From discord

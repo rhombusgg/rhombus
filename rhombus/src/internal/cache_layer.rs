@@ -118,10 +118,16 @@ impl Database for DbCache {
         result
     }
 
-    async fn solve_challenge(&self, user_id: i64, team_id: i64, challenge_id: i64) -> Result<()> {
+    async fn solve_challenge(
+        &self,
+        user_id: i64,
+        challenge_id: i64,
+        team_id: i64,
+        new_team_score: i64,
+    ) -> Result<()> {
         let result = self
             .inner
-            .solve_challenge(user_id, team_id, challenge_id)
+            .solve_challenge(user_id, challenge_id, team_id, new_team_score)
             .await;
         if result.is_ok() {
             TEAM_CACHE.remove(&team_id);

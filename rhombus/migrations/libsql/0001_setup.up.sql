@@ -21,6 +21,14 @@ CREATE TABLE IF NOT EXISTS rhombus_author (
     discord_id TEXT NOT NULL UNIQUE
 );
 
+CREATE TABLE IF NOT EXISTS rhombus_score_snapshot (
+    team_id INTEGER NOT NULL,
+    score INTEGER NOT NULL,
+    at INTEGER NOT NULL DEFAULT(strftime('%s', 'now')),
+    PRIMARY KEY (team_id, at),
+    FOREIGN KEY (team_id) REFERENCES rhombus_team(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS rhombus_category (
     id INTEGER PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,

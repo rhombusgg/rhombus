@@ -144,8 +144,9 @@ impl Database for Postgres {
     async fn solve_challenge(
         &self,
         _user_id: i64,
-        _team_id: i64,
         _challenge_id: i64,
+        _team_id: i64,
+        _new_team_score: i64,
     ) -> Result<()> {
         todo!()
     }

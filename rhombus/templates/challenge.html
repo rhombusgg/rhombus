@@ -18,22 +18,43 @@
     </div>
   </div>
   <div class="mb-4">{{ challenge.description }}</div>
-  <form
-    method="post"
-    class="flex gap-2"
-    hx-post="/challenges/{{ challenge.id }}"
-    hx-target="next"
-  >
-    <input
-      type="text"
-      name="flag"
-      placeholder="Enter flag..."
-      autocomplete="off"
-      class="bg-background border p-2 rounded-lg grow focus-visible:outline-none"
-    />
-    <button class="border rounded-lg p-2" type="submit">Submit Flag</button>
-  </form>
-  <div></div>
+  {% with solve=team.solves[challenge.id] %}
+    {% if not solve %}
+      <form
+        class="flex gap-2"
+        hx-post="/challenges/{{ challenge.id }}"
+        hx-target="next"
+      >
+        <input
+          type="text"
+          name="flag"
+          placeholder="Enter flag..."
+          autocomplete="off"
+          class="bg-background border p-2 rounded-lg grow focus-visible:outline-none"
+        />
+        <button class="border rounded-lg p-2" type="submit">Submit Flag</button>
+      </form>
+      <div></div>
+    {% else %}
+      <form
+        class="flex gap-2"
+        hx-post="/challenges/{{ challenge.id }}/writeup"
+        hx-target="next"
+      >
+        <input
+          type="text"
+          name="flag"
+          placeholder="Enter writeup link..."
+          autocomplete="off"
+          class="bg-background border p-2 rounded-lg grow focus-visible:outline-none"
+        />
+        <button class="border rounded-lg p-2" type="submit">
+          Submit Writeup
+        </button>
+      </form>
+      <div></div>
+    {% endif %}
+  {% endwith %}
   <div class="flex gap-2 mt-2">
     <a
       class="pr-2 py-1 pl-1 max-w-fit rounded-lg flex"
