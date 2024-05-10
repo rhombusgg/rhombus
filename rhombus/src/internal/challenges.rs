@@ -119,7 +119,12 @@ pub async fn route_challenge_submit(
             .unwrap();
     }
 
-    if let Err(error) = state.db.solve_challenge(user.id, challenge).await {
+    let first_bloods = state
+        .db
+        .solve_challenge(user.id, user.team_id, challenge)
+        .await;
+
+    if let Err(error) = first_bloods {
         tracing::error!("{:#?}", error);
         let html = state
             .jinja
@@ -136,6 +141,22 @@ pub async fn route_challenge_submit(
             .header("content-type", "text/html")
             .body(html)
             .unwrap();
+    }
+
+    let first_bloods = first_bloods.unwrap();
+
+    if !first_bloods.division_ids.is_empty() {
+        tracing::info!(
+            user.id,
+            challenge_id = challenge.id,
+            divisions = first_bloods
+                .division_ids
+                .iter()
+                .map(|n| n.to_string())
+                .collect::<Vec<String>>()
+                .join(","),
+            "First blooded"
+        );
     }
 
     let html = state

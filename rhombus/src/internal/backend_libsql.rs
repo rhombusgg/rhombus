@@ -16,8 +16,8 @@ use serde::Deserialize;
 use super::{
     auth::{User, UserInner},
     database::{
-        Author, Category, Challenge, ChallengeData, ChallengeSolve, Challenges, Database, Team,
-        TeamInner, TeamMeta, TeamMetaInner, TeamUser,
+        Author, Category, Challenge, ChallengeData, ChallengeSolve, Challenges, Database,
+        FirstBloods, Team, TeamInner, TeamMeta, TeamMetaInner, TeamUser,
     },
     team::create_team_invite_token,
 };
@@ -550,7 +550,12 @@ impl Database for LibSQL {
         Ok(())
     }
 
-    async fn solve_challenge(&self, user_id: i64, challenge: &Challenge) -> Result<()> {
+    async fn solve_challenge(
+        &self,
+        user_id: i64,
+        team_id: i64,
+        challenge: &Challenge,
+    ) -> Result<FirstBloods> {
         let tx = self.db.transaction().await?;
 
         let now = chrono::Utc::now().timestamp();
@@ -571,9 +576,29 @@ impl Database for LibSQL {
         )
         .await?;
 
+        let first_blood_division_ids = tx
+            .query(
+                "
+                SELECT rhombus_team_division.division_id
+                FROM rhombus_challenge_division_points
+                JOIN rhombus_team_division ON
+                    rhombus_team_division.division_id = rhombus_challenge_division_points.division_id AND
+                    rhombus_team_division.team_id = ?2
+                WHERE challenge_id = ?1 AND solves = 1
+            ",
+                [challenge.id, team_id],
+            )
+            .await?
+            .into_stream()
+            .map(|row| row.unwrap().get::<i64>(0).unwrap())
+            .collect::<Vec<_>>()
+            .await;
+
         tx.commit().await?;
 
-        Ok(())
+        Ok(FirstBloods {
+            division_ids: first_blood_division_ids,
+        })
     }
 }
 

@@ -28,7 +28,8 @@
   - [ ] Admin geoip view
 - [ ] Homepage/countdown (plugin integration)
 - [x] Divisions
-- [ ] First blood webhooks (per division)
+- [x] First bloods (per division)
+  - [ ] webhooks
 - [ ] Scoreboard
   - [x] Snapshots
   - [ ] UI/page

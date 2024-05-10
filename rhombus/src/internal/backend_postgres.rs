@@ -5,7 +5,7 @@ use sqlx::{FromRow, PgPool};
 
 use super::{
     auth::User,
-    database::{Challenge, Challenges, Database, Team, TeamMeta},
+    database::{Challenge, Challenges, Database, FirstBloods, Team, TeamMeta},
 };
 use crate::Result;
 
@@ -137,7 +137,12 @@ impl Database for Postgres {
         todo!()
     }
 
-    async fn solve_challenge(&self, _user_id: i64, _challenge: &Challenge) -> Result<()> {
+    async fn solve_challenge(
+        &self,
+        _user_id: i64,
+        _team_id: i64,
+        _challenge: &Challenge,
+    ) -> Result<FirstBloods> {
         todo!()
     }
 }
