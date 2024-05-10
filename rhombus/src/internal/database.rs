@@ -24,6 +24,13 @@ impl From<i64> for ScoringType {
 }
 
 #[derive(Debug, Serialize, Clone)]
+pub struct ChallengeDivisionPoints {
+    pub division_id: i64,
+    pub points: u64,
+    pub solves: u64,
+}
+
+#[derive(Debug, Serialize, Clone)]
 pub struct Challenge {
     pub id: i64,
     pub name: String,
@@ -33,7 +40,7 @@ pub struct Challenge {
     pub scoring_type: ScoringType,
     pub author_id: i64,
     pub flag: String,
-    pub division_points: Vec<(i64, u64, u64)>,
+    pub division_points: Vec<ChallengeDivisionPoints>,
 }
 
 #[derive(Debug, Serialize, Clone)]

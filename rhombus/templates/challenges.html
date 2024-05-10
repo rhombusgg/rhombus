@@ -43,7 +43,7 @@
                   </div>
                   <div class="flex items-center gap-4">
                     <span
-                      >{{ t("solves-points", solves=challenge.division_points[0][2], points=challenge.division_points[0][1]) }}</span
+                      >{{ t("solves-points", solves=challenge.division_points[0].solves, points=challenge.division_points[0].points) }}</span
                     >
                     {% if challenge.healthy %}
                       <div

@@ -39,8 +39,8 @@ pub type User = Arc<UserInner>;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TokenClaims {
     pub sub: i64,
-    pub iat: usize,
-    pub exp: usize,
+    pub iat: i64,
+    pub exp: i64,
 }
 
 pub type MaybeTokenClaims = Option<TokenClaims>;
@@ -103,16 +103,6 @@ pub async fn auth_injector_middleware(
         ) {
             req.extensions_mut().insert(Some(token_data.claims.clone()));
             req.extensions_mut().insert(token_data.claims.clone());
-            // let user = Arc::new(UserInner {
-            //     avatar: "a".to_owned(),
-            //     disabled: false,
-            //     discord_id: "a".to_owned(),
-            //     id: 1,
-            //     is_admin: false,
-            //     is_team_owner: false,
-            //     name: "a".to_owned(),
-            //     team_id: 1,
-            // });
             if let Ok(user) = state.db.get_user_from_id(token_data.claims.sub).await {
                 req.extensions_mut().insert(Some(user.clone()));
                 req.extensions_mut().insert(user);
@@ -345,8 +335,8 @@ pub async fn route_discord_callback(
         .unwrap();
 
     let now = chrono::Utc::now();
-    let iat = now.timestamp() as usize;
-    let exp = (now + chrono::Duration::try_hours(72).unwrap()).timestamp() as usize;
+    let iat = now.timestamp();
+    let exp = (now + chrono::Duration::try_hours(72).unwrap()).timestamp();
     let claims = TokenClaims {
         sub: user_id,
         exp,

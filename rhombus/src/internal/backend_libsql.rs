@@ -21,7 +21,7 @@ use super::{
     },
     team::create_team_invite_token,
 };
-use crate::Result;
+use crate::{internal::database::ChallengeDivisionPoints, Result};
 
 #[derive(Clone)]
 pub struct LibSQL {
@@ -211,8 +211,9 @@ impl Database for LibSQL {
     }
 
     async fn get_challenges(&self) -> Result<Challenges> {
-        let rhombus_challenge_division_points_rows = self
-            .db
+        let tx = self.db.transaction().await?;
+
+        let rhombus_challenge_division_points_rows = tx
             .query(
                 "
                 SELECT *
@@ -234,15 +235,18 @@ impl Database for LibSQL {
         }
         let mut dbps = HashMap::new();
         for d in rhombus_challenge_division_points_rows.into_iter() {
-            let elem = (d.division_id, d.points as u64, d.solves as u64);
+            let elem = ChallengeDivisionPoints {
+                division_id: d.division_id,
+                points: d.points as u64,
+                solves: d.solves as u64,
+            };
             match dbps.get_mut(&d.challenge_id) {
                 None => _ = dbps.insert(d.challenge_id, vec![elem]),
                 Some(ps) => ps.push(elem),
             }
         }
 
-        let challenge_rows = self
-            .db
+        let challenge_rows = tx
             .query(
                 "
                 SELECT rhombus_challenge.*, COUNT(rhombus_solve.challenge_id) AS solves_count
@@ -281,7 +285,7 @@ impl Database for LibSQL {
             .collect::<Vec<Challenge>>()
             .await;
 
-        let category_rows = self.db.query("SELECT * FROM rhombus_category", ()).await?;
+        let category_rows = tx.query("SELECT * FROM rhombus_category", ()).await?;
         #[derive(Debug, Deserialize)]
         struct DbCategory {
             id: i64,
@@ -299,7 +303,7 @@ impl Database for LibSQL {
             .collect::<Vec<Category>>()
             .await;
 
-        let mut author_rows = self.db.query("SELECT * FROM rhombus_author", ()).await?;
+        let mut author_rows = tx.query("SELECT * FROM rhombus_author", ()).await?;
         #[derive(Debug, Deserialize)]
         struct DbAuthor {
             id: i64,
@@ -319,6 +323,8 @@ impl Database for LibSQL {
                 },
             );
         }
+
+        tx.commit().await?;
 
         Ok(Arc::new(ChallengeData {
             challenges,
@@ -561,8 +567,6 @@ fn truncate_to_256_chars(s: &str) -> &str {
 #[cfg(test)]
 mod test {
     use std::net::IpAddr;
-
-    use libsql::params;
 
     use crate::internal::{backend_libsql::LibSQL, database::Database};
 
