@@ -8,11 +8,18 @@ CREATE TABLE IF NOT EXISTS rhombus_challenge (
     category_id INTEGER NOT NULL,
     healthy BOOLEAN NOT NULL DEFAULT(TRUE),
     author_id INTEGER NOT NULL,
-    points INTEGER NOT NULL,
     score_type INTEGER NOT NULL,
+    static_points INTEGER,
     FOREIGN KEY (category_id) REFERENCES rhombus_category(id),
     FOREIGN KEY (author_id) REFERENCES rhombus_author(id)
 );
+
+CREATE TABLE IF NOT EXISTS rhombus_division (
+    id INTEGER PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL UNIQUE
+);
+
+INSERT OR REPLACE INTO rhombus_division VALUES (1,'Open');
 
 CREATE TABLE IF NOT EXISTS rhombus_author (
     id INTEGER PRIMARY KEY NOT NULL,
@@ -21,12 +28,14 @@ CREATE TABLE IF NOT EXISTS rhombus_author (
     discord_id TEXT NOT NULL UNIQUE
 );
 
-CREATE TABLE IF NOT EXISTS rhombus_score_snapshot (
+CREATE TABLE IF NOT EXISTS rhombus_points_snapshot (
     team_id INTEGER NOT NULL,
-    score INTEGER NOT NULL,
+    division_id INTEGER NOT NULL,
     at INTEGER NOT NULL DEFAULT(strftime('%s', 'now')),
-    PRIMARY KEY (team_id, at),
-    FOREIGN KEY (team_id) REFERENCES rhombus_team(id) ON DELETE CASCADE
+    points INTEGER NOT NULL,
+    PRIMARY KEY (team_id, division_id, at),
+    FOREIGN KEY (team_id) REFERENCES rhombus_team(id) ON DELETE CASCADE,
+    FOREIGN KEY (division_id) REFERENCES rhombus_division(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS rhombus_category (
@@ -55,6 +64,14 @@ CREATE TABLE IF NOT EXISTS rhombus_user (
     FOREIGN KEY (owner_team_id) REFERENCES rhombus_team(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS rhombus_user_division (
+    user_id INTEGER NOT NULL,
+    division_id INTEGER NOT NULL,
+    PRIMARY KEY (user_id, division_id),
+    FOREIGN KEY (user_id) REFERENCES rhombus_user(id),
+    FOREIGN KEY (division_id) REFERENCES rhombus_division(id)
+);
+
 CREATE TABLE IF NOT EXISTS rhombus_email (
     email TEXT PRIMARY KEY NOT NULL,
     user_id INTEGER NOT NULL,
@@ -66,6 +83,45 @@ CREATE TABLE IF NOT EXISTS rhombus_team (
     name TEXT NOT NULL UNIQUE,
     invite_token TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS rhombus_team_division (
+    team_id INTEGER NOT NULL,
+    division_id INTEGER NOT NULL,
+    PRIMARY KEY (team_id, division_id),
+    FOREIGN KEY (team_id) REFERENCES rhombus_team(id),
+    FOREIGN KEY (division_id) REFERENCES rhombus_division(id)
+);
+
+CREATE VIEW IF NOT EXISTS rhombus_challenge_division_points AS
+SELECT
+	rhombus_challenge.id AS challenge_id,
+    rhombus_division.id AS division_id,
+    CASE
+		WHEN rhombus_challenge.score_type = 0 THEN
+			MAX(ROUND((((100 - 500) / POWER(50, 2)) * POWER(COUNT(rhombus_solve.challenge_id), 2)) + 500), 100)
+		ELSE rhombus_challenge.static_points
+	END as points,
+    COUNT(rhombus_solve.challenge_id) AS solves
+FROM rhombus_challenge
+CROSS JOIN rhombus_division
+LEFT JOIN rhombus_solve ON
+	rhombus_challenge.id = rhombus_solve.challenge_id AND
+	rhombus_solve.user_id IN (
+    	SELECT rhombus_user.id
+         FROM rhombus_user
+         JOIN rhombus_team ON rhombus_user.team_id = rhombus_team.id
+         JOIN rhombus_team_division ON rhombus_team.id = rhombus_team_division.team_id
+         WHERE rhombus_team_division.division_id = rhombus_division.id
+    )
+GROUP BY rhombus_challenge.id, rhombus_division.id;
+
+CREATE VIEW IF NOT EXISTS rhombus_team_division_points AS
+SELECT rhombus_team_division.team_id, rhombus_team_division.division_id, SUM(points) as points
+FROM rhombus_team_division
+JOIN rhombus_challenge_division_points ON rhombus_team_division.division_id = rhombus_challenge_division_points.division_id
+JOIN rhombus_user ON rhombus_team_division.team_id = rhombus_user.team_id
+JOIN rhombus_solve ON rhombus_user.id = rhombus_solve.user_id AND rhombus_solve.challenge_id = rhombus_challenge_division_points.challenge_id
+GROUP BY rhombus_team_division.team_id, rhombus_team_division.division_id;
 
 CREATE TABLE IF NOT EXISTS rhombus_track (
     id INTEGER PRIMARY KEY NOT NULL,

@@ -56,6 +56,8 @@
             vscode-langservers-extracted
             alejandra
 
+            cmake
+            sqlite
             mold
             rustup
             cargo-cross

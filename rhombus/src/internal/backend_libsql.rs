@@ -120,6 +120,13 @@ impl Database for LibSQL {
             .get::<i64>(0)
             .unwrap();
 
+        // add team to default "Open" division
+        tx.execute(
+            "INSERT INTO rhombus_team_division VALUES (?1, 1)",
+            [team_id],
+        )
+        .await?;
+
         let user_id = tx
             .query(
                 "INSERT INTO rhombus_user (name, avatar, discord_id, team_id, owner_team_id) VALUES (?1, ?2, ?3, ?4, ?4) RETURNING id",
@@ -135,6 +142,13 @@ impl Database for LibSQL {
         tx.execute(
             "INSERT INTO rhombus_email (email, user_id) VALUES (?1, ?2)",
             params!(email, user_id),
+        )
+        .await?;
+
+        // add user to default "Open" division
+        tx.execute(
+            "INSERT INTO rhombus_user_division VALUES (?1, 1)",
+            [user_id],
         )
         .await?;
 
@@ -197,6 +211,36 @@ impl Database for LibSQL {
     }
 
     async fn get_challenges(&self) -> Result<Challenges> {
+        let rhombus_challenge_division_points_rows = self
+            .db
+            .query(
+                "
+                SELECT *
+                FROM rhombus_challenge_division_points
+            ",
+                (),
+            )
+            .await?
+            .into_stream()
+            .map(|row| de::from_row::<DbDivisionPoints>(&row.unwrap()).unwrap())
+            .collect::<Vec<_>>()
+            .await;
+        #[derive(Debug, Deserialize)]
+        struct DbDivisionPoints {
+            challenge_id: i64,
+            division_id: i64,
+            points: f64,
+            solves: f64,
+        }
+        let mut dbps = HashMap::new();
+        for d in rhombus_challenge_division_points_rows.into_iter() {
+            let elem = (d.division_id, d.points as u64, d.solves as u64);
+            match dbps.get_mut(&d.challenge_id) {
+                None => _ = dbps.insert(d.challenge_id, vec![elem]),
+                Some(ps) => ps.push(elem),
+            }
+        }
+
         let challenge_rows = self
             .db
             .query(
@@ -216,9 +260,7 @@ impl Database for LibSQL {
             description: String,
             category_id: i64,
             healthy: bool,
-            points: i64,
             author_id: i64,
-            solves_count: i64,
             flag: String,
             score_type: i64,
         }
@@ -231,23 +273,10 @@ impl Database for LibSQL {
                 description: challenge.description,
                 category_id: challenge.category_id,
                 healthy: challenge.healthy,
-                solves: challenge.solves_count,
                 author_id: challenge.author_id,
                 flag: challenge.flag,
-                points: {
-                    if challenge.score_type == 0 {
-                        let minimum: i64 = 100;
-                        let initial: i64 = 500;
-                        let decay: i64 = 50;
-                        ((((minimum - initial) as f64 / decay.pow(2) as f64)
-                            * challenge.solves_count.pow(2) as f64
-                            + initial as f64)
-                            .ceil() as i64)
-                            .max(minimum)
-                    } else {
-                        challenge.points
-                    }
-                },
+                scoring_type: challenge.score_type.into(),
+                division_points: dbps.get(&challenge.id).unwrap().to_vec(),
             })
             .collect::<Vec<Challenge>>()
             .await;
@@ -494,24 +523,24 @@ impl Database for LibSQL {
         Ok(())
     }
 
-    async fn solve_challenge(
-        &self,
-        user_id: i64,
-        challenge_id: i64,
-        team_id: i64,
-        new_team_score: i64,
-    ) -> Result<()> {
+    async fn solve_challenge(&self, user_id: i64, challenge: &Challenge) -> Result<()> {
         let tx = self.db.transaction().await?;
 
+        let now = chrono::Utc::now().timestamp();
+
         tx.execute(
-            "INSERT INTO rhombus_solve (challenge_id, user_id) VALUES (?1, ?2)",
-            [challenge_id, user_id],
+            "INSERT INTO rhombus_solve (challenge_id, user_id, solved_at) VALUES (?1, ?2, ?3)",
+            [challenge.id, user_id, now],
         )
         .await?;
 
         tx.execute(
-            "INSERT INTO rhombus_score_snapshot (team_id, score) VALUES (?1, ?2)",
-            [team_id, new_team_score],
+            "
+            INSERT INTO rhombus_points_snapshot
+            SELECT team_id, division_id, ?1, points
+            FROM rhombus_team_division_points
+            ",
+            [now],
         )
         .await?;
 
@@ -559,7 +588,7 @@ mod test {
 
         let num_tracks = database
             .db
-            .query("SELECT COUNT(*) FROM rhombus_track", params!())
+            .query("SELECT COUNT(*) FROM rhombus_track", ())
             .await
             .unwrap()
             .next()

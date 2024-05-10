@@ -6,7 +6,7 @@ use tokio::sync::RwLock;
 
 use crate::{internal::auth::User, Result};
 
-use super::database::{Challenges, Connection, Database, Team, TeamMeta};
+use super::database::{Challenge, Challenges, Connection, Database, Team, TeamMeta};
 
 #[derive(Clone)]
 pub struct DbCache {
@@ -118,19 +118,11 @@ impl Database for DbCache {
         result
     }
 
-    async fn solve_challenge(
-        &self,
-        user_id: i64,
-        challenge_id: i64,
-        team_id: i64,
-        new_team_score: i64,
-    ) -> Result<()> {
-        let result = self
-            .inner
-            .solve_challenge(user_id, challenge_id, team_id, new_team_score)
-            .await;
+    async fn solve_challenge(&self, user_id: i64, challenge: &Challenge) -> Result<()> {
+        let result = self.inner.solve_challenge(user_id, challenge).await;
         if result.is_ok() {
-            TEAM_CACHE.remove(&team_id);
+            USER_CACHE.remove(&user_id);
+            TEAM_CACHE.clear();
             *CHALLENGES_CACHE.write().await = None;
         }
         result

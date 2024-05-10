@@ -49,7 +49,7 @@ unicode-segmentation = "1.11.0"
 unic-langid = { version = "0.9.4", features = ["unic-langid-macros"] }
 
 futures = { version = "0.3.30", optional = true }
-libsql = { git = 'https://github.com/tursodatabase/libsql.git', optional = true }
+libsql = { git = 'https://github.com/tursodatabase/libsql.git', optional = true, features = ["encryption"] }
 listenfd = { version = "1.0.1", optional = true }
 sqlx = { version = "0.7.4", optional = true, features = [
   "tls-rustls",

@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use axum::{
     extract::{Path, State},
     http::{Response, Uri},
@@ -9,12 +7,7 @@ use axum::{
 use minijinja::context;
 use serde::Deserialize;
 
-use super::{
-    auth::User,
-    database::{Challenge, Team},
-    locales::Languages,
-    router::RouterState,
-};
+use super::{auth::User, locales::Languages, router::RouterState};
 
 pub async fn route_challenges(
     state: State<RouterState>,
@@ -87,20 +80,6 @@ pub async fn route_challenge_view(
     )
 }
 
-pub fn calculate_team_score(team: &Team, challenges: &[Challenge]) -> i64 {
-    let solved_challenge_ids: HashSet<&i64> = team.solves.keys().collect();
-    challenges
-        .iter()
-        .filter_map(|c| {
-            if solved_challenge_ids.contains(&c.id) {
-                Some(c.points)
-            } else {
-                None
-            }
-        })
-        .sum()
-}
-
 #[derive(Deserialize)]
 pub struct SubmitChallenge {
     flag: String,
@@ -139,15 +118,8 @@ pub async fn route_challenge_submit(
             .unwrap();
     }
 
-    let team = state.db.get_team_from_id(user.team_id).await.unwrap();
-    let new_team_score = calculate_team_score(&team, &challenge_data.challenges) + challenge.points;
-
-    if state
-        .db
-        .solve_challenge(user.id, challenge.id, user.team_id, new_team_score)
-        .await
-        .is_err()
-    {
+    if let Err(error) = state.db.solve_challenge(user.id, challenge).await {
+        tracing::error!("{:#?}", error);
         let html = state
             .jinja
             .get_template("challenge-submit.html")
