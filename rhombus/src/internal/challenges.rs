@@ -33,6 +33,7 @@ pub async fn route_challenges(
                 challenges => challenge_data.challenges,
                 categories => challenge_data.categories,
                 authors => challenge_data.authors,
+                divisions => challenge_data.divisions,
                 team => team,
             })
             .unwrap(),

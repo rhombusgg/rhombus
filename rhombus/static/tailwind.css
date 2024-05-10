@@ -734,6 +734,10 @@ body {
   display: inline-flex;
 }
 
+.table {
+  display: table;
+}
+
 .grid {
   display: grid;
 }
@@ -1070,6 +1074,10 @@ body {
   padding-top: 1rem;
 }
 
+.text-right {
+  text-align: right;
+}
+
 .font-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
@@ -1213,6 +1221,8 @@ dialog[open] {
 .tippy-box[data-theme~='rhombus'] {
   --tw-bg-opacity: 1;
   background-color: hsl(var(--secondary) / var(--tw-bg-opacity));
+  --tw-text-opacity: 1;
+  color: hsl(var(--foreground) / var(--tw-text-opacity));
 }
 
 .tippy-box[data-theme~='rhombus'][data-placement^='top'] > .tippy-arrow::before {

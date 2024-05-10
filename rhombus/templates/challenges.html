@@ -7,8 +7,8 @@
   <div
     hx-get="/challenges"
     hx-trigger="manualRefresh from:body, every 120s"
-    hx-swap-oob="true"
-    hx-target="#challenges-content"
+    hx-select="#challenges-content"
+    hx-swap="outerHTML"
     id="challenges-content"
     class="mt-4 px-4 gap-4 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(600px,1fr))]"
   >
@@ -43,8 +43,28 @@
                   </div>
                   <div class="flex items-center gap-4">
                     <span
+                      id="solves-points-{{ challenge.id }}"
+                      class="cursor-pointer"
                       >{{ t("solves-points", solves=challenge.division_points[0].solves, points=challenge.division_points[0].points) }}</span
                     >
+                    <script>
+                      tippy("#solves-points-{{ challenge.id }}", {
+                        content: `
+                        <table>
+                          {%- for division_points in challenge.division_points -%}
+                          <tr>
+                          <td class="pr-2 text-right">{{ divisions[division_points.division_id].name }}</td>
+                          <td class="pr-2">{{ t("solves", solves=division_points.solves) }}</td>
+                          <td>{{ t("points", points=division_points.points) }}</td>
+                          </tr>
+                        {%- endfor -%}
+                        </table>
+                        `,
+                        allowHTML: true,
+                        theme: "rhombus",
+                        interactive: true,
+                      });
+                    </script>
                     {% if challenge.healthy %}
                       <div
                         id="healthy-{{ challenge.id }}"
@@ -116,6 +136,7 @@
                       id="focus-{{ challenge.id }}"
                       hx-trigger="click"
                       hx-get="/challenges/{{ challenge.id }}"
+                      hx-select="dialog"
                       hx-target="body"
                       hx-swap="beforeend"
                     >
@@ -165,7 +186,7 @@
       });
 
       document.body.addEventListener("closeModal", function () {
-        document.querySelector("dialog[open]").close();
+        document.querySelector("dialog[open]")?.close();
       });
     })();
   </script>

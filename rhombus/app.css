@@ -72,7 +72,7 @@ dialog[open] {
 }
 
 .tippy-box[data-theme~='rhombus'] {
-  @apply bg-secondary;
+  @apply bg-secondary text-foreground;
 }
 
 .tippy-box[data-theme~='rhombus'][data-placement^='top'] > .tippy-arrow::before {

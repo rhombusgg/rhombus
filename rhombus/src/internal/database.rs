@@ -45,7 +45,6 @@ pub struct Challenge {
 
 #[derive(Debug, Serialize, Clone)]
 pub struct Division {
-    pub id: i64,
     pub name: String,
 }
 
@@ -68,6 +67,7 @@ pub struct ChallengeData {
     pub challenges: Vec<Challenge>,
     pub categories: Vec<Category>,
     pub authors: HashMap<i64, Author>,
+    pub divisions: HashMap<i64, Division>,
 }
 
 pub type Challenges = Arc<ChallengeData>;

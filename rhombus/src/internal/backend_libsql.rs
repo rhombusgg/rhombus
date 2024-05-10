@@ -21,7 +21,10 @@ use super::{
     },
     team::create_team_invite_token,
 };
-use crate::{internal::database::ChallengeDivisionPoints, Result};
+use crate::{
+    internal::database::{ChallengeDivisionPoints, Division},
+    Result,
+};
 
 #[derive(Clone)]
 pub struct LibSQL {
@@ -213,7 +216,7 @@ impl Database for LibSQL {
     async fn get_challenges(&self) -> Result<Challenges> {
         let tx = self.db.transaction().await?;
 
-        let rhombus_challenge_division_points_rows = tx
+        let rhombus_challenge_division_points = tx
             .query(
                 "
                 SELECT *
@@ -223,18 +226,18 @@ impl Database for LibSQL {
             )
             .await?
             .into_stream()
-            .map(|row| de::from_row::<DbDivisionPoints>(&row.unwrap()).unwrap())
+            .map(|row| de::from_row::<DbChallengeDivisionPoints>(&row.unwrap()).unwrap())
             .collect::<Vec<_>>()
             .await;
         #[derive(Debug, Deserialize)]
-        struct DbDivisionPoints {
+        struct DbChallengeDivisionPoints {
             challenge_id: i64,
             division_id: i64,
             points: f64,
             solves: f64,
         }
         let mut dbps = HashMap::new();
-        for d in rhombus_challenge_division_points_rows.into_iter() {
+        for d in rhombus_challenge_division_points.into_iter() {
             let elem = ChallengeDivisionPoints {
                 division_id: d.division_id,
                 points: d.points as u64,
@@ -324,12 +327,30 @@ impl Database for LibSQL {
             );
         }
 
+        let mut division_rows = tx.query("SELECT * FROM rhombus_division", ()).await?;
+        #[derive(Debug, Deserialize)]
+        struct DbDivision {
+            id: i64,
+            name: String,
+        }
+        let mut divisions: HashMap<i64, Division> = Default::default();
+        while let Some(row) = division_rows.next().await? {
+            let query_division = de::from_row::<DbDivision>(&row).unwrap();
+            divisions.insert(
+                query_division.id,
+                Division {
+                    name: query_division.name,
+                },
+            );
+        }
+
         tx.commit().await?;
 
         Ok(Arc::new(ChallengeData {
             challenges,
             categories,
             authors,
+            divisions,
         }))
     }
 

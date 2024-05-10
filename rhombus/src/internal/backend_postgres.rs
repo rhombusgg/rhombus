@@ -1,11 +1,11 @@
-use std::{collections::HashMap, net::IpAddr, sync::Arc};
+use std::net::IpAddr;
 
 use async_trait::async_trait;
 use sqlx::{FromRow, PgPool};
 
 use super::{
     auth::User,
-    database::{Challenge, ChallengeData, Challenges, Database, Team, TeamMeta},
+    database::{Challenge, Challenges, Database, Team, TeamMeta},
 };
 use crate::Result;
 
@@ -102,11 +102,7 @@ impl Database for Postgres {
         //     })
         //     .collect();
 
-        Ok(Arc::new(ChallengeData {
-            challenges: vec![],
-            categories: vec![],
-            authors: HashMap::new(),
-        }))
+        todo!()
     }
 
     async fn get_team_meta_from_invite_token(

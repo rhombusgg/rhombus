@@ -2,10 +2,12 @@ sign-in = Sign In
 team = Team
 account = Account
 challenges = Challenges
-solves-points = {$solves ->
+solves-points = {solves} / {points}
+solves = {$solves ->
     [one] {$solves} solve
     *[other] {$solves} solves
-} / {$points -> 
+}
+points = {$points -> 
     [one] {$points} pt
     *[other] {$points} pts
 }
