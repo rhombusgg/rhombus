@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use axum::{
     extract::{Path, State},
     http::{Response, Uri},
@@ -49,9 +51,11 @@ pub async fn route_challenge_view(
 ) -> impl IntoResponse {
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
-    let (challenge_data, team) = tokio::join!(challenge_data, team);
+    let user_writeups = state.db.get_writeups_from_user_id(user.id);
+    let (challenge_data, team, user_writeups) = tokio::join!(challenge_data, team, user_writeups);
     let challenge_data = challenge_data.unwrap();
     let team = team.unwrap();
+    let user_writeups = user_writeups.unwrap();
 
     let challenge = challenge_data
         .challenges
@@ -77,6 +81,7 @@ pub async fn route_challenge_view(
                 category => category,
                 team => team,
                 divisions => challenge_data.divisions,
+                user_writeups => user_writeups,
             })
             .unwrap(),
     )
@@ -92,7 +97,6 @@ pub async fn route_challenge_submit(
     Extension(user): Extension<User>,
     Extension(lang): Extension<Languages>,
     challenge_id: Path<i64>,
-    uri: Uri,
     Form(form): Form<SubmitChallenge>,
 ) -> impl IntoResponse {
     let challenge_data = state.db.get_challenges().await.unwrap();
@@ -109,8 +113,6 @@ pub async fn route_challenge_submit(
             .unwrap()
             .render(context! {
                 lang => lang,
-                user => user,
-                uri => uri.to_string(),
                 error => "Incorrect flag",
             })
             .unwrap();
@@ -133,8 +135,6 @@ pub async fn route_challenge_submit(
             .unwrap()
             .render(context! {
                 lang => lang,
-                user => user,
-                uri => uri.to_string(),
                 error => "Unknown database error",
             })
             .unwrap();
@@ -160,20 +160,136 @@ pub async fn route_challenge_submit(
         );
     }
 
-    let html = state
-        .jinja
-        .get_template("challenge-submit.html")
+    Response::builder()
+        .header("content-type", "text/html")
+        .header("hx-trigger", "{\"manualRefresh\":true,\"closeModal\":true}")
+        .body("".to_owned())
         .unwrap()
-        .render(context! {
-            lang => lang,
-            user => user,
-            uri => uri.to_string(),
-        })
+}
+
+#[derive(Deserialize)]
+pub struct SubmitWriteup {
+    url: String,
+}
+
+pub async fn route_writeup_submit(
+    state: State<RouterState>,
+    Extension(user): Extension<User>,
+    Extension(lang): Extension<Languages>,
+    challenge_id: Path<i64>,
+    Form(form): Form<SubmitWriteup>,
+) -> impl IntoResponse {
+    if form.url.len() > 256 {
+        let html = state
+            .jinja
+            .get_template("challenge-submit.html")
+            .unwrap()
+            .render(context! {
+                lang => lang,
+                user => user,
+                error => "URL is too long",
+            })
+            .unwrap();
+
+        return Response::builder()
+            .header("content-type", "text/html")
+            .body(html)
+            .unwrap();
+    }
+
+    let url = reqwest::Url::parse(&form.url);
+    if url.is_err() {
+        let html = state
+            .jinja
+            .get_template("challenge-submit.html")
+            .unwrap()
+            .render(context! {
+                lang => lang,
+                user => user,
+                error => "Invalid URL",
+            })
+            .unwrap();
+
+        return Response::builder()
+            .header("content-type", "text/html")
+            .body(html)
+            .unwrap();
+    }
+
+    let url = url.unwrap();
+
+    let client = reqwest::Client::new();
+    let response = client
+        .request(reqwest::Method::GET, url)
+        .timeout(Duration::from_secs(8))
+        .send()
+        .await;
+
+    if response.is_err() {
+        let html = state
+            .jinja
+            .get_template("challenge-submit.html")
+            .unwrap()
+            .render(context! {
+                lang => lang,
+                user => user,
+                error => "Unknown error",
+            })
+            .unwrap();
+
+        return Response::builder()
+            .header("content-type", "text/html")
+            .body(html)
+            .unwrap();
+    }
+
+    let response = response.unwrap();
+
+    if !response.status().is_success() {
+        let html = state
+            .jinja
+            .get_template("challenge-submit.html")
+            .unwrap()
+            .render(context! {
+                lang => lang,
+                user => user,
+                error => "Server did not respond successfully",
+            })
+            .unwrap();
+
+        return Response::builder()
+            .header("content-type", "text/html")
+            .body(html)
+            .unwrap();
+    }
+
+    state
+        .db
+        .add_writeup(user.id, user.team_id, challenge_id.0, &form.url)
+        .await
         .unwrap();
 
     Response::builder()
         .header("content-type", "text/html")
         .header("hx-trigger", "{\"manualRefresh\":true,\"closeModal\":true}")
-        .body(html)
+        .body("".to_owned())
+        .unwrap()
+}
+
+pub async fn route_writeup_delete(
+    state: State<RouterState>,
+    Extension(user): Extension<User>,
+    challenge_id: Path<i64>,
+) -> impl IntoResponse {
+    state
+        .db
+        .delete_writeup(challenge_id.0, user.id, user.team_id)
+        .await
+        .unwrap();
+
+    Response::builder()
+        .header("content-type", "text/html")
+        .header("hx-trigger", "{\"manualRefresh\":true,\"closeModal\":true}")
+        .body("".to_owned())
         .unwrap()
 }

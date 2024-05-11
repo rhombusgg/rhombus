@@ -1,4 +1,4 @@
-use std::{net::IpAddr, time::Duration};
+use std::{collections::HashMap, net::IpAddr, time::Duration};
 
 use async_trait::async_trait;
 use dashmap::DashMap;
@@ -6,7 +6,9 @@ use tokio::sync::RwLock;
 
 use crate::{internal::auth::User, Result};
 
-use super::database::{Challenge, Challenges, Connection, Database, FirstBloods, Team, TeamMeta};
+use super::database::{
+    Challenge, Challenges, Connection, Database, FirstBloods, Team, TeamMeta, Writeup,
+};
 
 #[derive(Clone)]
 pub struct DbCache {
@@ -135,6 +137,40 @@ impl Database for DbCache {
         }
         result
     }
+
+    async fn add_writeup(
+        &self,
+        user_id: i64,
+        team_id: i64,
+        challenge_id: i64,
+        writeup_url: &str,
+    ) -> Result<()> {
+        let result = self
+            .inner
+            .add_writeup(user_id, team_id, challenge_id, writeup_url)
+            .await;
+        if result.is_ok() {
+            TEAM_CACHE.remove(&team_id);
+            USER_WRITEUP_CACHE.remove(&user_id);
+        }
+        result
+    }
+
+    async fn get_writeups_from_user_id(&self, user_id: i64) -> Result<Writeups> {
+        get_writeups_from_user_id(&self.inner, user_id).await
+    }
+
+    async fn delete_writeup(&self, challenge_id: i64, user_id: i64, team_id: i64) -> Result<()> {
+        let result = self
+            .inner
+            .delete_writeup(challenge_id, user_id, team_id)
+            .await;
+        if result.is_ok() {
+            TEAM_CACHE.remove(&team_id);
+            USER_WRITEUP_CACHE.remove(&user_id);
+        }
+        result
+    }
 }
 
 lazy_static::lazy_static! {
@@ -208,6 +244,26 @@ pub async fn get_user_from_id(db: &Connection, user_id: i64) -> Result<User> {
     user
 }
 
+pub type Writeups = HashMap<i64, Writeup>;
+
+lazy_static::lazy_static! {
+    pub static ref USER_WRITEUP_CACHE: DashMap<i64, TimedCache<Writeups>> = DashMap::new();
+}
+
+pub async fn get_writeups_from_user_id(db: &Connection, user_id: i64) -> Result<Writeups> {
+    if let Some(writeups) = USER_WRITEUP_CACHE.get(&user_id) {
+        return Ok(writeups.value.clone());
+    }
+    tracing::trace!(user_id, "cache miss: get_writeups_from_user_id");
+
+    let writeups = db.get_writeups_from_user_id(user_id).await;
+
+    if let Ok(writeups) = &writeups {
+        USER_WRITEUP_CACHE.insert(user_id, TimedCache::new(writeups.clone()));
+    }
+    writeups
+}
+
 pub fn database_cache_evictor(seconds: u64) {
     tokio::task::spawn(async move {
         let duration = Duration::from_secs(seconds);
@@ -239,6 +295,19 @@ pub fn database_cache_evictor(seconds: u64) {
             });
             if count > 0 {
                 tracing::trace!(count, "Evicted team cache");
+            }
+
+            let mut count: i64 = 0;
+            USER_WRITEUP_CACHE.retain(|_, v| {
+                if v.insert_timestamp > evict_threshold {
+                    true
+                } else {
+                    count += 1;
+                    false
+                }
+            });
+            if count > 0 {
+                tracing::trace!(count, "Evicted user writeup cache");
             }
 
             {

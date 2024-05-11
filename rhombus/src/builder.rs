@@ -20,7 +20,10 @@ use crate::{
             route_signin, route_signout,
         },
         cache_layer::{database_cache_evictor, DbCache},
-        challenges::{route_challenge_submit, route_challenge_view, route_challenges},
+        challenges::{
+            route_challenge_submit, route_challenge_view, route_challenges, route_writeup_delete,
+            route_writeup_submit,
+        },
         database::Database,
         home::route_home,
         ip::{
@@ -412,6 +415,10 @@ impl<P: Plugin> Builder<P> {
             .route("/team/roll-token", post(route_team_roll_token))
             .route("/team/name", post(route_team_set_name))
             .route("/challenges", get(route_challenges))
+            .route(
+                "/challenges/:id/writeup",
+                post(route_writeup_submit).delete(route_writeup_delete),
+            )
             .route(
                 "/challenges/:id",
                 get(route_challenge_view).post(route_challenge_submit),

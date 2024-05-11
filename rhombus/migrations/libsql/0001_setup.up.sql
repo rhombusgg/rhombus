@@ -48,7 +48,9 @@ CREATE TABLE IF NOT EXISTS rhombus_solve (
     challenge_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
     solved_at INTEGER NOT NULL DEFAULT(strftime('%s', 'now')),
-    PRIMARY KEY (challenge_id, user_id)
+    PRIMARY KEY (challenge_id, user_id),
+    FOREIGN KEY (challenge_id) REFERENCES rhombus_challenge(id),
+    FOREIGN KEY (user_id) REFERENCES rhombus_user(id)
 );
 
 CREATE TABLE IF NOT EXISTS rhombus_user (
@@ -76,6 +78,15 @@ CREATE TABLE IF NOT EXISTS rhombus_email (
     email TEXT PRIMARY KEY NOT NULL,
     user_id INTEGER NOT NULL,
     FOREIGN KEY (user_id) REFERENCES rhombus_user(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS rhombus_writeup (
+    user_id INTEGER NOT NULL,
+    challenge_id INTEGER NOT NULL,
+    url TEXT NOT NULL,
+    PRIMARY KEY (user_id, challenge_id),
+    FOREIGN KEY (user_id) REFERENCES rhombus_user(id),
+    FOREIGN KEY (challenge_id) REFERENCES rhombus_challenge(id)
 );
 
 CREATE TABLE IF NOT EXISTS rhombus_team (

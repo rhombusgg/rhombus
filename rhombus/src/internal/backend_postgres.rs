@@ -5,6 +5,7 @@ use sqlx::{FromRow, PgPool};
 
 use super::{
     auth::User,
+    cache_layer::Writeups,
     database::{Challenge, Challenges, Database, FirstBloods, Team, TeamMeta},
 };
 use crate::Result;
@@ -143,6 +144,24 @@ impl Database for Postgres {
         _team_id: i64,
         _challenge: &Challenge,
     ) -> Result<FirstBloods> {
+        todo!()
+    }
+
+    async fn add_writeup(
+        &self,
+        _user_id: i64,
+        _team_id: i64,
+        _challenge_id: i64,
+        _writeup_url: &str,
+    ) -> Result<()> {
+        todo!()
+    }
+
+    async fn get_writeups_from_user_id(&self, _user_id: i64) -> Result<Writeups> {
+        todo!()
+    }
+
+    async fn delete_writeup(&self, _challenge_id: i64, _user_id: i64, _team_id: i64) -> Result<()> {
         todo!()
     }
 }

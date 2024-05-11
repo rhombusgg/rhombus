@@ -9,6 +9,7 @@
     hx-trigger="manualRefresh from:body"
     hx-select="#challenges-content"
     hx-swap="outerHTML"
+    hx-disinherit="hx-select"
     id="challenges-content"
     class="mt-4 px-4 gap-4 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(600px,1fr))]"
   >
@@ -115,7 +116,6 @@
                         id="focus-{{ challenge.id }}"
                         hx-trigger="click"
                         hx-get="/challenges/{{ challenge.id }}"
-                        hx-select="dialog"
                         hx-target="body"
                         hx-swap="beforeend"
                       >
@@ -124,7 +124,7 @@
                     </sl-tooltip>
                   </div>
                 </div>
-                <div>{{ challenge.description }}</div>
+                <div>{{ challenge.description | safe }}</div>
               </li>
             {% endif %}
           {% endfor %}

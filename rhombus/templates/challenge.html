@@ -34,7 +34,7 @@
       </sl-tooltip>
     </div>
   </div>
-  <div class="mb-4">{{ challenge.description }}</div>
+  <div class="mb-4">{{ challenge.description | safe }}</div>
   {% with solve=team.solves[challenge.id] %}
     {% if not solve %}
       <form
@@ -53,26 +53,60 @@
       </form>
       <div></div>
     {% else %}
-      <form
-        class="flex gap-2"
-        hx-post="/challenges/{{ challenge.id }}/writeup"
-        hx-target="next"
-      >
-        <input
-          type="text"
-          name="flag"
-          placeholder="Enter writeup link..."
-          autocomplete="off"
-          class="bg-background border p-2 rounded-lg grow focus-visible:outline-none"
-        />
-        <button class="border rounded-lg p-2" type="submit">
-          Submit Writeup
+      {% if not user_writeups[challenge.id] %}
+        <form
+          class="flex gap-2"
+          hx-post="/challenges/{{ challenge.id }}/writeup"
+          hx-target="next"
+          hx-indicator="#loader"
+        >
+          <div class="grow flex justify-end items-center relative">
+            <input
+              type="text"
+              name="url"
+              placeholder="Enter writeup link..."
+              autocomplete="off"
+              class="bg-background border p-2 rounded-lg w-full focus-visible:outline-none"
+            />
+            <div id="loader" class="absolute mr-2 pointer-events-none">
+              {{ icons.spinner(attrs='class="animate-spin"') }}
+            </div>
+          </div>
+          <button class="border rounded-lg p-2" type="submit">
+            Submit Writeup
+          </button>
+        </form>
+        <div></div>
+        <div class="mb-2"></div>
+      {% else %}
+        <button
+          class="bg-destructive p-2 mb-2 rounded-lg"
+          hx-delete="/challenges/{{ challenge.id }}/writeup"
+        >
+          Rescind writeup
         </button>
-      </form>
-      <div></div>
+      {% endif %}
+      {% if team.writeups[challenge.id] %}
+        <div class="mb-2">
+          <div>Team's writeups:</div>
+          <ul>
+            {% for writeup in team.writeups[challenge.id] %}
+              <li class="flex justify-between">
+                <a
+                  class="underline text-blue-300"
+                  target="_blank"
+                  href="{{ writeup.url }}"
+                  >{{ writeup.url }}</a
+                >
+                <span>by {{ team.users[writeup.user_id].name }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
     {% endif %}
   {% endwith %}
-  <div class="flex gap-2 mt-2">
+  <div class="flex gap-2 mt-4">
     <a
       class="pr-2 py-1 pl-1 max-w-fit rounded-lg flex"
       style="background-color: {{ category.color }}77"

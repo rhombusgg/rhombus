@@ -23,7 +23,7 @@ use serde_json::json;
 
 use super::{locales::Languages, router::RouterState};
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 pub struct UserInner {
     pub id: i64,
     pub name: String,

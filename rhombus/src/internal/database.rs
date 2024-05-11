@@ -6,6 +6,8 @@ use serde::Serialize;
 
 use crate::{internal::auth::User, Result};
 
+use super::cache_layer::Writeups;
+
 pub type Connection = Arc<dyn Database + Send + Sync>;
 
 #[derive(Debug, Serialize, Clone)]
@@ -86,12 +88,19 @@ pub struct TeamUser {
 }
 
 #[derive(Debug, Serialize, Clone)]
+pub struct Writeup {
+    pub user_id: i64,
+    pub url: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
 pub struct TeamInner {
     pub id: i64,
     pub name: String,
     pub invite_token: String,
     pub users: HashMap<i64, TeamUser>,
     pub solves: HashMap<i64, ChallengeSolve>,
+    pub writeups: HashMap<i64, Vec<Writeup>>,
 }
 
 pub type Team = Arc<TeamInner>;
@@ -145,4 +154,13 @@ pub trait Database {
     async fn get_user_from_id(&self, user_id: i64) -> Result<User>;
     async fn roll_invite_token(&self, team_id: i64) -> Result<String>;
     async fn set_team_name(&self, team_id: i64, new_team_name: &str) -> Result<()>;
+    async fn add_writeup(
+        &self,
+        user_id: i64,
+        team_id: i64,
+        challenge_id: i64,
+        writeup_url: &str,
+    ) -> Result<()>;
+    async fn get_writeups_from_user_id(&self, user_id: i64) -> Result<Writeups>;
+    async fn delete_writeup(&self, challenge_id: i64, user_id: i64, team_id: i64) -> Result<()>;
 }

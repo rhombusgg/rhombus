@@ -15,16 +15,15 @@ use serde::Deserialize;
 
 use super::{
     auth::{User, UserInner},
+    cache_layer::Writeups,
     database::{
-        Author, Category, Challenge, ChallengeData, ChallengeSolve, Challenges, Database,
-        FirstBloods, Team, TeamInner, TeamMeta, TeamMetaInner, TeamUser,
+        Author, Category, Challenge, ChallengeData, ChallengeDivisionPoints, ChallengeSolve,
+        Challenges, Database, Division, FirstBloods, Team, TeamInner, TeamMeta, TeamMetaInner,
+        TeamUser, Writeup,
     },
     team::create_team_invite_token,
 };
-use crate::{
-    internal::database::{ChallengeDivisionPoints, Division},
-    Result,
-};
+use crate::Result;
 
 #[derive(Clone)]
 pub struct LibSQL {
@@ -458,6 +457,39 @@ impl Database for LibSQL {
             }
         }
 
+        #[derive(Debug, Deserialize)]
+        struct QueryWriteup {
+            pub user_id: i64,
+            pub challenge_id: i64,
+            pub url: String,
+        }
+        let mut query_writeups = tx
+            .query(
+                "
+                SELECT user_id, challenge_id, url
+                FROM rhombus_writeup
+                WHERE user_id IN (
+                    SELECT id
+                    FROM rhombus_user
+                    WHERE team_id = ?1
+                )
+            ",
+                [team_id],
+            )
+            .await?;
+        let mut writeups = HashMap::new();
+        while let Some(row) = query_writeups.next().await? {
+            let query_writeup = de::from_row::<QueryWriteup>(&row).unwrap();
+            let writeup = Writeup {
+                url: query_writeup.url,
+                user_id: query_writeup.user_id,
+            };
+            match writeups.get_mut(&query_writeup.challenge_id) {
+                None => _ = writeups.insert(query_writeup.challenge_id, vec![writeup]),
+                Some(ws) => ws.push(writeup),
+            };
+        }
+
         tx.commit().await?;
 
         Ok(Arc::new(TeamInner {
@@ -466,6 +498,7 @@ impl Database for LibSQL {
             invite_token: query_team.invite_token,
             users,
             solves,
+            writeups,
         }))
     }
 
@@ -595,6 +628,71 @@ impl Database for LibSQL {
         Ok(FirstBloods {
             division_ids: first_blood_division_ids,
         })
+    }
+
+    async fn add_writeup(
+        &self,
+        user_id: i64,
+        _team_id: i64,
+        challenge_id: i64,
+        writeup_url: &str,
+    ) -> Result<()> {
+        self.db
+            .execute(
+                "
+                INSERT INTO rhombus_writeup (user_id, challenge_id, url) VALUES (?1, ?2, ?3)
+            ",
+                params!(user_id, challenge_id, writeup_url),
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    async fn get_writeups_from_user_id(&self, user_id: i64) -> Result<Writeups> {
+        #[derive(Debug, Deserialize)]
+        struct QueryWriteup {
+            pub user_id: i64,
+            pub challenge_id: i64,
+            pub url: String,
+        }
+        let mut db_writeups = self
+            .db
+            .query(
+                "
+                SELECT user_id, challenge_id, url
+                FROM rhombus_writeup
+                WHERE user_id = ?1
+            ",
+                [user_id],
+            )
+            .await?;
+        let mut writeups = HashMap::new();
+        while let Some(writeup) = db_writeups.next().await? {
+            let writeup = de::from_row::<QueryWriteup>(&writeup).unwrap();
+            writeups.insert(
+                writeup.challenge_id,
+                Writeup {
+                    url: writeup.url,
+                    user_id: writeup.user_id,
+                },
+            );
+        }
+        Ok(writeups)
+    }
+
+    async fn delete_writeup(&self, challenge_id: i64, user_id: i64, _team_id: i64) -> Result<()> {
+        self.db
+            .execute(
+                "
+                DELETE FROM rhombus_writeup
+                WHERE challenge_id = ?1 AND user_id = ?2
+            ",
+                [challenge_id, user_id],
+            )
+            .await?;
+
+        Ok(())
     }
 }
 

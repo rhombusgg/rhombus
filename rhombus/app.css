@@ -82,3 +82,7 @@ sl-tooltip::part(body), sl-tooltip::part(base__arrow) {
 sl-tooltip:not(:defined) {
   display: none;
 }
+
+#loader:not(.htmx-request) {
+  display: none;
+}

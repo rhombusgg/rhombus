@@ -15,10 +15,10 @@
 - [ ] Challenges
   - [x] Categories
   - [ ] Healthchecks
-  - [ ] Writeups
+  - [x] Writeups
   - [x] Dynamic scoring
   - [ ] Markdown rendering
-  - [ ] Raw html rendering
+  - [x] Raw html rendering
   - [x] Authors without accounts
 - [ ] File uploads
 - [ ] Single static binary
