@@ -6,7 +6,7 @@
 {% block content %}
   <div
     hx-get="/challenges"
-    hx-trigger="manualRefresh from:body, every 120s"
+    hx-trigger="manualRefresh from:body"
     hx-select="#challenges-content"
     hx-swap="outerHTML"
     id="challenges-content"
@@ -34,7 +34,7 @@
                 class="border-l-4 bg-card p-4 ring-offset-4 ring-offset-background target:ring"
                 style="border-color: {{ category.color }}; --tw-ring-color: {{ category.color }}"
               >
-                <div class="mb-2 flex justify-between">
+                <div class="mb-2 flex justify-between h-8">
                   <div class="font-bold">
                     <span style="color: {{ category.color }}"
                       >{{ category.name }} /
@@ -42,113 +42,86 @@
                     <span>{{ challenge.name }}</span>
                   </div>
                   <div class="flex items-center gap-4">
-                    <span
-                      id="solves-points-{{ challenge.id }}"
-                      class="cursor-pointer"
-                      >{{ t("solves-points", solves=challenge.division_points[0].solves, points=challenge.division_points[0].points) }}</span
-                    >
-                    <script>
-                      tippy("#solves-points-{{ challenge.id }}", {
-                        content: `
-                        <table>
-                          {%- for division_points in challenge.division_points -%}
+                    <sl-tooltip>
+                      <table slot="content">
+                        {%- for division_points in challenge.division_points -%}
                           <tr>
-                          <td class="pr-2 text-right">{{ divisions[division_points.division_id].name }}</td>
-                          <td class="pr-2">{{ t("solves", solves=division_points.solves) }}</td>
-                          <td>{{ t("points", points=division_points.points) }}</td>
+                            <td class="pr-2 text-right">
+                              {{ divisions[division_points.division_id].name }}
+                            </td>
+                            <td class="pr-2">
+                              {{ t("solves", solves=division_points.solves) }}
+                            </td>
+                            <td>
+                              {{ t("points", points=division_points.points) }}
+                            </td>
                           </tr>
                         {%- endfor -%}
-                        </table>
-                        `,
-                        allowHTML: true,
-                        theme: "rhombus",
-                        interactive: true,
-                      });
-                    </script>
+                      </table>
+                      <span class="cursor-pointer"
+                        >{{ t("solves-points", solves=challenge.division_points[0].solves, points=challenge.division_points[0].points) }}</span
+                      >
+                    </sl-tooltip>
                     {% if challenge.healthy %}
-                      <div
-                        id="healthy-{{ challenge.id }}"
-                        class="size-3 rounded-full bg-green-500 cursor-pointer"
-                      ></div>
-                      <script>
-                        tippy("#healthy-{{ challenge.id }}", {
-                          content: `Challenge is <span class="text-green-500">up</span>`,
-                          allowHTML: true,
-                          theme: "rhombus",
-                        });
-                      </script>
+                      <sl-tooltip>
+                        <div slot="content">
+                          Challenge is <span class="text-green-500">up</span>
+                        </div>
+                        <div
+                          class="size-3 rounded-full bg-green-500 cursor-pointer"
+                        ></div>
+                      </sl-tooltip>
                     {% else %}
-                      <div
-                        id="unhealthy-{{ challenge.id }}"
-                        class="size-3 rounded-full bg-red-500 cursor-pointer"
-                      ></div>
-                      <script>
-                        tippy("#unhealthy-{{ challenge.id }}", {
-                          content: `Challenge is <span class="text-red-500">down</span>`,
-                          allowHTML: true,
-                          theme: "rhombus",
-                        });
-                      </script>
+                      <sl-tooltip>
+                        <div slot="content">
+                          Challenge is <span class="text-red-500">down</span>
+                        </div>
+                        <div
+                          class="size-3 rounded-full bg-red-500 cursor-pointer"
+                        ></div>
+                      </sl-tooltip>
                     {% endif %}
                     {% with solve=team.solves[challenge.id] %}
                       {% if solve %}
                         {% with solver=team.users[solve.user_id] %}
-                          <img
-                            id="solve-{{ challenge.id }}"
-                            class="aspect-square rounded-full size-8"
-                            alt="solved by {{ solver.name }}"
-                            src="{{ solver.avatar_url }}"
-                          />
-                          <script>
-                            tippy("#solve-{{ challenge.id }}", {
-                              content: `Solved by {{ solver.name }}`,
-                              theme: "rhombus",
-                            });
-                          </script>
+                          <sl-tooltip content="Solved by {{ solver.name }}">
+                            <img
+                              id="solve-{{ challenge.id }}"
+                              class="aspect-square rounded-full h-8"
+                              alt="Solved by {{ solver.name }}"
+                              src="{{ solver.avatar_url }}"
+                            />
+                          </sl-tooltip>
                         {% endwith %}
                       {% endif %}
                     {% endwith %}
                     {% with author=authors[challenge.author_id] %}
-                      <img
-                        id="author-{{ challenge.id }}"
-                        class="aspect-square rounded-full size-8"
-                        alt="authored by {{ author.name }}"
-                        src="{{ author.avatar_url }}"
-                      />
-                      <script>
-                        tippy("#author-{{ challenge.id }}", {
-                          content: `Authored by {{ author.name }}`,
-                          theme: "rhombus",
-                        });
-                      </script>
+                      <sl-tooltip content="Authored by {{ author.name }}">
+                        <img
+                          id="author-{{ challenge.id }}"
+                          class="aspect-square rounded-full h-8"
+                          alt="Authored by {{ author.name }}"
+                          src="{{ author.avatar_url }}"
+                        />
+                      </sl-tooltip>
                     {% endwith %}
-                    <a id="ticket-{{ challenge.id }}" class="-rotate-45">
-                      {{ icons.ticket() }}
-                    </a>
-                    <script>
-                      tippy("#ticket-{{ challenge.id }}", {
-                        content: `Submit a new support ticket`,
-                        theme: "rhombus",
-                        trigger: "mouseenter",
-                      });
-                    </script>
-                    <button
-                      id="focus-{{ challenge.id }}"
-                      hx-trigger="click"
-                      hx-get="/challenges/{{ challenge.id }}"
-                      hx-select="dialog"
-                      hx-target="body"
-                      hx-swap="beforeend"
-                    >
-                      {{ icons.submit() }}
-                    </button>
-                    <script>
-                      tippy("#focus-{{ challenge.id }}", {
-                        content: `View full challenge`,
-                        theme: "rhombus",
-                        trigger: "mouseenter",
-                      });
-                    </script>
+                    <sl-tooltip content="Submit a new support ticket">
+                      <a id="ticket-{{ challenge.id }}" class="-rotate-45">
+                        {{ icons.ticket() }}
+                      </a>
+                    </sl-tooltip>
+                    <sl-tooltip trigger="hover" content="View full challenge">
+                      <button
+                        id="focus-{{ challenge.id }}"
+                        hx-trigger="click"
+                        hx-get="/challenges/{{ challenge.id }}"
+                        hx-select="dialog"
+                        hx-target="body"
+                        hx-swap="beforeend"
+                      >
+                        {{ icons.submit() }}
+                      </button>
+                    </sl-tooltip>
                   </div>
                 </div>
                 <div>{{ challenge.description }}</div>

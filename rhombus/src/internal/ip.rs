@@ -37,7 +37,7 @@ pub fn track_flusher(db: Connection) {
             TRACK_CACHE.shrink_to_fit();
 
             if total_count > 0 {
-                tracing::info!(count = total_count, "Flushed tracks");
+                tracing::trace!(count = total_count, "Flushed tracks");
             }
         }
     });
@@ -62,7 +62,7 @@ pub async fn track_middleware(
         let user_agent = req
             .headers()
             .get(&USER_AGENT)
-            .map(|header| header.to_str().unwrap().to_string());
+            .map(|header| truncate_to_256_chars(header.to_str().unwrap()).to_string());
 
         tracing::trace!(user_id, uri = uri.to_string(), "Request");
         tokio::task::spawn(async move {
@@ -91,6 +91,14 @@ pub async fn ip_insert_blank_middleware(mut req: Request<Body>, next: Next) -> i
     let ip: Option<IpAddr> = None;
     req.extensions_mut().insert(ip);
     next.run(req).await
+}
+
+fn truncate_to_256_chars(s: &str) -> &str {
+    if s.len() <= 256 {
+        s
+    } else {
+        &s[..256]
+    }
 }
 
 pub fn maybe_rightmost_x_forwarded_for(headers: &HeaderMap, _: &Extensions) -> Option<IpAddr> {

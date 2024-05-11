@@ -4,7 +4,6 @@
   data-onload-showmodal
   class="backdrop:bg-background/50 bg-background max-w-prose w-full rounded-lg text-foreground border-4 p-6 shadow-lg"
   style="border-color: {{ category.color }}"
-  id="challenges-modal"
 >
   <div class="mb-2 flex justify-between">
     <div class="font-bold">
@@ -12,9 +11,27 @@
       <span>{{ challenge.name }}</span>
     </div>
     <div class="flex items-center gap-4">
-      <span
-        >{{ t("solves-points", solves=challenge.division_points[0].solves, points=challenge.division_points[0].points) }}</span
-      >
+      <sl-tooltip hoist>
+        <div slot="content">
+          <table>
+            {%- for division_points in challenge.division_points -%}
+              <tr>
+                <td class="pr-2 text-right">
+                  {{ divisions[division_points.division_id].name }}
+                </td>
+                <td class="pr-2">
+                  {{ t("solves", solves=division_points.solves) }}
+                </td>
+                <td>{{ t("points", points=division_points.points) }}</td>
+              </tr>
+            {%- endfor -%}
+          </table>
+        </div>
+
+        <span class="cursor-pointer"
+          >{{ t("solves-points", solves=challenge.division_points[0].solves, points=challenge.division_points[0].points) }}</span
+        >
+      </sl-tooltip>
     </div>
   </div>
   <div class="mb-4">{{ challenge.description }}</div>

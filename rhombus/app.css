@@ -71,23 +71,14 @@ dialog[open] {
   pointer-events: inherit;
 }
 
-.tippy-box[data-theme~='rhombus'] {
+sl-tooltip::part(body), sl-tooltip::part(base__arrow) {
   @apply bg-secondary text-foreground;
 }
 
-.tippy-box[data-theme~='rhombus'][data-placement^='top'] > .tippy-arrow::before {
-  @apply border-t-secondary;
+:not(:defined) {
+  visibility: hidden;
 }
 
-
-.tippy-box[data-theme~='rhombus'][data-placement^='bottom'] > .tippy-arrow::before {
-  @apply border-b-secondary;
-}
-
-.tippy-box[data-theme~='rhombus'][data-placement^='left'] > .tippy-arrow::before {
-  @apply border-l-secondary;
-}
-
-.tippy-box[data-theme~='rhombus'][data-placement^='right'] > .tippy-arrow::before {
-  @apply border-r-secondary;
+sl-tooltip:not(:defined) {
+  display: none;
 }

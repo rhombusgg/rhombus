@@ -184,11 +184,7 @@ impl Database for LibSQL {
                     requests = rhombus_track.requests + ?3
             RETURNING id
             ",
-                params!(
-                    ip,
-                    user_agent.map(truncate_to_256_chars).unwrap_or(""),
-                    requests
-                ),
+                params!(ip, user_agent.unwrap_or(""), requests),
             )
             .await?
             .next()
@@ -599,14 +595,6 @@ impl Database for LibSQL {
         Ok(FirstBloods {
             division_ids: first_blood_division_ids,
         })
-    }
-}
-
-fn truncate_to_256_chars(s: &str) -> &str {
-    if s.len() <= 256 {
-        s
-    } else {
-        &s[..256]
     }
 }
 

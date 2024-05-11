@@ -760,11 +760,6 @@ body {
   height: 1rem;
 }
 
-.size-8 {
-  width: 2rem;
-  height: 2rem;
-}
-
 .size-9 {
   width: 2.25rem;
   height: 2.25rem;
@@ -1218,31 +1213,19 @@ dialog[open] {
   pointer-events: inherit;
 }
 
-.tippy-box[data-theme~='rhombus'] {
+sl-tooltip::part(body), sl-tooltip::part(base__arrow) {
   --tw-bg-opacity: 1;
   background-color: hsl(var(--secondary) / var(--tw-bg-opacity));
   --tw-text-opacity: 1;
   color: hsl(var(--foreground) / var(--tw-text-opacity));
 }
 
-.tippy-box[data-theme~='rhombus'][data-placement^='top'] > .tippy-arrow::before {
-  --tw-border-opacity: 1;
-  border-top-color: hsl(var(--secondary) / var(--tw-border-opacity));
+:not(:defined) {
+  visibility: hidden;
 }
 
-.tippy-box[data-theme~='rhombus'][data-placement^='bottom'] > .tippy-arrow::before {
-  --tw-border-opacity: 1;
-  border-bottom-color: hsl(var(--secondary) / var(--tw-border-opacity));
-}
-
-.tippy-box[data-theme~='rhombus'][data-placement^='left'] > .tippy-arrow::before {
-  --tw-border-opacity: 1;
-  border-left-color: hsl(var(--secondary) / var(--tw-border-opacity));
-}
-
-.tippy-box[data-theme~='rhombus'][data-placement^='right'] > .tippy-arrow::before {
-  --tw-border-opacity: 1;
-  border-right-color: hsl(var(--secondary) / var(--tw-border-opacity));
+sl-tooltip:not(:defined) {
+  display: none;
 }
 
 @media (min-width: 768px) {

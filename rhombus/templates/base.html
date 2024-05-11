@@ -20,14 +20,17 @@
     {% endif %}
     <meta name="twitter:card" content="summary_large_image" />
 
-    <script src="https://unpkg.com/htmx.org@1.9.10" defer></script>
+    <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
     <script src="https://unpkg.com/fuse.js@7.0.0/dist/fuse.js" defer></script>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/@shoelace-style/shoelace@2.15.0/cdn/themes/light.css"
+    />
     <script
-      src="https://unpkg.com/alpinejs@3.13.10/dist/cdn.min.js"
-      defer
+      type="module"
+      src="https://unpkg.com/@shoelace-style/shoelace@2.15.0/cdn/shoelace-autoloader.js"
     ></script>
-    <script src="https://unpkg.com/@popperjs/core@2"></script>
-    <script src="https://unpkg.com/tippy.js@6"></script>
+
     <link rel="stylesheet" href="/static/tailwind.css" />
     {% block head %}{% endblock %}
 

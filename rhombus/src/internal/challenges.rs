@@ -76,6 +76,7 @@ pub async fn route_challenge_view(
                 challenge => challenge,
                 category => category,
                 team => team,
+                divisions => challenge_data.divisions,
             })
             .unwrap(),
     )
