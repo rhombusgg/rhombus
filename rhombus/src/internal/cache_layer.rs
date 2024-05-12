@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::IpAddr, time::Duration};
+use std::{collections::BTreeMap, net::IpAddr, time::Duration};
 
 use async_trait::async_trait;
 use dashmap::DashMap;
@@ -244,7 +244,7 @@ pub async fn get_user_from_id(db: &Connection, user_id: i64) -> Result<User> {
     user
 }
 
-pub type Writeups = HashMap<i64, Writeup>;
+pub type Writeups = BTreeMap<i64, Writeup>;
 
 lazy_static::lazy_static! {
     pub static ref USER_WRITEUP_CACHE: DashMap<i64, TimedCache<Writeups>> = DashMap::new();

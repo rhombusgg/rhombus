@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::IpAddr, sync::Arc};
+use std::{collections::BTreeMap, net::IpAddr, sync::Arc};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -68,8 +68,8 @@ pub struct Author {
 pub struct ChallengeData {
     pub challenges: Vec<Challenge>,
     pub categories: Vec<Category>,
-    pub authors: HashMap<i64, Author>,
-    pub divisions: HashMap<i64, Division>,
+    pub authors: BTreeMap<i64, Author>,
+    pub divisions: BTreeMap<i64, Division>,
 }
 
 pub type Challenges = Arc<ChallengeData>;
@@ -98,9 +98,9 @@ pub struct TeamInner {
     pub id: i64,
     pub name: String,
     pub invite_token: String,
-    pub users: HashMap<i64, TeamUser>,
-    pub solves: HashMap<i64, ChallengeSolve>,
-    pub writeups: HashMap<i64, Vec<Writeup>>,
+    pub users: BTreeMap<i64, TeamUser>,
+    pub solves: BTreeMap<i64, ChallengeSolve>,
+    pub writeups: BTreeMap<i64, Vec<Writeup>>,
 }
 
 pub type Team = Arc<TeamInner>;

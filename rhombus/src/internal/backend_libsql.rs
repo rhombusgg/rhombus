@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{btree_map::Entry, BTreeMap},
     net::IpAddr,
     path::Path,
     sync::Arc,
@@ -231,7 +231,7 @@ impl Database for LibSQL {
             points: f64,
             solves: f64,
         }
-        let mut dbps = HashMap::new();
+        let mut dbps = BTreeMap::new();
         for d in rhombus_challenge_division_points.into_iter() {
             let elem = ChallengeDivisionPoints {
                 division_id: d.division_id,
@@ -309,7 +309,7 @@ impl Database for LibSQL {
             avatar: String,
             discord_id: String,
         }
-        let mut authors: HashMap<i64, Author> = Default::default();
+        let mut authors: BTreeMap<i64, Author> = Default::default();
         while let Some(row) = author_rows.next().await? {
             let query_author = de::from_row::<DbAuthor>(&row).unwrap();
             authors.insert(
@@ -328,7 +328,7 @@ impl Database for LibSQL {
             id: i64,
             name: String,
         }
-        let mut divisions: HashMap<i64, Division> = Default::default();
+        let mut divisions: BTreeMap<i64, Division> = Default::default();
         while let Some(row) = division_rows.next().await? {
             let query_division = de::from_row::<DbDivision>(&row).unwrap();
             divisions.insert(
@@ -411,7 +411,7 @@ impl Database for LibSQL {
                 [team_id],
             )
             .await?;
-        let mut users: HashMap<i64, TeamUser> = Default::default();
+        let mut users: BTreeMap<i64, TeamUser> = Default::default();
         while let Some(row) = query_user_rows.next().await? {
             let query_user = de::from_row::<QueryTeamUser>(&row).unwrap();
             users.insert(
@@ -440,7 +440,7 @@ impl Database for LibSQL {
                 [team_id],
             )
             .await?;
-        let mut solves: HashMap<i64, ChallengeSolve> = Default::default();
+        let mut solves: BTreeMap<i64, ChallengeSolve> = Default::default();
         while let Some(row) = query_solves.next().await? {
             let query_solve = de::from_row::<QuerySolve>(&row).unwrap();
             let solve = ChallengeSolve {
@@ -477,7 +477,7 @@ impl Database for LibSQL {
                 [team_id],
             )
             .await?;
-        let mut writeups = HashMap::new();
+        let mut writeups = BTreeMap::new();
         while let Some(row) = query_writeups.next().await? {
             let query_writeup = de::from_row::<QueryWriteup>(&row).unwrap();
             let writeup = Writeup {
@@ -667,7 +667,7 @@ impl Database for LibSQL {
                 [user_id],
             )
             .await?;
-        let mut writeups = HashMap::new();
+        let mut writeups = BTreeMap::new();
         while let Some(writeup) = db_writeups.next().await? {
             let writeup = de::from_row::<QueryWriteup>(&writeup).unwrap();
             writeups.insert(
