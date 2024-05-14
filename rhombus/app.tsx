@@ -47,32 +47,27 @@ customElement("rhombus-tooltip", (props, { element }) => {
   );
 });
 
+const [data, { refetch }] = createResource(
+  async () =>
+    (await (
+      await fetch("/challenges", {
+        headers: { accept: "application/json" },
+      })
+    ).json()) as ChallengesData,
+);
+
+createEffect(() => {
+  data();
+  // @ts-ignore
+  htmx.process(document.body);
+});
+
+const handler = () => refetch();
+
+document.body.addEventListener("manualRefresh", handler);
+window.addEventListener("focus", handler);
+
 const ChallengesComponent = () => {
-  const [data, { refetch }] = createResource(
-    async () =>
-      (await (
-        await fetch("/challenges", {
-          headers: { accept: "application/json" },
-        })
-      ).json()) as ChallengesData,
-  );
-
-  createEffect(() => {
-    data();
-    // @ts-ignore
-    htmx.process(document.body);
-  });
-
-  const handler = () => refetch();
-
-  document.body.addEventListener("manualRefresh", handler);
-  window.addEventListener("focus", handler);
-
-  onCleanup(() => {
-    document.body.removeEventListener("manualRefresh", handler);
-    window.removeEventListener("focus", handler);
-  });
-
   return (
     <Show when={data()}>
       <For each={data().categories}>
@@ -200,10 +195,16 @@ const ChallengesComponent = () => {
                                             }
                                           </td>
                                           <td class="pr-2">
-                                            {division_points.solves} solves
+                                            {division_points.solves} solve
+                                            {division_points.solves !== 1
+                                              ? "s"
+                                              : ""}
                                           </td>
                                           <td>
-                                            {division_points.points} points
+                                            {division_points.points} point
+                                            {division_points.points !== 1
+                                              ? "s"
+                                              : ""}
                                           </td>
                                         </tr>
                                       ),
@@ -213,11 +214,17 @@ const ChallengesComponent = () => {
                                 </Tooltip.Content>
                               </Tooltip.Portal>
                               <Tooltip.Trigger as="span" class="cursor-pointer">
-                                {challenge.division_points[0].solves} solves /{" "}
-                                {challenge.division_points[0].points} points
+                                {challenge.division_points[0].solves} solve
+                                {challenge.division_points[0].solves !== 1
+                                  ? "s"
+                                  : ""}{" "}
+                                / {challenge.division_points[0].points} point
+                                {challenge.division_points[0].points !== 1
+                                  ? "s"
+                                  : ""}
                               </Tooltip.Trigger>
                             </Tooltip>
-                            {author && (
+                            <Show when={author}>
                               <Tooltip
                                 placement="top"
                                 floatingOptions={{
@@ -239,7 +246,7 @@ const ChallengesComponent = () => {
                                   src={author.avatar_url}
                                 />
                               </Tooltip>
-                            )}
+                            </Show>
                             <Tooltip
                               placement="top"
                               floatingOptions={{
