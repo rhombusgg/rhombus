@@ -37,12 +37,12 @@ pub struct Challenge {
     pub id: i64,
     pub name: String,
     pub description: String,
-    pub category_id: i64,
     pub healthy: bool,
-    pub scoring_type: ScoringType,
+    pub category_id: i64,
     pub author_id: i64,
-    pub flag: String,
     pub division_points: Vec<ChallengeDivisionPoints>,
+    pub scoring_type: ScoringType,
+    pub flag: String,
 }
 
 #[derive(Debug, Serialize, Clone)]

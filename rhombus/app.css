@@ -71,16 +71,8 @@ dialog[open] {
   pointer-events: inherit;
 }
 
-sl-tooltip::part(body), sl-tooltip::part(base__arrow) {
-  @apply bg-secondary text-foreground;
-}
-
-:not(:defined) {
-  visibility: hidden;
-}
-
-sl-tooltip:not(:defined) {
-  display: none;
+.tooltip {
+  @apply rounded-lg bg-secondary px-3 py-2 font-medium corvu-open:animate-in corvu-open:fade-in-50 corvu-open:slide-in-from-bottom-1 corvu-closed:animate-out corvu-closed:fade-out-50 corvu-closed:slide-out-to-bottom-1;
 }
 
 #loader:not(.htmx-request) {

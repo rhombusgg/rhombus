@@ -1,0 +1,21 @@
+{
+  "name": "rhombus",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Mark Bundschuh",
+  "license": "MPL-2.0",
+  "devDependencies": {
+    "@corvu/tailwind": "^0.1.5",
+    "@corvu/tooltip": "^0.1.0",
+    "esbuild": "^0.21.2",
+    "esbuild-plugin-solid": "^0.6.0",
+    "solid-element": "^1.8.0",
+    "solid-js": "^1.8.17",
+    "tailwindcss": "^3.4.3",
+    "tailwindcss-animate": "^1.0.7"
+  }
+}

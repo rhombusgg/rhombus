@@ -56,6 +56,7 @@
             vscode-langservers-extracted
             alejandra
 
+            nodejs_20
             cmake
             sqlite
             mold

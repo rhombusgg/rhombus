@@ -5,133 +5,15 @@
 
 {% block content %}
   <div
-    hx-get="/challenges"
-    hx-trigger="manualRefresh from:body"
-    hx-select="#challenges-content"
-    hx-swap="outerHTML"
-    hx-disinherit="hx-select"
-    id="challenges-content"
     class="mt-4 px-4 gap-4 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(600px,1fr))]"
-  >
-    {% for category in categories %}
-      <div>
-        <div
-          class="flex justify-between rounded-md p-4 font-bold"
-          style="background-color: {{ category.color }}"
-        >
-          <span>{{ category.name }}</span>
-          <span>
-            {% with challenges_in_category=challenges | selectattr("category_id", "==", category.id) %}
-              {{ challenges_in_category | selectattr("id", "in", team.solves) | length }}
-              / {{ challenges_in_category | length }}
-            {%- endwith -%}
-          </span>
-        </div>
-        <ul class="flex flex-col gap-4 px-2 pt-4">
-          {% for challenge in challenges %}
-            {% if category.id == challenge.category_id %}
-              <li
-                id="{{ challenge.name }}"
-                class="border-l-4 bg-card p-4 ring-offset-4 ring-offset-background target:ring"
-                style="border-color: {{ category.color }}; --tw-ring-color: {{ category.color }}"
-              >
-                <div class="mb-2 flex justify-between h-8">
-                  <div class="font-bold">
-                    <span style="color: {{ category.color }}"
-                      >{{ category.name }} /
-                    </span>
-                    <span>{{ challenge.name }}</span>
-                  </div>
-                  <div class="flex items-center gap-4">
-                    <sl-tooltip>
-                      <table slot="content">
-                        {%- for division_points in challenge.division_points -%}
-                          <tr>
-                            <td class="pr-2 text-right">
-                              {{ divisions[division_points.division_id].name }}
-                            </td>
-                            <td class="pr-2">
-                              {{ t("solves", solves=division_points.solves) }}
-                            </td>
-                            <td>
-                              {{ t("points", points=division_points.points) }}
-                            </td>
-                          </tr>
-                        {%- endfor -%}
-                      </table>
-                      <span class="cursor-pointer"
-                        >{{ t("solves-points", solves=challenge.division_points[0].solves, points=challenge.division_points[0].points) }}</span
-                      >
-                    </sl-tooltip>
-                    {% if challenge.healthy %}
-                      <sl-tooltip>
-                        <div slot="content">
-                          Challenge is <span class="text-green-500">up</span>
-                        </div>
-                        <div
-                          class="size-3 rounded-full bg-green-500 cursor-pointer"
-                        ></div>
-                      </sl-tooltip>
-                    {% else %}
-                      <sl-tooltip>
-                        <div slot="content">
-                          Challenge is <span class="text-red-500">down</span>
-                        </div>
-                        <div
-                          class="size-3 rounded-full bg-red-500 cursor-pointer"
-                        ></div>
-                      </sl-tooltip>
-                    {% endif %}
-                    {% with solve=team.solves[challenge.id] %}
-                      {% if solve %}
-                        {% with solver=team.users[solve.user_id] %}
-                          <sl-tooltip content="Solved by {{ solver.name }}">
-                            <img
-                              id="solve-{{ challenge.id }}"
-                              class="aspect-square rounded-full h-8"
-                              alt="Solved by {{ solver.name }}"
-                              src="{{ solver.avatar_url }}"
-                            />
-                          </sl-tooltip>
-                        {% endwith %}
-                      {% endif %}
-                    {% endwith %}
-                    {% with author=authors[challenge.author_id] %}
-                      <sl-tooltip content="Authored by {{ author.name }}">
-                        <img
-                          id="author-{{ challenge.id }}"
-                          class="aspect-square rounded-full h-8"
-                          alt="Authored by {{ author.name }}"
-                          src="{{ author.avatar_url }}"
-                        />
-                      </sl-tooltip>
-                    {% endwith %}
-                    <sl-tooltip content="Submit a new support ticket">
-                      <a id="ticket-{{ challenge.id }}" class="-rotate-45">
-                        {{ icons.ticket() }}
-                      </a>
-                    </sl-tooltip>
-                    <sl-tooltip trigger="hover" content="View full challenge">
-                      <button
-                        id="focus-{{ challenge.id }}"
-                        hx-trigger="click"
-                        hx-get="/challenges/{{ challenge.id }}"
-                        hx-target="body"
-                        hx-swap="beforeend"
-                      >
-                        {{ icons.submit() }}
-                      </button>
-                    </sl-tooltip>
-                  </div>
-                </div>
-                <div>{{ challenge.description | safe }}</div>
-              </li>
-            {% endif %}
-          {% endfor %}
-        </ul>
-      </div>
-    {% endfor %}
-  </div>
+    id="challenges"
+  ></div>
+
+  <script type="module">
+    import { renderCounter } from "/static/app.js";
+    renderCounter(document.getElementById("challenges"));
+  </script>
+
   <script>
     (function () {
       document.body.addEventListener("htmx:afterSettle", function (detail) {

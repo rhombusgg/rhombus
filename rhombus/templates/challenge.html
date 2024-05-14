@@ -11,7 +11,7 @@
       <span>{{ challenge.name }}</span>
     </div>
     <div class="flex items-center gap-4">
-      <sl-tooltip hoist>
+      <rhombus-tooltip class="cursor-pointer">
         <div slot="content">
           <table>
             {%- for division_points in challenge.division_points -%}
@@ -28,7 +28,7 @@
           </table>
         </div>
 
-        <span class="cursor-pointer"
+        <span
           >{{ t("solves-points", solves=challenge.division_points[0].solves, points=challenge.division_points[0].points) }}</span
         >
       </sl-tooltip>
