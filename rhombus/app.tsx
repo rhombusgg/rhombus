@@ -250,47 +250,49 @@ const ChallengesComponent = () => {
                                 />
                               </Tooltip>
                             </Show>
-                            <Tooltip
-                              placement="top"
-                              floatingOptions={{
-                                offset: 13,
-                                flip: true,
-                                shift: true,
-                              }}
-                              openOnFocus={false}
-                            >
-                              <Tooltip.Portal>
-                                <Tooltip.Content class="tooltip">
-                                  <span>Create new ticket</span>
-                                  <Tooltip.Arrow class="text-secondary" />
-                                </Tooltip.Content>
-                              </Tooltip.Portal>
-                              <Tooltip.Trigger
-                                as="button"
-                                hx-trigger="click"
-                                hx-get={`/challenges/${challenge.id}/ticket`}
-                                hx-target="body"
-                                hx-swap="beforeend"
+                            <Show when={data().ticket_enabled}>
+                              <Tooltip
+                                placement="top"
+                                floatingOptions={{
+                                  offset: 13,
+                                  flip: true,
+                                  shift: true,
+                                }}
+                                openOnFocus={false}
                               >
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="24"
-                                  height="24"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  stroke-width="2"
-                                  stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                  class="lucide lucide-ticket -rotate-45"
+                                <Tooltip.Portal>
+                                  <Tooltip.Content class="tooltip">
+                                    <span>Create new ticket</span>
+                                    <Tooltip.Arrow class="text-secondary" />
+                                  </Tooltip.Content>
+                                </Tooltip.Portal>
+                                <Tooltip.Trigger
+                                  as="button"
+                                  hx-trigger="click"
+                                  hx-get={`/challenges/${challenge.id}/ticket`}
+                                  hx-target="body"
+                                  hx-swap="beforeend"
                                 >
-                                  <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
-                                  <path d="M13 5v2" />
-                                  <path d="M13 17v2" />
-                                  <path d="M13 11v2" />
-                                </svg>
-                              </Tooltip.Trigger>
-                            </Tooltip>
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    class="lucide lucide-ticket -rotate-45"
+                                  >
+                                    <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
+                                    <path d="M13 5v2" />
+                                    <path d="M13 17v2" />
+                                    <path d="M13 11v2" />
+                                  </svg>
+                                </Tooltip.Trigger>
+                              </Tooltip>
+                            </Show>
                             <Tooltip
                               placement="top"
                               floatingOptions={{
@@ -373,6 +375,7 @@ const ChallengesComponent = () => {
 };
 
 type ChallengesData = {
+  ticket_enabled: boolean;
   challenges: {
     id: number;
     name: string;

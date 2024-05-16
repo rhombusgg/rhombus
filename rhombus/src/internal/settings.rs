@@ -8,8 +8,8 @@ pub struct DiscordSettings {
     pub client_secret: String,
     pub bot_token: String,
     pub guild_id: NonZeroU64,
-    pub first_blood_channel_id: NonZeroU64,
-    pub support_channel_id: NonZeroU64,
+    pub first_blood_channel_id: Option<NonZeroU64>,
+    pub support_channel_id: Option<NonZeroU64>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

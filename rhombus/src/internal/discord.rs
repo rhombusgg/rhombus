@@ -15,7 +15,7 @@ use super::{
     settings::Settings,
 };
 
-use crate::Result;
+use crate::{errors::RhombusError, Result};
 
 #[derive(Clone)]
 pub struct Bot {
@@ -51,9 +51,13 @@ impl Bot {
         author: &Author,
         content: impl AsRef<str>,
     ) -> Result<()> {
+        if self.settings.discord.support_channel_id.is_none() {
+            return Ok(());
+        }
+
         let ticket_number = self.db.create_ticket(user.id, challenge.id).await?;
 
-        let thread = ChannelId::from(self.settings.discord.support_channel_id)
+        let thread = ChannelId::from(self.settings.discord.support_channel_id.unwrap())
             .create_thread(
                 &self.http,
                 CreateThread::new(format!(
@@ -153,22 +157,19 @@ impl Bot {
             .choose_multiple(&mut thread_rng(), thread_rng().gen_range(1..=4))
             .cloned()
             .collect::<Vec<&str>>()
-            .join("");
+            .join(" ");
 
-        ChannelId::from(self.settings.discord.first_blood_channel_id)
-            .send_message(
-                &self.http,
-                CreateMessage::new().content(format!(
-                    "Congrats to <@{}> on team **{}** for first blood on **{} / {}** in {}! {}",
-                    user.discord_id,
-                    team.name,
-                    category.name,
-                    challenge.name,
-                    division_string,
-                    emoji,
-                )),
-            )
-            .await?;
+        ChannelId::from(self.settings.discord.first_blood_channel_id.ok_or(
+            RhombusError::MissingConfiguration("first blood channel id".to_owned()),
+        )?)
+        .send_message(
+            &self.http,
+            CreateMessage::new().content(format!(
+                "Congrats to <@{}> on team **{}** for first blood on **{} / {}** in {}! {}",
+                user.discord_id, team.name, category.name, challenge.name, division_string, emoji,
+            )),
+        )
+        .await?;
         Ok(())
     }
 }
