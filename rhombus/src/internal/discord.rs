@@ -1,13 +1,14 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, num::NonZeroU64, sync::Arc};
 
 use rand::{prelude::SliceRandom, thread_rng, Rng};
 use serenity::{
     all::{
-        ChannelId, ChannelType, CreateEmbed, CreateMessage, CreateThread, GatewayIntents, Http,
-        UserId,
+        ButtonStyle, ChannelId, ChannelType, CreateActionRow, CreateButton, CreateEmbed,
+        CreateMessage, CreateThread, GatewayIntents, Http, UserId,
     },
     Client,
 };
+use tokio::sync::RwLock;
 
 use super::{
     auth::User,
@@ -17,17 +18,287 @@ use super::{
 
 use crate::{errors::RhombusError, Result};
 
-#[derive(Clone)]
 pub struct Bot {
     http: Arc<Http>,
     db: Connection,
-    settings: Settings,
+    settings: Arc<RwLock<Settings>>,
+}
+
+pub struct Data {
+    settings: Arc<RwLock<Settings>>,
+    db: Connection,
+}
+pub type DiscordError = Box<dyn std::error::Error + Send + Sync>;
+pub type Context<'a> = poise::Context<'a, Data, DiscordError>;
+
+/// Go to the CTF profile page of a corresponding user
+#[poise::command(slash_command, ephemeral)]
+pub async fn whois(
+    ctx: Context<'_>,
+    #[description = "User to look up"] user: serenity::all::User,
+) -> std::result::Result<(), DiscordError> {
+    if let Ok(user) = ctx.data().db.get_user_from_discord_id(user.id.into()).await {
+        ctx.reply(format!(
+            "Found! [Go to {}'s user profile]({}/user/{})",
+            user.name,
+            ctx.data().settings.read().await.location_url,
+            user.id,
+        ))
+        .await?;
+    } else {
+        ctx.reply("Could not find user").await?;
+    }
+
+    Ok(())
+}
+
+#[poise::command(
+    slash_command,
+    subcommands("firstbloods", "support", "author", "verified", "status"),
+    subcommand_required,
+    default_member_permissions = "ADMINISTRATOR"
+)]
+pub async fn admin(_: Context<'_>) -> std::result::Result<(), DiscordError> {
+    Ok(())
+}
+
+/// Set the first blood channel
+#[poise::command(slash_command, ephemeral)]
+pub async fn firstbloods(
+    ctx: Context<'_>,
+    #[description = "Channel to send first bloods to"] channel: serenity::all::GuildChannel,
+) -> std::result::Result<(), DiscordError> {
+    if ctx.data().settings.read().await.immutable_config {
+        ctx.reply("Can not set first bloods channel because configuration is immutable")
+            .await?;
+        return Ok(());
+    }
+
+    {
+        let mut settings = ctx.data().settings.write().await;
+        settings.discord.first_blood_channel_id = Some(channel.id.into());
+        ctx.data().db.save_settings(&settings).await?;
+    }
+
+    ctx.reply(format!(
+        "Successfully bound <#{}> as the first blood channel",
+        channel.id
+    ))
+    .await?;
+
+    Ok(())
+}
+
+#[poise::command(
+    slash_command,
+    subcommands("support_link", "support_panel"),
+    subcommand_required
+)]
+pub async fn support(_: Context<'_>) -> std::result::Result<(), DiscordError> {
+    Ok(())
+}
+
+/// Set the support channel
+#[poise::command(slash_command, ephemeral, rename = "link")]
+pub async fn support_link(
+    ctx: Context<'_>,
+    #[description = "Channel to make support threads off of"] channel: serenity::all::GuildChannel,
+) -> std::result::Result<(), DiscordError> {
+    if ctx.data().settings.read().await.immutable_config {
+        ctx.reply("Can not set support channel because configuration is immutable")
+            .await?;
+        return Ok(());
+    }
+
+    {
+        let mut settings = ctx.data().settings.write().await;
+        settings.discord.support_channel_id = Some(channel.id.into());
+        ctx.data().db.save_settings(&settings).await?;
+    }
+
+    ctx.reply(format!(
+        "Successfully bound <#{}> as the support channel",
+        channel.id
+    ))
+    .await?;
+
+    Ok(())
+}
+
+/// Send the panel message to the current support channel
+#[poise::command(slash_command, ephemeral, rename = "panel")]
+pub async fn support_panel(ctx: Context<'_>) -> std::result::Result<(), DiscordError> {
+    let (support_channel_id, location_url) = {
+        let settings = ctx.data().settings.read().await;
+        (
+            settings.discord.support_channel_id,
+            settings.location_url.clone(),
+        )
+    };
+
+    if let Some(support_channel_id) = support_channel_id {
+        let message = ChannelId::from(support_channel_id)
+            .send_message(ctx.http(), CreateMessage::new().embed(
+                CreateEmbed::new()
+                    .color((0x00, 0x99, 0xff))
+                    .title("Ticket")
+                    .description("Submit a ticket for a challenge from the CTF website by clicking on the :tickets: button in the header of the challenge in question.")
+            ).components(vec![
+                CreateActionRow::Buttons(vec![
+                    CreateButton::new_link(format!("{}/challenges", location_url))
+                        .label("Go to Challenges"),
+                ])
+            ]))
+            .await?;
+
+        ctx.reply(format!(
+            "Sent https://discord.com/channels/{}/{}/{}",
+            ctx.guild_id().unwrap(),
+            message.channel_id,
+            message.id
+        ))
+        .await?;
+    } else {
+        ctx.reply("No support channel selected").await?;
+    }
+
+    Ok(())
+}
+
+/// Link the author role
+#[poise::command(slash_command, ephemeral)]
+pub async fn author(
+    ctx: Context<'_>,
+    #[description = "Role to link authors to"] role: serenity::all::Role,
+) -> std::result::Result<(), DiscordError> {
+    if ctx.data().settings.read().await.immutable_config {
+        ctx.reply("Can not set author role because configuration is immutable")
+            .await?;
+        return Ok(());
+    }
+
+    {
+        let mut settings = ctx.data().settings.write().await;
+        settings.discord.author_role_id = Some(role.id.into());
+        ctx.data().db.save_settings(&settings).await?;
+    }
+
+    ctx.reply(format!(
+        "Successfully bound <@&{}> as the author role",
+        role.id
+    ))
+    .await?;
+
+    Ok(())
+}
+
+/// Link the verified role
+#[poise::command(slash_command, ephemeral)]
+pub async fn verified(
+    ctx: Context<'_>,
+    #[description = "Role to assign verified users to"] role: serenity::all::Role,
+) -> std::result::Result<(), DiscordError> {
+    if ctx.data().settings.read().await.immutable_config {
+        ctx.reply("Can not set verified role because configuration is immutable")
+            .await?;
+        return Ok(());
+    }
+
+    {
+        let mut settings = ctx.data().settings.write().await;
+        settings.discord.verified_role_id = Some(role.id.into());
+        ctx.data().db.save_settings(&settings).await?;
+    }
+
+    ctx.reply(format!(
+        "Successfully bound <@&{}> as the verified role",
+        role.id
+    ))
+    .await?;
+
+    Ok(())
+}
+
+pub fn format_role(role: Option<NonZeroU64>) -> String {
+    if let Some(role) = role {
+        format!("<@&{}>", role)
+    } else {
+        "(not set)".to_owned()
+    }
+}
+
+pub fn format_channel(channel: Option<NonZeroU64>) -> String {
+    if let Some(channel) = channel {
+        format!("<#{}>", channel)
+    } else {
+        "(not set)".to_owned()
+    }
+}
+
+pub fn format_bool(b: bool) -> &'static str {
+    if b {
+        "✅"
+    } else {
+        "❌"
+    }
+}
+
+/// Show the current configuration
+#[poise::command(slash_command, ephemeral)]
+pub async fn status(ctx: Context<'_>) -> std::result::Result<(), DiscordError> {
+    let message = {
+        let settings = ctx.data().settings.read().await;
+
+        format!(
+            "
+Immutable Configuration: {}
+
+Verified Role {}
+Author Role {}
+First Blood Channel {}
+Support Channel {}
+
+Default Ticket Template
+```
+{}
+```
+            ",
+            format_bool(settings.immutable_config),
+            format_role(settings.discord.verified_role_id),
+            format_role(settings.discord.author_role_id),
+            format_channel(settings.discord.first_blood_channel_id),
+            format_channel(settings.discord.support_channel_id),
+            settings.default_ticket_template
+        )
+    };
+
+    ctx.reply(message).await?;
+
+    Ok(())
 }
 
 impl Bot {
-    pub async fn new(settings: Settings, db: Connection) -> Self {
+    pub async fn new(settings: Arc<RwLock<Settings>>, db: Connection) -> Self {
+        let bot_token = { settings.read().await.discord.bot_token.clone() };
+
+        let s = settings.clone();
+        let d = db.clone();
+        let framework = poise::Framework::builder()
+            .options(poise::FrameworkOptions {
+                commands: vec![admin(), whois()],
+                ..Default::default()
+            })
+            .setup(|ctx, _ready, framework| {
+                Box::pin(async move {
+                    poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                    Ok(Data { settings: s, db: d })
+                })
+            })
+            .build();
+
         let intents = GatewayIntents::non_privileged();
-        let mut discord_client = Client::builder(&settings.discord.bot_token, intents)
+        let mut discord_client = Client::builder(&bot_token, intents)
+            .framework(framework)
             .await
             .unwrap();
         let h = discord_client.http.clone();
@@ -51,13 +322,20 @@ impl Bot {
         author: &Author,
         content: impl AsRef<str>,
     ) -> Result<()> {
-        if self.settings.discord.support_channel_id.is_none() {
+        let (support_channel_id, location_url) = {
+            let settings = self.settings.read().await;
+            (
+                settings.discord.support_channel_id,
+                settings.location_url.clone(),
+            )
+        };
+        if support_channel_id.is_none() {
             return Ok(());
         }
 
         let ticket_number = self.db.create_ticket(user.id, challenge.id).await?;
 
-        let thread = ChannelId::from(self.settings.discord.support_channel_id.unwrap())
+        let thread = ChannelId::from(support_channel_id.unwrap())
             .create_thread(
                 &self.http,
                 CreateThread::new(format!(
@@ -71,46 +349,50 @@ impl Bot {
         thread
             .send_message(
                 &self.http,
-                CreateMessage::new().embed(
-                    CreateEmbed::new()
-                        .color((0x00, 0x99, 0xff))
-                        .title("Ticket")
-                        .field(
-                            ":identification_card: Opened By",
-                            format!(
-                                "<@{}> [:link:]({}/user/{})",
-                                user.discord_id, self.settings.location_url, user.id
-                            ),
-                            true,
-                        )
-                        .field(
-                            ":red_square: Team",
-                            format!(
-                                "[{}]({}/team/{})",
-                                team.name, self.settings.location_url, team.id
-                            ),
-                            true,
-                        )
-                        .field(
-                            ":watch: Opened",
-                            format!("<t:{}:F>", chrono::Utc::now().timestamp()),
-                            true,
-                        )
-                        .field(
-                            ":crossed_swords: Challenge",
-                            format!(
-                                "[{}]({}/challenges#{})",
-                                challenge.name, self.settings.location_url, challenge.name
-                            ),
-                            true,
-                        )
-                        .field(
-                            ":bookmark: Author",
-                            format!("<@{}>", author.discord_id),
-                            true,
-                        )
-                        .field("", "", true),
-                ),
+                CreateMessage::new()
+                    .embed(
+                        CreateEmbed::new()
+                            .color((0x00, 0x99, 0xff))
+                            .title("Ticket")
+                            .field(
+                                ":identification_card: Opened By",
+                                format!(
+                                    "<@{}> [:link:]({}/user/{})",
+                                    user.discord_id, location_url, user.id
+                                ),
+                                true,
+                            )
+                            .field(
+                                ":red_square: Team",
+                                format!("[{}]({}/team/{})", team.name, location_url, team.id),
+                                true,
+                            )
+                            .field(
+                                ":watch: Opened",
+                                format!("<t:{}:F>", chrono::Utc::now().timestamp()),
+                                true,
+                            )
+                            .field(
+                                ":crossed_swords: Challenge",
+                                format!(
+                                    "[{}]({}/challenges#{})",
+                                    challenge.name, location_url, challenge.name
+                                ),
+                                true,
+                            )
+                            .field(
+                                ":bookmark: Author",
+                                format!("<@{}>", author.discord_id),
+                                true,
+                            )
+                            .field("", "", true),
+                    )
+                    .components(vec![CreateActionRow::Buttons(vec![CreateButton::new(
+                        format!("close-ticket-{}", ticket_number),
+                    )
+                    .style(ButtonStyle::Primary)
+                    .label("Close Ticket")
+                    .emoji('🔒')])]),
             )
             .await?;
 
@@ -159,9 +441,16 @@ impl Bot {
             .collect::<Vec<&str>>()
             .join(" ");
 
-        ChannelId::from(self.settings.discord.first_blood_channel_id.ok_or(
-            RhombusError::MissingConfiguration("first blood channel id".to_owned()),
-        )?)
+        ChannelId::from(
+            self.settings
+                .read()
+                .await
+                .discord
+                .first_blood_channel_id
+                .ok_or(RhombusError::MissingConfiguration(
+                    "first blood channel id".to_owned(),
+                ))?,
+        )
         .send_message(
             &self.http,
             CreateMessage::new().content(format!(
@@ -170,6 +459,30 @@ impl Bot {
             )),
         )
         .await?;
+        Ok(())
+    }
+
+    pub async fn verify_user(&self, discord_id: NonZeroU64) -> Result<()> {
+        let (verified_role_id, guild_id) = {
+            let settings = self.settings.read().await;
+            (settings.discord.verified_role_id, settings.discord.guild_id)
+        };
+
+        if verified_role_id.is_none() {
+            return Ok(());
+        }
+
+        let verified_role_id = verified_role_id.unwrap();
+
+        self.http
+            .add_member_role(
+                guild_id.into(),
+                discord_id.into(),
+                verified_role_id.into(),
+                Some("Member joined main CTF website"),
+            )
+            .await?;
+
         Ok(())
     }
 }

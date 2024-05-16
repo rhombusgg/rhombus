@@ -113,6 +113,11 @@ CREATE TABLE IF NOT EXISTS rhombus_ticket (
     FOREIGN KEY (challenge_id) REFERENCES rhombus_challenge(id)
 );
 
+CREATE TABLE IF NOT EXISTS rhombus_config (
+    id INTEGER PRIMARY KEY NOT NULL,
+    config TEXT
+);
+
 CREATE VIEW IF NOT EXISTS rhombus_challenge_division_points AS
 SELECT
     rhombus_challenge.id AS challenge_id,

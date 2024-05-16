@@ -7,6 +7,7 @@ use super::{
     auth::User,
     cache_layer::Writeups,
     database::{Challenge, Challenges, Database, FirstBloods, Team, TeamMeta},
+    settings::Settings,
 };
 use crate::Result;
 
@@ -130,6 +131,10 @@ impl Database for Postgres {
         todo!()
     }
 
+    async fn get_user_from_discord_id(&self, _discord_id: NonZeroU64) -> Result<User> {
+        todo!()
+    }
+
     async fn roll_invite_token(&self, _team_id: i64) -> Result<String> {
         todo!()
     }
@@ -166,6 +171,14 @@ impl Database for Postgres {
     }
 
     async fn create_ticket(&self, _user_id: i64, _challenge_id: i64) -> Result<i64> {
+        todo!()
+    }
+
+    async fn load_settings(&self, _settings: &mut Settings) -> Result<()> {
+        todo!()
+    }
+
+    async fn save_settings(&self, _settings: &Settings) -> Result<()> {
         todo!()
     }
 }

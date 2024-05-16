@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use tokio::sync::RwLock;
+
 use super::{
     database::Connection, discord::Bot, ip::IpExtractorFn, locales::Localizations,
     settings::Settings,
@@ -12,6 +14,6 @@ pub struct RouterStateInner {
     pub bot: Bot,
     pub jinja: minijinja::Environment<'static>,
     pub localizer: Arc<Localizations>,
-    pub settings: Arc<Settings>,
+    pub settings: Arc<RwLock<Settings>>,
     pub ip_extractor: IpExtractorFn,
 }

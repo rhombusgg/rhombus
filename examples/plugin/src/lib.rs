@@ -84,6 +84,8 @@ async fn route_home(
     Extension(lang): Extension<Languages>,
     uri: Uri,
 ) -> Html<String> {
+    let location_url = { rhombus.settings.read().await.location_url.clone() };
+
     Html(
         rhombus
             .jinja
@@ -93,9 +95,9 @@ async fn route_home(
                 lang => lang,
                 user => user,
                 uri => uri.to_string(),
-                location_url => rhombus.settings.location_url,
+                location_url => location_url,
                 a => &plugin.a,
-                og_image => format!("{}/og-image.png", rhombus.settings.location_url)
+                og_image => format!("{}/og-image.png", location_url)
             })
             .unwrap(),
     )

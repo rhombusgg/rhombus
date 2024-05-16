@@ -22,6 +22,7 @@ use super::{
         Challenges, Database, Division, FirstBloods, Team, TeamInner, TeamMeta, TeamMetaInner,
         TeamUser, Writeup,
     },
+    settings::Settings,
     team::create_team_invite_token,
 };
 use crate::Result;
@@ -561,6 +562,43 @@ impl Database for LibSQL {
         }))
     }
 
+    async fn get_user_from_discord_id(&self, discord_id: NonZeroU64) -> Result<User> {
+        #[derive(Debug, Deserialize)]
+        struct DbUser {
+            id: i64,
+            name: String,
+            avatar: String,
+            discord_id: NonZeroU64,
+            team_id: i64,
+            owner_team_id: i64,
+            disabled: bool,
+            is_admin: bool,
+        }
+
+        let row = self
+            .db
+            .query(
+                "SELECT * FROM rhombus_user WHERE discord_id = ?1",
+                [discord_id.get()],
+            )
+            .await?
+            .next()
+            .await?
+            .ok_or(libsql::Error::QueryReturnedNoRows)?;
+
+        let user = de::from_row::<DbUser>(&row).unwrap();
+        Ok(Arc::new(UserInner {
+            id: user.id,
+            name: user.name,
+            avatar: user.avatar,
+            discord_id: user.discord_id,
+            disabled: user.disabled,
+            is_admin: user.is_admin,
+            team_id: user.team_id,
+            is_team_owner: user.team_id == user.owner_team_id,
+        }))
+    }
+
     async fn roll_invite_token(&self, team_id: i64) -> Result<String> {
         let new_invite_token = create_team_invite_token();
 
@@ -719,6 +757,49 @@ impl Database for LibSQL {
             .unwrap();
 
         Ok(ticket_number)
+    }
+
+    async fn save_settings(&self, settings: &Settings) -> Result<()> {
+        if settings.immutable_config {
+            return Ok(());
+        }
+
+        let json = serde_json::to_string(settings).unwrap();
+
+        self.db
+            .execute(
+                "
+                INSERT OR REPLACE INTO rhombus_config (id, config) VALUES (1, ?1)
+            ",
+                [json],
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    async fn load_settings(&self, settings: &mut Settings) -> Result<()> {
+        if settings.immutable_config {
+            return Ok(());
+        }
+
+        let db_settings: Option<Settings> = self
+            .db
+            .query("SELECT config FROM rhombus_config", ())
+            .await?
+            .next()
+            .await?
+            .map(|row| serde_json::from_str(&row.get::<String>(0).unwrap()).unwrap());
+
+        if let Some(db_settings) = db_settings {
+            settings.discord.first_blood_channel_id = db_settings.discord.first_blood_channel_id;
+            settings.discord.support_channel_id = db_settings.discord.support_channel_id;
+            settings.discord.guild_id = db_settings.discord.guild_id;
+            settings.discord.author_role_id = db_settings.discord.author_role_id;
+            settings.default_ticket_template = db_settings.default_ticket_template;
+        }
+
+        Ok(())
     }
 }
 

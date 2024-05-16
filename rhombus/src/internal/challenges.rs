@@ -29,7 +29,7 @@ pub async fn route_challenges(
     if let Some(accept) = req.headers().get("accept") {
         if accept.to_str().unwrap() == "application/json" {
             let json = json!({
-                "ticket_enabled": state.settings.discord.support_channel_id.is_some(),
+                "ticket_enabled": state.settings.read().await.discord.support_channel_id.is_some(),
                 "challenges": challenge_data.challenges.iter().map(|challenge| json!({
                     "id": challenge.id,
                     "name": challenge.name,
@@ -161,10 +161,11 @@ pub async fn route_ticket_view(
         .find(|c| challenge.category_id.eq(&c.id))
         .unwrap();
 
-    let ticket_template = challenge
-        .ticket_template
-        .as_ref()
-        .unwrap_or(&state.settings.default_ticket_template);
+    let ticket_template = if let Some(ticket_template) = &challenge.ticket_template {
+        ticket_template.clone()
+    } else {
+        state.settings.read().await.default_ticket_template.clone()
+    };
 
     Html(
         state
@@ -196,7 +197,14 @@ pub async fn route_ticket_submit(
     challenge_id: Path<i64>,
     Form(form): Form<TicketSubmit>,
 ) -> impl IntoResponse {
-    if state.settings.discord.support_channel_id.is_none() {
+    if state
+        .settings
+        .read()
+        .await
+        .discord
+        .support_channel_id
+        .is_none()
+    {
         return Response::builder()
             .header("Content-Type", "text/html")
             .header("HX-Trigger", "closeModal")
@@ -308,7 +316,14 @@ pub async fn route_challenge_submit(
             .unwrap();
     }
 
-    if state.settings.discord.first_blood_channel_id.is_some() {
+    if state
+        .settings
+        .read()
+        .await
+        .discord
+        .first_blood_channel_id
+        .is_some()
+    {
         let first_bloods = first_bloods.unwrap();
 
         if !first_bloods.division_ids.is_empty() {

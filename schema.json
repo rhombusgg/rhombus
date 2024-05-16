@@ -44,6 +44,15 @@
             "type": "boolean",
             "default": true,
             "examples": [
+                false
+            ]
+        },
+        "immutable_config": {
+            "title": "Immutable Configuration",
+            "description": "Allow configuration to be changed at runtime, from the Discord server or Admin dashboard",
+            "type": "boolean",
+            "default": false,
+            "examples": [
                 true
             ]
         },
@@ -192,6 +201,28 @@
                 "support_channel_id": {
                     "title": "Support Channel ID",
                     "description": "Snowflake Discord ID for the channel which support threads should be branched off of",
+                    "type": [
+                        "string",
+                        "number"
+                    ],
+                    "pattern": "^\\d{19}$",
+                    "minimum": 1000000000000000000,
+                    "maximum": 9999999999999999999
+                },
+                "author_role_id": {
+                    "title": "Author Role ID",
+                    "description": "Snowflake Discord ID for the author role to link authors",
+                    "type": [
+                        "string",
+                        "number"
+                    ],
+                    "pattern": "^\\d{19}$",
+                    "minimum": 1000000000000000000,
+                    "maximum": 9999999999999999999
+                },
+                "verified_role_id": {
+                    "title": "Author Role ID",
+                    "description": "Snowflake Discord ID for the verified role to give to users who sign in to the CTF website",
                     "type": [
                         "string",
                         "number"

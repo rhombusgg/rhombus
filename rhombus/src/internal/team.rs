@@ -27,10 +27,8 @@ pub async fn route_team(
 ) -> impl IntoResponse {
     let team = state.db.get_team_from_id(user.team_id).await.unwrap();
 
-    let team_invite_url = format!(
-        "{}/signin?token={}",
-        state.settings.location_url, team.invite_token
-    );
+    let location_url = { state.settings.read().await.location_url.clone() };
+    let team_invite_url = format!("{}/signin?token={}", location_url, team.invite_token);
 
     Html(
         state
@@ -43,8 +41,8 @@ pub async fn route_team(
                 team => team,
                 team_invite_url => team_invite_url,
                 uri => uri.to_string(),
-                location_url => state.settings.location_url,
-                og_image => format!("{}/og-image.png", state.settings.location_url),
+                location_url => location_url,
+                og_image => format!("{}/og-image.png", location_url),
             })
             .unwrap(),
     )
@@ -61,10 +59,8 @@ pub async fn route_team_roll_token(
 
     let new_invite_token = state.db.roll_invite_token(user.team_id).await.unwrap();
 
-    let team_invite_url = format!(
-        "{}/signin?token={}",
-        state.settings.location_url, new_invite_token
-    );
+    let location_url = { state.settings.read().await.location_url.clone() };
+    let team_invite_url = format!("{}/signin?token={}", location_url, new_invite_token);
 
     Ok(Html(
         state

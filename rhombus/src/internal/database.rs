@@ -6,7 +6,7 @@ use serde::Serialize;
 
 use crate::{internal::auth::User, Result};
 
-use super::cache_layer::Writeups;
+use super::{cache_layer::Writeups, settings::Settings};
 
 pub type Connection = Arc<dyn Database + Send + Sync>;
 
@@ -154,6 +154,7 @@ pub trait Database {
         challenge: &Challenge,
     ) -> Result<FirstBloods>;
     async fn get_user_from_id(&self, user_id: i64) -> Result<User>;
+    async fn get_user_from_discord_id(&self, discord_id: NonZeroU64) -> Result<User>;
     async fn roll_invite_token(&self, team_id: i64) -> Result<String>;
     async fn set_team_name(&self, team_id: i64, new_team_name: &str) -> Result<()>;
     async fn add_writeup(
@@ -166,4 +167,6 @@ pub trait Database {
     async fn get_writeups_from_user_id(&self, user_id: i64) -> Result<Writeups>;
     async fn delete_writeup(&self, challenge_id: i64, user_id: i64, team_id: i64) -> Result<()>;
     async fn create_ticket(&self, user_id: i64, challenge_id: i64) -> Result<i64>;
+    async fn save_settings(&self, settings: &Settings) -> Result<()>;
+    async fn load_settings(&self, settings: &mut Settings) -> Result<()>;
 }

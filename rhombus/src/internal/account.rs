@@ -44,12 +44,16 @@ pub async fn route_account(
     Extension(lang): Extension<Languages>,
     uri: Uri,
 ) -> Html<String> {
-    let in_server = is_in_server(
-        state.settings.discord.guild_id,
-        user.discord_id,
-        &state.settings.discord.bot_token,
-    )
-    .await;
+    let (discord_guild_id, discord_bot_token, location_url) = {
+        let settings = state.settings.read().await;
+        (
+            settings.discord.guild_id,
+            settings.discord.bot_token.clone(),
+            settings.location_url.clone(),
+        )
+    };
+
+    let in_server = is_in_server(discord_guild_id, user.discord_id, &discord_bot_token).await;
     debug!(user_id = user.id, in_server, "Discord");
 
     Html(
@@ -62,8 +66,8 @@ pub async fn route_account(
                 user => user,
                 uri => uri.to_string(),
                 in_server => in_server,
-                location_url => state.settings.location_url,
-                og_image => format!("{}/og-image.png", state.settings.location_url),
+                location_url => location_url,
+                og_image => format!("{}/og-image.png", location_url),
             })
             .unwrap(),
     )

@@ -1,8 +1,8 @@
 use std::num::NonZeroU64;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DiscordSettings {
     pub client_id: String,
     pub client_secret: String,
@@ -10,9 +10,11 @@ pub struct DiscordSettings {
     pub guild_id: NonZeroU64,
     pub first_blood_channel_id: Option<NonZeroU64>,
     pub support_channel_id: Option<NonZeroU64>,
+    pub author_role_id: Option<NonZeroU64>,
+    pub verified_role_id: Option<NonZeroU64>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct RateLimitSettings {
     /// Set the interval after which one element of the quota is replenished in milliseconds.
     ///
@@ -27,7 +29,7 @@ pub struct RateLimitSettings {
     pub burst_size: Option<u32>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum IpPreset {
     #[serde(rename = "rightmost-x-forwarded-for")]
     RightmostXForwardedFor,
@@ -43,14 +45,14 @@ pub enum IpPreset {
     PeerIp,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[cfg(feature = "libsql")]
 pub struct Turso {
     pub auth_token: String,
     pub local_replica_path: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Settings {
     pub location_url: String,
     pub jwt_secret: String,
@@ -60,6 +62,7 @@ pub struct Settings {
     pub ip_preset: Option<IpPreset>,
     pub live_reload: bool,
     pub default_ticket_template: String,
+    pub immutable_config: bool,
 
     /// `false` will disable the in memory cache.
     ///

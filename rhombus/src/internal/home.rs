@@ -14,6 +14,7 @@ pub async fn route_home(
     Extension(lang): Extension<Languages>,
     uri: Uri,
 ) -> impl IntoResponse {
+    let location_url = { state.settings.read().await.location_url.clone() };
     Html(
         state
             .jinja
@@ -23,8 +24,8 @@ pub async fn route_home(
                 lang => lang,
                 user => user,
                 uri => uri.to_string(),
-                location_url => state.settings.location_url,
-                og_image => format!("{}/og-image.png", state.settings.location_url)
+                location_url => location_url,
+                og_image => format!("{}/og-image.png", location_url)
             })
             .unwrap(),
     )

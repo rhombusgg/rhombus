@@ -7,6 +7,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use tokio::sync::RwLock;
 use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::{compression::CompressionLayer, services::ServeDir};
 use tracing::info;
@@ -303,7 +304,7 @@ impl<P: Plugin> Builder<P> {
     }
 
     pub async fn build(&self) -> Result<Router> {
-        let settings: Settings = self
+        let mut settings: Settings = self
             .config_builder
             .clone()
             .add_source(config::Environment::with_prefix("rhombus").separator("__"))
@@ -316,12 +317,19 @@ impl<P: Plugin> Builder<P> {
                 "# Describe the issue with the challenge\n\n",
             )
             .unwrap()
+            .set_default("immutable_config", false)
+            .unwrap()
             .build()?
             .try_deserialize()?;
 
         self.plugins.name();
 
         let db = self.build_database(&settings).await?;
+
+        db.load_settings(&mut settings).await?;
+        db.save_settings(&settings).await?;
+        let settings = settings;
+
         let db = match settings.in_memory_cache.as_str() {
             "false" => {
                 info!("Disabling in memory cache");
@@ -404,14 +412,18 @@ impl<P: Plugin> Builder<P> {
             })
         });
 
-        let bot = Bot::new(settings.clone(), db.clone()).await;
+        let live_reload = settings.live_reload;
+        let ratelimit = settings.ratelimit.clone();
+
+        let s = Arc::new(RwLock::new(settings));
+        let bot = Bot::new(s.clone(), db.clone()).await;
 
         let router_state = Arc::new(RouterStateInner {
             db: db.clone(),
             bot,
             jinja: env,
             localizer: localizer.clone(),
-            settings: Arc::new(settings.clone()),
+            settings: s,
             ip_extractor: ip_extractor.unwrap_or(default_ip_extractor),
         });
 
@@ -475,30 +487,29 @@ impl<P: Plugin> Builder<P> {
             router.layer(middleware::from_fn(ip_insert_blank_middleware))
         };
 
-        let router =
-            if let (Some(ip_extractor), Some(ratelimit)) = (ip_extractor, settings.ratelimit) {
-                let per_millisecond = ratelimit.per_millisecond.unwrap_or(500);
-                let burst_size = ratelimit.burst_size.unwrap_or(8);
-                info!(per_millisecond, burst_size, "Setting ratelimit");
+        let router = if let (Some(ip_extractor), Some(ratelimit)) = (ip_extractor, ratelimit) {
+            let per_millisecond = ratelimit.per_millisecond.unwrap_or(500);
+            let burst_size = ratelimit.burst_size.unwrap_or(8);
+            info!(per_millisecond, burst_size, "Setting ratelimit");
 
-                let governor_conf = Arc::new(
-                    GovernorConfigBuilder::default()
-                        .per_millisecond(per_millisecond)
-                        .burst_size(burst_size)
-                        .key_extractor(KeyExtractorShim::new(ip_extractor))
-                        .use_headers()
-                        .finish()
-                        .unwrap(),
-                );
+            let governor_conf = Arc::new(
+                GovernorConfigBuilder::default()
+                    .per_millisecond(per_millisecond)
+                    .burst_size(burst_size)
+                    .key_extractor(KeyExtractorShim::new(ip_extractor))
+                    .use_headers()
+                    .finish()
+                    .unwrap(),
+            );
 
-                router.layer(GovernorLayer {
-                    config: governor_conf,
-                })
-            } else {
-                router
-            };
+            router.layer(GovernorLayer {
+                config: governor_conf,
+            })
+        } else {
+            router
+        };
 
-        let router = if settings.live_reload {
+        let router = if live_reload {
             router.layer(
                 tower_livereload::LiveReloadLayer::new().request_predicate(not_htmx_predicate),
             )

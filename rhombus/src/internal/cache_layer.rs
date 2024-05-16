@@ -6,8 +6,9 @@ use tokio::sync::RwLock;
 
 use crate::{internal::auth::User, Result};
 
-use super::database::{
-    Challenge, Challenges, Connection, Database, FirstBloods, Team, TeamMeta, Writeup,
+use super::{
+    database::{Challenge, Challenges, Connection, Database, FirstBloods, Team, TeamMeta, Writeup},
+    settings::Settings,
 };
 
 #[derive(Clone)]
@@ -104,6 +105,10 @@ impl Database for DbCache {
         get_user_from_id(&self.inner, user_id).await
     }
 
+    async fn get_user_from_discord_id(&self, discord_id: NonZeroU64) -> Result<User> {
+        self.inner.get_user_from_discord_id(discord_id).await
+    }
+
     async fn roll_invite_token(&self, team_id: i64) -> Result<String> {
         let new_invite_token = self.inner.roll_invite_token(team_id).await;
         if new_invite_token.is_ok() {
@@ -174,6 +179,14 @@ impl Database for DbCache {
 
     async fn create_ticket(&self, user_id: i64, challenge_id: i64) -> Result<i64> {
         self.inner.create_ticket(user_id, challenge_id).await
+    }
+
+    async fn save_settings(&self, settings: &Settings) -> Result<()> {
+        self.inner.save_settings(settings).await
+    }
+
+    async fn load_settings(&self, settings: &mut Settings) -> Result<()> {
+        self.inner.load_settings(settings).await
     }
 }
 
