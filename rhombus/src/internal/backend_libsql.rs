@@ -1,6 +1,7 @@
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     net::IpAddr,
+    num::NonZeroU64,
     path::Path,
     sync::Arc,
     time::Duration,
@@ -90,7 +91,7 @@ impl Database for LibSQL {
         name: &str,
         email: &str,
         avatar: &str,
-        discord_id: &str,
+        discord_id: NonZeroU64,
     ) -> Result<i64> {
         let team_name = format!("{}'s team", name);
 
@@ -98,7 +99,7 @@ impl Database for LibSQL {
         let existing_user_id = tx
             .query(
                 "SELECT id FROM rhombus_user WHERE discord_id = ?",
-                [discord_id],
+                [discord_id.get()],
             )
             .await?
             .next()
@@ -132,7 +133,7 @@ impl Database for LibSQL {
         let user_id = tx
             .query(
                 "INSERT INTO rhombus_user (name, avatar, discord_id, team_id, owner_team_id) VALUES (?1, ?2, ?3, ?4, ?4) RETURNING id",
-                params!(name, avatar, discord_id, team_id),
+                params!(name, avatar, discord_id.get(), team_id),
             )
             .await?
             .next()
@@ -265,6 +266,7 @@ impl Database for LibSQL {
             author_id: i64,
             flag: String,
             score_type: i64,
+            ticket_template: Option<String>,
         }
         let challenges = challenge_rows
             .into_stream()
@@ -279,6 +281,7 @@ impl Database for LibSQL {
                 flag: challenge.flag,
                 scoring_type: challenge.score_type.into(),
                 division_points: dbps.get(&challenge.id).unwrap().to_vec(),
+                ticket_template: challenge.ticket_template,
             })
             .collect::<Vec<Challenge>>()
             .await;
@@ -307,7 +310,7 @@ impl Database for LibSQL {
             id: i64,
             name: String,
             avatar: String,
-            discord_id: String,
+            discord_id: NonZeroU64,
         }
         let mut authors: BTreeMap<i64, Author> = Default::default();
         while let Some(row) = author_rows.next().await? {
@@ -403,11 +406,12 @@ impl Database for LibSQL {
             id: i64,
             name: String,
             avatar: String,
+            discord_id: NonZeroU64,
             owner_team_id: i64,
         }
         let mut query_user_rows = tx
             .query(
-                "SELECT id, name, avatar, owner_team_id FROM rhombus_user WHERE team_id = ?1",
+                "SELECT id, name, avatar, discord_id, owner_team_id FROM rhombus_user WHERE team_id = ?1",
                 [team_id],
             )
             .await?;
@@ -419,6 +423,7 @@ impl Database for LibSQL {
                 TeamUser {
                     name: query_user.name,
                     avatar_url: query_user.avatar,
+                    discord_id: query_user.discord_id,
                     is_team_owner: query_user.owner_team_id == team_id,
                 },
             );
@@ -528,7 +533,7 @@ impl Database for LibSQL {
             id: i64,
             name: String,
             avatar: String,
-            discord_id: String,
+            discord_id: NonZeroU64,
             team_id: i64,
             owner_team_id: i64,
             disabled: bool,
@@ -693,6 +698,27 @@ impl Database for LibSQL {
             .await?;
 
         Ok(())
+    }
+
+    async fn create_ticket(&self, user_id: i64, challenge_id: i64) -> Result<i64> {
+        let ticket_number = self
+            .db
+            .query(
+                "
+                INSERT INTO rhombus_ticket (ticket_number, user_id, challenge_id)
+                SELECT COUNT(*) + 1, ?1, ?2 FROM rhombus_ticket
+                RETURNING ticket_number
+            ",
+                [user_id, challenge_id],
+            )
+            .await?
+            .next()
+            .await?
+            .unwrap()
+            .get::<i64>(0)
+            .unwrap();
+
+        Ok(ticket_number)
     }
 }
 

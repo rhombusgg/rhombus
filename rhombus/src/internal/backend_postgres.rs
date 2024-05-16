@@ -1,4 +1,4 @@
-use std::net::IpAddr;
+use std::{net::IpAddr, num::NonZeroU64};
 
 use async_trait::async_trait;
 use sqlx::{FromRow, PgPool};
@@ -34,7 +34,7 @@ impl Database for Postgres {
         name: &str,
         email: &str,
         avatar: &str,
-        discord_id: &str,
+        discord_id: NonZeroU64,
     ) -> Result<i64> {
         #[derive(FromRow)]
         struct InsertUserResult {
@@ -51,7 +51,7 @@ impl Database for Postgres {
         .bind(name)
         .bind(email)
         .bind(avatar)
-        .bind(discord_id)
+        .bind(discord_id.get() as i64)
         .fetch_one(&self.pool)
         .await?;
 
@@ -162,6 +162,10 @@ impl Database for Postgres {
     }
 
     async fn delete_writeup(&self, _challenge_id: i64, _user_id: i64, _team_id: i64) -> Result<()> {
+        todo!()
+    }
+
+    async fn create_ticket(&self, _user_id: i64, _challenge_id: i64) -> Result<i64> {
         todo!()
     }
 }

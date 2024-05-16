@@ -33,6 +33,11 @@
                 "postgres://postgres:password@localhost"
             ]
         },
+        "default_ticket_template": {
+            "title": "Default Ticket Template",
+            "description": "Ticket template to default to for challenges which do not define a custom ticket template",
+            "type": "string"
+        },
         "live_reload": {
             "title": "Live Reload",
             "description": "Automatically inject javascript to reload the page on save. Defaults to `true` when compiled in debug mode",
@@ -45,7 +50,10 @@
         "in_memory_cache": {
             "title": "In Memory Cache",
             "description": "Cache results from the database in memory for short periods of time to reduce load on database (recommended). false will disable the in memory cache. true will enable the in memory cache with default 360 second interval. Integers above 5 will be the number in seconds that values are considered valid for. Other values are invalid and will disable the in memory cache.",
-            "type": ["boolean", "number"],
+            "type": [
+                "boolean",
+                "number"
+            ],
             "minimum": 5,
             "default": true,
             "examples": [
@@ -169,6 +177,28 @@
                     "description": "Bot token",
                     "type": "string",
                     "pattern": ".+\\..+\\..+"
+                },
+                "first_blood_channel_id": {
+                    "title": "First Blood Channel ID",
+                    "description": "Snowflake Discord ID for the channel which first bloods should be sent to",
+                    "type": [
+                        "string",
+                        "number"
+                    ],
+                    "pattern": "^\\d{19}$",
+                    "minimum": 1000000000000000000,
+                    "maximum": 9999999999999999999
+                },
+                "support_channel_id": {
+                    "title": "Support Channel ID",
+                    "description": "Snowflake Discord ID for the channel which support threads should be branched off of",
+                    "type": [
+                        "string",
+                        "number"
+                    ],
+                    "pattern": "^\\d{19}$",
+                    "minimum": 1000000000000000000,
+                    "maximum": 9999999999999999999
                 }
             }
         }

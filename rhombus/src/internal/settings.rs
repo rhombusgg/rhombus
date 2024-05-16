@@ -1,3 +1,5 @@
+use std::num::NonZeroU64;
+
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone)]
@@ -5,7 +7,9 @@ pub struct DiscordSettings {
     pub client_id: String,
     pub client_secret: String,
     pub bot_token: String,
-    pub guild_id: String,
+    pub guild_id: NonZeroU64,
+    pub first_blood_channel_id: NonZeroU64,
+    pub support_channel_id: NonZeroU64,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -55,6 +59,7 @@ pub struct Settings {
     pub ratelimit: Option<RateLimitSettings>,
     pub ip_preset: Option<IpPreset>,
     pub live_reload: bool,
+    pub default_ticket_template: String,
 
     /// `false` will disable the in memory cache.
     ///

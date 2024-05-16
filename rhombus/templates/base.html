@@ -20,11 +20,15 @@
     {% endif %}
     <meta name="twitter:card" content="summary_large_image" />
 
-    <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
     <script src="https://unpkg.com/fuse.js@7.0.0/dist/fuse.js" defer></script>
+    <script
+      src="https://unpkg.com/monaco-editor@0.48.0/min/vs/loader.js"
+      defer
+    ></script>
 
     <link rel="stylesheet" href="/static/tailwind.css" />
-    <script type="module" src="/static/app.js"></script>
+    <script src="/static/app.js"></script>
     {% block head %}{% endblock %}
 
     <script>

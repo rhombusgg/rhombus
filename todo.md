@@ -34,7 +34,7 @@
   - [x] Snapshots
   - [ ] UI/page
 - [ ] Tickets
-  - [ ] From site (markdown editor)
+  - [x] From site (markdown editor)
   - [ ] From discord
   - [ ] Email-only
 - [ ] Email-only accounts

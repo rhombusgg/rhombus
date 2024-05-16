@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{num::NonZeroU64, sync::Arc};
 
 use axum::{
     body::Body,
@@ -28,7 +28,7 @@ pub struct UserInner {
     pub id: i64,
     pub name: String,
     pub avatar: String,
-    pub discord_id: String,
+    pub discord_id: NonZeroU64,
     pub team_id: i64,
     pub is_team_owner: bool,
     pub disabled: bool,
@@ -56,14 +56,9 @@ pub async fn enforce_auth_middleware(
     Extension(maybe_token_claims): Extension<MaybeTokenClaims>,
     req: Request<Body>,
     next: Next,
-) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+) -> Result<impl IntoResponse, impl IntoResponse> {
     if maybe_user.is_none() || maybe_token_claims.is_none() {
-        return Err((
-            StatusCode::UNAUTHORIZED,
-            Json(ErrorResponse {
-                message: "Unauthorized".to_string(),
-            }),
-        ));
+        return Err(Redirect::to("/signin").into_response());
     }
 
     Ok(next.run(req).await)
@@ -330,7 +325,12 @@ pub async fn route_discord_callback(
 
     let user_id = state
         .db
-        .upsert_user(&profile.global_name, &profile.email, &avatar, &profile.id)
+        .upsert_user(
+            &profile.global_name,
+            &profile.email,
+            &avatar,
+            profile.id.parse::<NonZeroU64>().unwrap(),
+        )
         .await
         .unwrap();
 

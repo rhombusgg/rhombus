@@ -1,0 +1,94 @@
+{% import "icons.html" as icons %}
+
+<dialog
+  data-onload-showmodal
+  class="backdrop:bg-background/50 bg-background max-w-prose w-full rounded-lg text-foreground border-4 p-6 shadow-lg"
+  style="border-color: {{ category.color }}"
+>
+  <div class="mb-2 flex justify-between">
+    <div class="font-bold">
+      <span style="color: {{ category.color }}">{{ category.name }} / </span>
+      <span>{{ challenge.name }}</span>
+    </div>
+  </div>
+  <div class="mb-4">{{ challenge.description | safe }}</div>
+  <div class="h-60 mb-2" id="editor"></div>
+  <button
+    class="p-2 rounded-lg"
+    style="background-color: {{ category.color }}aa"
+    hx-post="/challenges/{{ challenge.id }}/ticket"
+    hx-vals="js:{content: window.editor.getValue()}"
+    hx-target="next"
+  >
+    Submit
+  </button>
+  <div></div>
+  <script>
+    (function () {
+      require.config({
+        paths: { vs: "https://unpkg.com/monaco-editor@0.48.0/min/vs" },
+      });
+      window.MonacoEnvironment = { getWorkerUrl: () => proxy };
+
+      let proxy = URL.createObjectURL(
+        new Blob(
+          [
+            `
+	self.MonacoEnvironment = {
+		baseUrl: 'https://unpkg.com/monaco-editor@0.48.0/min/'
+	};
+	importScripts('https://unpkg.com/monaco-editor@0.48.0/min/vs/base/worker/workerMain.js');
+`,
+          ],
+          { type: "text/javascript" },
+        ),
+      );
+
+      require(["vs/editor/editor.main"], function () {
+        monaco.editor.defineTheme("customDark", {
+          base: "vs-dark",
+          inherit: true,
+          rules: [],
+          colors: {
+            "editor.background": "#020817",
+          },
+        });
+
+        window.editor = monaco.editor.create(
+          document.getElementById("editor"),
+          {
+            value: `{{ ticket_template }}`,
+            language: "markdown",
+            minimap: { enabled: false },
+            lineNumbers: "off",
+            wordWrap: "on",
+            scrollBeyondLastLine: false,
+            scrollbar: {
+              verticalScrollbarSize: 0,
+            },
+            folding: false,
+            lineDecorationsWidth: 0,
+          },
+        );
+
+        window.editor.setPosition({ lineNumber: 999999, column: 0 });
+
+        const setTheme = () => {
+          const isDark = document.documentElement.classList.contains("dark");
+          if (isDark) {
+            monaco.editor.setTheme("customDark");
+          } else {
+            monaco.editor.setTheme("vs");
+          }
+        };
+
+        setTheme();
+        const observer = new MutationObserver(() => setTheme());
+        observer.observe(document.documentElement, {
+          attributes: true,
+          attributeFilter: ["class"],
+        });
+      });
+    })();
+  </script>
+</dialog>

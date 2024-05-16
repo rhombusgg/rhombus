@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS rhombus_challenge (
     category_id INTEGER NOT NULL,
     healthy BOOLEAN NOT NULL DEFAULT(TRUE),
     author_id INTEGER NOT NULL,
+    ticket_template TEXT,
     score_type INTEGER NOT NULL,
     static_points INTEGER,
     FOREIGN KEY (category_id) REFERENCES rhombus_category(id),
@@ -25,7 +26,7 @@ CREATE TABLE IF NOT EXISTS rhombus_author (
     id INTEGER PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
     avatar TEXT NOT NULL,
-    discord_id TEXT NOT NULL UNIQUE
+    discord_id INTEGER NOT NULL UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS rhombus_points_snapshot (
@@ -57,7 +58,7 @@ CREATE TABLE IF NOT EXISTS rhombus_user (
     id INTEGER PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
     avatar TEXT NOT NULL,
-    discord_id TEXT NOT NULL UNIQUE,
+    discord_id INTEGER NOT NULL UNIQUE,
     team_id INTEGER NOT NULL,
     owner_team_id INTEGER NOT NULL,
     disabled BOOLEAN NOT NULL DEFAULT(FALSE),
@@ -103,26 +104,35 @@ CREATE TABLE IF NOT EXISTS rhombus_team_division (
     FOREIGN KEY (division_id) REFERENCES rhombus_division(id)
 );
 
+CREATE TABLE IF NOT EXISTS rhombus_ticket (
+    id INTEGER PRIMARY KEY NOT NULL,
+    ticket_number INTEGER NOT NULL UNIQUE,
+    user_id INTEGER NOT NULL,
+    challenge_id INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES rhombus_user(id),
+    FOREIGN KEY (challenge_id) REFERENCES rhombus_challenge(id)
+);
+
 CREATE VIEW IF NOT EXISTS rhombus_challenge_division_points AS
 SELECT
-	rhombus_challenge.id AS challenge_id,
+    rhombus_challenge.id AS challenge_id,
     rhombus_division.id AS division_id,
     CASE
-		WHEN rhombus_challenge.score_type = 0 THEN
-			MAX(ROUND((((100 - 500) / POWER(50, 2)) * POWER(COUNT(rhombus_solve.challenge_id), 2)) + 500), 100)
-		ELSE rhombus_challenge.static_points
-	END as points,
+        WHEN rhombus_challenge.score_type = 0 THEN
+            MAX(ROUND((((100 - 500) / POWER(50, 2)) * POWER(COUNT(rhombus_solve.challenge_id), 2)) + 500), 100)
+        ELSE rhombus_challenge.static_points
+    END AS points,
     COUNT(rhombus_solve.challenge_id) AS solves
 FROM rhombus_challenge
 CROSS JOIN rhombus_division
 LEFT JOIN rhombus_solve ON
-	rhombus_challenge.id = rhombus_solve.challenge_id AND
-	rhombus_solve.user_id IN (
-    	SELECT rhombus_user.id
-         FROM rhombus_user
-         JOIN rhombus_team ON rhombus_user.team_id = rhombus_team.id
-         JOIN rhombus_team_division ON rhombus_team.id = rhombus_team_division.team_id
-         WHERE rhombus_team_division.division_id = rhombus_division.id
+    rhombus_challenge.id = rhombus_solve.challenge_id AND
+    rhombus_solve.user_id IN (
+        SELECT rhombus_user.id
+        FROM rhombus_user
+        JOIN rhombus_team ON rhombus_user.team_id = rhombus_team.id
+        JOIN rhombus_team_division ON rhombus_team.id = rhombus_team_division.team_id
+        WHERE rhombus_team_division.division_id = rhombus_division.id
     )
 GROUP BY rhombus_challenge.id, rhombus_division.id;
 

@@ -31,6 +31,9 @@ pub enum RhombusError {
 
     #[error("Database configuration error: {0}")]
     DatabaseConfiguration(#[from] DatabaseConfigurationError),
+
+    #[error("Discord: {0}")]
+    Discord(#[from] serenity::Error),
 }
 
 #[derive(Error, Debug)]

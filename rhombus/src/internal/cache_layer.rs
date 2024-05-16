@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, net::IpAddr, time::Duration};
+use std::{collections::BTreeMap, net::IpAddr, num::NonZeroU64, time::Duration};
 
 use async_trait::async_trait;
 use dashmap::DashMap;
@@ -38,7 +38,7 @@ impl Database for DbCache {
         name: &str,
         email: &str,
         avatar: &str,
-        discord_id: &str,
+        discord_id: NonZeroU64,
     ) -> Result<i64> {
         let result = self
             .inner
@@ -170,6 +170,10 @@ impl Database for DbCache {
             USER_WRITEUP_CACHE.remove(&user_id);
         }
         result
+    }
+
+    async fn create_ticket(&self, user_id: i64, challenge_id: i64) -> Result<i64> {
+        self.inner.create_ticket(user_id, challenge_id).await
     }
 }
 

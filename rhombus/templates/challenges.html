@@ -9,9 +9,8 @@
     id="challenges"
   ></div>
 
-  <script type="module">
-    import { renderCounter } from "/static/app.js";
-    renderCounter(document.getElementById("challenges"));
+  <script>
+    rhombus.renderChallenges(document.getElementById("challenges"));
   </script>
 
   <script>
@@ -24,7 +23,7 @@
           dialog.addEventListener("close", () => {
             dialog.remove();
           });
-          dialog.addEventListener("mouseup", (event) => {
+          dialog.addEventListener("mousedown", (event) => {
             const rect = event.target.getBoundingClientRect();
 
             if (
@@ -33,8 +32,23 @@
               event.clientY - rect.top <= 0 ||
               rect.bottom - event.clientY <= 0
             ) {
+              dialog.isMouseDown = true;
+            }
+          });
+          dialog.addEventListener("mouseup", (event) => {
+            const rect = event.target.getBoundingClientRect();
+
+            if (
+              (event.clientX - rect.left <= 0 ||
+                rect.right - event.clientX <= 0 ||
+                event.clientY - rect.top <= 0 ||
+                rect.bottom - event.clientY <= 0) &&
+              dialog.isMouseDown
+            ) {
               dialog.close();
             }
+
+            dialog.isMouseDown = false;
           });
           dialog.showModal();
         }

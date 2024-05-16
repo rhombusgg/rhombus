@@ -3,6 +3,7 @@ pub mod auth;
 pub mod cache_layer;
 pub mod challenges;
 pub mod database;
+pub mod discord;
 pub mod home;
 pub mod ip;
 pub mod locales;

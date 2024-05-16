@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{num::NonZeroU64, time::Duration};
 
 use axum::{extract::State, http::Uri, response::Html, Extension};
 use dashmap::DashMap;
@@ -9,11 +9,15 @@ use tracing::debug;
 use super::{auth::User, cache_layer::TimedCache, locales::Languages, router::RouterState};
 
 lazy_static::lazy_static! {
-    pub static ref IS_IN_SERVER_CACHE: DashMap<String, TimedCache<bool>> = DashMap::new();
+    pub static ref IS_IN_SERVER_CACHE: DashMap<NonZeroU64, TimedCache<bool>> = DashMap::new();
 }
 
-async fn is_in_server(discord_guild_id: &str, discord_id: &str, discord_bot_token: &str) -> bool {
-    if let Some(team) = IS_IN_SERVER_CACHE.get(discord_id) {
+async fn is_in_server(
+    discord_guild_id: NonZeroU64,
+    discord_id: NonZeroU64,
+    discord_bot_token: &str,
+) -> bool {
+    if let Some(team) = IS_IN_SERVER_CACHE.get(&discord_id) {
         return team.value;
     }
     tracing::trace!(discord_id, "cache miss: is_in_server");
@@ -41,8 +45,8 @@ pub async fn route_account(
     uri: Uri,
 ) -> Html<String> {
     let in_server = is_in_server(
-        &state.settings.discord.guild_id,
-        &user.discord_id,
+        state.settings.discord.guild_id,
+        user.discord_id,
         &state.settings.discord.bot_token,
     )
     .await;

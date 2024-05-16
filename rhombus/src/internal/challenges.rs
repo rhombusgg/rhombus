@@ -136,6 +136,112 @@ pub async fn route_challenge_view(
     )
 }
 
+pub async fn route_ticket_view(
+    state: State<RouterState>,
+    Extension(user): Extension<User>,
+    Extension(lang): Extension<Languages>,
+    challenge_id: Path<i64>,
+    uri: Uri,
+) -> impl IntoResponse {
+    let challenge_data = state.db.get_challenges();
+    let team = state.db.get_team_from_id(user.team_id);
+    let (challenge_data, team) = tokio::join!(challenge_data, team);
+    let challenge_data = challenge_data.unwrap();
+    let team = team.unwrap();
+
+    let challenge = challenge_data
+        .challenges
+        .iter()
+        .find(|c| challenge_id.eq(&c.id))
+        .unwrap();
+    let category = challenge_data
+        .categories
+        .iter()
+        .find(|c| challenge.category_id.eq(&c.id))
+        .unwrap();
+
+    let ticket_template = challenge
+        .ticket_template
+        .as_ref()
+        .unwrap_or(&state.settings.default_ticket_template);
+
+    Html(
+        state
+            .jinja
+            .get_template("ticket.html")
+            .unwrap()
+            .render(context! {
+                lang,
+                user,
+                uri => uri.to_string(),
+                challenge,
+                category,
+                team,
+                ticket_template,
+            })
+            .unwrap(),
+    )
+}
+
+#[derive(Deserialize)]
+pub struct TicketSubmit {
+    content: String,
+}
+
+pub async fn route_ticket_submit(
+    state: State<RouterState>,
+    Extension(user): Extension<User>,
+    Extension(lang): Extension<Languages>,
+    challenge_id: Path<i64>,
+    Form(form): Form<TicketSubmit>,
+) -> impl IntoResponse {
+    let content = form.content;
+
+    if content.len() > 1000 {
+        let html = state
+            .jinja
+            .get_template("challenge-submit.html")
+            .unwrap()
+            .render(context! {
+                lang => lang,
+                user => user,
+                error => "Ticket is too long",
+            })
+            .unwrap();
+
+        return Response::builder()
+            .header("content-type", "text/html")
+            .body(html)
+            .unwrap();
+    }
+
+    let challenge_data = state.db.get_challenges();
+    let team = state.db.get_team_from_id(user.team_id);
+    let (challenge_data, team) = tokio::join!(challenge_data, team);
+    let challenge_data = challenge_data.unwrap();
+    let team = team.unwrap();
+
+    let challenge = challenge_data
+        .challenges
+        .iter()
+        .find(|c| challenge_id.eq(&c.id))
+        .unwrap();
+
+    let author = challenge_data.authors.get(&challenge.author_id).unwrap();
+
+    state
+        .bot
+        .create_support_thread(&user, &team, challenge, author, content.as_str())
+        .await
+        .unwrap();
+
+    Response::builder()
+        .header("Content-Type", "text/html")
+        .header("HX-Trigger", "closeModal")
+        .body("".to_owned())
+        .unwrap()
+}
+
 #[derive(Deserialize)]
 pub struct SubmitChallenge {
     flag: String,
@@ -196,8 +302,20 @@ pub async fn route_challenge_submit(
     let first_bloods = first_bloods.unwrap();
 
     if !first_bloods.division_ids.is_empty() {
+        let team = state.db.get_team_from_id(user.team_id).await.unwrap();
+        _ = state
+            .bot
+            .send_first_blood(
+                &user,
+                &team,
+                challenge,
+                &challenge_data.divisions,
+                &challenge_data.categories,
+                &first_bloods,
+            )
+            .await;
         tracing::info!(
-            user.id,
+            user_id = user.id,
             challenge_id = challenge.id,
             divisions = first_bloods
                 .division_ids
@@ -210,8 +328,8 @@ pub async fn route_challenge_submit(
     }
 
     Response::builder()
-        .header("content-type", "text/html")
-        .header("hx-trigger", "{\"manualRefresh\":true,\"closeModal\":true}")
+        .header("Content-Type", "text/html")
+        .header("HX-Trigger", "manualRefresh, closeModal")
         .body("".to_owned())
         .unwrap()
 }
@@ -319,8 +437,8 @@ pub async fn route_writeup_submit(
         .unwrap();
 
     Response::builder()
-        .header("content-type", "text/html")
-        .header("hx-trigger", "{\"manualRefresh\":true,\"closeModal\":true}")
+        .header("Content-Type", "text/html")
+        .header("HX-Trigger", "manualRefresh, closeModal")
         .body("".to_owned())
         .unwrap()
 }
@@ -337,8 +455,8 @@ pub async fn route_writeup_delete(
         .unwrap();
 
     Response::builder()
-        .header("content-type", "text/html")
-        .header("hx-trigger", "{\"manualRefresh\":true,\"closeModal\":true}")
+        .header("Content-Type", "text/html")
+        .header("HX-Trigger", "manualRefresh, closeModal")
         .body("".to_owned())
         .unwrap()
 }

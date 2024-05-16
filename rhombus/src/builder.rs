@@ -21,10 +21,11 @@ use crate::{
         },
         cache_layer::{database_cache_evictor, DbCache},
         challenges::{
-            route_challenge_submit, route_challenge_view, route_challenges, route_writeup_delete,
-            route_writeup_submit,
+            route_challenge_submit, route_challenge_view, route_challenges, route_ticket_submit,
+            route_ticket_view, route_writeup_delete, route_writeup_submit,
         },
         database::Database,
+        discord::Bot,
         home::route_home,
         ip::{
             default_ip_extractor, ip_insert_blank_middleware, ip_insert_middleware,
@@ -310,6 +311,11 @@ impl<P: Plugin> Builder<P> {
             .unwrap()
             .set_default("in_memory_cache", true)
             .unwrap()
+            .set_default(
+                "default_ticket_template",
+                "# Describe the issue with the challenge\n\n",
+            )
+            .unwrap()
             .build()?
             .try_deserialize()?;
 
@@ -398,8 +404,11 @@ impl<P: Plugin> Builder<P> {
             })
         });
 
+        let bot = Bot::new(settings.clone(), db.clone()).await;
+
         let router_state = Arc::new(RouterStateInner {
             db: db.clone(),
+            bot,
             jinja: env,
             localizer: localizer.clone(),
             settings: Arc::new(settings.clone()),
@@ -418,6 +427,10 @@ impl<P: Plugin> Builder<P> {
             .route(
                 "/challenges/:id/writeup",
                 post(route_writeup_submit).delete(route_writeup_delete),
+            )
+            .route(
+                "/challenges/:id/ticket",
+                get(route_ticket_view).post(route_ticket_submit),
             )
             .route(
                 "/challenges/:id",

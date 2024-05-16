@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, net::IpAddr, sync::Arc};
+use std::{collections::BTreeMap, net::IpAddr, num::NonZeroU64, sync::Arc};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -43,6 +43,7 @@ pub struct Challenge {
     pub division_points: Vec<ChallengeDivisionPoints>,
     pub scoring_type: ScoringType,
     pub flag: String,
+    pub ticket_template: Option<String>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -61,7 +62,7 @@ pub struct Category {
 pub struct Author {
     pub name: String,
     pub avatar_url: String,
-    pub discord_id: String,
+    pub discord_id: NonZeroU64,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -85,6 +86,7 @@ pub struct TeamUser {
     pub name: String,
     pub avatar_url: String,
     pub is_team_owner: bool,
+    pub discord_id: NonZeroU64,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -126,7 +128,7 @@ pub trait Database {
         name: &str,
         email: &str,
         avatar: &str,
-        discord_id: &str,
+        discord_id: NonZeroU64,
     ) -> Result<i64>;
     async fn insert_track(
         &self,
@@ -163,4 +165,5 @@ pub trait Database {
     ) -> Result<()>;
     async fn get_writeups_from_user_id(&self, user_id: i64) -> Result<Writeups>;
     async fn delete_writeup(&self, challenge_id: i64, user_id: i64, team_id: i64) -> Result<()>;
+    async fn create_ticket(&self, user_id: i64, challenge_id: i64) -> Result<i64>;
 }

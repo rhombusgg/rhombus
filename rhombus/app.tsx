@@ -55,19 +55,20 @@ const [data, { refetch }] = createResource(
       })
     ).json()) as ChallengesData,
 );
-
-createEffect(() => {
-  data();
-  // @ts-ignore
-  htmx.process(document.body);
-});
-
 const handler = () => refetch();
 
-document.body.addEventListener("manualRefresh", handler);
-window.addEventListener("focus", handler);
-
 const ChallengesComponent = () => {
+  document.body.removeEventListener("manualRefresh", handler);
+  document.body.addEventListener("manualRefresh", handler);
+  window.removeEventListener("focus", handler);
+  window.addEventListener("focus", handler);
+
+  createEffect(() => {
+    data();
+    // @ts-ignore
+    htmx.process(document.body);
+  });
+
   return (
     <Show when={data()}>
       <For each={data().categories}>
@@ -101,8 +102,10 @@ const ChallengesComponent = () => {
 
                     return (
                       <li
-                        id={challenge.name}
-                        class="border-l-4 bg-card p-4 ring-offset-4 ring-offset-background target:ring"
+                        classList={{
+                          ring: location.hash.substring(1) === challenge.name,
+                        }}
+                        class="border-l-4 bg-card p-4 ring-offset-4 ring-offset-background"
                         style={`border-color: ${category.color}; --tw-ring-color: ${category.color}`}
                       >
                         <div class="mb-2 flex justify-between h-8">
@@ -262,7 +265,13 @@ const ChallengesComponent = () => {
                                   <Tooltip.Arrow class="text-secondary" />
                                 </Tooltip.Content>
                               </Tooltip.Portal>
-                              <Tooltip.Trigger as="button">
+                              <Tooltip.Trigger
+                                as="button"
+                                hx-trigger="click"
+                                hx-get={`/challenges/${challenge.id}/ticket`}
+                                hx-target="body"
+                                hx-swap="beforeend"
+                              >
                                 <svg
                                   xmlns="http://www.w3.org/2000/svg"
                                   width="24"
@@ -413,6 +422,6 @@ type ChallengesData = {
   };
 };
 
-export function renderCounter(element: HTMLElement) {
+export function renderChallenges(element: HTMLElement) {
   render(() => <ChallengesComponent />, element);
 }

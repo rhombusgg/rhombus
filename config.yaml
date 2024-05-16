@@ -3,5 +3,7 @@ location_url: http://localhost:3000
 database_url: file://rhombus.db
 in_memory_cache: 60
 discord:
-  guild_id: "1160610137703186636"
-  client_id: "1160076447977848945"
+  guild_id: 1160610137703186636
+  client_id: 1160076447977848945
+  first_blood_channel_id: 1240422645938389102
+  support_channel_id: 1173026578385617010

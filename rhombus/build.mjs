@@ -4,10 +4,9 @@ import { solidPlugin } from "esbuild-plugin-solid";
 const ctx = await context({
   entryPoints: ['app.tsx'],
   bundle: true,
-  format: 'esm',
   outfile: 'static/app.js',
-  platform: 'browser',
-  minify: true,
+  sourcemap: "inline",
+  globalName: "rhombus",
   plugins: [solidPlugin()],
 });
 
