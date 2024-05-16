@@ -1,3 +1,4 @@
-/rhombus/static/tailwind.css linguist-vendored=true
-/rhombus/static/app.js linguist-vendored=true
+/rhombus/static/tailwind.css linguist-vendored=true -diff
+/rhombus/static/app.js linguist-vendored=true -diff
+Cargo.lock -diff
 *.sql linguist-detectable=true linguist-language=sql
