@@ -4,7 +4,7 @@ use axum::{
     http::StatusCode,
     middleware,
     response::{Html, IntoResponse},
-    routing::{get, post},
+    routing::{delete, get, post},
     Router,
 };
 use tokio::sync::RwLock;
@@ -34,11 +34,12 @@ use crate::{
             maybe_rightmost_x_forwarded_for, maybe_true_client_ip, maybe_x_real_ip, track_flusher,
             track_middleware, KeyExtractorShim,
         },
-        locales::{self, locale_middleware, translate},
+        locales::{self, jinja_timediff, jinja_translate, locale_middleware},
         open_graph::route_default_og_image,
+        public::{route_public_team, route_public_user},
         router::RouterStateInner,
         settings::IpPreset,
-        team::{route_team, route_team_roll_token, route_team_set_name},
+        team::{route_team, route_team_roll_token, route_team_set_name, route_user_kick},
     },
     Plugin,
 };
@@ -377,9 +378,10 @@ impl<P: Plugin> Builder<P> {
         env.add_function(
             "t",
             move |msg_id: &str, kwargs: minijinja::value::Kwargs, state: &minijinja::State| {
-                translate(l.clone(), msg_id, kwargs, state)
+                jinja_translate(l.clone(), msg_id, kwargs, state)
             },
         );
+        env.add_function("timediff", jinja_timediff);
 
         self.plugins.theme(&mut env)?;
 
@@ -432,6 +434,7 @@ impl<P: Plugin> Builder<P> {
         let rhombus_router = Router::new()
             .fallback(handler_404)
             .route("/account", get(route_account))
+            .route("/team/user/:id", delete(route_user_kick))
             .route("/team", get(route_team))
             .route("/team/roll-token", post(route_team_roll_token))
             .route("/team/name", post(route_team_set_name))
@@ -454,6 +457,8 @@ impl<P: Plugin> Builder<P> {
             .route("/signout", get(route_signout))
             .route("/signin", get(route_signin))
             .route("/signin/discord", get(route_discord_callback))
+            .route("/user/:id", get(route_public_user))
+            .route("/team/:id", get(route_public_team))
             .route("/og-image.png", get(route_default_og_image))
             .with_state(router_state.clone());
 

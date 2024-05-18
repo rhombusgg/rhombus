@@ -1,4 +1,4 @@
-use std::{num::NonZeroU64, time::Duration};
+use std::{collections::BTreeMap, num::NonZeroU64, time::Duration};
 
 use axum::{extract::State, http::Uri, response::Html, Extension};
 use dashmap::DashMap;
@@ -53,8 +53,24 @@ pub async fn route_account(
         )
     };
 
-    let in_server = is_in_server(discord_guild_id, user.discord_id, &discord_bot_token).await;
+    let in_server = is_in_server(discord_guild_id, user.discord_id, &discord_bot_token);
+    let challenge_data = state.db.get_challenges();
+    let team = state.db.get_team_from_id(user.team_id);
+    let (challenge_data, team, in_server) = tokio::join!(challenge_data, team, in_server);
+    let challenge_data = challenge_data.unwrap();
+    let team = team.unwrap();
+
     debug!(user_id = user.id, in_server, "Discord");
+
+    let mut challenges = BTreeMap::new();
+    for challenge in &challenge_data.challenges {
+        challenges.insert(challenge.id, challenge);
+    }
+
+    let mut categories = BTreeMap::new();
+    for category in &challenge_data.categories {
+        categories.insert(category.id, category);
+    }
 
     Html(
         state
@@ -68,6 +84,10 @@ pub async fn route_account(
                 in_server => in_server,
                 location_url => location_url,
                 og_image => format!("{}/og-image.png", location_url),
+                now => chrono::Utc::now(),
+                team,
+                challenges,
+                categories,
             })
             .unwrap(),
     )

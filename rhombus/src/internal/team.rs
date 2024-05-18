@@ -1,7 +1,9 @@
+use std::collections::BTreeMap;
+
 use axum::{
-    extract::State,
+    extract::{Path, State},
     http::Uri,
-    response::{Html, IntoResponse},
+    response::{Html, IntoResponse, Response},
     Extension, Form,
 };
 use minijinja::context;
@@ -11,6 +13,7 @@ use rand::{
 };
 use reqwest::StatusCode;
 use serde::Deserialize;
+use serde_json::json;
 use unicode_segmentation::UnicodeSegmentation;
 
 use super::{auth::User, locales::Languages, router::RouterState};
@@ -25,10 +28,24 @@ pub async fn route_team(
     Extension(lang): Extension<Languages>,
     uri: Uri,
 ) -> impl IntoResponse {
-    let team = state.db.get_team_from_id(user.team_id).await.unwrap();
+    let challenge_data = state.db.get_challenges();
+    let team = state.db.get_team_from_id(user.team_id);
+    let (challenge_data, team) = tokio::join!(challenge_data, team);
+    let challenge_data = challenge_data.unwrap();
+    let team = team.unwrap();
 
     let location_url = { state.settings.read().await.location_url.clone() };
     let team_invite_url = format!("{}/signin?token={}", location_url, team.invite_token);
+
+    let mut challenges = BTreeMap::new();
+    for challenge in &challenge_data.challenges {
+        challenges.insert(challenge.id, challenge);
+    }
+
+    let mut categories = BTreeMap::new();
+    for category in &challenge_data.categories {
+        categories.insert(category.id, category);
+    }
 
     Html(
         state
@@ -36,12 +53,15 @@ pub async fn route_team(
             .get_template("team.html")
             .unwrap()
             .render(context! {
-                lang => lang,
-                user => user,
-                team => team,
-                team_invite_url => team_invite_url,
+                lang,
+                user,
+                team,
+                team_invite_url,
                 uri => uri.to_string(),
-                location_url => location_url,
+                location_url,
+                now => chrono::Utc::now(),
+                challenges,
+                categories,
                 og_image => format!("{}/og-image.png", location_url),
             })
             .unwrap(),
@@ -106,22 +126,74 @@ pub async fn route_team_set_name(
     let team_name_template = state.jinja.get_template("team-set-name.html").unwrap();
 
     if errors.is_empty() {
-        Ok(Html(
-            team_name_template
-                .render(context! {
-                    lang => lang,
-                    new_team_name => &form.name,
+        let html = team_name_template
+            .render(context! {
+                lang => lang,
+                new_team_name => &form.name,
+            })
+            .unwrap();
+
+        Ok(Response::builder()
+            .header("Content-Type", "text/html")
+            .header(
+                "HX-Trigger",
+                json!({
+                    "successToast": "Set team name",
                 })
-                .unwrap(),
-        ))
+                .to_string(),
+            )
+            .body(html)
+            .unwrap())
     } else {
-        Ok(Html(
-            team_name_template
-                .render(context! {
-                    lang => lang,
-                    errors => errors,
-                })
-                .unwrap(),
-        ))
+        let html = team_name_template
+            .render(context! {
+                lang => lang,
+                errors => errors,
+            })
+            .unwrap();
+        Ok(Response::builder()
+            .header("Content-Type", "text/html")
+            .body(html)
+            .unwrap())
     }
+}
+
+pub async fn route_user_kick(
+    state: State<RouterState>,
+    Extension(user): Extension<User>,
+    user_id: Path<i64>,
+) -> impl IntoResponse {
+    if user_id.0 == user.id && !user.is_team_owner {
+        state.db.kick_user(user.id, user.team_id).await.unwrap();
+        return Response::builder()
+            .header("Content-Type", "text/html")
+            .header("HX-Trigger", "pageRefresh")
+            .body("".to_owned())
+            .unwrap();
+    }
+
+    if !user.is_team_owner {
+        return Response::builder()
+            .status(StatusCode::UNAUTHORIZED)
+            .body("".to_owned())
+            .unwrap();
+    }
+
+    let team = state.db.get_team_from_id(user.team_id).await.unwrap();
+    let user_in_team = team.users.keys().any(|&id| id == user_id.0);
+
+    if !user_in_team {
+        return Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body("".to_owned())
+            .unwrap();
+    }
+
+    state.db.kick_user(user_id.0, user.team_id).await.unwrap();
+
+    Response::builder()
+        .header("Content-Type", "text/html")
+        .header("HX-Trigger", "pageRefresh")
+        .body("".to_owned())
+        .unwrap()
 }

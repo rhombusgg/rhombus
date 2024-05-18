@@ -1,5 +1,6 @@
 {% extends "layout.html" %}
 {% import "card.html" as card %}
+{% import "icons.html" as icons %}
 
 {% block title %}{{ super() }} - {{ t("team") }}{% endblock %}
 
@@ -10,73 +11,200 @@
         Team {{ team.name }}
       </h2>
       <p class="text-muted-foreground">
-        Manage your individual account settings.
+        Manage and view your team. View
+        <a hx-boost="true" href="/team/{{ team.id }}" class="underline"
+          >public profile</a
+        >.
       </p>
     </div>
-    <div class="grid h-fit gap-6 md:grid-cols-2 lg:grid-cols-3">
-      {% call card.root() %}
-        {% call card.header() %}
-          {% call card.title() %}
-            Members
-          {% endcall %}
-          {% call card.description() %}
-            Players on your team
-          {% endcall %}
-        {% endcall %}
-        {% call card.content() %}
-          {% with x=team_invite_url %}
-          {% endwith %}
-          <ul>
-            <div>
-              {% if user.is_team_owner %}
-                <button
-                  hx-post="/team/roll-token"
-                  hx-target="next"
-                  hx-swap="outerHTML"
-                >
-                  Roll token
-                </button>
-              {% endif %}
-              {% include "team-token.html" %}
-            </div>
-            {% for player_id, player in team.users | items %}
-              <li>
-                <a href="{{ player_id }}">{{ player.name }}</a>
-                {% if user.id == player_id %}(You){% endif %}
-                {% if player.is_team_owner %}(Owner){% endif %}
-                <img src="{{ player.avatar_url }}" />
-              </li>
-            {% endfor %}
-          </ul>
-        {% endcall %}
-      {% endcall %}
-
-      {% if user.is_team_owner %}
+    <div class="grid lg:grid-cols-2 gap-6">
+      <div class="flex flex-col gap-6">
         {% call card.root() %}
           {% call card.header() %}
             {% call card.title() %}
-              Settings
+              Members
             {% endcall %}
             {% call card.description() %}
-              Change settings about your team
+              Invite and view members on your team
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
-            <div>
-              <div class="text-muted-foreground">Change name</div>
-              <input
-                type="text"
-                name="name"
-                value="{{ team.name | safe }}"
-                class="bg-background border p-2 rounded-md w-full focus-visible:outline-none"
-                hx-post="/team/name"
-                hx-target="next"
-              />
-              <div></div>
+            {% with x=team_invite_url %}
+            {% endwith %}
+            <h4 class="text-sm">Invite Link</h4>
+            <p class="mb-2 text-sm text-muted-foreground">
+              Send this invite link to your team members
+            </p>
+            <div class="flex mb-4 gap-2">
+              {% include "team-token.html" %}
+              <button
+                class="px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center rounded-md text-sm font-medium whitespace-nowrap ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                onclick="copyInviteTokenToClipboard()"
+                title="Copy invite token to clipboard"
+              >
+                {{ icons.copy() }}
+              </button>
+              {% if user.is_team_owner %}
+                <button
+                  hx-post="/team/roll-token"
+                  hx-target="#team-token"
+                  hx-swap="outerHTML"
+                  class="px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center rounded-md text-sm font-medium whitespace-nowrap ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                  title="Roll a new invite token"
+                >
+                  {{ icons.roll() }}
+                </button>
+              {% endif %}
+              <script>
+                function copyInviteTokenToClipboard() {
+                  navigator.clipboard
+                    .writeText(document.querySelector("#team-token").value)
+                    .then(
+                      () => {
+                        rhombus.toast.success(
+                          "Copied invite token to clipboard",
+                        );
+                      },
+                      () => {
+                        rhombus.toast.error(
+                          "Failed to copy invite token to clipboard",
+                        );
+                      },
+                    );
+                }
+              </script>
             </div>
+            <h4 class="text-sm">Members</h4>
+            <p class="mb-2 text-sm text-muted-foreground">Your team members</p>
+            <ul class="flex flex-col gap-2">
+              {% for player_id, player in team.users | items %}
+                <li class="flex items-center justify-between group">
+                  <div class="flex items-center gap-2">
+                    <a
+                      hx-boost="true"
+                      href="/user/{{ player_id }}"
+                      class="flex gap-2 items-center"
+                    >
+                      <img
+                        class="size-8 rounded-full"
+                        src="{{ player.avatar_url }}"
+                      />
+                      <span>{{ player.name }}</span>
+                    </a>
+                    <div class="flex gap-2">
+                      {% if player.is_team_owner %}
+                        <div class="text-yellow-300" title="Team owner">
+                          {{ icons.crown() }}
+                        </div>
+                      {% endif %}
+                      {% if user.id == player_id %}
+                        <div class="text-muted-foreground">(You)</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                  {% if user.is_team_owner != (user.id == player_id) %}
+                    <button
+                      hx-delete="/team/user/{{ player_id }}"
+                      title="{%- if user.is_team_owner -%}
+                        Kick user
+                      {%- else -%}
+                        Leave team
+                      {%- endif -%}"
+                      class="text-destructive hidden group-hover:block"
+                    >
+                      {{ icons.delete_user() }}
+                    </button>
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ul>
           {% endcall %}
         {% endcall %}
-      {% endif %}
+
+        {% if user.is_team_owner %}
+          {% call card.root() %}
+            {% call card.header() %}
+              {% call card.title() %}
+                Settings
+              {% endcall %}
+              {% call card.description() %}
+                Change settings about your team (owner only)
+              {% endcall %}
+            {% endcall %}
+            {% call card.content() %}
+              <div>
+                <h4 class="text-sm">Change name</h4>
+                <p class="text-sm text-muted-foreground mb-2">
+                  Must be between 3 and 30 characters
+                </p>
+                <input
+                  type="text"
+                  name="name"
+                  value="{{ team.name | safe }}"
+                  class="bg-background border p-2 rounded-md w-full focus-visible:outline-none"
+                  hx-post="/team/name"
+                  hx-target="next"
+                />
+                <div></div>
+              </div>
+            {% endcall %}
+          {% endcall %}
+        {% endif %}
+      </div>
+      <div>
+        {% call card.root() %}
+          {% call card.header() %}
+            {% call card.title() %}
+              Solves
+            {% endcall %}
+            {% call card.description() %}
+              Challenges your team has solved
+            {% endcall %}
+          {% endcall %}
+          {% call card.content() %}
+            {% with x=lang %}
+            {% endwith %}
+            <ol class="flex flex-col gap-2">
+              {% for challenge_id, solve in team.solves | dictsort(by="value", reverse=true) %}
+                {% with challenge=challenges[challenge_id], solver=team.users[solve.user_id], category=categories[challenge.category_id] %}
+                  <li class="flex items-center justify-between">
+                    <div>
+                      <a
+                        href="/challenges#{{ challenge.name }}"
+                        class="font-bold"
+                      >
+                        <span style="color: {{ category.color }}"
+                          >{{ category.name }} /
+                        </span>
+                        {{ challenge.name }}
+                      </a>
+                      <span class="text-muted-foreground">
+                        / {{ challenge.division_points[0].points }} points /
+                        <span title="{{ solve.solved_at }}">
+                          {% with diff=timediff(solve.solved_at, now) %}
+                            {{ t("time-difference", years=diff.years, days=diff.days, hours=diff.hours, minutes=diff.minutes, seconds=diff.seconds) }}
+                          {%- endwith -%}
+                        </span>
+                      </span>
+                    </div>
+                    <a
+                      hx-boost="true"
+                      href="/user/{{ solve.user_id }}"
+                      class="flex items-center gap-2"
+                    >
+                      <span>{{ solver.name }}</span>
+                      <img
+                        class="size-8 rounded-full"
+                        src="{{ solver.avatar_url }}"
+                      />
+                    </a>
+                  </li>
+                {% endwith %}
+              {% endfor %}
+            </ol>
+          {% endcall %}
+        {% endcall %}
+      </div>
     </div>
   </div>
 {% endblock %}

@@ -599,6 +599,16 @@ impl Database for LibSQL {
         }))
     }
 
+    async fn kick_user(&self, user_id: i64, _team_id: i64) -> Result<()> {
+        self.db
+            .execute(
+                "UPDATE rhombus_user SET team_id = owner_team_id WHERE id = ?1",
+                [user_id],
+            )
+            .await?;
+        Ok(())
+    }
+
     async fn roll_invite_token(&self, team_id: i64) -> Result<String> {
         let new_invite_token = create_team_invite_token();
 

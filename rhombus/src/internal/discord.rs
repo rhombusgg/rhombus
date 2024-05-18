@@ -252,6 +252,7 @@ pub async fn status(ctx: Context<'_>) -> std::result::Result<(), DiscordError> {
         format!(
             "
 Immutable Configuration: {}
+Location URL: {}
 
 Verified Role {}
 Author Role {}
@@ -264,6 +265,7 @@ Default Ticket Template
 ```
             ",
             format_bool(settings.immutable_config),
+            settings.location_url,
             format_role(settings.discord.verified_role_id),
             format_role(settings.discord.author_role_id),
             format_channel(settings.discord.first_blood_channel_id),
@@ -400,11 +402,9 @@ impl Bot {
             .send_message(&self.http, CreateMessage::new().content(content.as_ref()))
             .await?;
 
-        for user in team.users.iter() {
-            self.http
-                .add_thread_channel_member(thread.id, UserId::from(user.1.discord_id))
-                .await?;
-        }
+        self.http
+            .add_thread_channel_member(thread.id, UserId::from(user.discord_id))
+            .await?;
 
         self.http
             .add_thread_channel_member(thread.id, UserId::from(author.discord_id))
@@ -434,7 +434,30 @@ impl Bot {
             .collect::<Vec<&str>>();
         let division_string = format_list_en(&divisions);
 
-        let emoji = ["🩸", "🎉", "🔥", "🚀", "✨", "⚡", "💥", "🏹", "💉", "👏"];
+        let emoji = [
+            "🩸",
+            "🎉",
+            "🔥",
+            "🚀",
+            "✨",
+            "⚡",
+            "💥",
+            "🏹",
+            "💉",
+            "👏",
+            "🏆",
+            "🏅",
+            "🎊",
+            "🎈",
+            "🔔",
+            "🫑",
+            "🃏",
+            "🍍",
+            "🍹",
+            "🗡",
+            "🌪",
+            ":crossed_swords:",
+        ];
         let emoji = emoji
             .choose_multiple(&mut thread_rng(), thread_rng().gen_range(1..=4))
             .cloned()

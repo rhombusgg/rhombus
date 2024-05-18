@@ -135,6 +135,10 @@ impl Database for Postgres {
         todo!()
     }
 
+    async fn kick_user(&self, _user_id: i64, _team_id: i64) -> Result<()> {
+        todo!()
+    }
+
     async fn roll_invite_token(&self, _team_id: i64) -> Result<String> {
         todo!()
     }

@@ -1,0 +1,120 @@
+{% extends "layout.html" %}
+{% import "card.html" as card %}
+
+{% block title %}{{ super() }} - {{ t("team") }} - {{ public_team.name }}{% endblock %}
+
+{% block content %}
+  <div class="container">
+    <div class="mb-4 mt-4 space-y-0.5">
+      <h2 id="title" class="text-2xl font-bold tracking-tight">
+        User {{ public_team.name }}
+      </h2>
+      <p class="text-muted-foreground">
+        Public team profile.
+        {% if user.team_id == public_team.id %}
+          You are on the team,
+          <a hx-boost="true" href="/team" class="underline"
+            >go to your team view</a
+          >.
+        {% endif %}
+      </p>
+    </div>
+    <div class="grid lg:grid-cols-2 gap-6">
+      <div class="flex flex-col gap-6">
+        {% call card.root() %}
+          {% call card.header() %}
+            {% call card.title() %}
+              Members
+            {% endcall %}
+            {% call card.description() %}
+              Players on the team
+            {% endcall %}
+          {% endcall %}
+          {% call card.content() %}
+            <ul class="flex flex-col gap-2">
+              {% for player_id, player in public_team.users | items %}
+                <li class="flex items-center gap-2">
+                  <a
+                    hx-boost="true"
+                    href="/user/{{ player_id }}"
+                    class="flex gap-2 items-center"
+                  >
+                    <img
+                      class="size-8 rounded-full"
+                      src="{{ player.avatar_url }}"
+                    />
+                    <span>{{ player.name }}</span>
+                  </a>
+                  <div class="flex gap-2">
+                    {% if player.is_team_owner %}
+                      <div class="text-yellow-300" title="Team owner">
+                        {{ icons.crown() }}
+                      </div>
+                    {% endif %}
+                    {% if user.id == player_id %}
+                      <div class="text-muted-foreground">(You)</div>
+                    {% endif %}
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% endcall %}
+        {% endcall %}
+      </div>
+      <div>
+        {% call card.root() %}
+          {% call card.header() %}
+            {% call card.title() %}
+              Solves
+            {% endcall %}
+            {% call card.description() %}
+              Challenges your team has solved
+            {% endcall %}
+          {% endcall %}
+          {% call card.content() %}
+            {% with x=lang %}
+            {% endwith %}
+            <ol class="flex flex-col gap-2">
+              {% for challenge_id, solve in public_team.solves | dictsort(by="value", reverse=true) %}
+                {% with challenge=challenges[challenge_id], solver=public_team.users[solve.user_id], category=categories[challenge.category_id] %}
+                  <li class="flex items-center justify-between">
+                    <div>
+                      <a
+                        href="/challenges#{{ challenge.name }}"
+                        class="font-bold"
+                      >
+                        <span style="color: {{ category.color }}"
+                          >{{ category.name }} /
+                        </span>
+                        {{ challenge.name }}
+                      </a>
+                      <span class="text-muted-foreground">
+                        / {{ challenge.division_points[0].points }} points /
+                        <span title="{{ solve.solved_at }}">
+                          {% with diff=timediff(solve.solved_at, now) %}
+                            {{ t("time-difference", years=diff.years, days=diff.days, hours=diff.hours, minutes=diff.minutes, seconds=diff.seconds) }}
+                          {%- endwith -%}
+                        </span>
+                      </span>
+                    </div>
+                    <a
+                      hx-boost="true"
+                      href="/user/{{ solve.user_id }}"
+                      class="flex items-center gap-2"
+                    >
+                      <span>{{ solver.name }}</span>
+                      <img
+                        class="size-8 rounded-full"
+                        src="{{ solver.avatar_url }}"
+                      />
+                    </a>
+                  </li>
+                {% endwith %}
+              {% endfor %}
+            </ol>
+          {% endcall %}
+        {% endcall %}
+      </div>
+    </div>
+  </div>
+{% endblock %}

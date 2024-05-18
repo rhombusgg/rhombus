@@ -109,6 +109,15 @@ impl Database for DbCache {
         self.inner.get_user_from_discord_id(discord_id).await
     }
 
+    async fn kick_user(&self, user_id: i64, team_id: i64) -> Result<()> {
+        let result = self.inner.kick_user(user_id, team_id).await;
+        if result.is_ok() {
+            USER_CACHE.remove(&user_id);
+            TEAM_CACHE.remove(&team_id);
+        }
+        result
+    }
+
     async fn roll_invite_token(&self, team_id: i64) -> Result<String> {
         let new_invite_token = self.inner.roll_invite_token(team_id).await;
         if new_invite_token.is_ok() {

@@ -5,12 +5,12 @@
 
 {% block content %}
   <div
-    class="mt-4 px-4 gap-4 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(600px,1fr))]"
+    class="my-4 px-4 gap-4 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(600px,1fr))]"
     id="challenges"
   ></div>
 
   <script>
-    rhombus.renderChallenges(document.getElementById("challenges"));
+    rhombus.renderChallenges(document.getElementById("challenges"), {{ challenge_json | safe }});
   </script>
 
   <script>

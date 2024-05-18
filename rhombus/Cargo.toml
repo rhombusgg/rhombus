@@ -47,9 +47,13 @@ tower_governor = { version = "0.4.2" }
 tracing = "0.1.40"
 unicode-segmentation = "1.11.0"
 unic-langid = { version = "0.9.4", features = ["unic-langid-macros"] }
+serenity = "0.12.1"
+poise = "0.6.1"
 
 futures = { version = "0.3.30", optional = true }
-libsql = { git = 'https://github.com/tursodatabase/libsql.git', optional = true, features = ["encryption"] }
+libsql = { git = 'https://github.com/tursodatabase/libsql.git', optional = true, features = [
+  "encryption",
+] }
 listenfd = { version = "1.0.1", optional = true }
 sqlx = { version = "0.7.4", optional = true, features = [
   "tls-rustls",
@@ -58,8 +62,6 @@ sqlx = { version = "0.7.4", optional = true, features = [
   "chrono",
   "macros",
 ] }
-serenity = "0.12.1"
-poise = "0.6.1"
 
 [build-dependencies]
 minijinja-embed = "1.0.20"

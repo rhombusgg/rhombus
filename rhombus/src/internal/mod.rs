@@ -8,6 +8,7 @@ pub mod home;
 pub mod ip;
 pub mod locales;
 pub mod open_graph;
+pub mod public;
 pub mod router;
 pub mod settings;
 pub mod team;

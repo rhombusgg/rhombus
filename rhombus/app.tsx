@@ -5,10 +5,12 @@ import {
   Show,
   createEffect,
   createResource,
-  onCleanup,
-  onMount,
+  createSignal,
 } from "solid-js";
 import { customElement } from "solid-element";
+import { Toaster, toast } from "solid-toast";
+
+export { toast } from "solid-toast";
 
 customElement("rhombus-tooltip", (props, { element }) => {
   const anchor = document.querySelector("dialog");
@@ -47,21 +49,27 @@ customElement("rhombus-tooltip", (props, { element }) => {
   );
 });
 
-const [data, { refetch }] = createResource(
-  async () =>
-    (await (
-      await fetch("/challenges", {
-        headers: { accept: "application/json" },
-      })
-    ).json()) as ChallengesData,
-);
-const handler = () => refetch();
+const ChallengesComponent = ({
+  challenge_json,
+}: {
+  challenge_json: ChallengesData;
+}) => {
+  const [shouldFetch, setShouldFetch] = createSignal<boolean>();
+  const [data, { refetch }] = createResource(
+    shouldFetch,
+    async () =>
+      (await (
+        await fetch("/challenges", {
+          headers: { accept: "application/json" },
+        })
+      ).json()) as ChallengesData,
+    { initialValue: challenge_json },
+  );
 
-const ChallengesComponent = () => {
-  document.body.removeEventListener("manualRefresh", handler);
-  document.body.addEventListener("manualRefresh", handler);
-  window.removeEventListener("focus", handler);
-  window.addEventListener("focus", handler);
+  (window as any).refetchHandlerInner = () => {
+    setShouldFetch(true);
+    refetch();
+  };
 
   createEffect(() => {
     data();
@@ -167,13 +175,19 @@ const ChallengesComponent = () => {
                                   </Tooltip.Content>
                                 </Tooltip.Portal>
                                 <Tooltip.Trigger
-                                  as="img"
-                                  class="aspect-square rounded-full h-8"
-                                  alt={`Solved by ${data().team.users[solve.user_id].name}`}
-                                  src={
-                                    data().team.users[solve.user_id].avatar_url
-                                  }
-                                />
+                                  as="a"
+                                  hx-boost="true"
+                                  href={`/user/${solve.user_id}`}
+                                >
+                                  <img
+                                    class="aspect-square rounded-full h-8"
+                                    alt={`Solved by ${data().team.users[solve.user_id].name}`}
+                                    src={
+                                      data().team.users[solve.user_id]
+                                        .avatar_url
+                                    }
+                                  />
+                                </Tooltip.Trigger>
                               </Tooltip>
                             </Show>
                             <Tooltip
@@ -425,6 +439,40 @@ type ChallengesData = {
   };
 };
 
-export function renderChallenges(element: HTMLElement) {
-  render(() => <ChallengesComponent />, element);
+export function renderChallenges(
+  element: HTMLElement,
+  challenge_json: ChallengesData,
+) {
+  render(
+    () => <ChallengesComponent challenge_json={challenge_json} />,
+    element,
+  );
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+  render(
+    () => <Toaster attr:hx-preserve="true" position="top-center" gutter={8} />,
+    document.querySelector("#toaster"),
+  );
+
+  document.body.addEventListener("successToast", (event) => {
+    toast.success((event as any).detail.value);
+  });
+
+  document.body.addEventListener("pageRefresh", () => {
+    location.reload();
+  });
+
+  (window as any).refetchHandler = () => (window as any).refetchHandlerInner();
+
+  document.body.removeEventListener(
+    "manualRefresh",
+    (window as any).refetchHandler,
+  );
+  document.body.addEventListener(
+    "manualRefresh",
+    (window as any).refetchHandler,
+  );
+  window.removeEventListener("focus", (window as any).refetchHandler);
+  window.addEventListener("focus", (window as any).refetchHandler);
+});

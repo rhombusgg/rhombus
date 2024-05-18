@@ -128,6 +128,12 @@ pub async fn route_signin(
             .unwrap_or(None);
 
         if let (Some(team), Some(user)) = (&team, &user) {
+            // you cannot join a team if your current team has more than just you on it
+            let old_team = state.db.get_team_from_id(user.team_id).await.unwrap();
+            if old_team.users.len() > 1 {
+                return Redirect::to("/team").into_response();
+            }
+
             state
                 .db
                 .add_user_to_team(user.id, team.id, Some(user.team_id))

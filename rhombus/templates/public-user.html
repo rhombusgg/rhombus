@@ -1,50 +1,43 @@
 {% extends "layout.html" %}
 {% import "card.html" as card %}
 
-{% block title %}{{ super() }} - {{ t("account") }}{% endblock %}
+{% block title %}{{ super() }} - {{ t("user") }} - {{ public_user.name }}{% endblock %}
 
 {% block content %}
   <div class="container">
     <div class="mb-4 mt-4 space-y-0.5">
-      <h2 class="text-2xl font-bold tracking-tight">{{ t("account") }}</h2>
+      <h2 id="title" class="text-2xl font-bold tracking-tight">
+        User {{ public_user.name }}
+      </h2>
       <p class="text-muted-foreground">
-        Manage your individual account settings. View
-        <a hx-boost="true" href="/user/{{ user.id }}" class="underline"
-          >public profile</a
+        On team
+        <a
+          hx-boost="true"
+          href="/team/{{ public_user.team_id }}"
+          class="underline"
+          >{{ public_team.name }}</a
         >.
+        {% if user.id == public_user.id %}
+          This is your profile,
+          <a hx-boost="true" href="/account" class="underline"
+            >go to your account view</a
+          >.
+        {% endif %}
       </p>
     </div>
     <div class="grid lg:grid-cols-2 gap-6">
-      <div class="flex flex-col gap-6">
+      <div class="flex flex-col grow gap-6">
         {% call card.root() %}
           {% call card.header() %}
             {% call card.title() %}
-              Discord Integration
+              About
             {% endcall %}
             {% call card.description() %}
-              Link your Discord account to get rich feature integrations
+              User profile
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
-            {% if in_server %}
-              :check: You are in the server!
-            {% else %}
-              Join the server at https://
-            {% endif %}
-          {% endcall %}
-        {% endcall %}
-
-        {% call card.root() %}
-          {% call card.header() %}
-            {% call card.title() %}
-              Emails
-            {% endcall %}
-            {% call card.description() %}
-              Manage connected emails to qualify for certain divisions
-            {% endcall %}
-          {% endcall %}
-          {% call card.content() %}
-            content
+            <img src="{{ public_user.avatar }}" class="size-16 rounded-full" />
           {% endcall %}
         {% endcall %}
       </div>
@@ -55,16 +48,16 @@
               Solves
             {% endcall %}
             {% call card.description() %}
-              Challenges you have solved
+              Challenges this player has solved
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
             {% with x=lang %}
             {% endwith %}
             <ol class="flex flex-col gap-2">
-              {% for challenge_id, solve in team.solves | dictsort(by="value", reverse=true) %}
-                {% if solve.user_id == user.id %}
-                  {% with challenge=challenges[challenge_id], solver=team.users[solve.user_id], category=categories[challenge.category_id] %}
+              {% for challenge_id, solve in public_team.solves | dictsort(by="value", reverse=true) %}
+                {% if solve.user_id == public_user.id %}
+                  {% with challenge=challenges[challenge_id], solver=public_team.users[solve.user_id], category=categories[challenge.category_id] %}
                     <li class="flex items-center">
                       <a
                         href="/challenges#{{ challenge.name }}"

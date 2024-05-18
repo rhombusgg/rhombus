@@ -4,11 +4,15 @@ use axum::{
     middleware::Next,
     response::IntoResponse,
 };
+use chrono::DateTime;
 use fluent::{bundle::FluentBundle, FluentArgs, FluentResource, FluentValue};
 use intl_memoizer::concurrent::IntlLangMemoizer;
-use minijinja::{value::Kwargs, State};
+use minijinja::{value::Kwargs, State, Value};
 use rust_embed::RustEmbed;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 use unic_langid::{langid, LanguageIdentifier};
 
 use super::router::RouterState;
@@ -107,7 +111,7 @@ impl Default for Localizations {
     }
 }
 
-pub fn translate(
+pub fn jinja_translate(
     localizer: Arc<Localizations>,
     msg_id: &str,
     kwargs: Kwargs,
@@ -132,13 +136,38 @@ pub fn translate(
     for key in kwargs.args() {
         let maybe_str = kwargs.get::<&str>(key).map(FluentValue::from);
         let maybe_number = kwargs.get::<i64>(key).map(FluentValue::from);
-        args.insert(key, maybe_str.or(maybe_number).unwrap());
+        args.insert(key, maybe_str.or(maybe_number).unwrap_or(FluentValue::None));
     }
     kwargs.assert_all_used().unwrap();
 
     let text = localizer.localize(&langs, msg_id, Some(&args));
 
     text.unwrap_or(format!("Translation not found for {}", msg_id))
+}
+
+pub fn jinja_timediff(time1: &str, time2: &str) -> Value {
+    let time1 = DateTime::parse_from_rfc3339(time1).unwrap();
+    let time2 = DateTime::parse_from_rfc3339(time2).unwrap();
+
+    let diff = time2 - time1;
+
+    let seconds = diff.num_seconds() % 60;
+    let minutes = (diff.num_seconds() / 60) % 60;
+    let hours = (diff.num_seconds() / 60 / 60) % 24;
+    let days = (diff.num_seconds() / 60 / 60 / 24) % 30;
+    let months = (diff.num_seconds() / 60 / 60 / 24 / 30) % 12;
+    let years = diff.num_seconds() / 60 / 60 / 24 / 30 / 12;
+
+    Value::from({
+        let mut m = BTreeMap::new();
+        m.insert("seconds", seconds);
+        m.insert("minutes", minutes);
+        m.insert("hours", hours);
+        m.insert("days", days);
+        m.insert("months", months);
+        m.insert("years", years);
+        m
+    })
 }
 
 pub type Languages = Vec<String>;

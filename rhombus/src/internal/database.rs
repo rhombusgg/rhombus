@@ -155,6 +155,7 @@ pub trait Database {
     ) -> Result<FirstBloods>;
     async fn get_user_from_id(&self, user_id: i64) -> Result<User>;
     async fn get_user_from_discord_id(&self, discord_id: NonZeroU64) -> Result<User>;
+    async fn kick_user(&self, user_id: i64, team_id: i64) -> Result<()>;
     async fn roll_invite_token(&self, team_id: i64) -> Result<String>;
     async fn set_team_name(&self, team_id: i64, new_team_name: &str) -> Result<()>;
     async fn add_writeup(

@@ -23,6 +23,9 @@ devDependencies:
   solid-js:
     specifier: ^1.8.17
     version: 1.8.17
+  solid-toast:
+    specifier: ^0.5.0
+    version: 0.5.0(solid-js@1.8.17)
   tailwindcss:
     specifier: ^3.4.3
     version: 3.4.3
@@ -1420,6 +1423,14 @@ packages:
       solid-js: ^1.8
     dependencies:
       '@corvu/utils': 0.2.0(solid-js@1.8.17)
+      solid-js: 1.8.17
+    dev: true
+
+  /solid-toast@0.5.0(solid-js@1.8.17):
+    resolution: {integrity: sha512-t770JakjyS2P9b8Qa1zMLOD51KYKWXbTAyJePVUoYex5c5FH5S/HtUBUbZAWFcqRCKmAE8KhyIiCvDZA8bOnxQ==}
+    peerDependencies:
+      solid-js: ^1.5.4
+    dependencies:
       solid-js: 1.8.17
     dev: true
 

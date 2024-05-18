@@ -22,10 +22,9 @@
   - [x] Authors without accounts
 - [ ] File uploads
 - [ ] Single static binary
-- [ ] User pages
+- [x] User pages
   - [ ] Admin geoip view
-- [ ] Team pages
-  - [ ] Admin geoip view
+- [x] Team pages
 - [ ] Homepage/countdown (plugin integration)
 - [x] Divisions
 - [x] First bloods (per division)
@@ -33,10 +32,11 @@
 - [ ] Scoreboard
   - [x] Snapshots
   - [ ] UI/page
-- [ ] Tickets
+- [x] Tickets
   - [x] From site (markdown editor)
-  - [ ] From discord
+  - [x] From discord
   - [ ] Email-only
+- [ ] Onboarding
 - [ ] Email-only accounts
   - [ ] Email confirmation
   - [ ] Gravatar lookup
