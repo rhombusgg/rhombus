@@ -10,11 +10,19 @@
   ></div>
 
   <script>
-    rhombus.renderChallenges(document.getElementById("challenges"), {{ challenge_json | safe }});
-  </script>
-
-  <script>
     (function () {
+      rhombus.renderChallenges(document.getElementById("challenges"), {{ challenge_json | safe }});
+
+      window.register = () => {
+        window.addEventListener("focus", window.challengeRefetchHandlerInner);
+        window.addEventListener("manualRefresh", window.challengeRefetchHandlerInner);
+
+        return () => {
+          window.removeEventListener("focus", window.challengeRefetchHandlerInner);
+          window.removeEventListener("manualRefresh", window.challengeRefetchHandlerInner);
+        }
+      };
+
       document.body.addEventListener("htmx:afterSettle", function (detail) {
         const dialog = detail.target.querySelector(
           "dialog[data-onload-showmodal]",

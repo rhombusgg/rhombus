@@ -35,8 +35,8 @@ CREATE TABLE IF NOT EXISTS rhombus_points_snapshot (
     at INTEGER NOT NULL DEFAULT(strftime('%s', 'now')),
     points INTEGER NOT NULL,
     PRIMARY KEY (team_id, division_id, at),
-    FOREIGN KEY (team_id) REFERENCES rhombus_team(id) ON DELETE CASCADE,
-    FOREIGN KEY (division_id) REFERENCES rhombus_division(id) ON DELETE CASCADE
+    FOREIGN KEY (team_id) REFERENCES rhombus_team(id),
+    FOREIGN KEY (division_id) REFERENCES rhombus_division(id)
 );
 
 CREATE TABLE IF NOT EXISTS rhombus_category (

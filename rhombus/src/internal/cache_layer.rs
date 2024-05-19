@@ -7,7 +7,10 @@ use tokio::sync::RwLock;
 use crate::{internal::auth::User, Result};
 
 use super::{
-    database::{Challenge, Challenges, Connection, Database, FirstBloods, Team, TeamMeta, Writeup},
+    database::{
+        Challenge, Challenges, Connection, Database, FirstBloods, Leaderboard, Scoreboard, Team,
+        TeamMeta, Writeup,
+    },
     settings::Settings,
 };
 
@@ -148,6 +151,8 @@ impl Database for DbCache {
             USER_CACHE.remove(&user_id);
             TEAM_CACHE.clear();
             *CHALLENGES_CACHE.write().await = None;
+            SCOREBOARD_CACHE.clear();
+            LEADERBOARD_CACHE.clear();
         }
         result
     }
@@ -196,6 +201,14 @@ impl Database for DbCache {
 
     async fn load_settings(&self, settings: &mut Settings) -> Result<()> {
         self.inner.load_settings(settings).await
+    }
+
+    async fn get_scoreboard(&self, division_id: i64) -> Result<Scoreboard> {
+        get_scoreboard(&self.inner, division_id).await
+    }
+
+    async fn get_leaderboard(&self, division_id: i64, page: u64) -> Result<Leaderboard> {
+        get_leaderboard(&self.inner, division_id, page).await
     }
 }
 
@@ -290,6 +303,42 @@ pub async fn get_writeups_from_user_id(db: &Connection, user_id: i64) -> Result<
     writeups
 }
 
+lazy_static::lazy_static! {
+    pub static ref SCOREBOARD_CACHE: DashMap<i64, Scoreboard> = DashMap::new();
+}
+
+pub async fn get_scoreboard(db: &Connection, division_id: i64) -> Result<Scoreboard> {
+    if let Some(scoreboard) = SCOREBOARD_CACHE.get(&division_id) {
+        return Ok(scoreboard.clone());
+    }
+    tracing::trace!(division_id, "cache miss: get_scoreboard");
+
+    let scoreboard = db.get_scoreboard(division_id).await;
+
+    if let Ok(scoreboard) = &scoreboard {
+        SCOREBOARD_CACHE.insert(division_id, scoreboard.clone());
+    }
+    scoreboard
+}
+
+lazy_static::lazy_static! {
+    pub static ref LEADERBOARD_CACHE: DashMap<(i64, u64), Leaderboard> = DashMap::new();
+}
+
+pub async fn get_leaderboard(db: &Connection, division_id: i64, page: u64) -> Result<Leaderboard> {
+    if let Some(leaderboard) = LEADERBOARD_CACHE.get(&(division_id, page)) {
+        return Ok(leaderboard.clone());
+    }
+    tracing::trace!(division_id, page, "cache miss: get_leaderboard");
+
+    let leaderboard = db.get_leaderboard(division_id, page).await;
+
+    if let Ok(leaderboard) = &leaderboard {
+        LEADERBOARD_CACHE.insert((division_id, page), leaderboard.clone());
+    }
+    leaderboard
+}
+
 pub fn database_cache_evictor(seconds: u64) {
     tokio::task::spawn(async move {
         let duration = Duration::from_secs(seconds);
@@ -334,6 +383,24 @@ pub fn database_cache_evictor(seconds: u64) {
             });
             if count > 0 {
                 tracing::trace!(count, "Evicted user writeup cache");
+            }
+
+            let mut count: i64 = 0;
+            SCOREBOARD_CACHE.retain(|_, _| {
+                count += 1;
+                false
+            });
+            if count > 0 {
+                tracing::trace!(count, "Evicted scoreboard cache");
+            }
+
+            let mut count: i64 = 0;
+            LEADERBOARD_CACHE.retain(|_, _| {
+                count += 1;
+                false
+            });
+            if count > 0 {
+                tracing::trace!(count, "Evicted leaderboard cache");
             }
 
             {

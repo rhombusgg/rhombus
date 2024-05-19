@@ -15,6 +15,7 @@
             >Rhombus</span
           >
         </a>
+        {{ navbarItem(label=t("scoreboard"), href="/scoreboard", uri=uri) }}
         {% if user %}
           {{ navbarItem(label=t("challenges"), href="/challenges", uri=uri) }}
           {{ navbarItem(label=t("team"), href="/team", uri=uri) }}

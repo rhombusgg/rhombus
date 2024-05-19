@@ -6,7 +6,9 @@ use sqlx::{FromRow, PgPool};
 use super::{
     auth::User,
     cache_layer::Writeups,
-    database::{Challenge, Challenges, Database, FirstBloods, Team, TeamMeta},
+    database::{
+        Challenge, Challenges, Database, FirstBloods, Leaderboard, Scoreboard, Team, TeamMeta,
+    },
     settings::Settings,
 };
 use crate::Result;
@@ -183,6 +185,14 @@ impl Database for Postgres {
     }
 
     async fn save_settings(&self, _settings: &Settings) -> Result<()> {
+        todo!()
+    }
+
+    async fn get_scoreboard(&self, _division_id: i64) -> Result<Scoreboard> {
+        todo!()
+    }
+
+    async fn get_leaderboard(&self, _division_id: i64, _page: u64) -> Result<Leaderboard> {
         todo!()
     }
 }

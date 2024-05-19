@@ -10,6 +10,7 @@ pub mod locales;
 pub mod open_graph;
 pub mod public;
 pub mod router;
+pub mod scoreboard;
 pub mod settings;
 pub mod team;
 

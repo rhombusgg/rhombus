@@ -3,6 +3,7 @@ team = Team
 user = User
 account = Account
 challenges = Challenges
+scoreboard = Scoreboard
 solves-points = {solves} / {points}
 time-difference = {$years ->
     [0] {$days ->

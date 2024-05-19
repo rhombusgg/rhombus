@@ -120,6 +120,37 @@ pub struct FirstBloods {
     pub division_ids: Vec<i64>,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct ScoreboardSeriesPoint {
+    pub timestamp: i64,
+    pub total_score: i64,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct ScoreboardTeam {
+    pub team_name: String,
+    pub series: Vec<ScoreboardSeriesPoint>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct Scoreboard {
+    pub teams: BTreeMap<i64, ScoreboardTeam>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct LeaderboardEntry {
+    pub team_id: i64,
+    pub team_name: String,
+    pub score: i64,
+    pub rank: u64,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct Leaderboard {
+    pub num_pages: u64,
+    pub entries: Vec<LeaderboardEntry>,
+}
+
 #[async_trait]
 pub trait Database {
     async fn migrate(&self) -> Result<()>;
@@ -170,4 +201,6 @@ pub trait Database {
     async fn create_ticket(&self, user_id: i64, challenge_id: i64) -> Result<i64>;
     async fn save_settings(&self, settings: &Settings) -> Result<()>;
     async fn load_settings(&self, settings: &mut Settings) -> Result<()>;
+    async fn get_scoreboard(&self, division_id: i64) -> Result<Scoreboard>;
+    async fn get_leaderboard(&self, division_id: i64, page: u64) -> Result<Leaderboard>;
 }

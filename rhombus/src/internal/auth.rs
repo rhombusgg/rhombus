@@ -134,6 +134,15 @@ pub async fn route_signin(
                 return Redirect::to("/team").into_response();
             }
 
+            // you cannot join a new team if you have made some solves
+            if old_team
+                .solves
+                .iter()
+                .any(|solve| solve.1.user_id == user.id)
+            {
+                return Redirect::to("/team").into_response();
+            }
+
             state
                 .db
                 .add_user_to_team(user.id, team.id, Some(user.team_id))

@@ -12,7 +12,7 @@ import { Toaster, toast } from "solid-toast";
 
 export { toast } from "solid-toast";
 
-customElement("rhombus-tooltip", (props, { element }) => {
+customElement("rhombus-tooltip", (_props, { element }) => {
   const anchor = document.querySelector("dialog");
 
   // @ts-ignore
@@ -66,7 +66,7 @@ const ChallengesComponent = ({
     { initialValue: challenge_json },
   );
 
-  (window as any).refetchHandlerInner = () => {
+  (window as any).challengeRefetchHandlerInner = () => {
     setShouldFetch(true);
     refetch();
   };
@@ -462,17 +462,4 @@ document.addEventListener("DOMContentLoaded", () => {
   document.body.addEventListener("pageRefresh", () => {
     location.reload();
   });
-
-  (window as any).refetchHandler = () => (window as any).refetchHandlerInner();
-
-  document.body.removeEventListener(
-    "manualRefresh",
-    (window as any).refetchHandler,
-  );
-  document.body.addEventListener(
-    "manualRefresh",
-    (window as any).refetchHandler,
-  );
-  window.removeEventListener("focus", (window as any).refetchHandler);
-  window.addEventListener("focus", (window as any).refetchHandler);
 });

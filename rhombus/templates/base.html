@@ -26,9 +26,40 @@
       src="https://unpkg.com/monaco-editor@0.48.0/min/vs/loader.js"
       defer
     ></script>
+    <script src="https://unpkg.com/echarts@5.5.0/dist/echarts.common.min.js"></script>
 
     <link rel="stylesheet" href="/static/tailwind.css" />
     <script src="/static/app.js"></script>
+    <script>
+      document.addEventListener("htmx:afterSettle", (e) => {
+        if (e.detail.boosted) {
+          if (window.deregister) {
+            window.deregister();
+            window.deregister = undefined;
+          }
+          if (window.register) {
+            window.deregister = window.register();
+            window.register = undefined;
+          }
+        }
+      });
+      // window.addEventListener("popstate", (e) => {
+      //   if (window.deregister) {
+      //     window.deregister();
+      //     window.deregister = undefined;
+      //   }
+      //   if (window.register) {
+      //     window.deregister = window.register();
+      //     window.register = undefined;
+      //   }
+      // });
+      window.addEventListener("DOMContentLoaded", (e) => {
+        if (window.register) {
+          window.deregister = window.register();
+          window.register = undefined;
+        }
+      });
+    </script>
     {% block head %}{% endblock %}
 
     <script>

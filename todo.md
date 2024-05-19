@@ -29,9 +29,9 @@
 - [x] Divisions
 - [x] First bloods (per division)
   - [ ] webhooks
-- [ ] Scoreboard
+- [x] Scoreboard
   - [x] Snapshots
-  - [ ] UI/page
+  - [x] UI/page
 - [x] Tickets
   - [x] From site (markdown editor)
   - [x] From discord

@@ -19,13 +19,16 @@ use super::{
     cache_layer::Writeups,
     database::{
         Author, Category, Challenge, ChallengeData, ChallengeDivisionPoints, ChallengeSolve,
-        Challenges, Database, Division, FirstBloods, Team, TeamInner, TeamMeta, TeamMetaInner,
-        TeamUser, Writeup,
+        Challenges, Database, Division, FirstBloods, Leaderboard, LeaderboardEntry, Team,
+        TeamInner, TeamMeta, TeamMetaInner, TeamUser, Writeup,
     },
     settings::Settings,
     team::create_team_invite_token,
 };
-use crate::Result;
+use crate::{
+    internal::database::{Scoreboard, ScoreboardSeriesPoint, ScoreboardTeam},
+    Result,
+};
 
 #[derive(Clone)]
 pub struct LibSQL {
@@ -810,6 +813,169 @@ impl Database for LibSQL {
         }
 
         Ok(())
+    }
+
+    async fn get_scoreboard(&self, division_id: i64) -> Result<Scoreboard> {
+        let tx = self.db.transaction().await?;
+
+        #[derive(Debug, Deserialize)]
+        struct DbTeam {
+            id: i64,
+            name: String,
+        }
+
+        let mut db_teams = tx.query("SELECT id, name FROM rhombus_team", ()).await?;
+        let mut all_teams = BTreeMap::new();
+        while let Some(row) = db_teams.next().await? {
+            let team = de::from_row::<DbTeam>(&row).unwrap();
+            all_teams.insert(team.id, team.name);
+        }
+
+        let top_team_ids = tx
+            .query(
+                "
+                SELECT team_id
+                FROM rhombus_team_division_points
+                WHERE division_id = ?1
+                ORDER BY points DESC
+                LIMIT 10
+            ",
+                [division_id],
+            )
+            .await?
+            .into_stream()
+            .map(|row| row.unwrap().get::<i64>(0).unwrap())
+            .collect::<Vec<_>>()
+            .await;
+
+        if top_team_ids.is_empty() {
+            return Ok(Scoreboard {
+                teams: Default::default(),
+            });
+        }
+
+        #[derive(Debug, Deserialize)]
+        struct DbScoreboard {
+            team_id: i64,
+            at: i64,
+            points: i64,
+        }
+
+        let mut db_scoreboard = tx
+            .query(
+                "
+                SELECT team_id, at, points
+                FROM rhombus_points_snapshot
+                WHERE division_id = ?1 AND team_id in (?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+                ORDER BY at ASC
+            ",
+                params!(
+                    division_id,
+                    top_team_ids[0],
+                    top_team_ids.get(1).unwrap_or(&top_team_ids[0]),
+                    top_team_ids.get(2).unwrap_or(&top_team_ids[0]),
+                    top_team_ids.get(3).unwrap_or(&top_team_ids[0]),
+                    top_team_ids.get(4).unwrap_or(&top_team_ids[0]),
+                    top_team_ids.get(5).unwrap_or(&top_team_ids[0]),
+                    top_team_ids.get(6).unwrap_or(&top_team_ids[0]),
+                    top_team_ids.get(7).unwrap_or(&top_team_ids[0]),
+                    top_team_ids.get(8).unwrap_or(&top_team_ids[0]),
+                    top_team_ids.get(9).unwrap_or(&top_team_ids[0]),
+                ),
+            )
+            .await?;
+
+        let mut teams: BTreeMap<i64, ScoreboardTeam> = BTreeMap::new();
+        while let Some(row) = db_scoreboard.next().await? {
+            let scoreboard = de::from_row::<DbScoreboard>(&row).unwrap();
+            let series_point = ScoreboardSeriesPoint {
+                timestamp: scoreboard.at,
+                total_score: scoreboard.points,
+            };
+
+            match teams.entry(scoreboard.team_id) {
+                Entry::Vacant(entry) => {
+                    entry.insert(ScoreboardTeam {
+                        team_name: all_teams[&scoreboard.team_id].clone(),
+                        series: vec![series_point],
+                    });
+                }
+                Entry::Occupied(mut entry) => {
+                    entry.get_mut().series.push(series_point);
+                }
+            }
+        }
+
+        Ok(Scoreboard { teams })
+    }
+
+    async fn get_leaderboard(&self, division_id: i64, page: u64) -> Result<Leaderboard> {
+        let tx = self.db.transaction().await?;
+
+        let num_teams = tx
+            .query(
+                "
+            SELECT COUNT(*)
+            FROM rhombus_team_division_points
+            WHERE division_id = ?1
+        ",
+                [division_id],
+            )
+            .await?
+            .next()
+            .await?
+            .unwrap()
+            .get::<u64>(0)
+            .unwrap();
+
+        const PAGE_SIZE: u64 = 25;
+
+        let num_pages = (num_teams + (PAGE_SIZE - 1)) / PAGE_SIZE;
+
+        let page = page.min(num_pages - 1);
+
+        #[derive(Debug, Deserialize)]
+        struct DbLeaderboard {
+            team_id: i64,
+            name: String,
+            points: f64,
+        }
+
+        let mut rank = page * PAGE_SIZE;
+
+        let leaderboard_entries = tx
+            .query(
+                "
+                SELECT team_id, name, points
+                FROM rhombus_team_division_points
+                JOIN rhombus_team ON rhombus_team_division_points.team_id = rhombus_team.id
+                WHERE division_id = ?1
+                ORDER BY points DESC
+                LIMIT ?3 OFFSET ?2
+            ",
+                params!(division_id, page * PAGE_SIZE, PAGE_SIZE),
+            )
+            .await?
+            .into_stream()
+            .map(|row| {
+                let db_leaderboard = de::from_row::<DbLeaderboard>(&row.unwrap()).unwrap();
+                rank += 1;
+                LeaderboardEntry {
+                    rank,
+                    team_id: db_leaderboard.team_id,
+                    team_name: db_leaderboard.name,
+                    score: db_leaderboard.points.round() as i64,
+                }
+            })
+            .collect::<Vec<_>>()
+            .await;
+
+        tx.commit().await?;
+
+        Ok(Leaderboard {
+            entries: leaderboard_entries,
+            num_pages,
+        })
     }
 }
 

@@ -38,6 +38,7 @@ use crate::{
         open_graph::route_default_og_image,
         public::{route_public_team, route_public_user},
         router::RouterStateInner,
+        scoreboard::{route_scoreboard, route_scoreboard_division},
         settings::IpPreset,
         team::{route_team, route_team_roll_token, route_team_set_name, route_user_kick},
     },
@@ -457,6 +458,8 @@ impl<P: Plugin> Builder<P> {
             .route("/signout", get(route_signout))
             .route("/signin", get(route_signin))
             .route("/signin/discord", get(route_discord_callback))
+            .route("/scoreboard", get(route_scoreboard))
+            .route("/scoreboard/:id", get(route_scoreboard_division))
             .route("/user/:id", get(route_public_user))
             .route("/team/:id", get(route_public_team))
             .route("/og-image.png", get(route_default_og_image))

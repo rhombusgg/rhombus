@@ -65,8 +65,9 @@
               {% for challenge_id, solve in team.solves | dictsort(by="value", reverse=true) %}
                 {% if solve.user_id == user.id %}
                   {% with challenge=challenges[challenge_id], solver=team.users[solve.user_id], category=categories[challenge.category_id] %}
-                    <li class="flex items-center">
+                    <li class="flex items-center h-8">
                       <a
+                        hx-boost="true"
                         href="/challenges#{{ challenge.name }}"
                         class="font-bold"
                       >
