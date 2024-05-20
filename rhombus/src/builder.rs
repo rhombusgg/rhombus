@@ -17,71 +17,66 @@ use crate::{
     internal::{
         account::{discord_cache_evictor, route_account},
         auth::{
-            auth_injector_middleware, enforce_auth_middleware, route_discord_callback,
-            route_signin, route_signout,
+            auth_injector_middleware, enforce_admin_middleware, enforce_auth_middleware,
+            route_discord_callback, route_signin, route_signout,
         },
         cache_layer::{database_cache_evictor, DbCache},
         challenges::{
             route_challenge_submit, route_challenge_view, route_challenges, route_ticket_submit,
             route_ticket_view, route_writeup_delete, route_writeup_submit,
         },
-        database::Database,
+        database::{Connection, Database},
         discord::Bot,
         home::route_home,
         ip::{
             default_ip_extractor, ip_insert_blank_middleware, ip_insert_middleware,
             maybe_cf_connecting_ip, maybe_fly_client_ip, maybe_peer_ip,
             maybe_rightmost_x_forwarded_for, maybe_true_client_ip, maybe_x_real_ip, track_flusher,
-            track_middleware, KeyExtractorShim,
+            track_middleware, IpExtractorFn, KeyExtractorShim,
         },
         locales::{self, jinja_timediff, jinja_translate, locale_middleware},
         open_graph::route_default_og_image,
         public::{route_public_team, route_public_user},
         router::RouterStateInner,
         scoreboard::{route_scoreboard, route_scoreboard_division},
-        settings::IpPreset,
+        settings::{DbConfig, IpPreset, Settings},
         team::{route_team, route_team_roll_token, route_team_set_name, route_user_kick},
+        upload_provider::route_upload_file,
     },
-    Plugin,
-};
-
-use crate::{
-    internal::{
-        database::Connection,
-        ip::IpExtractorFn,
-        settings::{DbConfig, Settings},
-    },
-    Result,
+    upload_provider::UploadProvider,
+    Plugin, Result,
 };
 
 static STATIC_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/static");
 
-pub fn builder() -> Builder<()> {
+pub fn builder() -> Builder<(), ()> {
     Builder::default()
 }
 
 /// A builder to make an axum router
-pub struct Builder<P: Plugin> {
+pub struct Builder<P: Plugin, U: UploadProvider + Send + Sync + 'static> {
     plugins: P,
     num_plugins: u32,
     database: Option<DbConfig>,
+    upload_provider: Option<Arc<U>>,
     config_builder: config::ConfigBuilder<config::builder::DefaultState>,
     ip_extractor: Option<IpExtractorFn>,
 }
 
-impl Default for Builder<()> {
-    fn default() -> Builder<()> {
+impl Default for Builder<(), ()> {
+    fn default() -> Builder<(), ()> {
         Builder {
             plugins: (),
             num_plugins: 0,
             database: None,
+            upload_provider: None,
             config_builder: config::ConfigBuilder::<config::builder::DefaultState>::default(),
             ip_extractor: None,
         }
     }
 }
 
-impl<P: Plugin> Builder<P> {
+impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
     pub fn load_env(self) -> Self {
         _ = dotenvy::dotenv();
         self
@@ -155,13 +150,28 @@ impl<P: Plugin> Builder<P> {
         }
     }
 
-    pub fn plugin<Pn: Plugin>(self, plugin: Pn) -> Builder<(Pn, P)> {
+    pub fn upload_provider<Un: UploadProvider + Send + Sync>(
+        self,
+        upload_provider: Un,
+    ) -> Builder<P, Un> {
+        Builder {
+            plugins: self.plugins,
+            num_plugins: self.num_plugins,
+            config_builder: self.config_builder,
+            database: self.database,
+            ip_extractor: self.ip_extractor,
+            upload_provider: Some(Arc::new(upload_provider)),
+        }
+    }
+
+    pub fn plugin<Pn: Plugin>(self, plugin: Pn) -> Builder<(Pn, P), U> {
         Builder {
             plugins: (plugin, self.plugins),
             num_plugins: self.num_plugins + 1,
             config_builder: self.config_builder,
             database: self.database,
             ip_extractor: self.ip_extractor,
+            upload_provider: self.upload_provider,
         }
     }
 
@@ -430,10 +440,18 @@ impl<P: Plugin> Builder<P> {
             ip_extractor: ip_extractor.unwrap_or(default_ip_extractor),
         });
 
+        let upload_provider = self.upload_provider.as_ref().unwrap();
+        let upload_provider = upload_provider.build(router_state.clone());
+        let upload_router = upload_provider.routes()?;
+        let upload_provider_state = Arc::new(upload_provider);
+
         let plugin_router = self.plugins.routes(router_state.clone());
 
         let rhombus_router = Router::new()
             .fallback(handler_404)
+            .route("/upload/:path", post(route_upload_file::<U>))
+            .with_state(upload_provider_state)
+            .route_layer(middleware::from_fn(enforce_admin_middleware))
             .route("/account", get(route_account))
             .route("/team/user/:id", delete(route_user_kick))
             .route("/team", get(route_team))
@@ -464,6 +482,8 @@ impl<P: Plugin> Builder<P> {
             .route("/team/:id", get(route_public_team))
             .route("/og-image.png", get(route_default_og_image))
             .with_state(router_state.clone());
+
+        let rhombus_router = rhombus_router.merge(upload_router);
 
         let router = if self.num_plugins > 0 {
             Router::new()

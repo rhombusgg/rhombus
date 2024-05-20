@@ -20,7 +20,10 @@
   - [ ] Markdown rendering
   - [x] Raw html rendering
   - [x] Authors without accounts
-- [ ] File uploads
+- [x] File uploads
+  - [x] Local file provider
+  - [ ] In database file provider
+  - [ ] S3 file provider
 - [ ] Single static binary
 - [x] User pages
   - [ ] Admin geoip view

@@ -26,6 +26,9 @@ pub enum RhombusError {
     #[error("Database error")]
     UnknownDatabase(),
 
+    #[error("Unknown")]
+    Unknown(),
+
     #[error("Configuration")]
     Configuration(#[from] ConfigError),
 

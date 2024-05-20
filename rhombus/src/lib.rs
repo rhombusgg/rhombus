@@ -17,10 +17,12 @@ pub use minijinja;
 /// Builder module
 mod builder;
 
+mod local_upload_provider;
+mod plugin;
+mod upload_provider;
+
 #[cfg(feature = "systemfd")]
 mod systemfd;
-
-mod plugin;
 
 /// Common error type for Rhombus
 pub mod errors;
@@ -34,6 +36,12 @@ pub use builder::Builder;
 
 #[doc(inline)]
 pub use plugin::Plugin;
+
+#[doc(inline)]
+pub use local_upload_provider::LocalUploadProvider;
+
+#[doc(inline)]
+pub use upload_provider::UploadProvider;
 
 #[cfg(feature = "systemfd")]
 pub use systemfd::serve_systemfd;

@@ -51,6 +51,18 @@ pub struct ErrorResponse {
     pub message: String,
 }
 
+pub async fn enforce_admin_middleware(
+    Extension(user): Extension<User>,
+    req: Request<Body>,
+    next: Next,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    if !user.is_admin {
+        return Err(Redirect::to("/account").into_response());
+    }
+
+    Ok(next.run(req).await)
+}
+
 pub async fn enforce_auth_middleware(
     Extension(maybe_user): Extension<MaybeUser>,
     Extension(maybe_token_claims): Extension<MaybeTokenClaims>,
