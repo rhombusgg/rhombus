@@ -14,3 +14,10 @@ INSERT INTO rhombus_challenge VALUES
 (3,'my-first-web','desc ghi','flag{hi}',2,FALSE,1,'## Some custom text\n\n',1,200),
 (4,'wow','desc jkl','flag{hi}',4,TRUE,1,NULL,0,NULL),
 (5,'rsa','desc mno','flag{hi}',3,FALSE,2,NULL,0,NULL);
+
+INSERT INTO rhombus_file_attachment VALUES
+(1,'file1','https://example.com/file1'),
+(1,'file2','https://example.com/file2'),
+(2,'file3','https://example.com/file3'),
+(3,'file4','https://example.com/file4'),
+(4,'file5','https://example.com/file5');

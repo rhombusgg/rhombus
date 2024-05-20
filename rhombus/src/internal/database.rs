@@ -33,6 +33,12 @@ pub struct ChallengeDivisionPoints {
 }
 
 #[derive(Debug, Serialize, Clone)]
+pub struct ChallengeAttachment {
+    pub name: String,
+    pub url: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
 pub struct Challenge {
     pub id: i64,
     pub name: String,
@@ -44,6 +50,7 @@ pub struct Challenge {
     pub scoring_type: ScoringType,
     pub flag: String,
     pub ticket_template: Option<String>,
+    pub attachments: Vec<ChallengeAttachment>,
 }
 
 #[derive(Debug, Serialize, Clone)]

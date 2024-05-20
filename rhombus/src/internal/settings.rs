@@ -53,6 +53,11 @@ pub struct Turso {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct LocalUploadProviderOptions {
+    pub folder: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Settings {
     pub location_url: String,
     pub jwt_secret: String,
@@ -63,6 +68,7 @@ pub struct Settings {
     pub live_reload: bool,
     pub default_ticket_template: String,
     pub immutable_config: bool,
+    pub local_upload_provider: Option<LocalUploadProviderOptions>,
 
     /// `false` will disable the in memory cache.
     ///

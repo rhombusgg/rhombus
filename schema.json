@@ -116,6 +116,24 @@
                 "auth_token"
             ]
         },
+        "local_upload_provider": {
+            "title": "Local Upload Provider",
+            "description": "A default upload provider which saves and serves from a specified local folder on the filesystem",
+            "type": "object",
+            "properties": {
+                "folder": {
+                    "title": "Folder",
+                    "description": "Destination folder to save and serve challenge assets from",
+                    "type": "string",
+                    "examples": [
+                        "uploads"
+                    ]
+                }
+            },
+            "required": [
+                "folder"
+            ]
+        },
         "ratelimit": {
             "title": "Rate limit",
             "description": "Configuration related to built in rate limiting",

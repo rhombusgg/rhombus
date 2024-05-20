@@ -44,7 +44,7 @@ use crate::{
         upload_provider::route_upload_file,
     },
     upload_provider::UploadProvider,
-    Plugin, Result,
+    LocalUploadProvider, Plugin, Result,
 };
 
 static STATIC_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/static");
@@ -54,7 +54,7 @@ pub fn builder() -> Builder<(), ()> {
 }
 
 /// A builder to make an axum router
-pub struct Builder<P: Plugin, U: UploadProvider + Send + Sync + 'static> {
+pub struct Builder<P: Plugin, U: UploadProvider + Send + Sync> {
     plugins: P,
     num_plugins: u32,
     database: Option<DbConfig>,
@@ -300,8 +300,11 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
 
         #[cfg(feature = "libsql")]
         {
-            tracing::warn!("Falling back to in memory database");
-            let database = crate::internal::backend_libsql::LibSQL::new_memory().await?;
+            tracing::warn!(
+                database_url = "file://rhombus.db",
+                "Falling back to local database"
+            );
+            let database = crate::internal::backend_libsql::LibSQL::new_local("rhombus.db").await?;
             database.migrate().await?;
             self.plugins.migrate_libsql(database.clone()).await?;
 
@@ -315,7 +318,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
         )
     }
 
-    pub async fn build(&self) -> Result<Router> {
+    pub async fn build(self) -> Result<Router> {
         let mut settings: Settings = self
             .config_builder
             .clone()
@@ -436,22 +439,60 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             bot,
             jinja: env,
             localizer: localizer.clone(),
-            settings: s,
+            settings: s.clone(),
             ip_extractor: ip_extractor.unwrap_or(default_ip_extractor),
         });
 
-        let upload_provider = self.upload_provider.as_ref().unwrap();
-        let upload_provider = upload_provider.build(router_state.clone());
-        let upload_router = upload_provider.routes()?;
-        let upload_provider_state = Arc::new(upload_provider);
+        let upload_router = if let Some(upload_provider) = self.upload_provider.as_ref() {
+            let upload_provider = upload_provider.build(router_state.clone());
+            let upload_router = upload_provider.routes()?;
+            let upload_provider_state = Arc::new(upload_provider);
+            Router::new()
+                .route("/upload/:path", post(route_upload_file::<U>))
+                .with_state(upload_provider_state)
+                .route_layer(middleware::from_fn(enforce_admin_middleware))
+                .merge(upload_router)
+        } else {
+            let base_path = if let Some(local_upload_provider_options) =
+                &s.read().await.local_upload_provider
+            {
+                let base_path = &local_upload_provider_options.folder;
+                tracing::info!(
+                    folder = base_path.as_str(),
+                    "Using configured local upload provider"
+                );
+                base_path.into()
+            } else {
+                tracing::warn!(
+                    folder = "uploads",
+                    "No upload provider set, using local upload provider"
+                );
+                "uploads".into()
+            };
+
+            let local_upload_provider = LocalUploadProvider::new(base_path);
+            let local_upload_provider = local_upload_provider.build(router_state.clone());
+            let upload_router = local_upload_provider.routes()?;
+            let upload_provider_state = Arc::new(local_upload_provider);
+
+            Router::new()
+                .route(
+                    "/upload/:path",
+                    post(route_upload_file::<LocalUploadProvider>),
+                )
+                .with_state(upload_provider_state)
+                .route_layer(middleware::from_fn(enforce_admin_middleware))
+                .layer(middleware::from_fn_with_state(
+                    router_state.clone(),
+                    auth_injector_middleware,
+                ))
+                .merge(upload_router)
+        };
 
         let plugin_router = self.plugins.routes(router_state.clone());
 
         let rhombus_router = Router::new()
             .fallback(handler_404)
-            .route("/upload/:path", post(route_upload_file::<U>))
-            .with_state(upload_provider_state)
-            .route_layer(middleware::from_fn(enforce_admin_middleware))
             .route("/account", get(route_account))
             .route("/team/user/:id", delete(route_user_kick))
             .route("/team", get(route_team))
@@ -481,9 +522,8 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             .route("/user/:id", get(route_public_user))
             .route("/team/:id", get(route_public_team))
             .route("/og-image.png", get(route_default_og_image))
-            .with_state(router_state.clone());
-
-        let rhombus_router = rhombus_router.merge(upload_router);
+            .with_state(router_state.clone())
+            .merge(upload_router);
 
         let router = if self.num_plugins > 0 {
             Router::new()

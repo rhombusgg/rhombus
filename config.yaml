@@ -2,6 +2,8 @@
 location_url: http://localhost:3000
 database_url: file://rhombus.db
 in_memory_cache: 60
+local_upload_provider:
+  folder: uploads
 discord:
   guild_id: 1160610137703186636
   client_id: 1160076447977848945

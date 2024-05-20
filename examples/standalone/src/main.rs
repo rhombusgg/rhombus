@@ -15,9 +15,7 @@ async fn main() {
         .config_override("location_url", "http://localhost:3000")
         .config_source(rhombus::config::File::with_name("config"))
         .extractor(rhombus::ip::maybe_peer_ip)
-        .upload_provider(rhombus::LocalUploadProvider::new(std::path::PathBuf::from(
-            "uploads",
-        )))
+        // .upload_provider(rhombus::LocalUploadProvider::new("uploads2".into()))
         .build()
         .await
         .unwrap();

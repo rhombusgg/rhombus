@@ -18,17 +18,15 @@ use super::{
     auth::{User, UserInner},
     cache_layer::Writeups,
     database::{
-        Author, Category, Challenge, ChallengeData, ChallengeDivisionPoints, ChallengeSolve,
-        Challenges, Database, Division, FirstBloods, Leaderboard, LeaderboardEntry, Team,
-        TeamInner, TeamMeta, TeamMetaInner, TeamUser, Writeup,
+        Author, Category, Challenge, ChallengeAttachment, ChallengeData, ChallengeDivisionPoints,
+        ChallengeSolve, Challenges, Database, Division, FirstBloods, Leaderboard, LeaderboardEntry,
+        Scoreboard, ScoreboardSeriesPoint, ScoreboardTeam, Team, TeamInner, TeamMeta,
+        TeamMetaInner, TeamUser, Writeup,
     },
     settings::Settings,
     team::create_team_invite_token,
 };
-use crate::{
-    internal::database::{Scoreboard, ScoreboardSeriesPoint, ScoreboardTeam},
-    Result,
-};
+use crate::Result;
 
 #[derive(Clone)]
 pub struct LibSQL {
@@ -249,6 +247,34 @@ impl Database for LibSQL {
             }
         }
 
+        let mut query_challenges = tx
+            .query(
+                "
+                SELECT *
+                FROM rhombus_file_attachment
+            ",
+                (),
+            )
+            .await?;
+        #[derive(Debug, Deserialize)]
+        struct QueryChallengeFileAttachment {
+            challenge_id: i64,
+            name: String,
+            url: String,
+        }
+        let mut attachments = BTreeMap::new();
+        while let Some(row) = query_challenges.next().await? {
+            let query_attachment = de::from_row::<QueryChallengeFileAttachment>(&row).unwrap();
+            let attachment = ChallengeAttachment {
+                name: query_attachment.name,
+                url: query_attachment.url,
+            };
+            match attachments.get_mut(&query_attachment.challenge_id) {
+                None => _ = attachments.insert(query_attachment.challenge_id, vec![attachment]),
+                Some(ws) => ws.push(attachment),
+            };
+        }
+
         let challenge_rows = tx
             .query(
                 "
@@ -286,6 +312,7 @@ impl Database for LibSQL {
                 scoring_type: challenge.score_type.into(),
                 division_points: dbps.get(&challenge.id).unwrap().to_vec(),
                 ticket_template: challenge.ticket_template,
+                attachments: attachments.get(&challenge.id).unwrap_or(&vec![]).to_vec(),
             })
             .collect::<Vec<Challenge>>()
             .await;
