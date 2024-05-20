@@ -3215,6 +3215,7 @@ dependencies = [
  "lazy_static",
  "libsql",
  "listenfd",
+ "mime_guess",
  "minijinja",
  "minijinja-embed 1.0.21",
  "minijinja-embed 2.0.1",

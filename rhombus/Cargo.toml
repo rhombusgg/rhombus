@@ -22,6 +22,7 @@ fluent = "0.16.0"
 intl-memoizer = "0.5.1"
 jsonwebtoken = "9.3.0"
 lazy_static = "1.4.0"
+mime_guess = "2.0.4"
 minijinja = { version = "2.0.1", default-features = false, features = [
   "builtins",
   "multi_template",
@@ -30,6 +31,7 @@ minijinja = { version = "2.0.1", default-features = false, features = [
 ] }
 minijinja-embed = "2.0.1"
 pin-project-lite = "0.2.14"
+poise = "0.6.1"
 rand = "0.8.5"
 reqwest = { version = "0.12.4", default-features = false, features = [
   "rustls-tls",
@@ -39,19 +41,18 @@ resvg = "0.41.0"
 rust-embed = "8.3.0"
 serde = { version = "1.0.198", features = ["derive"] }
 serde_json = "1.0.116"
+serenity = "0.12.1"
 thiserror = "1.0.59"
 time = "0.3.36"
 tokio = { version = "1.37.0", features = ["full"] }
 tokio-util = { version = "0.7.11", features = ["io"] }
 tower = "0.4.13"
+tower_governor = { version = "0.4.2" }
 tower-http = { version = "0.5.2", features = ["compression-full", "fs"] }
 tower-livereload = "0.9.2"
-tower_governor = { version = "0.4.2" }
 tracing = "0.1.40"
-unicode-segmentation = "1.11.0"
 unic-langid = { version = "0.9.4", features = ["unic-langid-macros"] }
-serenity = "0.12.1"
-poise = "0.6.1"
+unicode-segmentation = "1.11.0"
 
 futures = { version = "0.3.30", optional = true }
 libsql = { git = 'https://github.com/tursodatabase/libsql.git', optional = true, features = [

@@ -13,6 +13,7 @@ pub mod public;
 pub mod router;
 pub mod scoreboard;
 pub mod settings;
+pub mod static_serve;
 pub mod team;
 pub mod upload_provider;
 

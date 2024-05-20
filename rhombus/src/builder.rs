@@ -9,7 +9,7 @@ use axum::{
 };
 use tokio::sync::RwLock;
 use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
-use tower_http::{compression::CompressionLayer, services::ServeDir};
+use tower_http::compression::CompressionLayer;
 use tracing::info;
 
 use crate::{
@@ -40,14 +40,13 @@ use crate::{
         router::RouterStateInner,
         scoreboard::{route_scoreboard, route_scoreboard_division},
         settings::{DbConfig, IpPreset, Settings},
+        static_serve::route_static_serve,
         team::{route_team, route_team_roll_token, route_team_set_name, route_user_kick},
         upload_provider::route_upload_file,
     },
     upload_provider::UploadProvider,
     LocalUploadProvider, Plugin, Result,
 };
-
-static STATIC_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/static");
 
 pub fn builder() -> Builder<(), ()> {
     Builder::default()
@@ -512,7 +511,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 get(route_challenge_view).post(route_challenge_submit),
             )
             .route_layer(middleware::from_fn(enforce_auth_middleware))
-            .nest_service("/static", ServeDir::new(STATIC_DIR))
+            .route("/static/:file", get(route_static_serve))
             .route("/", get(route_home))
             .route("/signout", get(route_signout))
             .route("/signin", get(route_signin))

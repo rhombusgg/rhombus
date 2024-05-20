@@ -24,7 +24,7 @@
   - [x] Local file provider
   - [ ] In database file provider
   - [ ] S3 file provider
-- [ ] Single static binary
+- [x] Single static binary
 - [x] User pages
   - [ ] Admin geoip view
 - [x] Team pages
