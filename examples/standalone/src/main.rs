@@ -16,6 +16,11 @@ async fn main() {
         .config_source(rhombus::config::File::with_name("config"))
         .extractor(rhombus::ip::maybe_peer_ip)
         // .upload_provider(rhombus::LocalUploadProvider::new("uploads2".into()))
+        .plugin(
+            rhombus::challenge_loader_plugin::ChallengeLoaderPlugin::new(std::path::Path::new(
+                "challenges",
+            )),
+        )
         .build()
         .await
         .unwrap();

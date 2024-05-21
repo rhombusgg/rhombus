@@ -43,7 +43,7 @@
 - [ ] Email-only accounts
   - [ ] Email confirmation
   - [ ] Gravatar lookup
-- [ ] Challenge loader plugin
+- [x] Challenge loader plugin
 - [ ] API
   - [ ] Access tokens
 - [ ] Documentation/marketing site

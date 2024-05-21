@@ -959,7 +959,7 @@ impl Database for LibSQL {
 
         let num_pages = (num_teams + (PAGE_SIZE - 1)) / PAGE_SIZE;
 
-        let page = page.min(num_pages - 1);
+        let page = page.min(num_pages);
 
         #[derive(Debug, Deserialize)]
         struct DbLeaderboard {

@@ -17,6 +17,7 @@ pub use minijinja;
 /// Builder module
 mod builder;
 
+pub mod challenge_loader_plugin;
 mod local_upload_provider;
 mod plugin;
 mod upload_provider;
