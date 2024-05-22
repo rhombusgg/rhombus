@@ -7,14 +7,15 @@ async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env()
-                .or_else(|_| EnvFilter::try_new("rhombus=trace"))
+                .or_else(|_| EnvFilter::try_new("rhombus=trace,plugin=trace"))
                 .unwrap(),
         )
         .init();
 
     let app = rhombus::Builder::default()
         .load_env()
-        .config_override("database_url", "postgres://postgres:password@localhost")
+        // .config_override("database_url", "postgres://postgres:password@localhost")
+        // .upload_provider(rhombus::LocalUploadProvider::new("uploads".into()))
         .plugin(plugin::MyPlugin::new(3))
         .build()
         .await

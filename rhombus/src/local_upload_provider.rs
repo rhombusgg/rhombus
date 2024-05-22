@@ -12,10 +12,7 @@ use tokio_util::io::StreamReader;
 
 use crate::{
     errors::RhombusError,
-    internal::{
-        local_upload_provider::{route_local_download, vec_to_hex_string, HashRead},
-        router::RouterState,
-    },
+    internal::local_upload_provider::{route_local_download, vec_to_hex_string, HashRead},
     upload_provider::UploadProvider,
     Result,
 };
@@ -23,27 +20,18 @@ use crate::{
 #[derive(Clone)]
 pub struct LocalUploadProvider {
     pub base_path: PathBuf,
-    pub rhombus_state: Option<RouterState>,
 }
 
 impl LocalUploadProvider {
     pub fn new(base_filepath: PathBuf) -> LocalUploadProvider {
         LocalUploadProvider {
             base_path: base_filepath,
-            rhombus_state: None,
         }
     }
 }
 
 #[async_trait]
 impl UploadProvider for LocalUploadProvider {
-    fn build(&self, rhombus_state: RouterState) -> Self {
-        Self {
-            base_path: self.base_path.clone(),
-            rhombus_state: Some(rhombus_state),
-        }
-    }
-
     fn routes(&self) -> Result<Router> {
         let provider_state = Arc::new(self.clone());
         let router = Router::new()
@@ -79,17 +67,7 @@ impl UploadProvider for LocalUploadProvider {
             let new_filepath = std::path::Path::new(&self.base_path).join(&new_filename);
             tokio::fs::rename(&filepath, &new_filepath).await?;
 
-            Ok::<_, io::Error>(format!(
-                "{}/uploads/{}",
-                self.rhombus_state
-                    .as_ref()
-                    .unwrap()
-                    .settings
-                    .read()
-                    .await
-                    .location_url,
-                &new_filename
-            ))
+            Ok::<_, io::Error>(format!("/uploads/{}", &new_filename))
         }
         .await
         .map_err(|_| RhombusError::Unknown())

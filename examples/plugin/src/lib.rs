@@ -1,19 +1,15 @@
 use axum::{
-    extract::{FromRef, State},
+    extract::State,
     http::Uri,
-    response::Html,
+    response::{Html, IntoResponse},
     routing, Extension, Router,
 };
 use fluent::FluentResource;
-use minijinja::{context, Environment};
+use minijinja::context;
 use rhombus::{
-    internal::{
-        auth::MaybeTokenClaims,
-        backend_postgres::Postgres,
-        locales::{Languages, Localizations},
-        router::RouterState,
-    },
-    Plugin,
+    internal::{auth::MaybeUser, locales::Languages, router::RouterState},
+    plugin::PluginBuilder,
+    Plugin, UploadProvider,
 };
 use sqlx::Executor;
 
@@ -25,65 +21,59 @@ pub struct MyPlugin {
 #[derive(Clone)]
 struct MyPluginRouterState {
     a: i32,
-    rhombus: Option<RouterState>,
-}
-
-impl FromRef<MyPluginRouterState> for RouterState {
-    fn from_ref(plugin_state: &MyPluginRouterState) -> RouterState {
-        plugin_state.rhombus.clone().unwrap()
-    }
 }
 
 impl MyPlugin {
     pub fn new(a: i32) -> Self {
         Self {
-            state: MyPluginRouterState { a, rhombus: None },
+            state: MyPluginRouterState { a },
         }
     }
 }
 
 impl Plugin for MyPlugin {
-    fn name(&self) -> String {
-        "MyPlugin".to_owned()
-    }
+    async fn run<U: UploadProvider>(
+        &self,
+        builder: &mut PluginBuilder<'_, U>,
+    ) -> rhombus::Result<Router<RouterState>> {
+        builder
+            .env
+            .add_template("home.html", include_str!("../templates/home.html"))?;
 
-    fn theme(&self, jinja: &mut Environment<'static>) -> rhombus::Result<()> {
-        jinja.add_template("home.html", include_str!("../templates/home.html"))?;
-        Ok(())
-    }
-
-    fn routes(&self, state: RouterState) -> Router {
-        Router::new()
-            .route("/", routing::get(route_home))
-            .with_state(MyPluginRouterState {
-                a: self.state.a,
-                rhombus: Some(state),
-            })
-    }
-
-    fn localize(&self, localizations: &mut Localizations) -> rhombus::Result<()> {
-        let res = FluentResource::try_new("test1 = Hello there\nho = Hol".to_string()).unwrap();
-        let bundle = localizations.bundles.get_mut("en").unwrap();
-
+        let res = FluentResource::try_new(
+            "challenges = Challs\ntest1 = Hello there\nho = Hol".to_string(),
+        )
+        .unwrap();
+        let bundle = builder.localizations.bundles.get_mut("en").unwrap();
         bundle.add_resource_overriding(res);
-        Ok(())
-    }
 
-    async fn migrate_postgresql(&self, db: Postgres) -> rhombus::Result<()> {
-        db.pool
-            .execute(include_str!("../migrations/standalone.sql"))
-            .await?;
-        Ok(())
+        match builder.rawdb {
+            rhombus::builder::RawDb::Postgres(db) => {
+                db.execute(include_str!("../migrations/standalone.sql"))
+                    .await?;
+            }
+            rhombus::builder::RawDb::LibSQL(_) => {
+                tracing::error!("Unsupported database type for MyPlugin");
+            }
+        }
+
+        let plugin_state = self.state.clone();
+
+        let router = Router::new()
+            .route("/", routing::get(route_home))
+            .layer(Extension(plugin_state));
+
+        Ok(router)
     }
 }
 
 async fn route_home(
-    rhombus: State<RouterState>,
-    plugin: State<MyPluginRouterState>,
-    Extension(user): Extension<MaybeTokenClaims>,
+    State(rhombus): State<RouterState>,
+    Extension(plugin): Extension<MyPluginRouterState>,
+    Extension(user): Extension<MaybeUser>,
     Extension(lang): Extension<Languages>,
     uri: Uri,
-) -> Html<String> {
+) -> impl IntoResponse {
     let location_url = { rhombus.settings.read().await.location_url.clone() };
 
     Html(

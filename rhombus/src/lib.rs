@@ -15,11 +15,11 @@ pub use config;
 pub use minijinja;
 
 /// Builder module
-mod builder;
+pub mod builder;
 
 pub mod challenge_loader_plugin;
 mod local_upload_provider;
-mod plugin;
+pub mod plugin;
 mod upload_provider;
 
 #[cfg(feature = "systemfd")]

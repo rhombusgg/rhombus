@@ -44,9 +44,18 @@ use crate::{
         team::{route_team, route_team_roll_token, route_team_set_name, route_user_kick},
         upload_provider::route_upload_file,
     },
+    plugin::PluginBuilder,
     upload_provider::UploadProvider,
     LocalUploadProvider, Plugin, Result,
 };
+
+pub enum RawDb {
+    #[cfg(feature = "postgres")]
+    Postgres(sqlx::postgres::PgPool),
+
+    #[cfg(feature = "libsql")]
+    LibSQL(libsql::Connection),
+}
 
 pub fn builder() -> Builder<(), ()> {
     Builder::default()
@@ -57,7 +66,7 @@ pub struct Builder<P: Plugin, U: UploadProvider + Send + Sync> {
     plugins: P,
     num_plugins: u32,
     database: Option<DbConfig>,
-    upload_provider: Option<Arc<U>>,
+    upload_provider: Option<U>,
     config_builder: config::ConfigBuilder<config::builder::DefaultState>,
     ip_extractor: Option<IpExtractorFn>,
 }
@@ -159,7 +168,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             config_builder: self.config_builder,
             database: self.database,
             ip_extractor: self.ip_extractor,
-            upload_provider: Some(Arc::new(upload_provider)),
+            upload_provider: Some(upload_provider),
         }
     }
 
@@ -174,29 +183,26 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
         }
     }
 
-    async fn build_database(&self, settings: &Settings) -> Result<Connection> {
+    async fn build_database(&self, settings: &Settings) -> Result<(Connection, RawDb)> {
         if let Some(database_config) = &self.database {
             match database_config {
                 #[cfg(feature = "postgres")]
                 DbConfig::RawPostgres(pool) => {
                     info!("Using user preconfigured postgres");
-                    let database =
-                        crate::internal::backend_postgres::Postgres::new(pool.to_owned());
+                    let database = crate::internal::backend_postgres::Postgres::new(pool.clone());
                     database.migrate().await?;
-                    self.plugins.migrate_postgresql(database.clone()).await?;
 
-                    return Ok(Arc::new(database));
+                    return Ok((Arc::new(database), RawDb::Postgres(pool.clone())));
                 }
 
                 #[cfg(feature = "libsql")]
                 DbConfig::RawLibSQL(connection) => {
                     info!("Using user preconfigured libsql connection");
                     let database: crate::internal::backend_libsql::LibSQL =
-                        connection.to_owned().into();
+                        connection.clone().into();
                     database.migrate().await?;
-                    self.plugins.migrate_libsql(database.clone()).await?;
 
-                    return Ok(Arc::new(database));
+                    return Ok((Arc::new(database), RawDb::LibSQL(connection.clone())));
                 }
             }
         }
@@ -216,11 +222,10 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     let pool = sqlx::postgres::PgPoolOptions::new()
                         .connect(database_url)
                         .await?;
-                    let database = crate::internal::backend_postgres::Postgres::new(pool);
+                    let database = crate::internal::backend_postgres::Postgres::new(pool.clone());
                     database.migrate().await?;
-                    self.plugins.migrate_postgresql(database.clone()).await?;
 
-                    return Ok(Arc::new(database));
+                    return Ok((Arc::new(database), RawDb::Postgres(pool)));
                 }
             }
 
@@ -239,10 +244,10 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 {
                     info!(database_url, "Connecting to local file libsql database");
                     let database = crate::internal::backend_libsql::LibSQL::new_local(path).await?;
+                    let inner = database.db.clone();
                     database.migrate().await?;
-                    self.plugins.migrate_libsql(database.clone()).await?;
 
-                    return Ok(Arc::new(database));
+                    return Ok((Arc::new(database), RawDb::LibSQL(inner)));
                 }
             }
 
@@ -279,16 +284,38 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                             )
                             .await?
                         };
+                        let inner = database.db.clone();
                         database.migrate().await?;
-                        self.plugins.migrate_libsql(database.clone()).await?;
 
-                        return Ok(Arc::new(database));
+                        return Ok((Arc::new(database), RawDb::LibSQL(inner)));
                     }
                 } else {
                     return Err(RhombusError::MissingConfiguration(format!(
                         "libsql.auth_token must be set for url {}",
                         database_url
                     )));
+                }
+            }
+
+            if database_url == ":memory:" {
+                #[cfg(not(feature = "libsql"))]
+                {
+                    _ = path;
+                    return Err(DatabaseConfigurationError::MissingFeature(
+                        "libsql".to_owned(),
+                        database_url.to_owned(),
+                    )
+                    .into());
+                }
+
+                #[cfg(feature = "libsql")]
+                {
+                    info!(database_url, "Connecting to in memory libsql database");
+                    let database = crate::internal::backend_libsql::LibSQL::new_memory().await?;
+                    let inner = database.db.clone();
+                    database.migrate().await?;
+
+                    return Ok((Arc::new(database), RawDb::LibSQL(inner)));
                 }
             }
 
@@ -304,10 +331,10 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 "Falling back to local database"
             );
             let database = crate::internal::backend_libsql::LibSQL::new_local("rhombus.db").await?;
+            let inner = database.db.clone();
             database.migrate().await?;
-            self.plugins.migrate_libsql(database.clone()).await?;
 
-            Ok(Arc::new(database))
+            Ok((Arc::new(database), RawDb::LibSQL(inner)))
         }
 
         #[cfg(not(feature = "libsql"))]
@@ -336,13 +363,78 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             .build()?
             .try_deserialize()?;
 
-        self.plugins.name();
-
-        let db = self.build_database(&settings).await?;
+        let (db, rawdb) = self.build_database(&settings).await?;
 
         db.load_settings(&mut settings).await?;
         db.save_settings(&settings).await?;
-        let settings = settings;
+
+        let mut localizer = locales::Localizations::new();
+
+        let mut env = minijinja::Environment::new();
+        minijinja_embed::load_templates!(&mut env);
+
+        env.add_function("timediff", jinja_timediff);
+
+        let (plugin_router, upload_router) = if let Some(upload_provider) = self.upload_provider {
+            let router = upload_provider.routes()?;
+
+            let mut plugin_builder = PluginBuilder {
+                upload_provider: &upload_provider,
+                env: &mut env,
+                rawdb: &rawdb,
+                localizations: &mut localizer,
+                settings: &mut settings,
+            };
+            let plugin_router = self.plugins.run(&mut plugin_builder).await?;
+
+            let state = Arc::new(upload_provider);
+            let upload_router = Router::new()
+                .route("/upload/:path", post(route_upload_file::<U>))
+                .with_state(state)
+                .merge(router);
+
+            (plugin_router, upload_router)
+        } else {
+            let base_path =
+                if let Some(local_upload_provider_options) = &settings.local_upload_provider {
+                    let base_path = &local_upload_provider_options.folder;
+                    tracing::info!(
+                        folder = base_path.as_str(),
+                        "Using configured local upload provider"
+                    );
+                    base_path.into()
+                } else {
+                    tracing::warn!(
+                        folder = "uploads",
+                        "No upload provider set, using local upload provider"
+                    );
+                    "uploads".into()
+                };
+
+            let local_upload_provider = LocalUploadProvider::new(base_path);
+
+            let router = local_upload_provider.routes()?;
+
+            let mut plugin_builder = PluginBuilder {
+                upload_provider: &local_upload_provider,
+                env: &mut env,
+                rawdb: &rawdb,
+                localizations: &mut localizer,
+                settings: &mut settings,
+            };
+            let plugin_router = self.plugins.run(&mut plugin_builder).await?;
+
+            let state = Arc::new(local_upload_provider);
+            let upload_router = Router::new()
+                .route(
+                    "/upload/:path",
+                    post(route_upload_file::<LocalUploadProvider>),
+                )
+                .with_state(state)
+                .merge(router);
+
+            (plugin_router, upload_router)
+        };
 
         let db = match settings.in_memory_cache.as_str() {
             "false" => {
@@ -380,24 +472,6 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
 
         discord_cache_evictor();
 
-        let mut localizer = locales::Localizations::new();
-        self.plugins.localize(&mut localizer)?;
-        let localizer = Arc::new(localizer);
-
-        let mut env = minijinja::Environment::new();
-        minijinja_embed::load_templates!(&mut env);
-
-        let l = localizer.clone();
-        env.add_function(
-            "t",
-            move |msg_id: &str, kwargs: minijinja::value::Kwargs, state: &minijinja::State| {
-                jinja_translate(l.clone(), msg_id, kwargs, state)
-            },
-        );
-        env.add_function("timediff", jinja_timediff);
-
-        self.plugins.theme(&mut env)?;
-
         let ip_extractor = self.ip_extractor.or_else(|| {
             settings.ip_preset.clone().map(|preset| match preset {
                 IpPreset::RightmostXForwardedFor => {
@@ -433,6 +507,15 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
         let s = Arc::new(RwLock::new(settings));
         let bot = Bot::new(s.clone(), db.clone()).await;
 
+        let localizer = Arc::new(localizer);
+        let l = localizer.clone();
+        env.add_function(
+            "t",
+            move |msg_id: &str, kwargs: minijinja::value::Kwargs, state: &minijinja::State| {
+                jinja_translate(l.clone(), msg_id, kwargs, state)
+            },
+        );
+
         let router_state = Arc::new(RouterStateInner {
             db: db.clone(),
             bot,
@@ -441,54 +524,6 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             settings: s.clone(),
             ip_extractor: ip_extractor.unwrap_or(default_ip_extractor),
         });
-
-        let upload_router = if let Some(upload_provider) = self.upload_provider.as_ref() {
-            let upload_provider = upload_provider.build(router_state.clone());
-            let upload_router = upload_provider.routes()?;
-            let upload_provider_state = Arc::new(upload_provider);
-            Router::new()
-                .route("/upload/:path", post(route_upload_file::<U>))
-                .with_state(upload_provider_state)
-                .route_layer(middleware::from_fn(enforce_admin_middleware))
-                .merge(upload_router)
-        } else {
-            let base_path = if let Some(local_upload_provider_options) =
-                &s.read().await.local_upload_provider
-            {
-                let base_path = &local_upload_provider_options.folder;
-                tracing::info!(
-                    folder = base_path.as_str(),
-                    "Using configured local upload provider"
-                );
-                base_path.into()
-            } else {
-                tracing::warn!(
-                    folder = "uploads",
-                    "No upload provider set, using local upload provider"
-                );
-                "uploads".into()
-            };
-
-            let local_upload_provider = LocalUploadProvider::new(base_path);
-            let local_upload_provider = local_upload_provider.build(router_state.clone());
-            let upload_router = local_upload_provider.routes()?;
-            let upload_provider_state = Arc::new(local_upload_provider);
-
-            Router::new()
-                .route(
-                    "/upload/:path",
-                    post(route_upload_file::<LocalUploadProvider>),
-                )
-                .with_state(upload_provider_state)
-                .route_layer(middleware::from_fn(enforce_admin_middleware))
-                .layer(middleware::from_fn_with_state(
-                    router_state.clone(),
-                    auth_injector_middleware,
-                ))
-                .merge(upload_router)
-        };
-
-        let plugin_router = self.plugins.routes(router_state.clone());
 
         let rhombus_router = Router::new()
             .fallback(handler_404)
@@ -522,12 +557,19 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             .route("/team/:id", get(route_public_team))
             .route("/og-image.png", get(route_default_og_image))
             .with_state(router_state.clone())
-            .merge(upload_router);
+            .merge(
+                upload_router
+                    .route_layer(middleware::from_fn(enforce_admin_middleware))
+                    .layer(middleware::from_fn_with_state(
+                        router_state.clone(),
+                        auth_injector_middleware,
+                    )),
+            );
 
         let router = if self.num_plugins > 0 {
             Router::new()
                 .fallback_service(rhombus_router)
-                .nest("/", plugin_router)
+                .nest("/", plugin_router.with_state(router_state.clone()))
         } else {
             rhombus_router
         };

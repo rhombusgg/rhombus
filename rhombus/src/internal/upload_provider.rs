@@ -10,14 +10,10 @@ use axum::{
 use futures::Stream;
 use reqwest::StatusCode;
 
-use crate::{internal::router::RouterState, Result, UploadProvider};
+use crate::{Result, UploadProvider};
 
 #[async_trait]
 impl UploadProvider for () {
-    fn build(&self, _rhombus_state: RouterState) -> Self {
-        unreachable!()
-    }
-
     fn routes(&self) -> Result<Router> {
         unreachable!()
     }
