@@ -15,8 +15,14 @@ async fn main() {
     let app = rhombus::Builder::default()
         .load_env()
         // .config_override("database_url", "postgres://postgres:password@localhost")
-        // .upload_provider(rhombus::LocalUploadProvider::new("uploads".into()))
+        .upload_provider(rhombus::LocalUploadProvider::new("uploads".into()))
+        .plugin(())
         .plugin(plugin::MyPlugin::new(3))
+        .plugin(
+            rhombus::challenge_loader_plugin::ChallengeLoaderPlugin::new(std::path::Path::new(
+                "challenges",
+            )),
+        )
         .build()
         .await
         .unwrap();

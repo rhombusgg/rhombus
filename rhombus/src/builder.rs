@@ -42,9 +42,8 @@ use crate::{
         settings::{DbConfig, IpPreset, Settings},
         static_serve::route_static_serve,
         team::{route_team, route_team_roll_token, route_team_set_name, route_user_kick},
-        upload_provider::route_upload_file,
     },
-    plugin::PluginBuilder,
+    plugin::{RunContext, UploadProviderContext},
     upload_provider::UploadProvider,
     LocalUploadProvider, Plugin, Result,
 };
@@ -61,7 +60,16 @@ pub fn builder() -> Builder<(), ()> {
     Builder::default()
 }
 
-/// A builder to make an axum router
+/// Build a Rhombus application.
+///
+/// ## Order of execution
+///
+/// 1. Load settings and configuration from file
+/// 2. Connect to database and execute migrations
+/// 3. Load settings from database (if mutable configuration is enabled)
+/// 4. Execute plugins
+/// 5. Merge routers and return the final router
+///
 pub struct Builder<P: Plugin, U: UploadProvider + Send + Sync> {
     plugins: P,
     num_plugins: u32,
@@ -375,66 +383,81 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
 
         env.add_function("timediff", jinja_timediff);
 
-        let (plugin_router, upload_router) = if let Some(upload_provider) = self.upload_provider {
-            let router = upload_provider.routes()?;
+        let plugin_upload_provider_builder = UploadProviderContext {
+            rawdb: &rawdb,
+            settings: &settings.clone(),
+            db: db.clone(),
+        };
+        let plugin_upload_provider = self
+            .plugins
+            .upload_provider(&plugin_upload_provider_builder)
+            .await;
 
-            let mut plugin_builder = PluginBuilder {
-                upload_provider: &upload_provider,
-                env: &mut env,
-                rawdb: &rawdb,
-                localizations: &mut localizer,
-                settings: &mut settings,
-            };
-            let plugin_router = self.plugins.run(&mut plugin_builder).await?;
+        let (plugin_router, upload_router) =
+            if let Some(plugin_upload_provider) = plugin_upload_provider {
+                let upload_router = plugin_upload_provider.routes()?;
 
-            let state = Arc::new(upload_provider);
-            let upload_router = Router::new()
-                .route("/upload/:path", post(route_upload_file::<U>))
-                .with_state(state)
-                .merge(router);
-
-            (plugin_router, upload_router)
-        } else {
-            let base_path =
-                if let Some(local_upload_provider_options) = &settings.local_upload_provider {
-                    let base_path = &local_upload_provider_options.folder;
-                    tracing::info!(
-                        folder = base_path.as_str(),
-                        "Using configured local upload provider"
-                    );
-                    base_path.into()
-                } else {
-                    tracing::warn!(
-                        folder = "uploads",
-                        "No upload provider set, using local upload provider"
-                    );
-                    "uploads".into()
+                let mut plugin_builder = RunContext {
+                    upload_provider: &plugin_upload_provider,
+                    env: &mut env,
+                    rawdb: &rawdb,
+                    localizations: &mut localizer,
+                    settings: &mut settings,
+                    db: db.clone(),
                 };
 
-            let local_upload_provider = LocalUploadProvider::new(base_path);
+                let plugin_router = self.plugins.run(&mut plugin_builder).await?;
 
-            let router = local_upload_provider.routes()?;
+                (plugin_router, upload_router)
+            } else if let Some(upload_provider) = self.upload_provider {
+                let upload_router = upload_provider.routes()?;
 
-            let mut plugin_builder = PluginBuilder {
-                upload_provider: &local_upload_provider,
-                env: &mut env,
-                rawdb: &rawdb,
-                localizations: &mut localizer,
-                settings: &mut settings,
+                let mut plugin_builder = RunContext {
+                    upload_provider: &upload_provider,
+                    env: &mut env,
+                    rawdb: &rawdb,
+                    localizations: &mut localizer,
+                    settings: &mut settings,
+                    db: db.clone(),
+                };
+
+                let plugin_router = self.plugins.run(&mut plugin_builder).await?;
+
+                (plugin_router, upload_router)
+            } else {
+                let base_path =
+                    if let Some(local_upload_provider_options) = &settings.local_upload_provider {
+                        let base_path = &local_upload_provider_options.folder;
+                        tracing::info!(
+                            folder = base_path.as_str(),
+                            "Using configured local upload provider"
+                        );
+                        base_path.into()
+                    } else {
+                        tracing::warn!(
+                            folder = "uploads",
+                            "No upload provider set, using local upload provider"
+                        );
+                        "uploads".into()
+                    };
+
+                let local_upload_provider = LocalUploadProvider::new(base_path);
+
+                let upload_router = local_upload_provider.routes()?;
+
+                let mut plugin_builder = RunContext {
+                    upload_provider: &local_upload_provider,
+                    env: &mut env,
+                    rawdb: &rawdb,
+                    localizations: &mut localizer,
+                    settings: &mut settings,
+                    db: db.clone(),
+                };
+
+                let plugin_router = self.plugins.run(&mut plugin_builder).await?;
+
+                (plugin_router, upload_router)
             };
-            let plugin_router = self.plugins.run(&mut plugin_builder).await?;
-
-            let state = Arc::new(local_upload_provider);
-            let upload_router = Router::new()
-                .route(
-                    "/upload/:path",
-                    post(route_upload_file::<LocalUploadProvider>),
-                )
-                .with_state(state)
-                .merge(router);
-
-            (plugin_router, upload_router)
-        };
 
         let db = match settings.in_memory_cache.as_str() {
             "false" => {

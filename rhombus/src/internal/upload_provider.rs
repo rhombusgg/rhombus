@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use axum::{
     body::Bytes,
     extract::{Path, Request, State},
@@ -12,7 +11,6 @@ use reqwest::StatusCode;
 
 use crate::{Result, UploadProvider};
 
-#[async_trait]
 impl UploadProvider for () {
     fn routes(&self) -> Result<Router> {
         unreachable!()
@@ -31,7 +29,7 @@ impl UploadProvider for () {
     }
 }
 
-pub async fn route_upload_file<U: UploadProvider + Send + Sync>(
+pub async fn route_upload_file<U: UploadProvider>(
     State(upload_provider): State<Arc<U>>,
     Path(file_name): Path<String>,
     request: Request,

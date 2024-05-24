@@ -8,8 +8,8 @@ use fluent::FluentResource;
 use minijinja::context;
 use rhombus::{
     internal::{auth::MaybeUser, locales::Languages, router::RouterState},
-    plugin::PluginBuilder,
-    Plugin, UploadProvider,
+    plugin::{RunContext, UploadProviderContext},
+    LocalUploadProvider, Plugin, UploadProvider,
 };
 use sqlx::Executor;
 
@@ -32,11 +32,24 @@ impl MyPlugin {
 }
 
 impl Plugin for MyPlugin {
+    async fn upload_provider(
+        &self,
+        _: &UploadProviderContext<'_>,
+    ) -> Option<impl UploadProvider + Send + Sync> {
+        if self.state.a == 3 {
+            tracing::info!(self.state.a, "Using plugin upload provider");
+            let local = LocalUploadProvider::new("myplugin-uploads".into());
+            Some(local)
+        } else {
+            None
+        }
+    }
+
     async fn run<U: UploadProvider>(
         &self,
-        builder: &mut PluginBuilder<'_, U>,
+        context: &mut RunContext<'_, U>,
     ) -> rhombus::Result<Router<RouterState>> {
-        builder
+        context
             .env
             .add_template("home.html", include_str!("../templates/home.html"))?;
 
@@ -44,10 +57,10 @@ impl Plugin for MyPlugin {
             "challenges = Challs\ntest1 = Hello there\nho = Hol".to_string(),
         )
         .unwrap();
-        let bundle = builder.localizations.bundles.get_mut("en").unwrap();
+        let bundle = context.localizations.bundles.get_mut("en").unwrap();
         bundle.add_resource_overriding(res);
 
-        match builder.rawdb {
+        match context.rawdb {
             rhombus::builder::RawDb::Postgres(db) => {
                 db.execute(include_str!("../migrations/standalone.sql"))
                     .await?;

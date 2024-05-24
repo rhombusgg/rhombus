@@ -1,7 +1,10 @@
 use std::{io, path::PathBuf, sync::Arc};
 
-use async_trait::async_trait;
-use axum::{body::Bytes, routing::get, Router};
+use axum::{
+    body::Bytes,
+    routing::{get, post},
+    Router,
+};
 use futures::{Stream, TryStreamExt};
 use rand::{
     distributions::{Alphanumeric, DistString},
@@ -12,7 +15,10 @@ use tokio_util::io::StreamReader;
 
 use crate::{
     errors::RhombusError,
-    internal::local_upload_provider::{route_local_download, vec_to_hex_string, HashRead},
+    internal::{
+        local_upload_provider::{route_local_download, vec_to_hex_string, HashRead},
+        upload_provider::route_upload_file,
+    },
     upload_provider::UploadProvider,
     Result,
 };
@@ -30,12 +36,12 @@ impl LocalUploadProvider {
     }
 }
 
-#[async_trait]
 impl UploadProvider for LocalUploadProvider {
     fn routes(&self) -> Result<Router> {
         let provider_state = Arc::new(self.clone());
         let router = Router::new()
             .route("/uploads/:hash_filename", get(route_local_download))
+            .route("/upload/:path", post(route_upload_file::<Self>))
             .with_state(provider_state);
         Ok(router)
     }

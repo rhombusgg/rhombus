@@ -16,7 +16,7 @@ use tokio_util::{
     codec::{BytesCodec, FramedRead},
 };
 
-use crate::{internal::router::RouterState, plugin::PluginBuilder, Plugin, Result, UploadProvider};
+use crate::{internal::router::RouterState, plugin::RunContext, Plugin, Result, UploadProvider};
 
 pub struct ChallengeLoaderPlugin {
     pub config: ChallengeLoaderConfiguration,
@@ -95,9 +95,9 @@ impl ChallengeLoaderPlugin {
 impl Plugin for ChallengeLoaderPlugin {
     async fn run<U: UploadProvider>(
         &self,
-        builder: &mut PluginBuilder<'_, U>,
+        context: &mut RunContext<'_, U>,
     ) -> Result<Router<RouterState>> {
-        match builder.rawdb {
+        match context.rawdb {
             #[cfg(feature = "postgres")]
             crate::builder::RawDb::Postgres(_) => panic!("Postgres not supported"),
 
@@ -261,7 +261,7 @@ impl Plugin for ChallengeLoaderPlugin {
                                 })
                                 .try_flatten_stream();
 
-                            builder
+                            context
                                 .upload_provider
                                 .upload(src.file_name().unwrap().to_str().unwrap(), stream)
                                 .await
