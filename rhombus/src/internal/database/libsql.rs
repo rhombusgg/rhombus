@@ -14,19 +14,23 @@ use libsql::{de, params, Builder};
 use rust_embed::RustEmbed;
 use serde::Deserialize;
 
-use super::{
-    auth::{User, UserInner},
-    cache_layer::Writeups,
-    database::{
-        Author, Category, Challenge, ChallengeAttachment, ChallengeData, ChallengeDivisionPoints,
-        ChallengeSolve, Challenges, Database, Division, FirstBloods, Leaderboard, LeaderboardEntry,
-        Scoreboard, ScoreboardSeriesPoint, ScoreboardTeam, Team, TeamInner, TeamMeta,
-        TeamMetaInner, TeamUser, Writeup,
+use crate::{
+    internal::{
+        auth::{User, UserInner},
+        database::{
+            cache::Writeups,
+            provider::{
+                Author, Category, Challenge, ChallengeAttachment, ChallengeData,
+                ChallengeDivisionPoints, ChallengeSolve, Challenges, Database, Division, Email,
+                FirstBloods, Leaderboard, LeaderboardEntry, Scoreboard, ScoreboardSeriesPoint,
+                ScoreboardTeam, Team, TeamInner, TeamMeta, TeamMetaInner, TeamUser, Writeup,
+            },
+        },
+        routes::{account::generate_email_callback_code, team::create_team_invite_token},
+        settings::Settings,
     },
-    settings::Settings,
-    team::create_team_invite_token,
+    Result,
 };
-use crate::Result;
 
 #[derive(Clone)]
 pub struct LibSQL {
@@ -1004,13 +1008,80 @@ impl Database for LibSQL {
             num_pages,
         })
     }
+
+    async fn get_emails_for_user_id(&self, user_id: i64) -> Result<Vec<Email>> {
+        #[derive(Debug, Deserialize)]
+        struct QueryEmail {
+            email: String,
+            code: Option<String>,
+        }
+
+        let emails = self
+            .db
+            .query(
+                "SELECT email, code FROM rhombus_email WHERE user_id = ?1",
+                [user_id],
+            )
+            .await?
+            .into_stream()
+            .map(|row| {
+                let email = de::from_row::<QueryEmail>(&row.unwrap()).unwrap();
+                Email {
+                    address: email.email,
+                    verified: email.code.is_none(),
+                }
+            })
+            .collect::<Vec<_>>()
+            .await;
+
+        Ok(emails)
+    }
+
+    async fn create_email_callback_code(&self, user_id: i64, email: &str) -> Result<String> {
+        let code = generate_email_callback_code();
+
+        self.db
+            .execute(
+                "INSERT INTO rhombus_email (email, user_id, code) VALUES (?1, ?2, ?3)",
+                params!(email, user_id, code.as_str()),
+            )
+            .await?;
+
+        Ok(code)
+    }
+
+    async fn verify_email_callback_code(&self, code: &str) -> Result<()> {
+        self.db
+            .execute(
+                "
+                UPDATE rhombus_email
+                SET code = NULL
+                WHERE code = ?1
+            ",
+                [code],
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    async fn delete_email(&self, user_id: i64, email: &str) -> Result<()> {
+        self.db
+            .execute(
+                "DELETE FROM rhombus_email WHERE user_id = ?1 AND email = ?2",
+                params!(user_id, email),
+            )
+            .await?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod test {
     use std::net::IpAddr;
 
-    use crate::internal::{backend_libsql::LibSQL, database::Database};
+    use crate::internal::database::{libsql::LibSQL, provider::Database};
 
     #[tokio::test]
     async fn migrate_libsql() {

@@ -10,13 +10,17 @@ use serenity::{
 };
 use tokio::sync::RwLock;
 
-use super::{
-    auth::User,
-    database::{Author, Category, Challenge, Connection, Division, FirstBloods, Team},
-    settings::Settings,
+use crate::{
+    errors::RhombusError,
+    internal::{
+        auth::User,
+        database::provider::{
+            Author, Category, Challenge, Connection, Division, FirstBloods, Team,
+        },
+        settings::Settings,
+    },
+    Result,
 };
-
-use crate::{errors::RhombusError, Result};
 
 pub struct Bot {
     http: Arc<Http>,

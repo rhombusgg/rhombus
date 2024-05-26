@@ -4,9 +4,10 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 
-use crate::{internal::auth::User, Result};
-
-use super::{cache_layer::Writeups, settings::Settings};
+use crate::{
+    internal::{auth::User, database::cache::Writeups, settings::Settings},
+    Result,
+};
 
 pub type Connection = Arc<dyn Database + Send + Sync>;
 
@@ -158,6 +159,12 @@ pub struct Leaderboard {
     pub entries: Vec<LeaderboardEntry>,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct Email {
+    pub address: String,
+    pub verified: bool,
+}
+
 #[async_trait]
 pub trait Database {
     async fn migrate(&self) -> Result<()>;
@@ -210,4 +217,8 @@ pub trait Database {
     async fn load_settings(&self, settings: &mut Settings) -> Result<()>;
     async fn get_scoreboard(&self, division_id: i64) -> Result<Scoreboard>;
     async fn get_leaderboard(&self, division_id: i64, page: u64) -> Result<Leaderboard>;
+    async fn get_emails_for_user_id(&self, user_id: i64) -> Result<Vec<Email>>;
+    async fn create_email_callback_code(&self, user_id: i64, email: &str) -> Result<String>;
+    async fn verify_email_callback_code(&self, code: &str) -> Result<()>;
+    async fn delete_email(&self, user_id: i64, email: &str) -> Result<()>;
 }

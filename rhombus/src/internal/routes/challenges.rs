@@ -11,7 +11,7 @@ use minijinja::context;
 use serde::Deserialize;
 use serde_json::json;
 
-use super::{auth::User, locales::Languages, router::RouterState};
+use crate::internal::{auth::User, locales::Languages, router::RouterState};
 
 pub async fn route_challenges(
     state: State<RouterState>,

@@ -37,6 +37,15 @@ pub enum RhombusError {
 
     #[error("Discord: {0}")]
     Discord(#[from] serenity::Error),
+
+    #[error("Email: {0}")]
+    Email(#[from] lettre::address::AddressError),
+
+    #[error("Email: {0}")]
+    Email2(#[from] lettre::transport::smtp::Error),
+
+    #[error("Email: {0}")]
+    Email3(#[from] lettre::error::Error),
 }
 
 #[derive(Error, Debug)]

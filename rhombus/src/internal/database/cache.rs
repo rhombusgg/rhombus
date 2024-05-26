@@ -4,14 +4,16 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use tokio::sync::RwLock;
 
-use crate::{internal::auth::User, Result};
-
-use super::{
-    database::{
-        Challenge, Challenges, Connection, Database, FirstBloods, Leaderboard, Scoreboard, Team,
-        TeamMeta, Writeup,
+use crate::{
+    internal::{
+        auth::User,
+        database::provider::{
+            Challenge, Challenges, Connection, Database, Email, FirstBloods, Leaderboard,
+            Scoreboard, Team, TeamMeta, Writeup,
+        },
+        settings::Settings,
     },
-    settings::Settings,
+    Result,
 };
 
 #[derive(Clone)]
@@ -209,6 +211,22 @@ impl Database for DbCache {
 
     async fn get_leaderboard(&self, division_id: i64, page: u64) -> Result<Leaderboard> {
         get_leaderboard(&self.inner, division_id, page).await
+    }
+
+    async fn get_emails_for_user_id(&self, user_id: i64) -> Result<Vec<Email>> {
+        self.inner.get_emails_for_user_id(user_id).await
+    }
+
+    async fn create_email_callback_code(&self, user_id: i64, email: &str) -> Result<String> {
+        self.inner.create_email_callback_code(user_id, email).await
+    }
+
+    async fn verify_email_callback_code(&self, code: &str) -> Result<()> {
+        self.inner.verify_email_callback_code(code).await
+    }
+
+    async fn delete_email(&self, user_id: i64, email: &str) -> Result<()> {
+        self.inner.delete_email(user_id, email).await
     }
 }
 

@@ -459,6 +459,10 @@ document.addEventListener("DOMContentLoaded", () => {
     toast.success((event as any).detail.value);
   });
 
+  document.body.addEventListener("errorToast", (event) => {
+    toast.error((event as any).detail.value);
+  });
+
   document.body.addEventListener("pageRefresh", () => {
     location.reload();
   });

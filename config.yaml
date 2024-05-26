@@ -1,6 +1,10 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/rhombusgg/rhombus-rs/main/schema.json
+title: Rhombus
 location_url: http://localhost:3000
 database_url: file://rhombus.db
+contact_email: admin@rhombus.gg
+email:
+  from: Rhombus <nextcloud@mbund.org>
 in_memory_cache: 60
 local_upload_provider:
   folder: uploads

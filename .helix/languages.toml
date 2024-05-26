@@ -2,6 +2,8 @@
 name = "jinja"
 language-servers = ["vscode-html-language-server", "tailwindcss-ls"]
 file-types = ["html"]
+formatter = { command = "npx", args = ["prettier", "--parser", "jinja-template"] }
+auto-format = true
 
 [[language]]
 name = "css"

@@ -1,0 +1,13 @@
+Hello {{ username }},
+
+To verify this email ({{ email }}) for {{ title }}, follow the link below.
+
+{{ verify_url }}
+
+This verification request came from {% if ip -%}
+{{ ip }}
+{%- else -%}
+located in {{ geo.city }}, {{ geo.region }} {{ geo.postal }}, {{ geo.country_name }}
+{%- endif -%}.
+
+If you were not expecting this verification request, you can safely ignore this email. If you are concerned about your account's safety, contact an admin or email us at {{ contact_email }}.

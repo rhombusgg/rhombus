@@ -7,7 +7,7 @@ use axum::{
 use minijinja::context;
 use serde::Deserialize;
 
-use super::{auth::MaybeUser, locales::Languages, router::RouterState};
+use crate::internal::{auth::MaybeUser, locales::Languages, router::RouterState};
 
 pub async fn route_scoreboard(
     state: State<RouterState>,

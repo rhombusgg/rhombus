@@ -3,15 +3,20 @@ use std::{net::IpAddr, num::NonZeroU64};
 use async_trait::async_trait;
 use sqlx::{FromRow, PgPool};
 
-use super::{
-    auth::User,
-    cache_layer::Writeups,
-    database::{
-        Challenge, Challenges, Database, FirstBloods, Leaderboard, Scoreboard, Team, TeamMeta,
+use crate::{
+    internal::{
+        auth::User,
+        database::{
+            cache::Writeups,
+            provider::{
+                Challenge, Challenges, Database, Email, FirstBloods, Leaderboard, Scoreboard, Team,
+                TeamMeta,
+            },
+        },
+        settings::Settings,
     },
-    settings::Settings,
+    Result,
 };
-use crate::Result;
 
 #[derive(Clone)]
 pub struct Postgres {
@@ -195,6 +200,22 @@ impl Database for Postgres {
     async fn get_leaderboard(&self, _division_id: i64, _page: u64) -> Result<Leaderboard> {
         todo!()
     }
+
+    async fn get_emails_for_user_id(&self, _user_id: i64) -> Result<Vec<Email>> {
+        todo!()
+    }
+
+    async fn create_email_callback_code(&self, _user_id: i64, _email: &str) -> Result<String> {
+        todo!()
+    }
+
+    async fn verify_email_callback_code(&self, _code: &str) -> Result<()> {
+        todo!()
+    }
+
+    async fn delete_email(&self, _user_id: i64, _email: &str) -> Result<()> {
+        todo!()
+    }
 }
 
 #[cfg(test)]
@@ -203,7 +224,7 @@ mod test {
     use testcontainers::clients;
     use testcontainers_modules::postgres::Postgres;
 
-    use crate::internal::database::Database;
+    use crate::internal::database::provider::Database;
 
     #[cfg_attr(not(feature = "testcontainers"), ignore)]
     #[tokio::test]
@@ -216,7 +237,7 @@ mod test {
         );
 
         let pool = PgPoolOptions::new().connect(&database_url).await.unwrap();
-        let database = crate::internal::backend_postgres::Postgres::new(pool);
+        let database = crate::internal::database::postgres::Postgres::new(pool);
         database.migrate().await.unwrap();
     }
 }

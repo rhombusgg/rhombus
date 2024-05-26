@@ -84,6 +84,7 @@
                       hx-boost="true"
                       href="/user/{{ player_id }}"
                       class="flex gap-2 items-center"
+                      title="Go to public user profile"
                     >
                       <img
                         class="size-8 rounded-full"
@@ -121,6 +122,34 @@
           {% endcall %}
         {% endcall %}
 
+        {% call card.root() %}
+          {% call card.header() %}
+            {% call card.title() %}
+              Divisions
+            {% endcall %}
+            {% call card.description() %}
+              Join your team to eligable divisions
+            {% endcall %}
+          {% endcall %}
+          {% call card.content() %}
+            <div class="flex flex-col gap-2">
+              <div class="flex items-center justify-between">
+                <div class="text-muted-foreground">Division Name</div>
+                <div class="text-muted-foreground">Joined</div>
+              </div>
+              <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                  Open&nbsp;
+                  <div title="... are ineligiable">(?)</div>
+                </div>
+                <div class="flex items-center">
+                  <input type="checkbox" />
+                </div>
+              </div>
+            </div>
+          {% endcall %}
+        {% endcall %}
+
         {% if user.is_team_owner %}
           {% call card.root() %}
             {% call card.header() %}
@@ -132,21 +161,19 @@
               {% endcall %}
             {% endcall %}
             {% call card.content() %}
-              <div>
-                <h4 class="text-sm">Change name</h4>
-                <p class="text-sm text-muted-foreground mb-2">
-                  Must be between 3 and 30 characters
-                </p>
-                <input
-                  type="text"
-                  name="name"
-                  value="{{ team.name | safe }}"
-                  class="bg-background border p-2 rounded-md w-full focus-visible:outline-none"
-                  hx-post="/team/name"
-                  hx-target="next"
-                />
-                <div></div>
-              </div>
+              <h4 class="text-sm">Change name</h4>
+              <p class="text-sm text-muted-foreground mb-2">
+                Must be between 3 and 30 characters
+              </p>
+              <input
+                type="text"
+                name="name"
+                value="{{ team.name | safe }}"
+                class="bg-background border p-2 rounded-md w-full focus-visible:outline-none"
+                hx-post="/team/name"
+                hx-target="next"
+              />
+              <div></div>
             {% endcall %}
           {% endcall %}
         {% endif %}
@@ -173,6 +200,7 @@
                         hx-boost="true"
                         href="/challenges#{{ challenge.name }}"
                         class="font-bold"
+                        title="Go to challenge"
                       >
                         <span style="color: {{ category.color }}"
                           >{{ category.name }} /
@@ -192,6 +220,7 @@
                       hx-boost="true"
                       href="/user/{{ solve.user_id }}"
                       class="flex items-center gap-2"
+                      title="Go to public user profile"
                     >
                       <span>{{ solver.name }}</span>
                       <img

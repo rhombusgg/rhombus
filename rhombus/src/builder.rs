@@ -15,19 +15,16 @@ use tracing::info;
 use crate::{
     errors::{DatabaseConfigurationError, RhombusError},
     internal::{
-        account::{discord_cache_evictor, route_account},
         auth::{
             auth_injector_middleware, enforce_admin_middleware, enforce_auth_middleware,
             route_discord_callback, route_signin, route_signout,
         },
-        cache_layer::{database_cache_evictor, DbCache},
-        challenges::{
-            route_challenge_submit, route_challenge_view, route_challenges, route_ticket_submit,
-            route_ticket_view, route_writeup_delete, route_writeup_submit,
+        database::{
+            cache::{database_cache_evictor, DbCache},
+            provider::{Connection, Database},
         },
-        database::{Connection, Database},
         discord::Bot,
-        home::route_home,
+        email::{mailer::Mailer, smtp::SmtpProvider},
         ip::{
             default_ip_extractor, ip_insert_blank_middleware, ip_insert_middleware,
             maybe_cf_connecting_ip, maybe_fly_client_ip, maybe_peer_ip,
@@ -38,10 +35,21 @@ use crate::{
         open_graph::route_default_og_image,
         public::{route_public_team, route_public_user},
         router::RouterStateInner,
-        scoreboard::{route_scoreboard, route_scoreboard_division},
+        routes::{
+            account::{
+                discord_cache_evictor, route_account, route_account_add_email,
+                route_account_delete_email, route_account_email_verify_callback,
+            },
+            challenges::{
+                route_challenge_submit, route_challenge_view, route_challenges,
+                route_ticket_submit, route_ticket_view, route_writeup_delete, route_writeup_submit,
+            },
+            home::route_home,
+            scoreboard::{route_scoreboard, route_scoreboard_division},
+            team::{route_team, route_team_roll_token, route_team_set_name, route_user_kick},
+        },
         settings::{DbConfig, IpPreset, Settings},
         static_serve::route_static_serve,
-        team::{route_team, route_team_roll_token, route_team_set_name, route_user_kick},
     },
     plugin::{RunContext, UploadProviderContext},
     upload_provider::UploadProvider,
@@ -197,7 +205,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 #[cfg(feature = "postgres")]
                 DbConfig::RawPostgres(pool) => {
                     info!("Using user preconfigured postgres");
-                    let database = crate::internal::backend_postgres::Postgres::new(pool.clone());
+                    let database = crate::internal::database::postgres::Postgres::new(pool.clone());
                     database.migrate().await?;
 
                     return Ok((Arc::new(database), RawDb::Postgres(pool.clone())));
@@ -206,7 +214,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 #[cfg(feature = "libsql")]
                 DbConfig::RawLibSQL(connection) => {
                     info!("Using user preconfigured libsql connection");
-                    let database: crate::internal::backend_libsql::LibSQL =
+                    let database: crate::internal::database::libsql::LibSQL =
                         connection.clone().into();
                     database.migrate().await?;
 
@@ -230,7 +238,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     let pool = sqlx::postgres::PgPoolOptions::new()
                         .connect(database_url)
                         .await?;
-                    let database = crate::internal::backend_postgres::Postgres::new(pool.clone());
+                    let database = crate::internal::database::postgres::Postgres::new(pool.clone());
                     database.migrate().await?;
 
                     return Ok((Arc::new(database), RawDb::Postgres(pool)));
@@ -251,7 +259,8 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 #[cfg(feature = "libsql")]
                 {
                     info!(database_url, "Connecting to local file libsql database");
-                    let database = crate::internal::backend_libsql::LibSQL::new_local(path).await?;
+                    let database =
+                        crate::internal::database::libsql::LibSQL::new_local(path).await?;
                     let inner = database.db.clone();
                     database.migrate().await?;
 
@@ -278,7 +287,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                                 database_url,
                                 "Connecting to remote libsql database with local replica"
                             );
-                            crate::internal::backend_libsql::LibSQL::new_remote_replica(
+                            crate::internal::database::libsql::LibSQL::new_remote_replica(
                                 local_replica_path,
                                 database_url.to_owned(),
                                 turso.auth_token.to_owned(),
@@ -286,7 +295,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                             .await?
                         } else {
                             info!(database_url, "Connecting to remote libsql database");
-                            crate::internal::backend_libsql::LibSQL::new_remote(
+                            crate::internal::database::libsql::LibSQL::new_remote(
                                 database_url.to_owned(),
                                 turso.auth_token.to_owned(),
                             )
@@ -319,7 +328,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 #[cfg(feature = "libsql")]
                 {
                     info!(database_url, "Connecting to in memory libsql database");
-                    let database = crate::internal::backend_libsql::LibSQL::new_memory().await?;
+                    let database = crate::internal::database::libsql::LibSQL::new_memory().await?;
                     let inner = database.db.clone();
                     database.migrate().await?;
 
@@ -338,7 +347,8 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 database_url = "file://rhombus.db",
                 "Falling back to local database"
             );
-            let database = crate::internal::backend_libsql::LibSQL::new_local("rhombus.db").await?;
+            let database =
+                crate::internal::database::libsql::LibSQL::new_local("rhombus.db").await?;
             let inner = database.db.clone();
             database.migrate().await?;
 
@@ -539,17 +549,41 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             },
         );
 
+        let jinja = Arc::new(env);
+
+        let mailer = if s.clone().read().await.email.is_some() {
+            let mail_provider = SmtpProvider::new(s.clone()).await.unwrap();
+
+            let mailer = Mailer::new(mail_provider, jinja.clone(), s.clone());
+            Some(Arc::new(mailer))
+        } else {
+            None
+        };
+
+        // mailer
+        //     .clone()
+        //     .unwrap()
+        //     .send_email_confirmation("mbund", "::1", "mark@mbund.dev", "345678")
+        //     .await
+        //     .unwrap();
+
         let router_state = Arc::new(RouterStateInner {
             db: db.clone(),
             bot,
-            jinja: env,
+            jinja: jinja.clone(),
             localizer: localizer.clone(),
             settings: s.clone(),
             ip_extractor: ip_extractor.unwrap_or(default_ip_extractor),
+            mailer,
         });
 
         let rhombus_router = Router::new()
             .fallback(handler_404)
+            .route("/account/verify", get(route_account_email_verify_callback))
+            .route(
+                "/account/email",
+                post(route_account_add_email).delete(route_account_delete_email),
+            )
             .route("/account", get(route_account))
             .route("/team/user/:id", delete(route_user_kick))
             .route("/team", get(route_team))

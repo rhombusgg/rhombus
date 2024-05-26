@@ -53,12 +53,19 @@ pub struct Turso {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct LocalUploadProviderOptions {
+pub struct LocalUploadProviderSettings {
     pub folder: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct EmailSettings {
+    pub connection_url: String,
+    pub from: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Settings {
+    pub title: String,
     pub location_url: String,
     pub jwt_secret: String,
     pub database_url: Option<String>,
@@ -68,7 +75,9 @@ pub struct Settings {
     pub live_reload: bool,
     pub default_ticket_template: String,
     pub immutable_config: bool,
-    pub local_upload_provider: Option<LocalUploadProviderOptions>,
+    pub contact_email: Option<String>,
+    pub email: Option<EmailSettings>,
+    pub local_upload_provider: Option<LocalUploadProviderSettings>,
 
     /// `false` will disable the in memory cache.
     ///

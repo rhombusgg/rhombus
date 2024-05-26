@@ -16,7 +16,7 @@ use serde::Deserialize;
 use serde_json::json;
 use unicode_segmentation::UnicodeSegmentation;
 
-use super::{auth::User, locales::Languages, router::RouterState};
+use crate::internal::{auth::User, locales::Languages, router::RouterState};
 
 pub fn create_team_invite_token() -> String {
     Alphanumeric.sample_string(&mut thread_rng(), 16)

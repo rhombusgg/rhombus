@@ -22,6 +22,12 @@ fluent = "0.16.0"
 intl-memoizer = "0.5.1"
 jsonwebtoken = "9.3.0"
 lazy_static = "1.4.0"
+lettre = { version = "0.11.7", default-features = false, features = [
+  "tokio1-rustls-tls",
+  "smtp-transport",
+  "builder",
+  "pool",
+] }
 mime_guess = "2.0.4"
 minijinja = { version = "2.0.1", default-features = false, features = [
   "builtins",

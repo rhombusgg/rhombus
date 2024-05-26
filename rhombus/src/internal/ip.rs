@@ -13,7 +13,7 @@ use std::{
 };
 use tower_governor::{key_extractor::KeyExtractor, GovernorError};
 
-use super::{auth::MaybeUser, database::Connection, router::RouterState};
+use crate::internal::{auth::MaybeUser, database::provider::Connection, router::RouterState};
 
 pub fn track_flusher(db: Connection) {
     tokio::task::spawn(async move {

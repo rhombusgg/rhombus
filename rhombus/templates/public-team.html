@@ -38,6 +38,7 @@
                     hx-boost="true"
                     href="/user/{{ player_id }}"
                     class="flex gap-2 items-center"
+                    title="Go to public user profile"
                   >
                     <img
                       class="size-8 rounded-full"
@@ -83,6 +84,7 @@
                         hx-boost="true"
                         href="/challenges#{{ challenge.name }}"
                         class="font-bold"
+                        title="Go to challenge"
                       >
                         <span style="color: {{ category.color }}"
                           >{{ category.name }} /
@@ -102,6 +104,7 @@
                       hx-boost="true"
                       href="/user/{{ solve.user_id }}"
                       class="flex items-center gap-2"
+                      title="Go to public user profile"
                     >
                       <span>{{ solver.name }}</span>
                       <img

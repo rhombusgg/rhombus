@@ -4,7 +4,8 @@ use minijinja::Environment;
 use crate::{
     builder::RawDb,
     internal::{
-        database::Connection, locales::Localizations, router::RouterState, settings::Settings,
+        database::provider::Connection, locales::Localizations, router::RouterState,
+        settings::Settings,
     },
     upload_provider::EitherUploadProvider,
     Result, UploadProvider,
