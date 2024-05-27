@@ -41,10 +41,13 @@ pub async fn route_team(
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
     let team_divisions = state.db.get_team_divisions(user.team_id);
-    let (challenge_data, team, team_divisions) = tokio::join!(challenge_data, team, team_divisions);
+    let standings = state.db.get_team_standings(user.team_id);
+    let (challenge_data, team, team_divisions, standings) =
+        tokio::join!(challenge_data, team, team_divisions, standings);
     let challenge_data = challenge_data.unwrap();
     let team = team.unwrap();
     let team_divisions = team_divisions.unwrap();
+    let standings = standings.unwrap();
 
     let location_url = { state.settings.read().await.location_url.clone() };
     let team_invite_url = format!("{}/signin?token={}", location_url, team.invite_token);
@@ -97,6 +100,7 @@ pub async fn route_team(
                 categories,
                 og_image => format!("{}/og-image.png", location_url),
                 divisions,
+                standings => standings.standings,
             })
             .unwrap(),
     )
@@ -268,6 +272,8 @@ pub async fn route_team_set_division(
         .await
         .unwrap();
 
+    let standings = state.db.get_team_standings(user.team_id).await.unwrap();
+
     tracing::trace!(
         user_id = user.id,
         division_id,
@@ -275,5 +281,16 @@ pub async fn route_team_set_division(
         "Set division"
     );
 
-    Response::builder().body("".to_owned()).unwrap()
+    let html = state
+        .jinja
+        .get_template("standing-table.html")
+        .unwrap()
+        .render(context! {
+            divisions => state.divisions,
+            standings => standings.standings,
+            oob => true,
+        })
+        .unwrap();
+
+    Response::builder().body(html).unwrap()
 }

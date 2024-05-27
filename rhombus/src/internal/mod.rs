@@ -7,7 +7,6 @@ pub mod ip;
 pub mod local_upload_provider;
 pub mod locales;
 pub mod open_graph;
-pub mod public;
 pub mod router;
 pub mod routes;
 pub mod settings;

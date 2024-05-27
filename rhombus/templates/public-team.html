@@ -4,8 +4,8 @@
 {% block title %}{{ super() }} - {{ t("team") }} - {{ public_team.name }}{% endblock %}
 
 {% block content %}
-  <div class="container">
-    <div class="mb-4 mt-4 space-y-0.5">
+  <div class="container my-4">
+    <div class="mb-4 space-y-0.5">
       <h2 id="title" class="text-2xl font-bold tracking-tight">
         Team {{ public_team.name }}
       </h2>
@@ -59,6 +59,22 @@
                 </li>
               {% endfor %}
             </ul>
+          {% endcall %}
+        {% endcall %}
+
+        {% call card.root() %}
+          {% call card.header() %}
+            {% call card.title() %}
+              Standing
+            {% endcall %}
+            {% call card.description() %}
+              The team's standing in the competition
+            {% endcall %}
+          {% endcall %}
+          {% call card.content() %}
+            {% with x=divisions, y=standings %}
+            {% endwith %}
+            {% include "standing-table.html" %}
           {% endcall %}
         {% endcall %}
       </div>

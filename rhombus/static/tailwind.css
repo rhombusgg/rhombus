@@ -836,6 +836,10 @@ body {
   max-height: 300px;
 }
 
+.w-2\/3 {
+  width: 66.666667%;
+}
+
 .w-full {
   width: 100%;
 }
@@ -859,6 +863,10 @@ body {
 
 .grow {
   flex-grow: 1;
+}
+
+.table-fixed {
+  table-layout: fixed;
 }
 
 .-rotate-45 {
@@ -1155,6 +1163,10 @@ body {
   padding-top: 1rem;
 }
 
+.text-left {
+  text-align: left;
+}
+
 .text-right {
   text-align: right;
 }
@@ -1431,6 +1443,10 @@ dialog[open] {
   }
 }
 
+.\*\:p-2 > * {
+  padding: 0.5rem;
+}
+
 .placeholder\:text-muted-foreground::-moz-placeholder {
   --tw-text-opacity: 1;
   color: hsl(var(--muted-foreground) / var(--tw-text-opacity));
@@ -1494,6 +1510,11 @@ dialog[open] {
   content: var(--tw-content);
   --tw-bg-opacity: 1;
   background-color: hsl(var(--primary) / var(--tw-bg-opacity));
+}
+
+.odd\:bg-secondary:nth-child(odd) {
+  --tw-bg-opacity: 1;
+  background-color: hsl(var(--secondary) / var(--tw-bg-opacity));
 }
 
 .even\:bg-secondary:nth-child(even) {

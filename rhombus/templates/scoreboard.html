@@ -60,16 +60,16 @@
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
-            <table class="w-full">
+            <table class="w-full table-fixed">
               {% for entry in leaderboard.entries %}
-                <tr class="even:bg-secondary">
-                  <td class="p-2">{{ entry.rank }}</td>
-                  <td class="p-2">
+                <tr class="even:bg-secondary *:p-2">
+                  <td>{{ entry.rank }}</td>
+                  <td class="w-2/3">
                     <a hx-boost="true" href="/team/{{ entry.team_id }}"
                       >{{ entry.team_name }}</a
                     >
                   </td>
-                  <td class="p-2">{{ entry.score }} points</td>
+                  <td>{{ entry.score }} points</td>
                 </tr>
               {% endfor %}
             </table>

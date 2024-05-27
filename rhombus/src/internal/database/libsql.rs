@@ -23,7 +23,8 @@ use crate::{
                 Author, Category, Challenge, ChallengeAttachment, ChallengeData, ChallengeDivision,
                 ChallengeDivisionPoints, ChallengeSolve, Challenges, Database, Email, FirstBloods,
                 Leaderboard, LeaderboardEntry, Scoreboard, ScoreboardSeriesPoint, ScoreboardTeam,
-                Team, TeamInner, TeamMeta, TeamMetaInner, TeamUser, Writeup,
+                Team, TeamInner, TeamMeta, TeamMetaInner, TeamStandingEntry, TeamStandings,
+                TeamUser, Writeup,
             },
         },
         division::Division,
@@ -1209,6 +1210,54 @@ impl Database for LibSQL {
         }
 
         Ok(())
+    }
+
+    async fn get_team_standings(&self, team_id: i64) -> Result<TeamStandings> {
+        #[derive(Debug, Deserialize)]
+        struct DbTeamDivisionPoints {
+            division_id: i64,
+            points: f64,
+            rank: i64,
+        }
+
+        let mut standings = BTreeMap::new();
+        let mut standing_rows = self
+            .db
+            .query(
+                "
+                WITH ranked_teams AS (
+                    SELECT
+                        team_id,
+                        division_id,
+                        points,
+                        RANK() OVER (PARTITION BY division_id ORDER BY points DESC) AS rank
+                    FROM
+                        rhombus_team_division_points
+                )
+                SELECT
+                    division_id,
+                    points,
+                    rank
+                FROM
+                    ranked_teams
+                WHERE
+                    team_id = ?1
+            ",
+                [team_id],
+            )
+            .await?;
+        while let Some(row) = standing_rows.next().await? {
+            let standing = de::from_row::<DbTeamDivisionPoints>(&row).unwrap();
+            standings.insert(
+                standing.division_id,
+                TeamStandingEntry {
+                    points: standing.points as u64,
+                    rank: standing.rank as u64,
+                },
+            );
+        }
+
+        Ok(TeamStandings { standings })
     }
 }
 

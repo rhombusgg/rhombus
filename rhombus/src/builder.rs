@@ -41,7 +41,6 @@ use crate::{
         },
         locales::{self, jinja_timediff, jinja_translate, locale_middleware},
         open_graph::route_default_og_image,
-        public::{route_public_team, route_public_user},
         router::RouterStateInner,
         routes::{
             account::{
@@ -54,6 +53,7 @@ use crate::{
                 route_ticket_submit, route_ticket_view, route_writeup_delete, route_writeup_submit,
             },
             home::route_home,
+            public::{route_public_team, route_public_user},
             scoreboard::{route_scoreboard, route_scoreboard_division},
             team::{
                 route_team, route_team_roll_token, route_team_set_division, route_team_set_name,

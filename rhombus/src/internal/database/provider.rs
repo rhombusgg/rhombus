@@ -165,6 +165,17 @@ pub struct Email {
     pub verified: bool,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct TeamStandingEntry {
+    pub points: u64,
+    pub rank: u64,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct TeamStandings {
+    pub standings: BTreeMap<i64, TeamStandingEntry>,
+}
+
 #[async_trait]
 pub trait Database {
     async fn migrate(&self) -> Result<()>;
@@ -232,4 +243,5 @@ pub trait Database {
     async fn insert_divisions(&self, divisions: &[Division]) -> Result<()>;
     async fn get_team_divisions(&self, team_id: i64) -> Result<Vec<i64>>;
     async fn set_team_division(&self, team_id: i64, division_id: i64, join: bool) -> Result<()>;
+    async fn get_team_standings(&self, team_id: i64) -> Result<TeamStandings>;
 }

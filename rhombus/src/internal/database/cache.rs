@@ -9,7 +9,7 @@ use crate::{
         auth::User,
         database::provider::{
             Challenge, Challenges, Connection, Database, Email, FirstBloods, Leaderboard,
-            Scoreboard, Team, TeamMeta, Writeup,
+            Scoreboard, Team, TeamMeta, TeamStandings, Writeup,
         },
         division::Division,
         settings::Settings,
@@ -152,9 +152,10 @@ impl Database for DbCache {
         if result.is_ok() {
             USER_CACHE.remove(&user_id);
             TEAM_CACHE.clear();
-            *CHALLENGES_CACHE.write().await = None;
             SCOREBOARD_CACHE.clear();
             LEADERBOARD_CACHE.clear();
+            TEAM_STANDINGS.remove(&team_id);
+            *CHALLENGES_CACHE.write().await = None;
         }
         result
     }
@@ -259,6 +260,8 @@ impl Database for DbCache {
         if result.is_ok() {
             USER_DIVISIONS.remove(&user_id);
             TEAM_DIVISIONS.remove(&team_id);
+            TEAM_STANDINGS.clear();
+            *CHALLENGES_CACHE.write().await = None;
         }
         result
     }
@@ -283,8 +286,14 @@ impl Database for DbCache {
             .await;
         if result.is_ok() {
             TEAM_DIVISIONS.remove(&team_id);
+            TEAM_STANDINGS.clear();
+            *CHALLENGES_CACHE.write().await = None;
         }
         result
+    }
+
+    async fn get_team_standings(&self, team_id: i64) -> Result<TeamStandings> {
+        get_team_standing(&self.inner, team_id).await
     }
 }
 
@@ -467,6 +476,24 @@ pub async fn get_team_divisions(db: &Connection, team_id: i64) -> Result<Vec<i64
         TEAM_DIVISIONS.insert(team_id, TimedCache::new(divisions.clone()));
     }
     divisions
+}
+
+lazy_static::lazy_static! {
+    pub static ref TEAM_STANDINGS: DashMap<i64, TimedCache<TeamStandings>> = DashMap::new();
+}
+
+pub async fn get_team_standing(db: &Connection, team_id: i64) -> Result<TeamStandings> {
+    if let Some(standings) = TEAM_STANDINGS.get(&team_id) {
+        return Ok(standings.value.clone());
+    }
+    tracing::trace!(team_id, "cache miss: get_team_standing");
+
+    let standings = db.get_team_standings(team_id).await;
+
+    if let Ok(standings) = &standings {
+        TEAM_STANDINGS.insert(team_id, TimedCache::new(standings.clone()));
+    }
+    standings
 }
 
 pub fn database_cache_evictor(seconds: u64) {

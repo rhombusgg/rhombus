@@ -8,7 +8,7 @@ use axum::{
 };
 use minijinja::context;
 
-use super::{auth::MaybeUser, locales::Languages, router::RouterState};
+use crate::internal::{auth::MaybeUser, locales::Languages, router::RouterState};
 
 pub async fn route_public_user(
     state: State<RouterState>,
@@ -62,9 +62,11 @@ pub async fn route_public_team(
 ) -> impl IntoResponse {
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(team_id.0);
-    let (challenge_data, team) = tokio::join!(challenge_data, team);
+    let standings = state.db.get_team_standings(team_id.0);
+    let (challenge_data, team, standings) = tokio::join!(challenge_data, team, standings);
     let challenge_data = challenge_data.unwrap();
     let team = team.unwrap();
+    let standings = standings.unwrap();
 
     let mut challenges = BTreeMap::new();
     for challenge in &challenge_data.challenges {
@@ -89,6 +91,8 @@ pub async fn route_public_team(
                 now => chrono::Utc::now(),
                 challenges,
                 categories,
+                divisions => state.divisions,
+                standings => standings.standings,
             })
             .unwrap(),
     )
