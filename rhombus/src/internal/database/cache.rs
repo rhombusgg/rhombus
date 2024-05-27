@@ -154,7 +154,7 @@ impl Database for DbCache {
             TEAM_CACHE.clear();
             SCOREBOARD_CACHE.clear();
             LEADERBOARD_CACHE.clear();
-            TEAM_STANDINGS.remove(&team_id);
+            TEAM_STANDINGS.clear();
             *CHALLENGES_CACHE.write().await = None;
         }
         result
@@ -261,6 +261,8 @@ impl Database for DbCache {
             USER_DIVISIONS.remove(&user_id);
             TEAM_DIVISIONS.remove(&team_id);
             TEAM_STANDINGS.clear();
+            SCOREBOARD_CACHE.clear();
+            LEADERBOARD_CACHE.clear();
             *CHALLENGES_CACHE.write().await = None;
         }
         result
@@ -287,6 +289,8 @@ impl Database for DbCache {
         if result.is_ok() {
             TEAM_DIVISIONS.remove(&team_id);
             TEAM_STANDINGS.clear();
+            SCOREBOARD_CACHE.clear();
+            LEADERBOARD_CACHE.clear();
             *CHALLENGES_CACHE.write().await = None;
         }
         result

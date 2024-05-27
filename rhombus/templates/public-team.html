@@ -85,53 +85,57 @@
               Solves
             {% endcall %}
             {% call card.description() %}
-              Challenges your team has solved
+              Challenges the team has solved
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
             {% with x=lang %}
             {% endwith %}
-            <ol class="flex flex-col gap-2">
-              {% for challenge_id, solve in public_team.solves | dictsort(by="value", reverse=true) %}
-                {% with challenge=challenges[challenge_id], solver=public_team.users[solve.user_id], category=categories[challenge.category_id] %}
-                  <li class="flex items-center justify-between">
-                    <div>
+            {% if public_team.solves | length > 0 %}
+              <ol class="flex flex-col gap-2">
+                {% for challenge_id, solve in public_team.solves | dictsort(by="value", reverse=true) %}
+                  {% with challenge=challenges[challenge_id], solver=public_team.users[solve.user_id], category=categories[challenge.category_id] %}
+                    <li class="flex items-center justify-between">
+                      <div>
+                        <a
+                          hx-boost="true"
+                          href="/challenges#{{ challenge.name }}"
+                          class="font-bold"
+                          title="Go to challenge"
+                        >
+                          <span style="color: {{ category.color }}"
+                            >{{ category.name }} /
+                          </span>
+                          {{ challenge.name }}
+                        </a>
+                        <span class="text-muted-foreground">
+                          / {{ challenge.division_points[0].points }} points /
+                          <span title="{{ solve.solved_at }}">
+                            {% with diff=timediff(solve.solved_at, now) %}
+                              {{ t("time-difference", years=diff.years, days=diff.days, hours=diff.hours, minutes=diff.minutes, seconds=diff.seconds) }}
+                            {%- endwith -%}
+                          </span>
+                        </span>
+                      </div>
                       <a
                         hx-boost="true"
-                        href="/challenges#{{ challenge.name }}"
-                        class="font-bold"
-                        title="Go to challenge"
+                        href="/user/{{ solve.user_id }}"
+                        class="flex items-center gap-2"
+                        title="Go to public user profile"
                       >
-                        <span style="color: {{ category.color }}"
-                          >{{ category.name }} /
-                        </span>
-                        {{ challenge.name }}
+                        <span>{{ solver.name }}</span>
+                        <img
+                          class="size-8 rounded-full"
+                          src="{{ solver.avatar_url }}"
+                        />
                       </a>
-                      <span class="text-muted-foreground">
-                        / {{ challenge.division_points[0].points }} points /
-                        <span title="{{ solve.solved_at }}">
-                          {% with diff=timediff(solve.solved_at, now) %}
-                            {{ t("time-difference", years=diff.years, days=diff.days, hours=diff.hours, minutes=diff.minutes, seconds=diff.seconds) }}
-                          {%- endwith -%}
-                        </span>
-                      </span>
-                    </div>
-                    <a
-                      hx-boost="true"
-                      href="/user/{{ solve.user_id }}"
-                      class="flex items-center gap-2"
-                      title="Go to public user profile"
-                    >
-                      <span>{{ solver.name }}</span>
-                      <img
-                        class="size-8 rounded-full"
-                        src="{{ solver.avatar_url }}"
-                      />
-                    </a>
-                  </li>
-                {% endwith %}
-              {% endfor %}
-            </ol>
+                    </li>
+                  {% endwith %}
+                {% endfor %}
+              </ol>
+            {% else %}
+              <p>This team has no solves yet.</p>
+            {% endif %}
           {% endcall %}
         {% endcall %}
       </div>

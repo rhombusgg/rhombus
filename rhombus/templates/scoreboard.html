@@ -7,11 +7,18 @@
 {% block content %}
   <div class="container mb-6">
     <div
-      id="chart"
-      hx-preserve="true"
-      class="w-full mt-4"
+      class="w-full mt-4 relative"
       style="height: 600px"
-    ></div>
+    >
+      <div class="size-full absolute"
+        id="chart"
+        hx-preserve="true"
+        ></div>
+      <div id="empty-banner" style="display: none;" class="absolute z-10 size-full items-center justify-center">
+        <span class="text-2xl font-semibold">No historical data yet!</span>
+      </div>
+    </div>
+
     <div class="flex gap-6 mt-6 flex-col lg:flex-row">
       {% if divisions | length > 1 %}
         <div class="lg:max-w-96">
@@ -60,43 +67,49 @@
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
-            <table class="w-full table-fixed">
-              {% for entry in leaderboard.entries %}
-                <tr class="even:bg-secondary *:p-2">
-                  <td>{{ entry.rank }}</td>
-                  <td class="w-2/3">
-                    <a hx-boost="true" href="/team/{{ entry.team_id }}"
-                      >{{ entry.team_name }}</a
-                    >
-                  </td>
-                  <td>{{ entry.score }} points</td>
-                </tr>
-              {% endfor %}
-            </table>
-            {% if leaderboard.num_pages > 1 %}
-              <div class="flex justify-center">
-                <div>
-                  {% for i in range(leaderboard.num_pages) %}
-                    {% if i == 0 and page != 0 %}
-                      <a
-                        hx-boost="true"
-                        class="underline"
-                        href="/scoreboard/{{ selected_division_id }}"
-                        >1</a
-                      >
-                    {% elif i != page %}
-                      <a
-                        hx-boost="true"
-                        class="underline"
-                        href="/scoreboard/{{ selected_division_id }}?page={{ i + 1 }}"
-                        >{{ i + 1 }}</a
-                      >
-                    {% else %}
-                      <span>{{ i + 1 }}</span>
-                    {% endif %}
+            {% if leaderboard.entries | length > 0 %}
+              <div class="w-full flex">
+                <table class="table-fixed grow">
+                  {% for entry in leaderboard.entries %}
+                    <tr class="even:bg-secondary *:p-2">
+                      <td>{{ entry.rank }}</td>
+                      <td class="w-2/3">
+                        <a hx-boost="true" href="/team/{{ entry.team_id }}"
+                          >{{ entry.team_name }}</a
+                        >
+                      </td>
+                      <td>{{ entry.score }} points</td>
+                    </tr>
                   {% endfor %}
-                </div>
+                </table>
               </div>
+              {% if leaderboard.num_pages > 1 %}
+                <div class="flex justify-center">
+                  <div>
+                    {% for i in range(leaderboard.num_pages) %}
+                      {% if i == 0 and page != 0 %}
+                        <a
+                          hx-boost="true"
+                          class="underline"
+                          href="/scoreboard/{{ selected_division_id }}"
+                          >1</a
+                        >
+                      {% elif i != page %}
+                        <a
+                          hx-boost="true"
+                          class="underline"
+                          href="/scoreboard/{{ selected_division_id }}?page={{ i + 1 }}"
+                          >{{ i + 1 }}</a
+                        >
+                      {% else %}
+                        <span>{{ i + 1 }}</span>
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+                </div>
+              {% endif %}
+            {% else %}
+              <p>No teams in this division have solved a challenge yet!</p>
             {% endif %}
           {% endcall %}
         {% endcall %}
@@ -158,6 +171,10 @@
       render({{ scoreboard | safe }});
 
       function render(scoreboard_data) {
+        if (Object.values(scoreboard_data).length === 0) {
+          document.getElementById("empty-banner").style.display = "flex";
+        }
+
         const seriesCommon = {
           type: "line",
           emphasis: {

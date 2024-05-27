@@ -54,35 +54,39 @@
           {% call card.content() %}
             {% with x=lang %}
             {% endwith %}
-            <ol class="flex flex-col gap-2">
-              {% for challenge_id, solve in public_team.solves | dictsort(by="value", reverse=true) %}
-                {% if solve.user_id == public_user.id %}
-                  {% with challenge=challenges[challenge_id], solver=public_team.users[solve.user_id], category=categories[challenge.category_id] %}
-                    <li class="flex items-center h-8">
-                      <a
-                        hx-boost="true"
-                        href="/challenges#{{ challenge.name }}"
-                        class="font-bold"
-                      >
-                        <span style="color: {{ category.color }}"
-                          >{{ category.name }} /
+            {% if public_team.solves | length > 0 %}
+              <ol class="flex flex-col gap-2">
+                {% for challenge_id, solve in public_team.solves | dictsort(by="value", reverse=true) %}
+                  {% if solve.user_id == public_user.id %}
+                    {% with challenge=challenges[challenge_id], solver=public_team.users[solve.user_id], category=categories[challenge.category_id] %}
+                      <li class="flex items-center h-8">
+                        <a
+                          hx-boost="true"
+                          href="/challenges#{{ challenge.name }}"
+                          class="font-bold"
+                        >
+                          <span style="color: {{ category.color }}"
+                            >{{ category.name }} /
+                          </span>
+                          {{ challenge.name }}
+                        </a>
+                        <span class="text-muted-foreground">
+                          &nbsp;/ {{ challenge.division_points[0].points }}
+                          points /
+                          <span title="{{ solve.solved_at }}">
+                            {% with diff=timediff(solve.solved_at, now) %}
+                              {{ t("time-difference", years=diff.years, days=diff.days, hours=diff.hours, minutes=diff.minutes, seconds=diff.seconds) }}
+                            {%- endwith -%}
+                          </span>
                         </span>
-                        {{ challenge.name }}
-                      </a>
-                      <span class="text-muted-foreground">
-                        &nbsp;/ {{ challenge.division_points[0].points }} points
-                        /
-                        <span title="{{ solve.solved_at }}">
-                          {% with diff=timediff(solve.solved_at, now) %}
-                            {{ t("time-difference", years=diff.years, days=diff.days, hours=diff.hours, minutes=diff.minutes, seconds=diff.seconds) }}
-                          {%- endwith -%}
-                        </span>
-                      </span>
-                    </li>
-                  {% endwith %}
-                {% endif %}
-              {% endfor %}
-            </ol>
+                      </li>
+                    {% endwith %}
+                  {% endif %}
+                {% endfor %}
+              </ol>
+            {% else %}
+              <p>This player has no solves yet.</p>
+            {% endif %}
           {% endcall %}
         {% endcall %}
       </div>
