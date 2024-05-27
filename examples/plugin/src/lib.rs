@@ -1,4 +1,7 @@
+use std::sync::Arc;
+
 use axum::{
+    async_trait,
     extract::State,
     http::Uri,
     response::{Html, IntoResponse},
@@ -7,7 +10,10 @@ use axum::{
 use fluent::FluentResource;
 use minijinja::context;
 use rhombus::{
-    internal::{auth::MaybeUser, locales::Languages, router::RouterState},
+    internal::{
+        auth::MaybeUser, database::provider::Connection, division::DivisionEligible,
+        locales::Languages, router::RouterState,
+    },
     plugin::{RunContext, UploadProviderContext},
     LocalUploadProvider, Plugin, UploadProvider,
 };
@@ -70,6 +76,14 @@ impl Plugin for MyPlugin {
             }
         }
 
+        let osu_division = context.divisions.iter_mut().find(|d| d.name == "OSU");
+        if let Some(osu_division) = osu_division {
+            tracing::info!("Found OSU division");
+            let osu_division_eligibility_provider =
+                OsuDivisionEligibilityProvider::new(context.db.clone());
+            osu_division.division_eligibility = Arc::new(osu_division_eligibility_provider);
+        }
+
         let plugin_state = self.state.clone();
 
         let router = Router::new()
@@ -104,4 +118,28 @@ async fn route_home(
             })
             .unwrap(),
     )
+}
+
+pub struct OsuDivisionEligibilityProvider {
+    pub db: Connection,
+}
+
+impl OsuDivisionEligibilityProvider {
+    pub fn new(db: Connection) -> Self {
+        Self { db }
+    }
+}
+
+#[async_trait]
+impl DivisionEligible for OsuDivisionEligibilityProvider {
+    async fn is_user_eligible(&self, user_id: i64) -> std::result::Result<bool, String> {
+        let emails = self.db.get_emails_for_user_id(user_id).await.unwrap();
+        let eligible = emails.iter().filter(|email| email.verified).count() >= 3;
+
+        if eligible {
+            Ok(true)
+        } else {
+            Err("Must have verified at least 3 emails.".to_string())
+        }
+    }
 }

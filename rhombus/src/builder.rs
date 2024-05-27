@@ -1,4 +1,8 @@
-use std::{env, sync::Arc};
+use std::{
+    env,
+    hash::{BuildHasher, BuildHasherDefault, Hasher},
+    sync::Arc,
+};
 
 use axum::{
     http::StatusCode,
@@ -24,6 +28,10 @@ use crate::{
             provider::{Connection, Database},
         },
         discord::Bot,
+        division::{
+            Division, DivisionEligibilityProvider, EmailDivisionEligibilityProvider,
+            OpenDivisionEligibilityProvider,
+        },
         email::{mailer::Mailer, smtp::SmtpProvider},
         ip::{
             default_ip_extractor, ip_insert_blank_middleware, ip_insert_middleware,
@@ -39,6 +47,7 @@ use crate::{
             account::{
                 discord_cache_evictor, route_account, route_account_add_email,
                 route_account_delete_email, route_account_email_verify_callback,
+                route_account_set_division,
             },
             challenges::{
                 route_challenge_submit, route_challenge_view, route_challenges,
@@ -46,7 +55,10 @@ use crate::{
             },
             home::route_home,
             scoreboard::{route_scoreboard, route_scoreboard_division},
-            team::{route_team, route_team_roll_token, route_team_set_name, route_user_kick},
+            team::{
+                route_team, route_team_roll_token, route_team_set_division, route_team_set_name,
+                route_user_kick,
+            },
         },
         settings::{DbConfig, IpPreset, Settings},
         static_serve::route_static_serve,
@@ -172,6 +184,10 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             database: Some(database),
             ..self
         }
+    }
+
+    pub async fn division(self) -> Self {
+        self
     }
 
     pub fn upload_provider<Un: UploadProvider + Send + Sync>(
@@ -386,6 +402,42 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
         db.load_settings(&mut settings).await?;
         db.save_settings(&settings).await?;
 
+        let mut divisions = if let Some(ref divisions) = settings.divisions {
+            divisions
+                .iter()
+                .map(|division| {
+                    let division_eligibility: DivisionEligibilityProvider =
+                        if let Some(email_regex) = &division.email_regex {
+                            Arc::new(EmailDivisionEligibilityProvider::new(
+                                db.clone(),
+                                email_regex,
+                                division.requirement.clone(),
+                            ))
+                        } else {
+                            Arc::new(OpenDivisionEligibilityProvider {})
+                        };
+
+                    let id = hash(division.stable_id.as_ref().unwrap_or(&division.name));
+
+                    Division {
+                        id,
+                        name: division.name.clone(),
+                        description: division.description.clone(),
+                        division_eligibility,
+                    }
+                })
+                .collect()
+        } else {
+            let name = "Open".to_owned();
+            let id = hash(&name);
+            vec![Division {
+                id,
+                name,
+                description: "Open division for everyone".to_owned(),
+                division_eligibility: Arc::new(OpenDivisionEligibilityProvider {}),
+            }]
+        };
+
         let mut localizer = locales::Localizations::new();
 
         let mut env = minijinja::Environment::new();
@@ -413,6 +465,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     rawdb: &rawdb,
                     localizations: &mut localizer,
                     settings: &mut settings,
+                    divisions: &mut divisions,
                     db: db.clone(),
                 };
 
@@ -428,6 +481,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     rawdb: &rawdb,
                     localizations: &mut localizer,
                     settings: &mut settings,
+                    divisions: &mut divisions,
                     db: db.clone(),
                 };
 
@@ -461,6 +515,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     rawdb: &rawdb,
                     localizations: &mut localizer,
                     settings: &mut settings,
+                    divisions: &mut divisions,
                     db: db.clone(),
                 };
 
@@ -560,12 +615,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             None
         };
 
-        // mailer
-        //     .clone()
-        //     .unwrap()
-        //     .send_email_confirmation("mbund", "::1", "mark@mbund.dev", "345678")
-        //     .await
-        //     .unwrap();
+        db.insert_divisions(&divisions).await?;
 
         let router_state = Arc::new(RouterStateInner {
             db: db.clone(),
@@ -575,20 +625,23 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             settings: s.clone(),
             ip_extractor: ip_extractor.unwrap_or(default_ip_extractor),
             mailer,
+            divisions,
         });
 
         let rhombus_router = Router::new()
             .fallback(handler_404)
+            .route("/account/division/:id", post(route_account_set_division))
             .route("/account/verify", get(route_account_email_verify_callback))
             .route(
                 "/account/email",
                 post(route_account_add_email).delete(route_account_delete_email),
             )
             .route("/account", get(route_account))
+            .route("/team/division/:id", post(route_team_set_division))
             .route("/team/user/:id", delete(route_user_kick))
-            .route("/team", get(route_team))
             .route("/team/roll-token", post(route_team_roll_token))
             .route("/team/name", post(route_team_set_name))
+            .route("/team", get(route_team))
             .route("/challenges", get(route_challenges))
             .route(
                 "/challenges/:id/writeup",
@@ -695,4 +748,13 @@ fn not_htmx_predicate<T>(req: &axum::http::Request<T>) -> bool {
 
 async fn handler_404() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, Html("404"))
+}
+
+pub fn hash(s: impl AsRef<str>) -> i64 {
+    let s = s.as_ref();
+    let mut hasher =
+        BuildHasherDefault::<std::collections::hash_map::DefaultHasher>::default().build_hasher();
+    hasher.write(s.as_bytes());
+    let hash_value = hasher.finish();
+    (hash_value >> 11) as i64
 }

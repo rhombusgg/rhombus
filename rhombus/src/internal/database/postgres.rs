@@ -13,6 +13,7 @@ use crate::{
                 TeamMeta,
             },
         },
+        division::Division,
         settings::Settings,
     },
     Result,
@@ -43,17 +44,18 @@ impl Database for Postgres {
         email: &str,
         avatar: &str,
         discord_id: NonZeroU64,
-    ) -> Result<i64> {
+    ) -> Result<(i64, i64)> {
         #[derive(FromRow)]
         struct InsertUserResult {
             id: i64,
+            team_id: i64,
         }
 
         let user = sqlx::query_as::<_, InsertUserResult>(
             r#"
             INSERT INTO "User" (name, email, avatar, discord_id) VALUES ($1, $2, $3, $4)
             ON CONFLICT (discord_id) DO UPDATE SET name = $1, email = $2, avatar = $3, updated_at = now()
-            RETURNING id
+            RETURNING id, team_id
             "#
         )
         .bind(name)
@@ -63,7 +65,7 @@ impl Database for Postgres {
         .fetch_one(&self.pool)
         .await?;
 
-        Ok(user.id)
+        Ok((user.id, user.team_id))
     }
 
     async fn insert_track(
@@ -214,6 +216,32 @@ impl Database for Postgres {
     }
 
     async fn delete_email(&self, _user_id: i64, _email: &str) -> Result<()> {
+        todo!()
+    }
+
+    async fn get_user_divisions(&self, _user_id: i64) -> Result<Vec<i64>> {
+        todo!()
+    }
+
+    async fn set_user_division(
+        &self,
+        _user_id: i64,
+        _team_id: i64,
+        _division_id: i64,
+        _join: bool,
+    ) -> Result<()> {
+        todo!()
+    }
+
+    async fn insert_divisions(&self, _divisions: &[Division]) -> Result<()> {
+        todo!()
+    }
+
+    async fn get_team_divisions(&self, _team_id: i64) -> Result<Vec<i64>> {
+        todo!()
+    }
+
+    async fn set_team_division(&self, _team_id: i64, _division_id: i64, _join: bool) -> Result<()> {
         todo!()
     }
 }

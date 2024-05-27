@@ -376,9 +376,21 @@ pub async fn route_discord_callback(
         )
     };
 
-    let user_id = state
+    let (user_id, team_id) = state
         .db
         .upsert_user(&profile.global_name, &profile.email, &avatar, discord_id)
+        .await
+        .unwrap();
+
+    let default_division_id = state.divisions[0].id;
+    state
+        .db
+        .set_user_division(user_id, team_id, default_division_id, true)
+        .await
+        .unwrap();
+    state
+        .db
+        .set_team_division(team_id, default_division_id, true)
         .await
         .unwrap();
 

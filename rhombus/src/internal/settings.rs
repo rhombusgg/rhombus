@@ -64,6 +64,15 @@ pub struct EmailSettings {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct Division {
+    pub stable_id: Option<String>,
+    pub name: String,
+    pub description: String,
+    pub requirement: Option<String>,
+    pub email_regex: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Settings {
     pub title: String,
     pub location_url: String,
@@ -76,6 +85,7 @@ pub struct Settings {
     pub default_ticket_template: String,
     pub immutable_config: bool,
     pub contact_email: Option<String>,
+    pub divisions: Option<Vec<Division>>,
     pub email: Option<EmailSettings>,
     pub local_upload_provider: Option<LocalUploadProviderSettings>,
 

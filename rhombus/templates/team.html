@@ -137,15 +137,72 @@
                 <div class="text-muted-foreground">Division Name</div>
                 <div class="text-muted-foreground">Joined</div>
               </div>
-              <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                  Open&nbsp;
-                  <div title="... are ineligiable">(?)</div>
+              {% for division in divisions %}
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center">
+                    {{ division.name }}
+                    <div title="{{ division.description }}">
+                      {{ icons.info(class="h-4 ml-2") }}
+                    </div>
+                  </div>
+                  <div class="flex items-center">
+                    <!-- prettier-ignore-start -->
+                    {% if user.is_team_owner %}
+                      <input
+                        type="checkbox"
+                        hx-post="/team/division/{{ division.id }}"
+                        name="join"
+                        {% if division.joined %}
+                          checked
+                        {% elif not division.eligible %}
+                          disabled
+                        {% endif %}
+                        {% if not division.joined %}
+                          unchecked
+                        {% endif %}
+                        class="size-4 accent-primary"
+                        {% if not division.eligible %}
+                          title="Ineligible for division because users are not in division:&nbsp;
+                          {%- for user_id in division.ineligible_user_ids -%}
+                            {{ team.users[user_id].name }}
+                            {%- if loop.index < division.ineligible_user_ids | length -%}, {% endif -%}
+                          {%- endfor -%}."
+                        {% else %}
+                          title="Eligible for division."
+                        {% endif %}
+                      />
+                    {% else %}
+                      <div
+                        {% if division.joined %}
+                          title="Your team is in the division. Only the team owner can join or leave divisions."
+                        {% elif not division.eligible %}
+                          title="Your team is ineligible for the division because users are not in the division:&nbsp;
+                          {%- for user_id in division.ineligible_user_ids -%}
+                            {{ team.users[user_id].name }}
+                            {%- if loop.index < division.ineligible_user_ids | length -%}, {% endif -%}
+                          {%- endfor -%}."
+                        {% else %}
+                          title="Your team is eligible for the division. Only the team owner can join divisions."
+                        {% endif %}
+                      >
+                        <input
+                          type="checkbox"
+                          {% if division.joined %}
+                            checked
+                          {% elif not division.eligible %}
+                            disabled
+                          {% endif %}
+                          {% if not division.joined %}
+                            unchecked
+                          {% endif %}
+                          class="size-4 accent-primary pointer-events-none"
+                        />
+                      </div>
+                    {% endif %}
+                    <!-- prettier-ignore-end -->
+                  </div>
                 </div>
-                <div class="flex items-center">
-                  <input type="checkbox" />
-                </div>
-              </div>
+              {% endfor %}
             </div>
           {% endcall %}
         {% endcall %}
@@ -237,4 +294,13 @@
       </div>
     </div>
   </div>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      document
+        .querySelectorAll('input[type="checkbox"][unchecked]')
+        .forEach((el) => {
+          el.checked = false;
+        });
+    });
+  </script>
 {% endblock %}

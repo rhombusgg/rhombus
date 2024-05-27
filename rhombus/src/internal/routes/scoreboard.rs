@@ -24,7 +24,7 @@ pub async fn route_scoreboard(
             .into_response();
     }
 
-    Redirect::permanent(format!("/scoreboard/{}", default_division).as_str()).into_response()
+    Redirect::temporary(format!("/scoreboard/{}", default_division).as_str()).into_response()
 }
 
 #[derive(Deserialize)]

@@ -25,10 +25,9 @@ CREATE TABLE IF NOT EXISTS rhombus_file_attachment (
 
 CREATE TABLE IF NOT EXISTS rhombus_division (
     id INTEGER PRIMARY KEY NOT NULL,
-    name TEXT NOT NULL UNIQUE
+    name TEXT NOT NULL UNIQUE,
+    description TEXT NOT NULL
 );
-
-INSERT OR REPLACE INTO rhombus_division VALUES (1,'Open');
 
 CREATE TABLE IF NOT EXISTS rhombus_author (
     id INTEGER PRIMARY KEY NOT NULL,

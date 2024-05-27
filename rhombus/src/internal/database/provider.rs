@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use serde::Serialize;
 
 use crate::{
-    internal::{auth::User, database::cache::Writeups, settings::Settings},
+    internal::{auth::User, database::cache::Writeups, division::Division, settings::Settings},
     Result,
 };
 
@@ -55,7 +55,7 @@ pub struct Challenge {
 }
 
 #[derive(Debug, Serialize, Clone)]
-pub struct Division {
+pub struct ChallengeDivision {
     pub name: String,
 }
 
@@ -78,7 +78,7 @@ pub struct ChallengeData {
     pub challenges: Vec<Challenge>,
     pub categories: Vec<Category>,
     pub authors: BTreeMap<i64, Author>,
-    pub divisions: BTreeMap<i64, Division>,
+    pub divisions: BTreeMap<i64, ChallengeDivision>,
 }
 
 pub type Challenges = Arc<ChallengeData>;
@@ -174,7 +174,7 @@ pub trait Database {
         email: &str,
         avatar: &str,
         discord_id: NonZeroU64,
-    ) -> Result<i64>;
+    ) -> Result<(i64, i64)>;
     async fn insert_track(
         &self,
         ip: IpAddr,
@@ -221,4 +221,15 @@ pub trait Database {
     async fn create_email_callback_code(&self, user_id: i64, email: &str) -> Result<String>;
     async fn verify_email_callback_code(&self, code: &str) -> Result<()>;
     async fn delete_email(&self, user_id: i64, email: &str) -> Result<()>;
+    async fn get_user_divisions(&self, user_id: i64) -> Result<Vec<i64>>;
+    async fn set_user_division(
+        &self,
+        user_id: i64,
+        team_id: i64,
+        division_id: i64,
+        join: bool,
+    ) -> Result<()>;
+    async fn insert_divisions(&self, divisions: &[Division]) -> Result<()>;
+    async fn get_team_divisions(&self, team_id: i64) -> Result<Vec<i64>>;
+    async fn set_team_division(&self, team_id: i64, division_id: i64, join: bool) -> Result<()>;
 }

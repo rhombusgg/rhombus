@@ -15,7 +15,7 @@ use crate::{
     internal::{
         auth::User,
         database::provider::{
-            Author, Category, Challenge, Connection, Division, FirstBloods, Team,
+            Author, Category, Challenge, ChallengeDivision, Connection, FirstBloods, Team,
         },
         settings::Settings,
     },
@@ -422,7 +422,7 @@ impl Bot {
         user: &User,
         team: &Team,
         challenge: &Challenge,
-        divisions: &BTreeMap<i64, Division>,
+        divisions: &BTreeMap<i64, ChallengeDivision>,
         categories: &[Category],
         first_bloods: &FirstBloods,
     ) -> Result<()> {

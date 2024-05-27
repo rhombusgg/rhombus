@@ -8,6 +8,17 @@ email:
 in_memory_cache: 60
 local_upload_provider:
   folder: uploads
+divisions:
+  - name: Open
+    description: Open division for everyone
+  - name: Undergraduate
+    description: Undergraduate university students globally
+    email_regex: ^.*.edu$
+    requirement: Must verify a valid university .edu email address
+  - name: OSU
+    description: OSU undergraduate students
+    email_regex: ^.*\.\d+@(buckeyemail\.)?osu\.edu$
+    requirement: Must verify a valid OSU email address
 discord:
   guild_id: 1160610137703186636
   client_id: 1160076447977848945

@@ -20,12 +20,13 @@ use crate::{
         database::{
             cache::Writeups,
             provider::{
-                Author, Category, Challenge, ChallengeAttachment, ChallengeData,
-                ChallengeDivisionPoints, ChallengeSolve, Challenges, Database, Division, Email,
-                FirstBloods, Leaderboard, LeaderboardEntry, Scoreboard, ScoreboardSeriesPoint,
-                ScoreboardTeam, Team, TeamInner, TeamMeta, TeamMetaInner, TeamUser, Writeup,
+                Author, Category, Challenge, ChallengeAttachment, ChallengeData, ChallengeDivision,
+                ChallengeDivisionPoints, ChallengeSolve, Challenges, Database, Email, FirstBloods,
+                Leaderboard, LeaderboardEntry, Scoreboard, ScoreboardSeriesPoint, ScoreboardTeam,
+                Team, TeamInner, TeamMeta, TeamMetaInner, TeamUser, Writeup,
             },
         },
+        division::Division,
         routes::{account::generate_email_callback_code, team::create_team_invite_token},
         settings::Settings,
     },
@@ -98,21 +99,27 @@ impl Database for LibSQL {
         email: &str,
         avatar: &str,
         discord_id: NonZeroU64,
-    ) -> Result<i64> {
+    ) -> Result<(i64, i64)> {
         let team_name = format!("{}'s team", name);
 
         let tx = self.db.transaction().await?;
-        let existing_user_id = tx
+        let existing_user_row = tx
             .query(
-                "SELECT id FROM rhombus_user WHERE discord_id = ?",
+                "SELECT id, team_id FROM rhombus_user WHERE discord_id = ?",
                 [discord_id.get()],
             )
             .await?
             .next()
             .await?;
-        if let Some(existing_user_id) = existing_user_id {
-            let existing_user_id = existing_user_id.get::<i64>(0).unwrap();
-            return Ok(existing_user_id);
+        if let Some(existing_user_row) = existing_user_row {
+            #[derive(Debug, Deserialize)]
+            struct ExistingUser {
+                id: i64,
+                team_id: i64,
+            }
+
+            let existing_user = de::from_row::<ExistingUser>(&existing_user_row).unwrap();
+            return Ok((existing_user.id, existing_user.team_id));
         }
 
         let team_invite_token = create_team_invite_token();
@@ -128,13 +135,6 @@ impl Database for LibSQL {
             .unwrap()
             .get::<i64>(0)
             .unwrap();
-
-        // add team to default "Open" division
-        tx.execute(
-            "INSERT INTO rhombus_team_division VALUES (?1, 1)",
-            [team_id],
-        )
-        .await?;
 
         let user_id = tx
             .query(
@@ -154,16 +154,9 @@ impl Database for LibSQL {
         )
         .await?;
 
-        // add user to default "Open" division
-        tx.execute(
-            "INSERT INTO rhombus_user_division VALUES (?1, 1)",
-            [user_id],
-        )
-        .await?;
-
         tx.commit().await?;
 
-        return Ok(user_id);
+        return Ok((user_id, team_id));
     }
 
     async fn insert_track(
@@ -366,12 +359,12 @@ impl Database for LibSQL {
             id: i64,
             name: String,
         }
-        let mut divisions: BTreeMap<i64, Division> = Default::default();
+        let mut divisions: BTreeMap<i64, ChallengeDivision> = Default::default();
         while let Some(row) = division_rows.next().await? {
             let query_division = de::from_row::<DbDivision>(&row).unwrap();
             divisions.insert(
                 query_division.id,
-                Division {
+                ChallengeDivision {
                     name: query_division.name,
                 },
             );
@@ -1072,6 +1065,148 @@ impl Database for LibSQL {
                 params!(user_id, email),
             )
             .await?;
+
+        Ok(())
+    }
+
+    async fn get_user_divisions(&self, user_id: i64) -> Result<Vec<i64>> {
+        let divisions = self
+            .db
+            .query(
+                "SELECT division_id FROM rhombus_user_division WHERE user_id = ?1",
+                [user_id],
+            )
+            .await?
+            .into_stream()
+            .map(|row| row.unwrap().get::<i64>(0).unwrap())
+            .collect::<Vec<_>>()
+            .await;
+
+        Ok(divisions)
+    }
+
+    async fn set_user_division(
+        &self,
+        user_id: i64,
+        team_id: i64,
+        division_id: i64,
+        join: bool,
+    ) -> Result<()> {
+        let tx = self.db.transaction().await?;
+
+        if join {
+            let num_users_in_team = tx
+                .query(
+                    "SELECT COUNT(*) FROM rhombus_user WHERE team_id = ?1",
+                    [team_id],
+                )
+                .await?
+                .next()
+                .await?
+                .unwrap()
+                .get::<i64>(0)
+                .unwrap();
+
+            tx
+                .execute(
+                    "INSERT OR IGNORE INTO rhombus_user_division (user_id, division_id) VALUES (?1, ?2)",
+                    [user_id, division_id],
+                )
+                .await?;
+
+            if num_users_in_team == 1 {
+                tx
+                    .execute(
+                        "INSERT OR IGNORE INTO rhombus_team_division (team_id, division_id) VALUES (?1, ?2)",
+                        [team_id, division_id],
+                    )
+                    .await?;
+            }
+        } else {
+            _ = tx
+                .execute(
+                    "DELETE FROM rhombus_user_division WHERE user_id = ?1 AND division_id = ?2",
+                    [user_id, division_id],
+                )
+                .await;
+            _ = tx
+                .execute(
+                    "DELETE FROM rhombus_team_division WHERE team_id = ?1 AND division_id = ?2",
+                    [team_id, division_id],
+                )
+                .await;
+        }
+
+        tx.commit().await?;
+
+        Ok(())
+    }
+
+    async fn insert_divisions(&self, divisions: &[Division]) -> Result<()> {
+        let tx = self.db.transaction().await?;
+
+        let current_division_ids = tx
+            .query("SELECT id FROM rhombus_division", ())
+            .await?
+            .into_stream()
+            .map(|row| row.unwrap().get::<i64>(0).unwrap())
+            .collect::<Vec<_>>()
+            .await;
+
+        for division_id in current_division_ids {
+            if !divisions.iter().any(|d| d.id == division_id) {
+                _ = tx
+                    .execute("DELETE FROM rhombus_division WHERE id = ?1", [division_id])
+                    .await;
+            }
+        }
+
+        for division in divisions {
+            tx.execute(
+                "INSERT OR REPLACE INTO rhombus_division (id, name, description) VALUES (?1, ?2, ?3)",
+                params!(division.id, division.name.as_str(), division.description.as_str()),
+            )
+            .await?;
+        }
+
+        tx.commit().await?;
+
+        Ok(())
+    }
+
+    async fn get_team_divisions(&self, team_id: i64) -> Result<Vec<i64>> {
+        let divisions = self
+            .db
+            .query(
+                "SELECT division_id FROM rhombus_team_division WHERE team_id = ?1",
+                [team_id],
+            )
+            .await?
+            .into_stream()
+            .map(|row| row.unwrap().get::<i64>(0).unwrap())
+            .collect::<Vec<_>>()
+            .await;
+
+        Ok(divisions)
+    }
+
+    async fn set_team_division(&self, team_id: i64, division_id: i64, join: bool) -> Result<()> {
+        if join {
+            self.db
+                .execute(
+                    "INSERT OR IGNORE INTO rhombus_team_division (team_id, division_id) VALUES (?1, ?2)",
+                    [team_id, division_id],
+                )
+                .await?;
+        } else {
+            _ = self
+                .db
+                .execute(
+                    "DELETE FROM rhombus_team_division WHERE team_id = ?1 AND division_id = ?2",
+                    [team_id, division_id],
+                )
+                .await;
+        }
 
         Ok(())
     }

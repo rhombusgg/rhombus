@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod database;
 pub mod discord;
+pub mod division;
 pub mod email;
 pub mod ip;
 pub mod local_upload_provider;

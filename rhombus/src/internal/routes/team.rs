@@ -12,7 +12,7 @@ use rand::{
     thread_rng,
 };
 use reqwest::StatusCode;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -20,6 +20,16 @@ use crate::internal::{auth::User, locales::Languages, router::RouterState};
 
 pub fn create_team_invite_token() -> String {
     Alphanumeric.sample_string(&mut thread_rng(), 16)
+}
+
+#[derive(Serialize)]
+pub struct TeamDivision<'a> {
+    pub id: i64,
+    pub name: &'a str,
+    pub description: &'a str,
+    pub eligible: bool,
+    pub ineligible_user_ids: Vec<i64>,
+    pub joined: bool,
 }
 
 pub async fn route_team(
@@ -30,9 +40,11 @@ pub async fn route_team(
 ) -> impl IntoResponse {
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
-    let (challenge_data, team) = tokio::join!(challenge_data, team);
+    let team_divisions = state.db.get_team_divisions(user.team_id);
+    let (challenge_data, team, team_divisions) = tokio::join!(challenge_data, team, team_divisions);
     let challenge_data = challenge_data.unwrap();
     let team = team.unwrap();
+    let team_divisions = team_divisions.unwrap();
 
     let location_url = { state.settings.read().await.location_url.clone() };
     let team_invite_url = format!("{}/signin?token={}", location_url, team.invite_token);
@@ -45,6 +57,27 @@ pub async fn route_team(
     let mut categories = BTreeMap::new();
     for category in &challenge_data.categories {
         categories.insert(category.id, category);
+    }
+
+    let mut divisions = vec![];
+    for division in &state.divisions {
+        let mut ineligible_user_ids = vec![];
+        for user_id in team.users.keys() {
+            let user_divisions = state.db.get_user_divisions(*user_id).await.unwrap();
+
+            if !user_divisions.contains(&division.id) {
+                ineligible_user_ids.push(*user_id);
+            }
+        }
+
+        divisions.push(TeamDivision {
+            id: division.id,
+            name: &division.name,
+            description: &division.description,
+            eligible: ineligible_user_ids.is_empty(),
+            ineligible_user_ids,
+            joined: team_divisions.contains(&division.id),
+        })
     }
 
     Html(
@@ -63,6 +96,7 @@ pub async fn route_team(
                 challenges,
                 categories,
                 og_image => format!("{}/og-image.png", location_url),
+                divisions,
             })
             .unwrap(),
     )
@@ -196,4 +230,50 @@ pub async fn route_user_kick(
         .header("HX-Trigger", "pageRefresh")
         .body("".to_owned())
         .unwrap()
+}
+
+#[derive(Deserialize)]
+pub struct DivisionSet {
+    join: Option<String>,
+}
+
+pub async fn route_team_set_division(
+    state: State<RouterState>,
+    Extension(user): Extension<User>,
+    Path(division_id): Path<i64>,
+    Form(form): Form<DivisionSet>,
+) -> impl IntoResponse {
+    if !user.is_team_owner {
+        return Response::builder()
+            .status(StatusCode::UNAUTHORIZED)
+            .body("".to_owned())
+            .unwrap();
+    }
+
+    let team = state.db.get_team_from_id(user.team_id).await.unwrap();
+
+    let mut eligible = true;
+    for user_id in team.users.keys() {
+        let user_divisions = state.db.get_user_divisions(*user_id).await.unwrap();
+
+        if !user_divisions.contains(&division_id) {
+            eligible = false;
+            break;
+        }
+    }
+
+    state
+        .db
+        .set_team_division(user.team_id, division_id, eligible && form.join.is_some())
+        .await
+        .unwrap();
+
+    tracing::trace!(
+        user_id = user.id,
+        division_id,
+        joined = form.join.is_some(),
+        "Set division"
+    );
+
+    Response::builder().body("".to_owned()).unwrap()
 }

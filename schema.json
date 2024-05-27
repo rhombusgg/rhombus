@@ -1,255 +1,263 @@
 {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://example.com/product.schema.json",
-    "title": "Rhombus Configuration",
-    "description": "Configuration format for the Rhombus CTF platform",
-    "type": "object",
-    "properties": {
-        "location_url": {
-            "title": "Location URL",
-            "description": "Base URL where the site is hosted at",
-            "type": "string",
-            "pattern": "^https?:\/\/.*",
-            "examples": [
-                "https://demo.rhombus.gg",
-                "http://localhost:3000"
-            ]
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/product.schema.json",
+  "title": "Rhombus Configuration",
+  "description": "Configuration format for the Rhombus CTF platform",
+  "type": "object",
+  "properties": {
+    "location_url": {
+      "title": "Location URL",
+      "description": "Base URL where the site is hosted at",
+      "type": "string",
+      "pattern": "^https?://.*",
+      "examples": ["https://demo.rhombus.gg", "http://localhost:3000"]
+    },
+    "jwt_secret": {
+      "title": "JWT Secret",
+      "description": "Secret (ideally random) value to sign and verify JWTs. Generate with\nopenssl rand -hex 16",
+      "type": "string",
+      "examples": ["long_random_value"]
+    },
+    "database_url": {
+      "title": "Database URL",
+      "description": "Database connection url. Will automatically detect from scheme",
+      "type": "string",
+      "pattern": "^(postgres|file)://.*",
+      "examples": [
+        "file://rhombus.db",
+        "postgres://postgres:password@localhost"
+      ]
+    },
+    "default_ticket_template": {
+      "title": "Default Ticket Template",
+      "description": "Ticket template to default to for challenges which do not define a custom ticket template",
+      "type": "string"
+    },
+    "live_reload": {
+      "title": "Live Reload",
+      "description": "Automatically inject javascript to reload the page on save. Defaults to `true` when compiled in debug mode",
+      "type": "boolean",
+      "default": true,
+      "examples": [false]
+    },
+    "immutable_config": {
+      "title": "Immutable Configuration",
+      "description": "Allow configuration to be changed at runtime, from the Discord server or Admin dashboard",
+      "type": "boolean",
+      "default": false,
+      "examples": [true]
+    },
+    "in_memory_cache": {
+      "title": "In Memory Cache",
+      "description": "Cache results from the database in memory for short periods of time to reduce load on database (recommended). false will disable the in memory cache. true will enable the in memory cache with default 360 second interval. Integers above 5 will be the number in seconds that values are considered valid for. Other values are invalid and will disable the in memory cache.",
+      "type": ["boolean", "number"],
+      "minimum": 5,
+      "default": true,
+      "examples": [false, 120]
+    },
+    "ip_preset": {
+      "title": "IP Preset",
+      "description": "Choose from a few default ways to extract the client IP address. For more advanced configuration, omit this option and write a custom function in Rust",
+      "type": "string",
+      "default": "peer-ip",
+      "enum": [
+        "rightmost-x-forwarded-for",
+        "x-real-ip",
+        "fly-client-ip",
+        "true-client-ip",
+        "cf-connecting-ip",
+        "peer-ip"
+      ],
+      "examples": [
+        "rightmost-x-forwarded-for",
+        "x-real-ip",
+        "fly-client-ip",
+        "true-client-ip",
+        "cf-connecting-ip",
+        "peer-ip"
+      ]
+    },
+    "turso": {
+      "title": "Turso",
+      "description": "Configuration for 3rd party database provider https://turso.tech\ndatabase_url must be a libsql:// scheme url for Turso to have an effect",
+      "type": "object",
+      "properties": {
+        "auth_token": {
+          "title": "Auth Token",
+          "description": "Authentication token to access the database",
+          "type": "string",
+          "pattern": ".+\\..+\\..+"
         },
-        "jwt_secret": {
-            "title": "JWT Secret",
-            "description": "Secret (ideally random) value to sign and verify JWTs. Generate with\nopenssl rand -hex 16",
-            "type": "string",
-            "examples": [
-                "long_random_value"
-            ]
-        },
-        "database_url": {
-            "title": "Database URL",
-            "description": "Database connection url. Will automatically detect from scheme",
-            "type": "string",
-            "pattern": "^(postgres|file):\/\/.*",
-            "examples": [
-                "file://rhombus.db",
-                "postgres://postgres:password@localhost"
-            ]
-        },
-        "default_ticket_template": {
-            "title": "Default Ticket Template",
-            "description": "Ticket template to default to for challenges which do not define a custom ticket template",
-            "type": "string"
-        },
-        "live_reload": {
-            "title": "Live Reload",
-            "description": "Automatically inject javascript to reload the page on save. Defaults to `true` when compiled in debug mode",
-            "type": "boolean",
-            "default": true,
-            "examples": [
-                false
-            ]
-        },
-        "immutable_config": {
-            "title": "Immutable Configuration",
-            "description": "Allow configuration to be changed at runtime, from the Discord server or Admin dashboard",
-            "type": "boolean",
-            "default": false,
-            "examples": [
-                true
-            ]
-        },
-        "in_memory_cache": {
-            "title": "In Memory Cache",
-            "description": "Cache results from the database in memory for short periods of time to reduce load on database (recommended). false will disable the in memory cache. true will enable the in memory cache with default 360 second interval. Integers above 5 will be the number in seconds that values are considered valid for. Other values are invalid and will disable the in memory cache.",
-            "type": [
-                "boolean",
-                "number"
-            ],
-            "minimum": 5,
-            "default": true,
-            "examples": [
-                false,
-                120
-            ]
-        },
-        "ip_preset": {
-            "title": "IP Preset",
-            "description": "Choose from a few default ways to extract the client IP address. For more advanced configuration, omit this option and write a custom function in Rust",
-            "type": "string",
-            "default": "peer-ip",
-            "enum": [
-                "rightmost-x-forwarded-for",
-                "x-real-ip",
-                "fly-client-ip",
-                "true-client-ip",
-                "cf-connecting-ip",
-                "peer-ip"
-            ],
-            "examples": [
-                "rightmost-x-forwarded-for",
-                "x-real-ip",
-                "fly-client-ip",
-                "true-client-ip",
-                "cf-connecting-ip",
-                "peer-ip"
-            ]
-        },
-        "turso": {
-            "title": "Turso",
-            "description": "Configuration for 3rd party database provider https://turso.tech\ndatabase_url must be a libsql:// scheme url for Turso to have an effect",
-            "type": "object",
-            "properties": {
-                "auth_token": {
-                    "title": "Auth Token",
-                    "description": "Authentication token to access the database",
-                    "type": "string",
-                    "pattern": ".+\\..+\\..+"
-                },
-                "local_replica_path": {
-                    "title": "Local Replica Path",
-                    "description": "Optional file path to where the local db replica should be stored",
-                    "type": "string",
-                    "examples": [
-                        "replica.db"
-                    ]
-                }
-            },
-            "required": [
-                "auth_token"
-            ]
-        },
-        "local_upload_provider": {
-            "title": "Local Upload Provider",
-            "description": "A default upload provider which saves and serves from a specified local folder on the filesystem",
-            "type": "object",
-            "properties": {
-                "folder": {
-                    "title": "Folder",
-                    "description": "Destination folder to save and serve challenge assets from",
-                    "type": "string",
-                    "examples": [
-                        "uploads"
-                    ]
-                }
-            },
-            "required": [
-                "folder"
-            ]
-        },
-        "ratelimit": {
-            "title": "Rate limit",
-            "description": "Configuration related to built in rate limiting",
-            "type": "object",
-            "properties": {
-                "per_millisecond": {
-                    "title": "Per Millisecond",
-                    "description": "Set the interval after which one element of the quota is replenished in milliseconds",
-                    "type": "number",
-                    "minimum": 1,
-                    "default": 500,
-                    "examples": [
-                        500
-                    ]
-                },
-                "burst_size": {
-                    "title": "Burst Size",
-                    "description": "Set quota size that defines how many requests can occur before the governor middleware starts blocking requests from an IP address and clients have to wait until the elements of the quota are replenished",
-                    "type": "number",
-                    "minimum": 1,
-                    "default": 8,
-                    "examples": [
-                        8
-                    ]
-                }
-            }
-        },
-        "discord": {
-            "title": "Discord",
-            "description": "Discord configuration properties",
-            "type": "object",
-            "properties": {
-                "guild_id": {
-                    "title": "Guild ID",
-                    "description": "Snowflake developer discord ID of guild (server) for support",
-                    "type": [
-                        "string",
-                        "number"
-                    ],
-                    "pattern": "^\\d{19}$",
-                    "minimum": 1000000000000000000,
-                    "maximum": 9999999999999999999,
-                    "examples": [
-                        "1160610137703186636"
-                    ]
-                },
-                "client_id": {
-                    "title": "Client ID",
-                    "description": "OAuth2 Client ID (discord snowflake)",
-                    "type": [
-                        "string",
-                        "number"
-                    ],
-                    "pattern": "^\\d{19}$",
-                    "minimum": 1000000000000000000,
-                    "maximum": 9999999999999999999,
-                    "examples": [
-                        "1160076447977848945"
-                    ]
-                },
-                "client_secret": {
-                    "title": "Client Secret",
-                    "description": "OAuth2 Client Secret",
-                    "type": "string"
-                },
-                "bot_token": {
-                    "title": "Bot Token",
-                    "description": "Bot token",
-                    "type": "string",
-                    "pattern": ".+\\..+\\..+"
-                },
-                "first_blood_channel_id": {
-                    "title": "First Blood Channel ID",
-                    "description": "Snowflake Discord ID for the channel which first bloods should be sent to",
-                    "type": [
-                        "string",
-                        "number"
-                    ],
-                    "pattern": "^\\d{19}$",
-                    "minimum": 1000000000000000000,
-                    "maximum": 9999999999999999999
-                },
-                "support_channel_id": {
-                    "title": "Support Channel ID",
-                    "description": "Snowflake Discord ID for the channel which support threads should be branched off of",
-                    "type": [
-                        "string",
-                        "number"
-                    ],
-                    "pattern": "^\\d{19}$",
-                    "minimum": 1000000000000000000,
-                    "maximum": 9999999999999999999
-                },
-                "author_role_id": {
-                    "title": "Author Role ID",
-                    "description": "Snowflake Discord ID for the author role to link authors",
-                    "type": [
-                        "string",
-                        "number"
-                    ],
-                    "pattern": "^\\d{19}$",
-                    "minimum": 1000000000000000000,
-                    "maximum": 9999999999999999999
-                },
-                "verified_role_id": {
-                    "title": "Author Role ID",
-                    "description": "Snowflake Discord ID for the verified role to give to users who sign in to the CTF website",
-                    "type": [
-                        "string",
-                        "number"
-                    ],
-                    "pattern": "^\\d{19}$",
-                    "minimum": 1000000000000000000,
-                    "maximum": 9999999999999999999
-                }
-            }
+        "local_replica_path": {
+          "title": "Local Replica Path",
+          "description": "Optional file path to where the local db replica should be stored",
+          "type": "string",
+          "examples": ["replica.db"]
         }
+      },
+      "required": ["auth_token"]
+    },
+    "local_upload_provider": {
+      "title": "Local Upload Provider",
+      "description": "A default upload provider which saves and serves from a specified local folder on the filesystem",
+      "type": "object",
+      "properties": {
+        "folder": {
+          "title": "Folder",
+          "description": "Destination folder to save and serve challenge assets from",
+          "type": "string",
+          "examples": ["uploads"]
+        }
+      },
+      "required": ["folder"]
+    },
+    "ratelimit": {
+      "title": "Rate limit",
+      "description": "Configuration related to built in rate limiting",
+      "type": "object",
+      "properties": {
+        "per_millisecond": {
+          "title": "Per Millisecond",
+          "description": "Set the interval after which one element of the quota is replenished in milliseconds",
+          "type": "number",
+          "minimum": 1,
+          "default": 500,
+          "examples": [500]
+        },
+        "burst_size": {
+          "title": "Burst Size",
+          "description": "Set quota size that defines how many requests can occur before the governor middleware starts blocking requests from an IP address and clients have to wait until the elements of the quota are replenished",
+          "type": "number",
+          "minimum": 1,
+          "default": 8,
+          "examples": [8]
+        }
+      }
+    },
+    "divisions": {
+      "title": "Divisions",
+      "description": "Configuration for the different divisions of the CTF",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "description": "Name of the division",
+            "type": "string",
+            "examples": ["Open"]
+          },
+          "description": {
+            "title": "Description",
+            "description": "Description of the division",
+            "type": "string",
+            "examples": ["Open division for everyone"]
+          },
+          "email_regex": {
+            "title": "Email Regex",
+            "description": "Regular expression to validate email addresses for this division",
+            "type": "string",
+            "format": "regex",
+            "examples": ["^.+@example.com$"]
+          },
+          "requirement": {
+            "title": "Requirement",
+            "description": "Nice error message to show when a user is ineligible to join this division",
+            "type": "string",
+            "examples": [
+              "Must have a verified email from an @example.com domain"
+            ]
+          }
+        },
+        "required": ["name", "description"]
+      }
+    },
+    "email": {
+      "title": "Email",
+      "description": "Email configuration properties",
+      "type": "object",
+      "properties": {
+        "from": {
+          "title": "From",
+          "description": "Email address to send emails from",
+          "type": "string",
+          "examples": ["Rhombus <no-reply@rhombus.gg>"]
+        },
+        "connection_url": {
+          "title": "Connection URL",
+          "description": "Connection URL for the email provider",
+          "type": "string",
+          "examples": ["smtp://user:password@localhost"]
+        }
+      }
+    },
+    "discord": {
+      "title": "Discord",
+      "description": "Discord configuration properties",
+      "type": "object",
+      "properties": {
+        "guild_id": {
+          "title": "Guild ID",
+          "description": "Snowflake developer discord ID of guild (server) for support",
+          "type": ["string", "number"],
+          "pattern": "^\\d{19}$",
+          "minimum": 1000000000000000000,
+          "maximum": 9999999999999999999,
+          "examples": ["1160610137703186636"]
+        },
+        "client_id": {
+          "title": "Client ID",
+          "description": "OAuth2 Client ID (discord snowflake)",
+          "type": ["string", "number"],
+          "pattern": "^\\d{19}$",
+          "minimum": 1000000000000000000,
+          "maximum": 9999999999999999999,
+          "examples": ["1160076447977848945"]
+        },
+        "client_secret": {
+          "title": "Client Secret",
+          "description": "OAuth2 Client Secret",
+          "type": "string"
+        },
+        "bot_token": {
+          "title": "Bot Token",
+          "description": "Bot token",
+          "type": "string",
+          "pattern": ".+\\..+\\..+"
+        },
+        "first_blood_channel_id": {
+          "title": "First Blood Channel ID",
+          "description": "Snowflake Discord ID for the channel which first bloods should be sent to",
+          "type": ["string", "number"],
+          "pattern": "^\\d{19}$",
+          "minimum": 1000000000000000000,
+          "maximum": 9999999999999999999
+        },
+        "support_channel_id": {
+          "title": "Support Channel ID",
+          "description": "Snowflake Discord ID for the channel which support threads should be branched off of",
+          "type": ["string", "number"],
+          "pattern": "^\\d{19}$",
+          "minimum": 1000000000000000000,
+          "maximum": 9999999999999999999
+        },
+        "author_role_id": {
+          "title": "Author Role ID",
+          "description": "Snowflake Discord ID for the author role to link authors",
+          "type": ["string", "number"],
+          "pattern": "^\\d{19}$",
+          "minimum": 1000000000000000000,
+          "maximum": 9999999999999999999
+        },
+        "verified_role_id": {
+          "title": "Author Role ID",
+          "description": "Snowflake Discord ID for the verified role to give to users who sign in to the CTF website",
+          "type": ["string", "number"],
+          "pattern": "^\\d{19}$",
+          "minimum": 1000000000000000000,
+          "maximum": 9999999999999999999
+        }
+      }
     }
+  }
 }

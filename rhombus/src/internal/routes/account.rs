@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, net::IpAddr, num::NonZeroU64, time::Duration};
 
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::Uri,
     response::{Html, IntoResponse, Redirect, Response},
     Extension, Form,
@@ -13,7 +13,7 @@ use rand::{
     thread_rng,
 };
 use reqwest::{Client, StatusCode};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tracing::debug;
 
@@ -55,6 +55,16 @@ async fn is_in_server(
     is_in
 }
 
+#[derive(Serialize)]
+pub struct UserDivision<'a> {
+    pub id: i64,
+    pub name: &'a str,
+    pub description: &'a str,
+    pub eligible: bool,
+    pub requirement: Option<String>,
+    pub joined: bool,
+}
+
 pub async fn route_account(
     state: State<RouterState>,
     Extension(user): Extension<User>,
@@ -74,11 +84,29 @@ pub async fn route_account(
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
     let emails = state.db.get_emails_for_user_id(user.id);
-    let (challenge_data, team, emails, in_server) =
-        tokio::join!(challenge_data, team, emails, in_server);
+    let user_divisions = state.db.get_user_divisions(user.id);
+    let (challenge_data, team, emails, user_divisions, in_server) =
+        tokio::join!(challenge_data, team, emails, user_divisions, in_server);
     let challenge_data = challenge_data.unwrap();
     let team = team.unwrap();
     let emails = emails.unwrap();
+    let user_divisions = user_divisions.unwrap();
+
+    let mut divisions = vec![];
+    for division in &state.divisions {
+        let eligible = division
+            .division_eligibility
+            .is_user_eligible(user.id)
+            .await;
+        divisions.push(UserDivision {
+            id: division.id,
+            name: &division.name,
+            description: &division.description,
+            eligible: eligible.is_ok(),
+            requirement: eligible.err(),
+            joined: user_divisions.contains(&division.id),
+        })
+    }
 
     debug!(user_id = user.id, in_server, "Discord");
 
@@ -109,6 +137,7 @@ pub async fn route_account(
                 challenges,
                 categories,
                 emails,
+                divisions,
             })
             .unwrap(),
     )
@@ -245,6 +274,54 @@ pub async fn route_account_delete_email(
         .header("HX-Trigger", "pageRefresh")
         .body("".to_owned())
         .unwrap()
+}
+
+#[derive(Deserialize)]
+pub struct DivisionSet {
+    join: Option<String>,
+}
+
+pub async fn route_account_set_division(
+    state: State<RouterState>,
+    Extension(user): Extension<User>,
+    Path(division_id): Path<i64>,
+    Form(form): Form<DivisionSet>,
+) -> impl IntoResponse {
+    let eligible = state
+        .divisions
+        .iter()
+        .find(|division| division.id == division_id)
+        .unwrap()
+        .division_eligibility
+        .is_user_eligible(user.id)
+        .await;
+
+    state
+        .db
+        .set_user_division(
+            user.id,
+            user.team_id,
+            division_id,
+            eligible.is_ok() && form.join.is_some(),
+        )
+        .await
+        .unwrap();
+
+    tracing::trace!(
+        user_id = user.id,
+        division_id,
+        joined = form.join.is_some(),
+        "Set division"
+    );
+
+    if eligible.is_err() {
+        Response::builder()
+            .header("HX-Trigger", "pageRefresh")
+            .body("".to_owned())
+            .unwrap()
+    } else {
+        Response::builder().body("".to_owned()).unwrap()
+    }
 }
 
 pub fn discord_cache_evictor() {

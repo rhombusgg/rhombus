@@ -15,6 +15,7 @@ async fn main() {
     let app = rhombus::Builder::default()
         .load_env()
         // .config_override("database_url", "postgres://postgres:password@localhost")
+        .config_source(rhombus::config::File::with_name("config"))
         .upload_provider(rhombus::LocalUploadProvider::new("uploads".into()))
         .plugin(())
         .plugin(plugin::MyPlugin::new(3))

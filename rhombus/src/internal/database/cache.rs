@@ -11,6 +11,7 @@ use crate::{
             Challenge, Challenges, Connection, Database, Email, FirstBloods, Leaderboard,
             Scoreboard, Team, TeamMeta, Writeup,
         },
+        division::Division,
         settings::Settings,
     },
     Result,
@@ -45,14 +46,13 @@ impl Database for DbCache {
         email: &str,
         avatar: &str,
         discord_id: NonZeroU64,
-    ) -> Result<i64> {
+    ) -> Result<(i64, i64)> {
         let result = self
             .inner
             .upsert_user(name, email, avatar, discord_id)
             .await;
         if let Ok(result) = result {
-            // GET_USER_FROM_ID.lock().await.cache_remove(&result);
-            USER_CACHE.remove(&result);
+            USER_CACHE.remove(&result.0);
         }
         result
     }
@@ -214,19 +214,77 @@ impl Database for DbCache {
     }
 
     async fn get_emails_for_user_id(&self, user_id: i64) -> Result<Vec<Email>> {
-        self.inner.get_emails_for_user_id(user_id).await
+        get_emails_for_user_id(&self.inner, user_id).await
     }
 
     async fn create_email_callback_code(&self, user_id: i64, email: &str) -> Result<String> {
-        self.inner.create_email_callback_code(user_id, email).await
+        let result = self.inner.create_email_callback_code(user_id, email).await;
+        if result.is_ok() {
+            USER_EMAILS_CACHE.remove(&user_id);
+        }
+        result
     }
 
     async fn verify_email_callback_code(&self, code: &str) -> Result<()> {
-        self.inner.verify_email_callback_code(code).await
+        let result = self.inner.verify_email_callback_code(code).await;
+        if result.is_ok() {
+            USER_EMAILS_CACHE.clear();
+        }
+        result
     }
 
     async fn delete_email(&self, user_id: i64, email: &str) -> Result<()> {
-        self.inner.delete_email(user_id, email).await
+        let result = self.inner.delete_email(user_id, email).await;
+        if result.is_ok() {
+            USER_EMAILS_CACHE.remove(&user_id);
+        }
+        result
+    }
+
+    async fn get_user_divisions(&self, user_id: i64) -> Result<Vec<i64>> {
+        get_user_divisions(&self.inner, user_id).await
+    }
+
+    async fn set_user_division(
+        &self,
+        user_id: i64,
+        team_id: i64,
+        division_id: i64,
+        join: bool,
+    ) -> Result<()> {
+        let result = self
+            .inner
+            .set_user_division(user_id, team_id, division_id, join)
+            .await;
+        if result.is_ok() {
+            USER_DIVISIONS.remove(&user_id);
+            TEAM_DIVISIONS.remove(&team_id);
+        }
+        result
+    }
+
+    async fn insert_divisions(&self, divisions: &[Division]) -> Result<()> {
+        let result = self.inner.insert_divisions(divisions).await;
+        if result.is_ok() {
+            USER_DIVISIONS.clear();
+            TEAM_DIVISIONS.clear();
+        }
+        result
+    }
+
+    async fn get_team_divisions(&self, team_id: i64) -> Result<Vec<i64>> {
+        get_team_divisions(&self.inner, team_id).await
+    }
+
+    async fn set_team_division(&self, team_id: i64, division_id: i64, join: bool) -> Result<()> {
+        let result = self
+            .inner
+            .set_team_division(team_id, division_id, join)
+            .await;
+        if result.is_ok() {
+            TEAM_DIVISIONS.remove(&team_id);
+        }
+        result
     }
 }
 
@@ -357,6 +415,60 @@ pub async fn get_leaderboard(db: &Connection, division_id: i64, page: u64) -> Re
     leaderboard
 }
 
+lazy_static::lazy_static! {
+    pub static ref USER_EMAILS_CACHE: DashMap<i64, TimedCache<Vec<Email>>> = DashMap::new();
+}
+
+pub async fn get_emails_for_user_id(db: &Connection, user_id: i64) -> Result<Vec<Email>> {
+    if let Some(emails) = USER_EMAILS_CACHE.get(&user_id) {
+        return Ok(emails.value.clone());
+    }
+    tracing::trace!(user_id, "cache miss: get_emails_for_user_id");
+
+    let emails = db.get_emails_for_user_id(user_id).await;
+
+    if let Ok(emails) = &emails {
+        USER_EMAILS_CACHE.insert(user_id, TimedCache::new(emails.clone()));
+    }
+    emails
+}
+
+lazy_static::lazy_static! {
+    pub static ref USER_DIVISIONS: DashMap<i64, TimedCache<Vec<i64>>> = DashMap::new();
+}
+
+pub async fn get_user_divisions(db: &Connection, user_id: i64) -> Result<Vec<i64>> {
+    if let Some(divisions) = USER_DIVISIONS.get(&user_id) {
+        return Ok(divisions.value.clone());
+    }
+    tracing::trace!(user_id, "cache miss: get_user_divisions");
+
+    let divisions = db.get_user_divisions(user_id).await;
+
+    if let Ok(divisions) = &divisions {
+        USER_DIVISIONS.insert(user_id, TimedCache::new(divisions.clone()));
+    }
+    divisions
+}
+
+lazy_static::lazy_static! {
+    pub static ref TEAM_DIVISIONS: DashMap<i64, TimedCache<Vec<i64>>> = DashMap::new();
+}
+
+pub async fn get_team_divisions(db: &Connection, team_id: i64) -> Result<Vec<i64>> {
+    if let Some(divisions) = TEAM_DIVISIONS.get(&team_id) {
+        return Ok(divisions.value.clone());
+    }
+    tracing::trace!(team_id, "cache miss: get_team_divisions");
+
+    let divisions = db.get_team_divisions(team_id).await;
+
+    if let Ok(divisions) = &divisions {
+        TEAM_DIVISIONS.insert(team_id, TimedCache::new(divisions.clone()));
+    }
+    divisions
+}
+
 pub fn database_cache_evictor(seconds: u64) {
     tokio::task::spawn(async move {
         let duration = Duration::from_secs(seconds);
@@ -364,6 +476,7 @@ pub fn database_cache_evictor(seconds: u64) {
             tokio::time::sleep(duration).await;
             let evict_threshold = (chrono::Utc::now() - duration).timestamp();
 
+            // User cache
             let mut count: i64 = 0;
             USER_CACHE.retain(|_, v| {
                 if v.insert_timestamp > evict_threshold {
@@ -377,6 +490,7 @@ pub fn database_cache_evictor(seconds: u64) {
                 tracing::trace!(count, "Evicted user cache");
             }
 
+            // Team cache
             let mut count: i64 = 0;
             TEAM_CACHE.retain(|_, v| {
                 if v.insert_timestamp > evict_threshold {
@@ -390,6 +504,7 @@ pub fn database_cache_evictor(seconds: u64) {
                 tracing::trace!(count, "Evicted team cache");
             }
 
+            // User writeup cache
             let mut count: i64 = 0;
             USER_WRITEUP_CACHE.retain(|_, v| {
                 if v.insert_timestamp > evict_threshold {
@@ -403,6 +518,7 @@ pub fn database_cache_evictor(seconds: u64) {
                 tracing::trace!(count, "Evicted user writeup cache");
             }
 
+            // Scoreboard cache
             let mut count: i64 = 0;
             SCOREBOARD_CACHE.retain(|_, _| {
                 count += 1;
@@ -412,6 +528,7 @@ pub fn database_cache_evictor(seconds: u64) {
                 tracing::trace!(count, "Evicted scoreboard cache");
             }
 
+            // Leaderboard cache
             let mut count: i64 = 0;
             LEADERBOARD_CACHE.retain(|_, _| {
                 count += 1;
@@ -419,6 +536,48 @@ pub fn database_cache_evictor(seconds: u64) {
             });
             if count > 0 {
                 tracing::trace!(count, "Evicted leaderboard cache");
+            }
+
+            // User emails cache
+            let mut count: i64 = 0;
+            USER_EMAILS_CACHE.retain(|_, v| {
+                if v.insert_timestamp > evict_threshold {
+                    true
+                } else {
+                    count += 1;
+                    false
+                }
+            });
+            if count > 0 {
+                tracing::trace!(count, "Evicted user emails cache");
+            }
+
+            // User divisions cache
+            let mut count: i64 = 0;
+            USER_DIVISIONS.retain(|_, v| {
+                if v.insert_timestamp > evict_threshold {
+                    true
+                } else {
+                    count += 1;
+                    false
+                }
+            });
+            if count > 0 {
+                tracing::trace!(count, "Evicted user divisions cache");
+            }
+
+            // Team divisions cache
+            let mut count: i64 = 0;
+            TEAM_DIVISIONS.retain(|_, v| {
+                if v.insert_timestamp > evict_threshold {
+                    true
+                } else {
+                    count += 1;
+                    false
+                }
+            });
+            if count > 0 {
+                tracing::trace!(count, "Evicted team divisions cache");
             }
 
             {

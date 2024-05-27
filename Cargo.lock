@@ -3293,6 +3293,7 @@ dependencies = [
  "pin-project-lite",
  "poise",
  "rand",
+ "regex",
  "reqwest 0.12.4",
  "resvg",
  "rust-embed",

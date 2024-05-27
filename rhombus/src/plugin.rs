@@ -4,8 +4,8 @@ use minijinja::Environment;
 use crate::{
     builder::RawDb,
     internal::{
-        database::provider::Connection, locales::Localizations, router::RouterState,
-        settings::Settings,
+        database::provider::Connection, division::Division, locales::Localizations,
+        router::RouterState, settings::Settings,
     },
     upload_provider::EitherUploadProvider,
     Result, UploadProvider,
@@ -34,6 +34,9 @@ pub struct RunContext<'a, U: UploadProvider> {
 
     /// High level database connection used by Rhombus core.
     pub db: Connection,
+
+    /// Divisions and their eligibility functions.
+    pub divisions: &'a mut Vec<Division>,
 }
 
 pub struct UploadProviderContext<'a> {

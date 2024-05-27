@@ -731,6 +731,10 @@ body {
   margin-bottom: 1.5rem;
 }
 
+.ml-2 {
+  margin-left: 0.5rem;
+}
+
 .mr-2 {
   margin-right: 0.5rem;
 }
@@ -810,6 +814,10 @@ body {
 
 .h-11 {
   height: 2.75rem;
+}
+
+.h-4 {
+  height: 1rem;
 }
 
 .h-5 {
@@ -1249,6 +1257,10 @@ body {
 
 .underline {
   text-decoration-line: underline;
+}
+
+.accent-primary {
+  accent-color: hsl(var(--primary) / 1);
 }
 
 .opacity-100 {
