@@ -256,6 +256,12 @@
           "pattern": "^\\d{19}$",
           "minimum": 1000000000000000000,
           "maximum": 9999999999999999999
+        },
+        "invite_url": {
+          "title": "Invite URL",
+          "description": "URL to invite players to your discord server. Will be automatically created by the bot if not provided",
+          "type": "string",
+          "examples": ["https://discord.gg/E2CcvJxq"]
         }
       }
     }

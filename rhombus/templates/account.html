@@ -27,11 +27,66 @@
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
-            {% if in_server %}
-              :check: You are in the server!
-            {% else %}
-              Join the server at https://
-            {% endif %}
+            <div class="ml-[18px] mt-1 border-l pl-8">
+              <h3
+                class="flex items-center text-xl font-semibold tracking-tight"
+              >
+                <div
+                  class="absolute ml-[-50px] inline-flex size-9 items-center justify-center rounded-full border-4 {% if user.discord_id %}bg-green-500{% else %}bg-border{% endif %}"
+                >
+                  {% if user.discord_id %}
+                    {{ icons.check(class="size-4") }}
+                  {% else %}
+                    {{ icons.ellipsis(class="size-4") }}
+                  {% endif %}
+                </div>
+                {% if user.discord_id %}
+                  Link Discord
+                {% else %}
+                  <a
+                    class="flex items-center gap-2"
+                    href="{{ discord_signin_url }}"
+                  >
+                    <span>Link Discord</span>
+                    {{ icons.external_link(class="size-6") }}
+                  </a>
+                {% endif %}
+              </h3>
+              <p class="mt-2">
+                Challenge authors are on the Discord and verifying your Discord
+                account allows for better one-on-one communication with issues.
+              </p>
+
+              <h3
+                class="mt-8 flex items-center text-xl font-semibold tracking-tight"
+              >
+                <div
+                  class="absolute ml-[-50px] inline-flex size-9 items-center justify-center rounded-full border-4 {% if in_server %}bg-green-500{% else %}bg-border{% endif %}"
+                >
+                  {% if in_server %}
+                    {{ icons.check(class="size-4") }}
+                  {% else %}
+                    {{ icons.ellipsis(class="size-4") }}
+                  {% endif %}
+                </div>
+
+                {% if in_server %}
+                  Join Server
+                {% else %}
+                  <a
+                    class="flex items-center gap-2"
+                    href="{{ discord_invite_url }}"
+                  >
+                    <span>Join Server</span>
+                    {{ icons.external_link(class="size-6") }}
+                  </a>
+                {% endif %}
+              </h3>
+              <p class="mt-2">
+                Join the official Discord server to get important announcements
+                and chat with other competitors.
+              </p>
+            </div>
           {% endcall %}
         {% endcall %}
 

@@ -184,10 +184,7 @@ pub async fn route_signin(
 
     let (discord_client_id, location_url) = {
         let settings = state.settings.read().await;
-        (
-            settings.discord.client_id.clone(),
-            settings.location_url.clone(),
-        )
+        (settings.discord.client_id, settings.location_url.clone())
     };
 
     let discord_signin_url = format!(
@@ -278,7 +275,7 @@ pub async fn route_discord_callback(
         let settings = state.settings.read().await;
         (
             settings.jwt_secret.clone(),
-            settings.discord.client_id.clone(),
+            settings.discord.client_id,
             settings.discord.client_secret.clone(),
             settings.discord.guild_id,
             settings.discord.bot_token.clone(),
@@ -293,7 +290,7 @@ pub async fn route_discord_callback(
             reqwest::header::CONTENT_TYPE,
             "application/x-www-form-urlencoded",
         )
-        .basic_auth(&discord_client_id, Some(&discord_client_secret))
+        .basic_auth(discord_client_id, Some(&discord_client_secret))
         .form(&[
             ("grant_type", "authorization_code"),
             ("code", code),

@@ -739,6 +739,14 @@ body {
   margin-left: 0.5rem;
 }
 
+.ml-\[-50px\] {
+  margin-left: -50px;
+}
+
+.ml-\[18px\] {
+  margin-left: 18px;
+}
+
 .mr-2 {
   margin-right: 0.5rem;
 }
@@ -747,12 +755,24 @@ body {
   margin-right: 1.5rem;
 }
 
+.mt-1 {
+  margin-top: 0.25rem;
+}
+
+.mt-2 {
+  margin-top: 0.5rem;
+}
+
 .mt-4 {
   margin-top: 1rem;
 }
 
 .mt-6 {
   margin-top: 1.5rem;
+}
+
+.mt-8 {
+  margin-top: 2rem;
 }
 
 .block {
@@ -804,6 +824,11 @@ body {
 .size-4 {
   width: 1rem;
   height: 1rem;
+}
+
+.size-6 {
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .size-8 {
@@ -1039,6 +1064,10 @@ body {
   border-bottom-width: 1px;
 }
 
+.border-l {
+  border-left-width: 1px;
+}
+
 .border-l-4 {
   border-left-width: 4px;
 }
@@ -1055,6 +1084,11 @@ body {
 
 .bg-background\/50 {
   background-color: hsl(var(--background) / 0.5);
+}
+
+.bg-border {
+  --tw-bg-opacity: 1;
+  background-color: hsl(var(--border) / var(--tw-bg-opacity));
 }
 
 .bg-card {
@@ -1160,6 +1194,10 @@ body {
   padding-left: 0.25rem;
 }
 
+.pl-8 {
+  padding-left: 2rem;
+}
+
 .pr-2 {
   padding-right: 0.5rem;
 }
@@ -1201,6 +1239,11 @@ body {
 .text-sm {
   font-size: 0.875rem;
   line-height: 1.25rem;
+}
+
+.text-xl {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
 }
 
 .font-bold {

@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, num::NonZeroU64, sync::Arc};
 
 use rand::{prelude::SliceRandom, thread_rng, Rng};
+use serde_json::json;
 use serenity::{
     all::{
         ButtonStyle, ChannelId, ChannelType, CreateActionRow, CreateButton, CreateEmbed,
@@ -320,6 +321,64 @@ impl Bot {
         }
     }
 
+    pub async fn get_invite_url(&self) -> Result<String> {
+        let (invite_url, guild_id, client_id) = {
+            let settings = self.settings.read().await;
+            (
+                settings.discord.invite_url.clone(),
+                settings.discord.guild_id,
+                settings.discord.client_id,
+            )
+        };
+        if let Some(invite_url) = invite_url {
+            return Ok(invite_url);
+        }
+
+        {
+            let cached_invite_url = INVITE_URL_CACHE.read().await;
+            if cached_invite_url.timestamp + 60 > chrono::Utc::now().timestamp() {
+                return Ok(cached_invite_url.url.clone());
+            }
+        }
+
+        let channels = self.http.get_channels(guild_id.into()).await?;
+        let guild = self.http.get_guild(guild_id.into()).await?;
+        let default_channel_id = guild.system_channel_id.unwrap_or(channels[0].id);
+
+        let guild_invites = self.http.get_guild_invites(guild_id.into()).await?;
+        let invite = guild_invites
+            .iter()
+            .find(|invite| invite.inviter.as_ref().map(|user| user.id) == Some(client_id.into()));
+
+        let invite_code = match invite {
+            Some(invite) => invite.code.clone(),
+            None => self
+                .http
+                .create_invite(
+                    default_channel_id,
+                    &json!({
+                        "max_age": 0,
+                    }),
+                    Some("Rhombus CTF website invite"),
+                )
+                .await?
+                .code
+                .clone(),
+        };
+
+        let invite_url = format!("https://discord.gg/{}", invite_code);
+
+        {
+            let mut cached_invite_url = INVITE_URL_CACHE.write().await;
+            cached_invite_url.url = invite_url.clone();
+            cached_invite_url.timestamp = chrono::Utc::now().timestamp();
+        }
+
+        tracing::trace!("evicted invite url cache");
+
+        Ok(invite_url)
+    }
+
     pub async fn create_support_thread(
         &self,
         user: &User,
@@ -512,6 +571,18 @@ impl Bot {
 
         Ok(())
     }
+}
+
+pub struct DiscordInviteUrlCache {
+    pub url: String,
+    pub timestamp: i64,
+}
+
+lazy_static::lazy_static! {
+    pub static ref INVITE_URL_CACHE: RwLock<DiscordInviteUrlCache> = RwLock::new(DiscordInviteUrlCache {
+        url: String::new(),
+        timestamp: 0,
+    });
 }
 
 fn format_list_en(items: &[&str]) -> String {

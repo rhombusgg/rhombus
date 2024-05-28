@@ -71,11 +71,12 @@ pub async fn route_account(
     Extension(lang): Extension<Languages>,
     uri: Uri,
 ) -> impl IntoResponse {
-    let (discord_guild_id, discord_bot_token, location_url) = {
+    let (discord_guild_id, discord_bot_token, discord_client_id, location_url) = {
         let settings = state.settings.read().await;
         (
             settings.discord.guild_id,
             settings.discord.bot_token.clone(),
+            settings.discord.client_id,
             settings.location_url.clone(),
         )
     };
@@ -120,17 +121,25 @@ pub async fn route_account(
         categories.insert(category.id, category);
     }
 
+    let discord_signin_url = format!(
+        "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}/signin/discord&response_type=code&scope=identify+guilds.join",
+        discord_client_id,
+        location_url,
+    );
+
+    let discord_invite_url = state.bot.get_invite_url().await.unwrap();
+
     Html(
         state
             .jinja
             .get_template("account.html")
             .unwrap()
             .render(context! {
-                lang => lang,
-                user => user,
+                lang,
+                user,
                 uri => uri.to_string(),
-                in_server => in_server,
-                location_url => location_url,
+                in_server,
+                location_url,
                 og_image => format!("{}/og-image.png", location_url),
                 now => chrono::Utc::now(),
                 team,
@@ -138,6 +147,8 @@ pub async fn route_account(
                 categories,
                 emails,
                 divisions,
+                discord_signin_url,
+                discord_invite_url,
             })
             .unwrap(),
     )

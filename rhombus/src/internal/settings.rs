@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DiscordSettings {
-    pub client_id: String,
+    pub client_id: NonZeroU64,
     pub client_secret: String,
     pub bot_token: String,
     pub guild_id: NonZeroU64,
@@ -12,6 +12,7 @@ pub struct DiscordSettings {
     pub support_channel_id: Option<NonZeroU64>,
     pub author_role_id: Option<NonZeroU64>,
     pub verified_role_id: Option<NonZeroU64>,
+    pub invite_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
