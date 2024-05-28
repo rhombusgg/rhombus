@@ -32,7 +32,11 @@
                 class="flex items-center text-xl font-semibold tracking-tight"
               >
                 <div
-                  class="absolute ml-[-50px] inline-flex size-9 items-center justify-center rounded-full border-4 {% if user.discord_id %}bg-green-500{% else %}bg-border{% endif %}"
+                  class="absolute ml-[-50px] inline-flex size-9 items-center justify-center rounded-full border-4 {% if user.discord_id %}
+                    bg-green-300 dark:bg-green-500
+                  {% else %}
+                    bg-border
+                  {% endif %}"
                 >
                   {% if user.discord_id %}
                     {{ icons.check(class="size-4") }}
@@ -61,7 +65,11 @@
                 class="mt-8 flex items-center text-xl font-semibold tracking-tight"
               >
                 <div
-                  class="absolute ml-[-50px] inline-flex size-9 items-center justify-center rounded-full border-4 {% if in_server %}bg-green-500{% else %}bg-border{% endif %}"
+                  class="absolute ml-[-50px] inline-flex size-9 items-center justify-center rounded-full border-4 {% if in_server %}
+                    bg-green-300 dark:bg-green-500
+                  {% else %}
+                    bg-border
+                  {% endif %}"
                 >
                   {% if in_server %}
                     {{ icons.check(class="size-4") }}

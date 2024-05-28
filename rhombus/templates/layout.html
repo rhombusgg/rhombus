@@ -3,30 +3,56 @@
 {% extends "base.html" %}
 
 {% block body %}
-  <header class="border-b">
-    <div
-      class="flex items-center justify-between overflow-auto md:container md:mx-auto mx-4"
-    >
-      <nav hx-boost="true" class="flex">
-        <a href="/" class="mr-6 flex items-center space-x-2">
-          {{ icons.rhombus(attrs='class="size-9"') }}
+  <div class="relative flex min-h-screen flex-col">
+    <header class="border-b">
+      <div
+        class="flex items-center justify-between overflow-auto md:container md:mx-auto mx-4"
+      >
+        <nav hx-boost="true" class="flex">
+          <a href="/" class="mr-6 flex items-center space-x-2">
+            {{ icons.rhombus(attrs='class="size-9"') }}
 
-          <span class="hidden font-bold sm:inline-block lg:text-base"
-            >Rhombus</span
-          >
-        </a>
-        {{ navbarItem(label=t("scoreboard"), href="/scoreboard", uri=uri) }}
-        {% if user %}
-          {{ navbarItem(label=t("challenges"), href="/challenges", uri=uri) }}
-          {{ navbarItem(label=t("team"), href="/team", uri=uri) }}
-          {{ navbarItem(label=t("account"), href="/account", uri=uri) }}
-        {% else %}
-          {{ navbarItem(label=t("sign-in"), href="/signin", uri=uri) }}
-        {% endif %}
-      </nav>
-      {% include "command-palette.html" %}
+            <span class="hidden font-bold sm:inline-block lg:text-base"
+              >Rhombus</span
+            >
+          </a>
+          {{ navbarItem(label=t("scoreboard"), href="/scoreboard", uri=uri) }}
+          {% if user %}
+            {{ navbarItem(label=t("challenges"), href="/challenges", uri=uri) }}
+            {{ navbarItem(label=t("team"), href="/team", uri=uri) }}
+            {{ navbarItem(label=t("account"), href="/account", uri=uri) }}
+          {% else %}
+            {{ navbarItem(label=t("sign-in"), href="/signin", uri=uri) }}
+          {% endif %}
+        </nav>
+        {% include "command-palette.html" %}
+      </div>
+    </header>
+    <div class="flex flex-1">
+      {% block content %}
+      {% endblock %}
     </div>
-  </header>
-  {% block content %}
-  {% endblock %}
+    <footer class="py-6 md:px-8 md:py-0">
+      <div
+        class="container flex flex-col items-center justify-between gap-4 md:h-24 md:flex-row"
+      >
+        <div
+          class="flex flex-col items-center gap-4 px-8 md:flex-row md:gap-2 md:px-0"
+        >
+          <div class="hidden h-6 w-6 md:inline-block"></div>
+          <p
+            class="text-center text-sm leading-loose text-muted-foreground md:text-left"
+          >
+            The source code is available on
+            <a
+              href="https://github.com/rhombusgg/rhombus-rs"
+              target="_blank"
+              class="font-medium underline"
+              >GitHub</a
+            >.
+          </p>
+        </div>
+      </div>
+    </footer>
+  </div>
 {% endblock %}
