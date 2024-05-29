@@ -11,6 +11,12 @@ devDependencies:
   '@corvu/tooltip':
     specifier: ^0.1.0
     version: 0.1.0(solid-js@1.8.17)
+  '@fluent/bundle':
+    specifier: ^0.18.0
+    version: 0.18.0
+  '@fluent/langneg':
+    specifier: ^0.7.0
+    version: 0.7.0
   esbuild:
     specifier: ^0.21.2
     version: 0.21.2
@@ -619,6 +625,16 @@ packages:
 
   /@floating-ui/utils@0.2.2:
     resolution: {integrity: sha512-J4yDIIthosAsRZ5CPYP/jQvUAQtlZTTD/4suA08/FEnlxqW3sKS9iAhgsa9VYLZ6vDHn/ixJgIqRQPotoBjxIw==}
+    dev: true
+
+  /@fluent/bundle@0.18.0:
+    resolution: {integrity: sha512-8Wfwu9q8F9g2FNnv82g6Ch/E1AW1wwljsUOolH5NEtdJdv0sZTuWvfCM7c3teB9dzNaJA8rn4khpidpozHWYEA==}
+    engines: {node: '>=14.0.0', npm: '>=7.0.0'}
+    dev: true
+
+  /@fluent/langneg@0.7.0:
+    resolution: {integrity: sha512-StAM0vgsD1QK+nFikaKs9Rxe3JGNipiXrpmemNGwM4gWERBXPe9gjzsBoKjgBgq1Vyiy+xy/C652QIWY+MPyYw==}
+    engines: {node: '>=14.0.0', npm: '>=7.0.0'}
     dev: true
 
   /@isaacs/cliui@8.0.2:

@@ -18,7 +18,7 @@ chrono = { version = "0.4.38", features = ["serde"] }
 config = "0.14.0"
 dashmap = { version = "5.5.3", features = ["inline"] }
 dotenvy = { version = "0.15.7" }
-fluent = "0.16.0"
+fluent = "0.16.1"
 intl-memoizer = "0.5.1"
 jsonwebtoken = "9.3.0"
 lazy_static = "1.4.0"

@@ -224,7 +224,7 @@ pub async fn route_ticket_submit(
             .render(context! {
                 lang => lang,
                 user => user,
-                error => "Ticket is too long",
+                error => state.localizer.localize(&lang, "challenges-error-ticket-too-long", None),
             })
             .unwrap();
 
@@ -260,11 +260,16 @@ pub async fn route_ticket_submit(
             "HX-Trigger",
             json!({
                 "closeModal": true,
-                "successToast": "Ticket submitted",
             })
             .to_string(),
         )
-        .body("".to_owned())
+        .body(format!(
+            r#"<div id="htmx-toaster" data-toast="success" hx-swap-oob="true">{}</div>"#,
+            state
+                .localizer
+                .localize(&lang, "challenges-ticket-submitted", None)
+                .unwrap()
+        ))
         .unwrap()
 }
 
@@ -294,7 +299,7 @@ pub async fn route_challenge_submit(
             .unwrap()
             .render(context! {
                 lang => lang,
-                error => "Incorrect flag",
+                error => state.localizer.localize(&lang, "challenges-error-incorrect-flag", None),
             })
             .unwrap();
         return Response::builder()
@@ -316,7 +321,7 @@ pub async fn route_challenge_submit(
             .unwrap()
             .render(context! {
                 lang => lang,
-                error => "Unknown database error",
+                error => state.localizer.localize(&lang, "unknown-error", None),
             })
             .unwrap();
         return Response::builder()
@@ -369,11 +374,16 @@ pub async fn route_challenge_submit(
             json!({
                 "manualRefresh": true,
                 "closeModal": true,
-                "successToast": "Challenge solved",
             })
             .to_string(),
         )
-        .body("".to_owned())
+        .body(format!(
+            r#"<div id="htmx-toaster" data-toast="success" hx-swap-oob="true">{}</div>"#,
+            state
+                .localizer
+                .localize(&lang, "challenges-challenge-solved", None)
+                .unwrap(),
+        ))
         .unwrap()
 }
 
@@ -397,7 +407,7 @@ pub async fn route_writeup_submit(
             .render(context! {
                 lang => lang,
                 user => user,
-                error => "URL is too long",
+                error => state.localizer.localize(&lang, "error-writeup-url-too-long", None)
             })
             .unwrap();
 
@@ -416,7 +426,7 @@ pub async fn route_writeup_submit(
             .render(context! {
                 lang => lang,
                 user => user,
-                error => "Invalid URL",
+                error => state.localizer.localize(&lang, "challenges-error-writeup-invalid-url", None),
             })
             .unwrap();
 
@@ -463,7 +473,7 @@ pub async fn route_writeup_submit(
             .render(context! {
                 lang => lang,
                 user => user,
-                error => "Server did not respond successfully",
+                error => state.localizer.localize(&lang, "challenges-error-writeup-server-error", None),
             })
             .unwrap();
 

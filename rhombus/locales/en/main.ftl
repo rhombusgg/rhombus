@@ -1,10 +1,54 @@
 sign-in = Sign In
+scoreboard = Scoreboard
 team = Team
-user = User
 account = Account
 challenges = Challenges
-scoreboard = Scoreboard
+
+account-description = Manage your individual account settings. View
+    {$link_start}public profile{$link_end}.
+account-discord-integration = Discord Integration
+account-discord-integration-description = Link your Discord account to get rich feature integrations
+account-discord-integration-link-discord = Link Discord
+account-discord-integration-link-discord-description =
+    Challenge authors are on the Discord and verifying your Discord
+    account allows for better one-on-one communication with issues.
+account-discord-integration-join-server = Join Server
+account-discord-integration-join-server-description =
+    Join the official Discord server to get important announcements
+    and chat with other competitors.
+
+team-success-set-team-name = Set team name successfully
+team-error-name-length = Team name must be between 3 and 30 characters
+team-error-name-taken = Team name already taken
+
+account-check-email = Check your email for a verification link
+account-error-email-length = Email must be between 1 and 255 characters
+account-error-email-already-added = Email already added
+account-error-verification-email = Failed to send verification email
+
+challenges-ticket-submitted = Ticket submitted
+challenges-challenge-solved = Challenge solved
+challenges-error-ticket-too-long = Ticket is too long
+challenges-error-incorrect-flag = Incorrect flag
+challenges-error-writeup-invalid-url = Invalid URL
+challenges-error-writeup-url-too-long = URL is too long
+challenges-error-writeup-server-error = Server did not respond successfully
+
+unknown-error = "Unknown error"
+
+solves = {$solves ->
+    [one] {$solves} solve
+    *[other] {$solves} solves
+}
+points = {$points -> 
+    [one] {$points} pt
+    *[other] {$points} pts
+}
 solves-points = {solves} / {points}
+
+command-palette = Command Palette...
+    .hint = Type a command...
+
 time-difference = {$years ->
     [0] {$days ->
         [0] {$hours ->
@@ -29,13 +73,3 @@ time-difference = {$years ->
     [one] 1 year ago
     *[other] {$years} years ago
 }
-solves = {$solves ->
-    [one] {$solves} solve
-    *[other] {$solves} solves
-}
-points = {$points -> 
-    [one] {$points} pt
-    *[other] {$points} pts
-}
-command-palette = Command Palette...
-    .hint = Type a command...

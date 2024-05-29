@@ -13,7 +13,6 @@ use rand::{
 };
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::internal::{auth::User, locales::Languages, router::RouterState};
@@ -151,14 +150,22 @@ pub async fn route_team_set_name(
     let mut errors = vec![];
     let graphemes = form.name.graphemes(true).count();
     if !(3..=30).contains(&graphemes) {
-        errors.push("Team name must be between 3 and 30 characters");
+        errors.push(
+            state
+                .localizer
+                .localize(&lang, "team-error-name-length", None),
+        );
     } else if state
         .db
         .set_team_name(user.team_id, &form.name)
         .await
         .is_err()
     {
-        errors.push("Team name already taken");
+        errors.push(
+            state
+                .localizer
+                .localize(&lang, "team-error-name-taken", None),
+        );
     }
 
     let team_name_template = state.jinja.get_template("team-set-name.html").unwrap();
@@ -173,13 +180,6 @@ pub async fn route_team_set_name(
 
         Ok(Response::builder()
             .header("Content-Type", "text/html")
-            .header(
-                "HX-Trigger",
-                json!({
-                    "successToast": "Set team name",
-                })
-                .to_string(),
-            )
             .body(html)
             .unwrap())
     } else {

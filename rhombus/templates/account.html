@@ -9,10 +9,9 @@
     <div class="mb-4 space-y-0.5">
       <h2 class="text-2xl font-bold tracking-tight">{{ t("account") }}</h2>
       <p class="text-muted-foreground">
-        Manage your individual account settings. View
-        <a hx-boost="true" href="/user/{{ user.id }}" class="underline"
-          >public profile</a
-        >.
+        {% with link_start="<a hx-boost='true' href='/user/{}' class='underline'>" | replace("{}", user.id) %}
+          {{ t("account-description", link_start=link_start, link_end="</a>") | safe }}
+        {% endwith %}
       </p>
     </div>
     <div class="grid lg:grid-cols-2 gap-6">
@@ -20,10 +19,16 @@
         {% call card.root() %}
           {% call card.header() %}
             {% call card.title() %}
-              Discord Integration
+              {% with minijinja_lift=lang %}
+              {% endwith %}
+
+              {{ t("account-discord-integration") }}
             {% endcall %}
             {% call card.description() %}
-              Link your Discord account to get rich feature integrations
+              {% with minijinja_lift=lang %}
+              {% endwith %}
+
+              {{ t("account-discord-integration-description") }}
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
@@ -45,20 +50,21 @@
                   {% endif %}
                 </div>
                 {% if user.discord_id %}
-                  Link Discord
+                  {{ t("account-discord-integration-link-discord") }}
                 {% else %}
                   <a
                     class="flex items-center gap-2"
                     href="{{ discord_signin_url }}"
                   >
-                    <span>Link Discord</span>
+                    <span
+                      >{{ t("account-discord-integration-link-discord") }}</span
+                    >
                     {{ icons.external_link(class="size-6") }}
                   </a>
                 {% endif %}
               </h3>
               <p class="mt-2">
-                Challenge authors are on the Discord and verifying your Discord
-                account allows for better one-on-one communication with issues.
+                {{ t("account-discord-integration-link-discord-description") }}
               </p>
 
               <h3
@@ -79,20 +85,21 @@
                 </div>
 
                 {% if in_server %}
-                  Join Server
+                  {{ t("account-discord-integration-join-server") }}
                 {% else %}
                   <a
                     class="flex items-center gap-2"
                     href="{{ discord_invite_url }}"
                   >
-                    <span>Join Server</span>
+                    <span
+                      >{{ t("account-discord-integration-join-server") }}</span
+                    >
                     {{ icons.external_link(class="size-6") }}
                   </a>
                 {% endif %}
               </h3>
               <p class="mt-2">
-                Join the official Discord server to get important announcements
-                and chat with other competitors.
+                {{ t("account-discord-integration-join-server-description") }}
               </p>
             </div>
           {% endcall %}

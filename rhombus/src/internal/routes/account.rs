@@ -14,7 +14,6 @@ use rand::{
 };
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use tracing::debug;
 
 use crate::internal::{
@@ -163,32 +162,31 @@ pub async fn route_account_add_email(
     state: State<RouterState>,
     Extension(user): Extension<User>,
     Extension(ip): Extension<Option<IpAddr>>,
+    Extension(lang): Extension<Languages>,
     Form(form): Form<EmailSubmit>,
 ) -> impl IntoResponse {
     if form.email.is_empty() || form.email.len() > 255 {
         return Response::builder()
-            .header(
-                "HX-Trigger",
-                json!({
-                    "errorToast": "Email must be between 1 and 255 characters",
-                })
-                .to_string(),
-            )
-            .body("".to_owned())
+            .body(format!(
+                r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
+                state
+                    .localizer
+                    .localize(&lang, "account-error-email-length", None)
+                    .unwrap(),
+            ))
             .unwrap();
     }
 
     let emails = state.db.get_emails_for_user_id(user.id).await.unwrap();
     if emails.iter().any(|email| email.address == form.email) {
         return Response::builder()
-            .header(
-                "HX-Trigger",
-                json!({
-                    "errorToast": "Email already added",
-                })
-                .to_string(),
-            )
-            .body("".to_owned())
+            .body(format!(
+                r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
+                state
+                    .localizer
+                    .localize(&lang, "account-error-email-already-added", None)
+                    .unwrap(),
+            ))
             .unwrap();
     }
 
@@ -212,14 +210,13 @@ pub async fn route_account_add_email(
             state.db.delete_email(user.id, &form.email).await.unwrap();
 
             return Response::builder()
-                .header(
-                    "HX-Trigger",
-                    json!({
-                        "errorToast": "Failed to send verification email",
-                    })
-                    .to_string(),
-                )
-                .body("".to_owned())
+                .body(format!(
+                    r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
+                    state
+                        .localizer
+                        .localize(&lang, "account-error-verification-email", None)
+                        .unwrap(),
+                ))
                 .unwrap();
         }
 
@@ -231,14 +228,13 @@ pub async fn route_account_add_email(
     }
 
     Response::builder()
-        .header(
-            "HX-Trigger",
-            json!({
-                "successToast": "Check your email for a verification link",
-            })
-            .to_string(),
-        )
-        .body("".to_owned())
+        .body(format!(
+            r#"<div id="htmx-toaster" data-toast="success" hx-swap-oob="true">{}</div>"#,
+            state
+                .localizer
+                .localize(&lang, "account-check-email", None)
+                .unwrap(),
+        ))
         .unwrap()
 }
 

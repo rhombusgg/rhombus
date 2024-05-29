@@ -830,11 +830,18 @@ impl Database for LibSQL {
             .map(|row| serde_json::from_str(&row.get::<String>(0).unwrap()).unwrap());
 
         if let Some(db_settings) = db_settings {
-            settings.discord.first_blood_channel_id = db_settings.discord.first_blood_channel_id;
-            settings.discord.support_channel_id = db_settings.discord.support_channel_id;
-            settings.discord.guild_id = db_settings.discord.guild_id;
-            settings.discord.author_role_id = db_settings.discord.author_role_id;
-            settings.default_ticket_template = db_settings.default_ticket_template;
+            if settings.discord.first_blood_channel_id.is_none() {
+                settings.discord.first_blood_channel_id =
+                    db_settings.discord.first_blood_channel_id;
+            }
+
+            if settings.discord.support_channel_id.is_none() {
+                settings.discord.support_channel_id = db_settings.discord.support_channel_id;
+            }
+
+            if settings.discord.author_role_id.is_none() {
+                settings.discord.author_role_id = db_settings.discord.author_role_id;
+            }
         }
 
         Ok(())

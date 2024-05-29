@@ -22,7 +22,7 @@ divisions:
 discord:
   guild_id: 1160610137703186636
   client_id: 1160076447977848945
-  # author_role_id: 1198496803130183770
-  # first_blood_channel_id: 1240422645938389102
-  # support_channel_id: 1173026578385617010
-  # verified_role_id: 1170429782270431283
+  author_role_id: 1198496803130183770
+  first_blood_channel_id: 1240422645938389102
+  support_channel_id: 1173026578385617010
+  verified_role_id: 1170429782270431283

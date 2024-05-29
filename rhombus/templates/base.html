@@ -104,5 +104,19 @@
   <body>
     {% block body %}{% endblock %}
     <div hx-preserve="true" id="toaster"></div>
+    <div id="htmx-toaster"></div>
+    <script>
+      window.removeEventListener("htmx:oobAfterSwap", window.toaster);
+      window.toaster = (e) => {
+        if (e.detail.elt.id === "htmx-toaster") {
+          if (e.detail.elt.dataset.toast === "success") {
+            rhombus.toast.success(e.detail.elt.innerHTML);
+          } else if (e.detail.elt.dataset.toast === "error") {
+            rhombus.toast.error(e.detail.elt.innerHTML);
+          }
+        }
+      };
+      window.addEventListener("htmx:oobAfterSwap", window.toaster);
+    </script>
   </body>
 </html>

@@ -11,6 +11,8 @@
   "devDependencies": {
     "@corvu/tailwind": "^0.1.5",
     "@corvu/tooltip": "^0.1.0",
+    "@fluent/bundle": "^0.18.0",
+    "@fluent/langneg": "^0.7.0",
     "esbuild": "^0.21.2",
     "esbuild-plugin-solid": "^0.6.0",
     "solid-element": "^1.8.0",

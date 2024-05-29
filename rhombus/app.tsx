@@ -12,6 +12,70 @@ import { Toaster, toast } from "solid-toast";
 
 export { toast } from "solid-toast";
 
+import { FluentBundle, FluentResource } from "@fluent/bundle";
+import { negotiateLanguages } from "@fluent/langneg";
+
+const localizations: Record<string, string> = {
+  en: `
+healthy = Challenge is <span class="text-green-500">up</span>
+unhealthy = Challenge is <span class="text-red-500">down</span>
+solved-by = Solved by {$name}
+authored-by = Authored by {$name}
+new-ticket = Create new ticket
+focus-challenge = View full challenge
+solves = {$solves ->
+  [one] {$solves} solve 
+  *[other] {$solves} solves
+}
+points = {$points ->
+  [one] {$points} point
+  *[other] {$points} points
+}
+solves-points = {solves} / {points}
+  `.trim(),
+  de: `
+healthy = Challenge ist <span class="text-green-500">online</span>
+unhealthy = Challenge ist <span class="text-red-500">offline</span>
+solved-by = Gelöst von {$name}
+authored-by = Geschrieben von {$name}
+new-ticket = Neues Ticket erstellen
+focus-challenge = Challenge im Detail ansehen
+solves = {$solves ->
+  [one] {$solves} Lösung
+  *[other] {$solves} Lösungen
+}
+points = {$points ->
+  [one] {$points} Punkt
+  *[other] {$points} Punkte
+}
+solves-points = {solves} / {points}
+`.trim(),
+};
+
+const negotiatedLocales = negotiateLanguages(
+  navigator.languages,
+  Object.keys(localizations),
+  {
+    defaultLocale: Object.keys(localizations)[0],
+  },
+);
+
+const bundles = negotiatedLocales.map((locale) => {
+  const bundle = new FluentBundle(locale);
+  bundle.addResource(new FluentResource(localizations[locale]));
+  return bundle;
+});
+
+export function translate(key: string, args?: Record<string, string | number>) {
+  for (const bundle of bundles) {
+    const message = bundle.getMessage(key);
+    if (message) {
+      return bundle.formatPattern(message.value, args);
+    }
+  }
+  return key;
+}
+
 customElement("rhombus-tooltip", (_props, { element }) => {
   const anchor = document.querySelector("dialog");
 
@@ -136,15 +200,11 @@ const ChallengesComponent = ({
                               <Tooltip.Portal>
                                 <Tooltip.Content class="tooltip">
                                   {challenge.healthy ? (
-                                    <>
-                                      Challenge is{" "}
-                                      <span class="text-green-500">up</span>
-                                    </>
+                                    <div innerHTML={translate("healthy")}></div>
                                   ) : (
-                                    <>
-                                      Challenge is{" "}
-                                      <span class="text-red-500">down</span>
-                                    </>
+                                    <div
+                                      innerHTML={translate("unhealthy")}
+                                    ></div>
                                   )}
                                   <Tooltip.Arrow class="text-secondary" />
                                 </Tooltip.Content>
@@ -168,8 +228,10 @@ const ChallengesComponent = ({
                                 <Tooltip.Portal>
                                   <Tooltip.Content class="tooltip">
                                     <span>
-                                      Solved by{" "}
-                                      {data().team.users[solve.user_id].name}
+                                      {translate("solved-by", {
+                                        name: data().team.users[solve.user_id]
+                                          .name,
+                                      })}
                                     </span>
                                     <Tooltip.Arrow class="text-secondary" />
                                   </Tooltip.Content>
@@ -181,7 +243,10 @@ const ChallengesComponent = ({
                                 >
                                   <img
                                     class="aspect-square rounded-full h-8"
-                                    alt={`Solved by ${data().team.users[solve.user_id].name}`}
+                                    alt={translate("solved-by", {
+                                      name: data().team.users[solve.user_id]
+                                        .name,
+                                    })}
                                     src={
                                       data().team.users[solve.user_id]
                                         .avatar_url
@@ -212,16 +277,14 @@ const ChallengesComponent = ({
                                             }
                                           </td>
                                           <td class="pr-2">
-                                            {division_points.solves} solve
-                                            {division_points.solves !== 1
-                                              ? "s"
-                                              : ""}
+                                            {translate("solves", {
+                                              solves: division_points.solves,
+                                            })}
                                           </td>
                                           <td>
-                                            {division_points.points} point
-                                            {division_points.points !== 1
-                                              ? "s"
-                                              : ""}
+                                            {translate("points", {
+                                              points: division_points.points,
+                                            })}
                                           </td>
                                         </tr>
                                       ),
@@ -231,14 +294,10 @@ const ChallengesComponent = ({
                                 </Tooltip.Content>
                               </Tooltip.Portal>
                               <Tooltip.Trigger as="span" class="cursor-pointer">
-                                {challenge.division_points[0].solves} solve
-                                {challenge.division_points[0].solves !== 1
-                                  ? "s"
-                                  : ""}{" "}
-                                / {challenge.division_points[0].points} point
-                                {challenge.division_points[0].points !== 1
-                                  ? "s"
-                                  : ""}
+                                {translate("solves-points", {
+                                  solves: challenge.division_points[0].solves,
+                                  points: challenge.division_points[0].points,
+                                })}
                               </Tooltip.Trigger>
                             </Tooltip>
                             <Show when={author}>
@@ -252,14 +311,20 @@ const ChallengesComponent = ({
                               >
                                 <Tooltip.Portal>
                                   <Tooltip.Content class="tooltip">
-                                    <span>Authored by {author.name}</span>
+                                    <span>
+                                      {translate("authored-by", {
+                                        name: author.name,
+                                      })}
+                                    </span>
                                     <Tooltip.Arrow class="text-secondary" />
                                   </Tooltip.Content>
                                 </Tooltip.Portal>
                                 <Tooltip.Trigger
                                   as="img"
                                   class="aspect-square rounded-full h-8"
-                                  alt={`Authored by ${author.name}`}
+                                  alt={translate("authored-by", {
+                                    name: author.name,
+                                  })}
                                   src={author.avatar_url}
                                 />
                               </Tooltip>
@@ -276,7 +341,7 @@ const ChallengesComponent = ({
                               >
                                 <Tooltip.Portal>
                                   <Tooltip.Content class="tooltip">
-                                    <span>Create new ticket</span>
+                                    <span>{translate("new-ticket")}</span>
                                     <Tooltip.Arrow class="text-secondary" />
                                   </Tooltip.Content>
                                 </Tooltip.Portal>
@@ -318,7 +383,7 @@ const ChallengesComponent = ({
                             >
                               <Tooltip.Portal>
                                 <Tooltip.Content class="tooltip">
-                                  <span>View full challenge</span>
+                                  <span>{translate("focus-challenge")}</span>
                                   <Tooltip.Arrow class="text-secondary" />
                                 </Tooltip.Content>
                               </Tooltip.Portal>
@@ -454,14 +519,6 @@ document.addEventListener("DOMContentLoaded", () => {
     () => <Toaster attr:hx-preserve="true" position="top-center" gutter={8} />,
     document.querySelector("#toaster"),
   );
-
-  document.body.addEventListener("successToast", (event) => {
-    toast.success((event as any).detail.value);
-  });
-
-  document.body.addEventListener("errorToast", (event) => {
-    toast.error((event as any).detail.value);
-  });
 
   document.body.addEventListener("pageRefresh", () => {
     location.reload();

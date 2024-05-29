@@ -6,4 +6,8 @@
 
 {% if new_team_name %}
   <h2 id="title" hx-swap-oob="innerHTML">Team {{ new_team_name }}</h2>
+
+  <div id="htmx-toaster" data-toast="success" hx-swap-oob="true">
+    {{- t("team-success-set-team-name") -}}
+  </div>
 {% endif %}
