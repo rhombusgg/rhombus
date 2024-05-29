@@ -13,13 +13,22 @@
         On team
         <a
           hx-boost="true"
+          hx-select="#screen"
+          hx-target="#screen"
+          hx-swap="outerHTML"
           href="/team/{{ public_user.team_id }}"
           class="underline"
           >{{ public_team.name }}</a
         >.
         {% if user.id == public_user.id %}
           This is your profile,
-          <a hx-boost="true" href="/account" class="underline"
+          <a
+            hx-boost="true"
+            hx-select="#screen"
+            hx-target="#screen"
+            hx-swap="outerHTML"
+            href="/account"
+            class="underline"
             >go to your account view</a
           >.
         {% endif %}
@@ -62,6 +71,9 @@
                       <li class="flex items-center h-8">
                         <a
                           hx-boost="true"
+                          hx-select="#screen"
+                          hx-target="#screen"
+                          hx-swap="outerHTML"
                           href="/challenges#{{ challenge.name }}"
                           class="font-bold"
                         >

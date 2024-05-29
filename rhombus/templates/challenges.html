@@ -5,7 +5,7 @@
 
 {% block content %}
   <div
-    class="w-full my-4 px-4 gap-4 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(600px,1fr))]"
+    class="w-full h-fit my-4 px-4 gap-4 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(600px,1fr))]"
     id="challenges"
   ></div>
 
@@ -13,14 +13,15 @@
     (function () {
       rhombus.renderChallenges(document.getElementById("challenges"), {{ challenge_json | safe }});
 
-      window.register = () => {
-        window.addEventListener("focus", window.challengeRefetchHandlerInner);
-        window.addEventListener("manualRefresh", window.challengeRefetchHandlerInner);
+      window.addEventListener("focus", window.challengeRefetchHandler);
+      window.addEventListener("manualRefresh", window.challengeRefetchHandler);
 
-        return () => {
-          window.removeEventListener("focus", window.challengeRefetchHandlerInner);
-          window.removeEventListener("manualRefresh", window.challengeRefetchHandlerInner);
-        }
+      window.deregister = () => {
+        window.removeEventListener("focus", window.challengeRefetchHandler);
+        window.removeEventListener(
+          "manualRefresh",
+          window.challengeRefetchHandler,
+        );
       };
 
       document.body.addEventListener("htmx:afterSettle", function (detail) {

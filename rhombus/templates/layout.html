@@ -3,12 +3,18 @@
 {% extends "base.html" %}
 
 {% block body %}
-  <div class="relative flex min-h-screen flex-col">
+  <div id="screen" class="relative flex min-h-screen flex-col">
     <header class="border-b">
       <div
         class="flex items-center justify-between overflow-auto md:container md:mx-auto mx-4"
       >
-        <nav hx-boost="true" class="flex">
+        <nav
+          hx-boost="true"
+          hx-select="#screen"
+          hx-target="#screen"
+          hx-swap="outerHTML"
+          class="flex"
+        >
           <a href="/" class="mr-6 flex items-center space-x-2">
             {{ icons.rhombus(attrs='class="size-9"') }}
 

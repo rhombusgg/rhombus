@@ -12,7 +12,13 @@
       </h2>
       <p class="text-muted-foreground">
         Manage and view your team. View
-        <a hx-boost="true" href="/team/{{ team.id }}" class="underline"
+        <a
+          hx-boost="true"
+          hx-select="#screen"
+          hx-target="#screen"
+          hx-swap="outerHTML"
+          href="/team/{{ team.id }}"
+          class="underline"
           >public profile</a
         >.
       </p>
@@ -82,6 +88,9 @@
                   <div class="flex items-center gap-2">
                     <a
                       hx-boost="true"
+                      hx-select="#screen"
+                      hx-target="#screen"
+                      hx-swap="outerHTML"
                       href="/user/{{ player_id }}"
                       class="flex gap-2 items-center"
                       title="Go to public user profile"
@@ -272,6 +281,9 @@
                       <div>
                         <a
                           hx-boost="true"
+                          hx-select="#screen"
+                          hx-target="#screen"
+                          hx-swap="outerHTML"
                           href="/challenges#{{ challenge.name }}"
                           class="font-bold"
                           title="Go to challenge"
@@ -292,6 +304,9 @@
                       </div>
                       <a
                         hx-boost="true"
+                        hx-select="#screen"
+                        hx-target="#screen"
+                        hx-swap="outerHTML"
                         href="/user/{{ solve.user_id }}"
                         class="flex items-center gap-2"
                         title="Go to public user profile"

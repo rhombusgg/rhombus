@@ -31,32 +31,19 @@
     <link rel="stylesheet" href="/static/tailwind.css" />
     <script src="/static/app.js"></script>
     <script>
-      document.addEventListener("htmx:afterSettle", (e) => {
+      document.addEventListener("htmx:beforeOnLoad", (e) => {
         if (e.detail.boosted) {
           if (window.deregister) {
             window.deregister();
             window.deregister = undefined;
           }
-          if (window.register) {
-            window.deregister = window.register();
-            window.register = undefined;
-          }
         }
       });
-      // window.addEventListener("popstate", (e) => {
-      //   if (window.deregister) {
-      //     window.deregister();
-      //     window.deregister = undefined;
-      //   }
-      //   if (window.register) {
-      //     window.deregister = window.register();
-      //     window.register = undefined;
-      //   }
-      // });
-      window.addEventListener("DOMContentLoaded", (e) => {
-        if (window.register) {
-          window.deregister = window.register();
-          window.register = undefined;
+      window.onunload = function () {};
+      window.addEventListener("popstate", (e) => {
+        if (window.deregister) {
+          window.deregister();
+          window.deregister = undefined;
         }
       });
     </script>
@@ -103,11 +90,10 @@
 
   <body>
     {% block body %}{% endblock %}
-    <div hx-preserve="true" id="toaster"></div>
+    <div id="toaster"></div>
     <div id="htmx-toaster"></div>
     <script>
-      window.removeEventListener("htmx:oobAfterSwap", window.toaster);
-      window.toaster = (e) => {
+      window.addEventListener("htmx:oobAfterSwap", (e) => {
         if (e.detail.elt.id === "htmx-toaster") {
           if (e.detail.elt.dataset.toast === "success") {
             rhombus.toast.success(e.detail.elt.innerHTML);
@@ -115,8 +101,7 @@
             rhombus.toast.error(e.detail.elt.innerHTML);
           }
         }
-      };
-      window.addEventListener("htmx:oobAfterSwap", window.toaster);
+      });
     </script>
   </body>
 </html>

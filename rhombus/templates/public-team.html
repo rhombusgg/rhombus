@@ -13,7 +13,13 @@
         Public team profile.
         {% if user.team_id == public_team.id %}
           You are on the team,
-          <a hx-boost="true" href="/team" class="underline"
+          <a
+            hx-boost="true"
+            hx-select="#screen"
+            hx-target="#screen"
+            hx-swap="outerHTML"
+            href="/team"
+            class="underline"
             >go to your team view</a
           >.
         {% endif %}
@@ -36,6 +42,9 @@
                 <li class="flex items-center gap-2">
                   <a
                     hx-boost="true"
+                    hx-select="#screen"
+                    hx-target="#screen"
+                    hx-swap="outerHTML"
                     href="/user/{{ player_id }}"
                     class="flex gap-2 items-center"
                     title="Go to public user profile"
@@ -99,6 +108,9 @@
                       <div>
                         <a
                           hx-boost="true"
+                          hx-select="#screen"
+                          hx-target="#screen"
+                          hx-swap="outerHTML"
                           href="/challenges#{{ challenge.name }}"
                           class="font-bold"
                           title="Go to challenge"
@@ -119,6 +131,9 @@
                       </div>
                       <a
                         hx-boost="true"
+                        hx-select="#screen"
+                        hx-target="#screen"
+                        hx-swap="outerHTML"
                         href="/user/{{ solve.user_id }}"
                         class="flex items-center gap-2"
                         title="Go to public user profile"

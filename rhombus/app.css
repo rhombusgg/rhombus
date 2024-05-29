@@ -78,3 +78,7 @@ dialog[open] {
 #loader:not(.htmx-request) {
   display: none;
 }
+
+#htmx-toaster {
+  display: none;
+}

@@ -6,15 +6,13 @@
 
 {% block content %}
   <div class="container mb-6">
-    <div
-      class="w-full mt-4 relative"
-      style="height: 600px"
-    >
-      <div class="size-full absolute"
-        id="chart"
-        hx-preserve="true"
-        ></div>
-      <div id="empty-banner" style="display: none;" class="absolute z-10 size-full items-center justify-center">
+    <div class="w-full mt-4 relative" style="height: 600px">
+      <div class="size-full absolute" id="chart" hx-preserve="true"></div>
+      <div
+        id="empty-banner"
+        style="display: none;"
+        class="absolute z-10 size-full items-center justify-center"
+      >
         <span class="text-2xl font-semibold">No historical data yet!</span>
       </div>
     </div>
@@ -36,6 +34,9 @@
                 {% for division_id, division in divisions | items %}
                   <a
                     hx-boost="true"
+                    hx-select="#screen"
+                    hx-target="#screen"
+                    hx-swap="outerHTML"
                     href="/scoreboard/{{ division_id }}"
                     class="relative"
                   >
@@ -74,7 +75,12 @@
                     <tr class="even:bg-secondary *:p-2">
                       <td>{{ entry.rank }}</td>
                       <td class="w-2/3">
-                        <a hx-boost="true" href="/team/{{ entry.team_id }}"
+                        <a
+                          hx-boost="true"
+                          hx-select="#screen"
+                          hx-target="#screen"
+                          hx-swap="outerHTML"
+                          href="/team/{{ entry.team_id }}"
                           >{{ entry.team_name }}</a
                         >
                       </td>
@@ -90,6 +96,9 @@
                       {% if i == 0 and page != 0 %}
                         <a
                           hx-boost="true"
+                          hx-select="#screen"
+                          hx-target="#screen"
+                          hx-swap="outerHTML"
                           class="underline"
                           href="/scoreboard/{{ selected_division_id }}"
                           >1</a
@@ -97,6 +106,9 @@
                       {% elif i != page %}
                         <a
                           hx-boost="true"
+                          hx-select="#screen"
+                          hx-target="#screen"
+                          hx-swap="outerHTML"
                           class="underline"
                           href="/scoreboard/{{ selected_division_id }}?page={{ i + 1 }}"
                           >{{ i + 1 }}</a
@@ -119,53 +131,54 @@
   <script>
     (function () {
       const chartElement = document.getElementById("chart");
-      let chart = undefined;
-      window.mostRecentOptions = undefined;
 
-      const setTheme = () => {
+      const setScoreboardTheme = () => {
         const isDark = document.documentElement.classList.contains("dark");
-        if (chart) {
-          chart.dispose();
+        if (window.scoreboardChart) {
+          window.scoreboardChart.dispose();
         }
         if (isDark) {
-          chart = echarts.init(chartElement, "dark", undefined);
+          window.scoreboardChart = echarts.init(
+            chartElement,
+            "dark",
+            undefined,
+          );
         } else {
-          chart = echarts.init(chartElement, null, undefined);
+          window.scoreboardChart = echarts.init(chartElement, null, undefined);
         }
-        if (window.mostRecentOptions) chart.setOption(window.mostRecentOptions);
-        chart.resize();
+        if (window.mostRecentOptions)
+          window.scoreboardChart.setOption(window.mostRecentOptions);
+        window.scoreboardChart.resize();
       };
 
-      setTheme();
-      const observer = new MutationObserver(() => setTheme());
+      setScoreboardTheme();
+      const observer = new MutationObserver(() => setScoreboardTheme());
       observer.observe(document.documentElement, {
         attributes: true,
         attributeFilter: ["class"],
       });
 
-      window.register = () => {
-        const refetchHandler = async () => {
-          const scoreboard_data = await (
-            await fetch(window.location.pathname, {
-              headers: { accept: "application/json" },
-            })
-          ).json();
-          render(scoreboard_data);
-        };
+      const refetchHandler = async () => {
+        const scoreboard_data = await (
+          await fetch(window.location.pathname, {
+            headers: { accept: "application/json" },
+          })
+        ).json();
+        render(scoreboard_data);
+      };
 
-        const resizeHandler = () => {
-          chart.resize();
-        };
+      const resizeHandler = () => {
+        window.scoreboardChart.resize();
+      };
 
-        window.addEventListener("resize", resizeHandler);
-        window.addEventListener("focus", refetchHandler);
-        const periodicRefetch = setInterval(refetchHandler, 1000 * 60 * 2);
+      window.addEventListener("resize", resizeHandler);
+      window.addEventListener("focus", refetchHandler);
+      const periodicRefetch = setInterval(refetchHandler, 1000 * 60 * 2);
 
-        return () => {
-          window.removeEventListener("resize", resizeHandler);
-          window.removeEventListener("focus", refetchHandler);
-          clearInterval(periodicRefetch);
-        };
+      window.deregister = () => {
+        window.removeEventListener("resize", resizeHandler);
+        window.removeEventListener("focus", refetchHandler);
+        clearInterval(periodicRefetch);
       };
 
       render({{ scoreboard | safe }});
@@ -256,7 +269,7 @@
         };
 
         window.mostRecentOptions = options;
-        chart.setOption(options, true);
+        window.scoreboardChart.setOption(options, true);
       }
     })();
   </script>

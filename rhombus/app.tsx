@@ -130,7 +130,7 @@ const ChallengesComponent = ({
     { initialValue: challenge_json },
   );
 
-  (window as any).challengeRefetchHandlerInner = () => {
+  (window as any).challengeRefetchHandler = () => {
     setShouldFetch(true);
     refetch();
   };
@@ -239,6 +239,9 @@ const ChallengesComponent = ({
                                 <Tooltip.Trigger
                                   as="a"
                                   hx-boost="true"
+                                  hx-select="#screen"
+                                  hx-target="#screen"
+                                  hx-swap="outerHTML"
                                   href={`/user/${solve.user_id}`}
                                 >
                                   <img
@@ -508,6 +511,7 @@ export function renderChallenges(
   element: HTMLElement,
   challenge_json: ChallengesData,
 ) {
+  element.innerHTML = "";
   render(
     () => <ChallengesComponent challenge_json={challenge_json} />,
     element,
@@ -516,7 +520,7 @@ export function renderChallenges(
 
 document.addEventListener("DOMContentLoaded", () => {
   render(
-    () => <Toaster attr:hx-preserve="true" position="top-center" gutter={8} />,
+    () => <Toaster position="top-center" gutter={8} />,
     document.querySelector("#toaster"),
   );
 

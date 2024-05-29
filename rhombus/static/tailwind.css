@@ -878,6 +878,11 @@ body {
   height: 2rem;
 }
 
+.h-fit {
+  height: -moz-fit-content;
+  height: fit-content;
+}
+
 .max-h-\[300px\] {
   max-height: 300px;
 }
@@ -1552,6 +1557,10 @@ dialog[open] {
 }
 
 #loader:not(.htmx-request) {
+  display: none;
+}
+
+#htmx-toaster {
   display: none;
 }
 
