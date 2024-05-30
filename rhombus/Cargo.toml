@@ -70,7 +70,6 @@ listenfd = { version = "1.0.1", optional = true }
 sqlx = { version = "0.7.4", optional = true, features = [
   "tls-rustls",
   "runtime-tokio",
-  "postgres",
   "chrono",
   "macros",
 ] }
@@ -85,7 +84,8 @@ testcontainers-modules = { version = "0.3.7", features = ["postgres"] }
 
 [features]
 default = ["libsql"]
-postgres = ["dep:sqlx"]
+postgres = ["dep:sqlx", "sqlx/postgres"]
+mysql = ["dep:sqlx", "sqlx/mysql"]
 libsql = ["dep:libsql", "dep:futures"]
 systemfd = ["dep:listenfd"]
 shuttle = []
@@ -93,6 +93,7 @@ testcontainers = []
 internal = []
 all = [
   "postgres",
+  "mysql",
   "libsql",
   "systemfd",
   "shuttle",

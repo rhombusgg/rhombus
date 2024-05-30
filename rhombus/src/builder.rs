@@ -1,4 +1,5 @@
 use std::{
+    any::Any,
     env,
     hash::{BuildHasher, BuildHasherDefault, Hasher},
     sync::Arc,
@@ -64,7 +65,7 @@ use crate::{
         settings::{DbConfig, IpPreset, Settings},
         static_serve::route_static_serve,
     },
-    plugin::{RunContext, UploadProviderContext},
+    plugin::{DatabaseProviderContext, RunContext, UploadProviderContext},
     upload_provider::UploadProvider,
     LocalUploadProvider, Plugin, Result,
 };
@@ -75,6 +76,8 @@ pub enum RawDb {
 
     #[cfg(feature = "libsql")]
     LibSQL(libsql::Connection),
+
+    Plugin(Box<dyn Any + Send + Sync>),
 }
 
 pub fn builder() -> Builder<(), ()> {
@@ -398,7 +401,21 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             .build()?
             .try_deserialize()?;
 
-        let (db, rawdb) = self.build_database(&settings).await?;
+        let mut database_provider_context = DatabaseProviderContext {
+            settings: &mut settings,
+        };
+        let custom_provider = self
+            .plugins
+            .database_provider(&mut database_provider_context)
+            .await;
+
+        let (db, rawdb) = if let Some(custom_provider) = custom_provider {
+            let rawdb = RawDb::Plugin(custom_provider.1);
+            let db = custom_provider.0;
+            (db, rawdb)
+        } else {
+            self.build_database(&settings).await?
+        };
 
         db.load_settings(&mut settings).await?;
         db.save_settings(&settings).await?;

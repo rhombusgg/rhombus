@@ -13,5 +13,6 @@ sqlx = { version = "0.7.4", features = [
     "runtime-tokio",
     "postgres",
     "chrono",
+    "mysql",
 ] }
 tracing = "0.1.40"

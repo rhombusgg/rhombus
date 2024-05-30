@@ -1,3 +1,5 @@
+use std::any::Any;
+
 use axum::Router;
 use minijinja::Environment;
 
@@ -50,6 +52,11 @@ pub struct UploadProviderContext<'a> {
     pub db: Connection,
 }
 
+pub struct DatabaseProviderContext<'a> {
+    /// Base settings for the application.
+    pub settings: &'a mut Settings,
+}
+
 /// A plugin can be used to extend Rhombus with custom functionality, themes, or localization.
 ///
 /// ## Order of execution
@@ -87,6 +94,13 @@ pub trait Plugin {
         None::<()>
     }
 
+    async fn database_provider(
+        &self,
+        _context: &mut DatabaseProviderContext<'_>,
+    ) -> Option<(Connection, Box<dyn Any + Send + Sync>)> {
+        None
+    }
+
     async fn run<U: UploadProvider>(
         &self,
         context: &mut RunContext<'_, U>,
@@ -106,6 +120,13 @@ impl<P: Plugin> Plugin for (P,) {
         context: &UploadProviderContext<'_>,
     ) -> Option<impl UploadProvider + Send + Sync> {
         self.0.upload_provider(context).await
+    }
+
+    async fn database_provider(
+        &self,
+        context: &mut DatabaseProviderContext<'_>,
+    ) -> Option<(Connection, Box<dyn Any + Send + Sync>)> {
+        self.0.database_provider(context).await
     }
 
     async fn run<U: UploadProvider>(
@@ -133,6 +154,16 @@ where
                 .upload_provider(context)
                 .await
                 .map(EitherUploadProvider::Right),
+        }
+    }
+
+    async fn database_provider(
+        &self,
+        context: &mut DatabaseProviderContext<'_>,
+    ) -> Option<(Connection, Box<dyn Any + Send + Sync>)> {
+        match self.0.database_provider(context).await {
+            Some(u) => Some(u),
+            None => self.1.database_provider(context).await,
         }
     }
 

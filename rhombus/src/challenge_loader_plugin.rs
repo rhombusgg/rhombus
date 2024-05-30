@@ -1,3 +1,4 @@
+use core::panic;
 use std::{
     collections::BTreeSet,
     fs::{self, ReadDir},
@@ -98,6 +99,19 @@ impl Plugin for ChallengeLoaderPlugin {
         context: &mut RunContext<'_, U>,
     ) -> Result<Router<RouterState>> {
         match context.rawdb {
+            #[allow(unused_labels)]
+            crate::builder::RawDb::Plugin(d) => 'raw: {
+                #[cfg(feature = "mysql")]
+                if let Some(mysql) = d.downcast_ref::<sqlx::MySqlPool>() {
+                    let row: (i64,) = sqlx::query_as("SELECT 3 + 8").fetch_one(mysql).await?;
+                    tracing::info!("Database provider: {}", row.0);
+                    break 'raw;
+                }
+
+                _ = d;
+                panic!("Unsupported database type for ChallengeLoaderPlugin");
+            }
+
             #[cfg(feature = "postgres")]
             crate::builder::RawDb::Postgres(_) => panic!("Postgres not supported"),
 

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{any::Any, sync::Arc};
 
 use axum::{
     async_trait,
@@ -11,10 +11,13 @@ use fluent::FluentResource;
 use minijinja::context;
 use rhombus::{
     internal::{
-        auth::MaybeUser, database::provider::Connection, division::DivisionEligible,
-        locales::Languages, router::RouterState,
+        auth::MaybeUser,
+        database::provider::{Connection, Database},
+        division::DivisionEligible,
+        locales::Languages,
+        router::RouterState,
     },
-    plugin::{RunContext, UploadProviderContext},
+    plugin::{DatabaseProviderContext, RunContext, UploadProviderContext},
     LocalUploadProvider, Plugin, UploadProvider,
 };
 use sqlx::Executor;
@@ -51,6 +54,22 @@ impl Plugin for MyPlugin {
         }
     }
 
+    async fn database_provider(
+        &self,
+        _context: &mut DatabaseProviderContext<'_>,
+    ) -> Option<(Connection, Box<dyn Any + Send + Sync>)> {
+        let mysql = sqlx::MySqlPool::connect("mysql://user:password@localhost/dbname")
+            .await
+            .unwrap();
+
+        let core_db = rhombus::internal::database::libsql::LibSQL::new_memory()
+            .await
+            .unwrap();
+        core_db.migrate().await.unwrap();
+
+        Some((Arc::new(core_db), Box::new(mysql)))
+    }
+
     async fn run<U: UploadProvider>(
         &self,
         context: &mut RunContext<'_, U>,
@@ -67,6 +86,7 @@ impl Plugin for MyPlugin {
         bundle.add_resource_overriding(res);
 
         match context.rawdb {
+            rhombus::builder::RawDb::Plugin(_) => {}
             rhombus::builder::RawDb::Postgres(db) => {
                 db.execute(include_str!("../migrations/standalone.sql"))
                     .await?;
