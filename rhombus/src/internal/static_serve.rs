@@ -26,6 +26,13 @@ pub async fn route_static_serve(Path(file): Path<String>) -> impl IntoResponse {
 
         let mut response = content.data.into_response();
         response.headers_mut().insert("Content-Type", mime);
+
+        #[cfg(not(debug_assertions))]
+        response.headers_mut().insert(
+            "Cache-Control",
+            HeaderValue::from_static("public, max-age=604800"),
+        );
+
         response
     } else {
         (StatusCode::NOT_FOUND, "Not Found").into_response()
