@@ -34,6 +34,7 @@ minijinja = { version = "2.0.1", default-features = false, features = [
   "multi_template",
   "macros",
   "speedups",
+  "json",
 ] }
 minijinja-embed = "2.0.1"
 pin-project-lite = "0.2.14"

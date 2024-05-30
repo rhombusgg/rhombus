@@ -1,28 +1,261 @@
 import { render } from "solid-js/web";
-import Tooltip from "@corvu/tooltip";
+import { Tooltip } from "@kobalte/core/tooltip";
 import {
   For,
   Show,
   createEffect,
   createResource,
   createSignal,
+  onMount,
+  onCleanup,
 } from "solid-js";
 import { customElement } from "solid-element";
-import { Toaster, toast } from "solid-toast";
+import {
+  SunIcon,
+  MoonIcon,
+  HomeIcon,
+  TrophyIcon,
+  SwordsIcon,
+  UsersIcon,
+  UserIcon,
+  LogInIcon,
+  LogOutIcon,
+} from "lucide-solid";
+import { Toaster } from "solid-toast";
 
 export { toast } from "solid-toast";
 
 import { FluentBundle, FluentResource } from "@fluent/bundle";
 import { negotiateLanguages } from "@fluent/langneg";
 
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "./command";
+
+function navigate(url: string) {
+  // @ts-ignore
+  htmx.ajax("GET", url, {
+    select: "#screen",
+    target: "#screen",
+    swap: "outerHTML",
+    history: "push",
+    headers: {
+      "HX-Boosted": true,
+    },
+  });
+  history.pushState({ htmx: true }, "", url);
+}
+
+const CommandMenu = () => {
+  const [open, setOpen] = createSignal(false);
+
+  const [data] = createResource(
+    async () =>
+      (await (await fetch("/command-palette")).json()) as CommandPaletteData,
+  );
+
+  onMount(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setOpen((open) => !open);
+      }
+    };
+
+    // @ts-ignore
+    window.openCommandPalette = () => setOpen(true);
+
+    document.addEventListener("keydown", down);
+    onCleanup(() => document.removeEventListener("keydown", down));
+  });
+
+  return (
+    <CommandDialog open={open()} onOpenChange={setOpen}>
+      <CommandInput placeholder={translate("type-to-search")} />
+      <CommandList>
+        <CommandEmpty>{translate("no-results")}</CommandEmpty>
+        <CommandGroup heading={translate("pages")}>
+          <CommandItem
+            onSelect={() => {
+              navigate("/");
+              setOpen(false);
+            }}
+          >
+            <HomeIcon class="mr-2 h-4 w-4" />
+            <span>{translate("home")}</span>
+          </CommandItem>
+          <Show when={data().challenges}>
+            <CommandItem
+              onSelect={() => {
+                navigate("/challenges");
+                setOpen(false);
+              }}
+            >
+              <SwordsIcon class="mr-2 h-4 w-4" />
+              <span>{translate("challenges")}</span>
+            </CommandItem>
+            <CommandItem
+              onSelect={() => {
+                navigate("/team");
+                setOpen(false);
+              }}
+            >
+              <UsersIcon class="mr-2 h-4 w-4" />
+              <span>{translate("team")}</span>
+            </CommandItem>
+            <CommandItem
+              onSelect={() => {
+                navigate("/account");
+                setOpen(false);
+              }}
+            >
+              <UserIcon class="mr-2 h-4 w-4" />
+              <span>{translate("account")}</span>
+            </CommandItem>
+          </Show>
+          <Show when={!data().challenges}>
+            <CommandItem
+              onSelect={() => {
+                navigate("/signin");
+                setOpen(false);
+              }}
+            >
+              <LogInIcon class="mr-2 h-4 w-4" />
+              <span>{translate("sign-in")}</span>
+            </CommandItem>
+          </Show>
+        </CommandGroup>
+        <CommandSeparator />
+        <Show when={data().challenges}>
+          <For each={Object.entries(data().challenges)}>
+            {(category) => {
+              const category_name = category[0];
+              const challenges = category[1];
+              return (
+                <CommandGroup heading={category_name}>
+                  <For each={challenges}>
+                    {(challenge) => {
+                      return (
+                        <CommandItem
+                          onSelect={() => {
+                            navigate(`/challenges#${challenge}`);
+                            setOpen(false);
+                          }}
+                        >
+                          <SwordsIcon class="mr-2 h-4 w-4" />
+                          <span>{challenge}</span>
+                        </CommandItem>
+                      );
+                    }}
+                  </For>
+                </CommandGroup>
+              );
+            }}
+          </For>
+          <CommandSeparator />
+        </Show>
+        <Show when={data().divisions}>
+          <CommandGroup heading={translate("scoreboard-title")}>
+            <For each={Object.entries(data().divisions)}>
+              {(division) => {
+                const id = division[0];
+                const name = division[1];
+                return (
+                  <CommandItem
+                    onSelect={() => {
+                      navigate(`/scoreboard/${id}`);
+                      setOpen(false);
+                    }}
+                  >
+                    <TrophyIcon class="mr-2 h-4 w-4" />
+                    <span>{translate("scoreboard", { scoreboard: name })}</span>
+                  </CommandItem>
+                );
+              }}
+            </For>
+          </CommandGroup>
+          <CommandSeparator />
+        </Show>
+        <CommandGroup heading={translate("account")}>
+          <Show when={!data().challenges}>
+            <CommandItem
+              onSelect={() => {
+                // @ts-ignore
+                window.location = data().discord_signin_url;
+              }}
+            >
+              <LogInIcon class="mr-2 h-4 w-4" />
+              <span>{translate("sign-in-with-discord")}</span>
+            </CommandItem>
+          </Show>
+          <Show when={data().challenges}>
+            <CommandItem
+              onSelect={() => {
+                navigate("/signout");
+                setOpen(false);
+              }}
+            >
+              <LogOutIcon class="mr-2 h-4 w-4" />
+              <span>{translate("sign-out")}</span>
+            </CommandItem>
+          </Show>
+        </CommandGroup>
+        <CommandSeparator />
+        <CommandGroup heading={translate("theme")}>
+          <CommandItem
+            onSelect={() => {
+              // @ts-ignore
+              setTheme(false);
+              setOpen(false);
+            }}
+          >
+            <SunIcon class="mr-2 h-4 w-4" />
+            <span>{translate("light-theme")}</span>
+          </CommandItem>
+          <CommandItem
+            onSelect={() => {
+              // @ts-ignore
+              setTheme(true);
+              setOpen(false);
+            }}
+          >
+            <MoonIcon class="mr-2 h-4 w-4" />
+            <span>{translate("dark-theme")}</span>
+          </CommandItem>
+        </CommandGroup>
+      </CommandList>
+    </CommandDialog>
+  );
+};
+
 const localizations: Record<string, string> = {
   en: `
+type-to-search = Type a command or search...
+no-results = No results found.
+pages = Pages
+home = Home
+challenges = Challenges
+team = Team
+account = Account
+sign-in = Sign In
+scoreboard-title = Division Scoreboards
+scoreboard = {$scoreboard} Scoreboard
+sign-in-with-discord = Sign In with Discord
+sign-out = Sign Out
+theme = Theme
+light-theme = Light Theme
+dark-theme = Dark Theme
+
 healthy = Challenge is <span class="text-green-500">up</span>
 unhealthy = Challenge is <span class="text-red-500">down</span>
 solved-by = Solved by {$name}
 authored-by = Authored by {$name}
-new-ticket = Create new ticket
-focus-challenge = View full challenge
 solves = {$solves ->
   [one] {$solves} solve 
   *[other] {$solves} solves
@@ -34,12 +267,26 @@ points = {$points ->
 solves-points = {solves} / {points}
   `.trim(),
   de: `
+type-to-search = Befehl oder Suche eingeben...
+no-results = Keine Ergebnisse gefunden.
+pages = Seiten
+home = Startseite
+challenges = Challenges
+team = Team
+account = Konto
+sign-in = Anmelden
+scoreboard-title = Teilung Anzeigetafeln
+scoreboard = {$scoreboard} Anzeigetafel
+sign-in-with-discord = Mit Discord anmelden
+sign-out = Abmelden
+theme = Farbdesign
+light-theme = Helles Farbdesign
+dark-theme = Dunkles Farbdesign
+
 healthy = Challenge ist <span class="text-green-500">online</span>
 unhealthy = Challenge ist <span class="text-red-500">offline</span>
 solved-by = Gelöst von {$name}
 authored-by = Geschrieben von {$name}
-new-ticket = Neues Ticket erstellen
-focus-challenge = Challenge im Detail ansehen
 solves = {$solves ->
   [one] {$solves} Lösung
   *[other] {$solves} Lösungen
@@ -93,15 +340,7 @@ customElement("rhombus-tooltip", (_props, { element }) => {
   }
 
   return (
-    <Tooltip
-      placement="top"
-      floatingOptions={{
-        offset: 13,
-        flip: true,
-        shift: true,
-      }}
-      strategy="fixed"
-    >
+    <Tooltip placement="top">
       <Tooltip.Portal mount={anchor}>
         <Tooltip.Content class="tooltip">
           {content}
@@ -188,15 +427,7 @@ const ChallengesComponent = ({
                               </span>
                               <span> {challenge.name}</span>
                             </div>
-                            <Tooltip
-                              placement="top"
-                              floatingOptions={{
-                                offset: 13,
-                                flip: true,
-                                shift: true,
-                              }}
-                              openOnFocus={false}
-                            >
+                            <Tooltip placement="top">
                               <Tooltip.Portal>
                                 <Tooltip.Content class="tooltip">
                                   {challenge.healthy ? (
@@ -217,14 +448,7 @@ const ChallengesComponent = ({
                           </div>
                           <div class="flex items-center gap-4">
                             <Show when={solve}>
-                              <Tooltip
-                                placement="top"
-                                floatingOptions={{
-                                  offset: 13,
-                                  flip: true,
-                                  shift: true,
-                                }}
-                              >
+                              <Tooltip placement="top">
                                 <Tooltip.Portal>
                                   <Tooltip.Content class="tooltip">
                                     <span>
@@ -258,14 +482,7 @@ const ChallengesComponent = ({
                                 </Tooltip.Trigger>
                               </Tooltip>
                             </Show>
-                            <Tooltip
-                              placement="top"
-                              floatingOptions={{
-                                offset: 13,
-                                flip: true,
-                                shift: true,
-                              }}
-                            >
+                            <Tooltip placement="top">
                               <Tooltip.Portal>
                                 <Tooltip.Content class="tooltip">
                                   <table>
@@ -304,14 +521,7 @@ const ChallengesComponent = ({
                               </Tooltip.Trigger>
                             </Tooltip>
                             <Show when={author}>
-                              <Tooltip
-                                placement="top"
-                                floatingOptions={{
-                                  offset: 13,
-                                  flip: true,
-                                  shift: true,
-                                }}
-                              >
+                              <Tooltip placement="top">
                                 <Tooltip.Portal>
                                   <Tooltip.Content class="tooltip">
                                     <span>
@@ -333,67 +543,9 @@ const ChallengesComponent = ({
                               </Tooltip>
                             </Show>
                             <Show when={data().ticket_enabled}>
-                              <Tooltip
-                                placement="top"
-                                floatingOptions={{
-                                  offset: 13,
-                                  flip: true,
-                                  shift: true,
-                                }}
-                                openOnFocus={false}
-                              >
-                                <Tooltip.Portal>
-                                  <Tooltip.Content class="tooltip">
-                                    <span>{translate("new-ticket")}</span>
-                                    <Tooltip.Arrow class="text-secondary" />
-                                  </Tooltip.Content>
-                                </Tooltip.Portal>
-                                <Tooltip.Trigger
-                                  as="button"
-                                  hx-trigger="click"
-                                  hx-get={`/challenges/${challenge.id}/ticket`}
-                                  hx-target="body"
-                                  hx-swap="beforeend"
-                                >
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="24"
-                                    height="24"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    stroke-width="2"
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    class="lucide lucide-ticket -rotate-45"
-                                  >
-                                    <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
-                                    <path d="M13 5v2" />
-                                    <path d="M13 17v2" />
-                                    <path d="M13 11v2" />
-                                  </svg>
-                                </Tooltip.Trigger>
-                              </Tooltip>
-                            </Show>
-                            <Tooltip
-                              placement="top"
-                              floatingOptions={{
-                                offset: 13,
-                                flip: true,
-                                shift: true,
-                              }}
-                              openOnFocus={false}
-                            >
-                              <Tooltip.Portal>
-                                <Tooltip.Content class="tooltip">
-                                  <span>{translate("focus-challenge")}</span>
-                                  <Tooltip.Arrow class="text-secondary" />
-                                </Tooltip.Content>
-                              </Tooltip.Portal>
-                              <Tooltip.Trigger
-                                as="button"
+                              <button
                                 hx-trigger="click"
-                                hx-get={`/challenges/${challenge.id}`}
+                                hx-get={`/challenges/${challenge.id}/ticket`}
                                 hx-target="body"
                                 hx-swap="beforeend"
                               >
@@ -407,39 +559,57 @@ const ChallengesComponent = ({
                                   stroke-width="2"
                                   stroke-linecap="round"
                                   stroke-linejoin="round"
-                                  class="lucide lucide-layout-grid"
+                                  class="lucide lucide-ticket -rotate-45"
                                 >
-                                  <rect
-                                    width="7"
-                                    height="7"
-                                    x="3"
-                                    y="3"
-                                    rx="1"
-                                  />
-                                  <rect
-                                    width="7"
-                                    height="7"
-                                    x="14"
-                                    y="3"
-                                    rx="1"
-                                  />
-                                  <rect
-                                    width="7"
-                                    height="7"
-                                    x="14"
-                                    y="14"
-                                    rx="1"
-                                  />
-                                  <rect
-                                    width="7"
-                                    height="7"
-                                    x="3"
-                                    y="14"
-                                    rx="1"
-                                  />
+                                  <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
+                                  <path d="M13 5v2" />
+                                  <path d="M13 17v2" />
+                                  <path d="M13 11v2" />
                                 </svg>
-                              </Tooltip.Trigger>
-                            </Tooltip>
+                              </button>
+                            </Show>
+                            <button
+                              hx-trigger="click"
+                              hx-get={`/challenges/${challenge.id}`}
+                              hx-target="body"
+                              hx-swap="beforeend"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                class="lucide lucide-layout-grid"
+                              >
+                                <rect width="7" height="7" x="3" y="3" rx="1" />
+                                <rect
+                                  width="7"
+                                  height="7"
+                                  x="14"
+                                  y="3"
+                                  rx="1"
+                                />
+                                <rect
+                                  width="7"
+                                  height="7"
+                                  x="14"
+                                  y="14"
+                                  rx="1"
+                                />
+                                <rect
+                                  width="7"
+                                  height="7"
+                                  x="3"
+                                  y="14"
+                                  rx="1"
+                                />
+                              </svg>
+                            </button>
                           </div>
                         </div>
                         <div>{challenge.description}</div>
@@ -454,6 +624,12 @@ const ChallengesComponent = ({
       </For>
     </Show>
   );
+};
+
+type CommandPaletteData = {
+  challenges?: Record<string, string[]>;
+  discord_signin_url?: string;
+  divisions: Record<string, string>;
 };
 
 type ChallengesData = {
@@ -523,6 +699,8 @@ document.addEventListener("DOMContentLoaded", () => {
     () => <Toaster position="top-center" gutter={8} />,
     document.querySelector("#toaster"),
   );
+
+  render(() => <CommandMenu />, document.body);
 
   document.body.addEventListener("pageRefresh", () => {
     location.reload();

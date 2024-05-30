@@ -9,9 +9,15 @@
     id="challenges"
   ></div>
 
+  <div class="hidden" id="initial-challenge-json">
+    {{- challenge_json | safe -}}
+  </div>
   <script>
     (function () {
-      rhombus.renderChallenges(document.getElementById("challenges"), {{ challenge_json | safe }});
+      rhombus.renderChallenges(
+        document.getElementById("challenges"),
+        JSON.parse(document.getElementById("initial-challenge-json").innerHTML),
+      );
 
       window.addEventListener("focus", window.challengeRefetchHandler);
       window.addEventListener("manualRefresh", window.challengeRefetchHandler);

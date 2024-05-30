@@ -2,19 +2,24 @@
   "name": "rhombus",
   "version": "1.0.0",
   "description": "",
+  "source": "./app.tsx",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build-tailwind": "tailwindcss --input app.css -o static/tailwind.css",
+    "build-js": "node build.mjs",
+    "build": "npm run build-tailwind && npm run build-js"
   },
   "keywords": [],
   "author": "Mark Bundschuh",
   "license": "MPL-2.0",
   "devDependencies": {
-    "@corvu/tailwind": "^0.1.5",
-    "@corvu/tooltip": "^0.1.0",
     "@fluent/bundle": "^0.18.0",
     "@fluent/langneg": "^0.7.0",
+    "@kobalte/core": "^0.13.2",
+    "clsx": "^2.1.1",
+    "cmdk-solid": "^1.0.1",
     "esbuild": "^0.21.2",
     "esbuild-plugin-solid": "^0.6.0",
+    "lucide-solid": "^0.379.0",
     "solid-element": "^1.8.0",
     "solid-js": "^1.8.17",
     "solid-toast": "^0.5.0",

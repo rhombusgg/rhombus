@@ -21,7 +21,6 @@
     <meta name="twitter:card" content="summary_large_image" />
 
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-    <script src="https://unpkg.com/fuse.js@7.0.0/dist/fuse.js" defer></script>
     <script
       src="https://unpkg.com/monaco-editor@0.48.0/min/vs/loader.js"
       defer
@@ -32,7 +31,7 @@
     <script src="/static/app.js"></script>
     <script>
       document.addEventListener("htmx:beforeOnLoad", (e) => {
-        if (e.detail.boosted) {
+        if (e.detail.requestConfig.headers["HX-Boosted"]) {
           if (window.deregister) {
             window.deregister();
             window.deregister = undefined;

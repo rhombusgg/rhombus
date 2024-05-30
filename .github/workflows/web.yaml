@@ -1,0 +1,64 @@
+name: Web
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build Typescript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Install dependencies
+        working-directory: rhombus
+        run: |
+          pnpm install
+
+      - name: Build
+        working-directory: rhombus
+        run: |
+          pnpm build-js
+
+  tailwindcss:
+    name: Build TailwindCSS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Install dependencies
+        working-directory: rhombus
+        run: |
+          pnpm install
+
+      - name: Build
+        working-directory: rhombus
+        run: |
+          pnpm build-tailwind
+
+  format:
+    name: Check Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: |
+          pnpm install
+
+      - name: Check formatting
+        run: |
+          pnpm check-format

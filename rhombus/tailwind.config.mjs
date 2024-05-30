@@ -2,7 +2,7 @@ import plugin from "tailwindcss/plugin";
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ["./static/**/*.js", "./templates/**/*.html", "components.tsx"],
+  content: ["./static/**/*.js", "./templates/**/*.html", "./frontend/**/*.tsx"],
   theme: {
     extend: {},
   },
@@ -14,7 +14,6 @@ module.exports = {
       addVariant("htmx-added", ["&.htmx-added", ".htmx-added &"]);
     }),
     require('tailwindcss-animate'),
-    require('@corvu/tailwind'),
   ],
   theme: {
     container: {

@@ -72,7 +72,13 @@ dialog[open] {
 }
 
 .tooltip {
-  @apply rounded-lg bg-secondary px-3 py-2 font-medium corvu-open:animate-in corvu-open:fade-in-50 corvu-open:slide-in-from-bottom-1 corvu-closed:animate-out corvu-closed:fade-out-50 corvu-closed:slide-out-to-bottom-1;
+  @apply rounded-lg bg-secondary px-3 py-2 font-medium slide-in-from-bottom-full;
+  transform-origin: var(--kb-tooltip-content-transform-origin);
+	animation: contentHide 100ms ease-in forwards;
+}
+
+.tooltip[data-expanded] {
+	animation: contentShow 100ms ease-out;
 }
 
 #loader:not(.htmx-request) {
@@ -81,4 +87,25 @@ dialog[open] {
 
 #htmx-toaster {
   display: none;
+}
+
+@keyframes contentShow {
+	from {
+		opacity: 0;
+		transform: scale(0.96);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+@keyframes contentHide {
+	from {
+		opacity: 1;
+		transform: scale(1);
+	}
+	to {
+		opacity: 0;
+		transform: scale(0.96);
+	}
 }

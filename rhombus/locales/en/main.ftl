@@ -34,7 +34,9 @@ challenges-error-writeup-invalid-url = Invalid URL
 challenges-error-writeup-url-too-long = URL is too long
 challenges-error-writeup-server-error = Server did not respond successfully
 
-unknown-error = "Unknown error"
+unknown-error = Unknown error
+
+sign-out = Sign Out
 
 solves = {$solves ->
     [one] {$solves} solve

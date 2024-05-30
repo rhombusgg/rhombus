@@ -23,6 +23,7 @@ use crate::{
             auth_injector_middleware, enforce_admin_middleware, enforce_auth_middleware,
             route_discord_callback, route_signin, route_signout,
         },
+        command_palette::route_command_palette_items,
         database::{
             cache::{database_cache_evictor, DbCache},
             provider::{Connection, Database},
@@ -657,6 +658,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             )
             .route_layer(middleware::from_fn(enforce_auth_middleware))
             .route("/static/:file", get(route_static_serve))
+            .route("/command-palette", get(route_command_palette_items))
             .route("/", get(route_home))
             .route("/signout", get(route_signout))
             .route("/signin", get(route_signin))

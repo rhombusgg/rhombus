@@ -1,5 +1,5 @@
 sign-in = Anmelden
-scoreboard = Punktebrett
+scoreboard = Anzeigetafel
 team = Team
 account = Konto
 challenges = Challenges
@@ -33,6 +33,10 @@ challenges-error-incorrect-flag = Falsche Flag
 challenges-error-writeup-invalid-url = Ungültige URL
 challenges-error-writeup-url-too-long = URL ist zu lang
 challenges-error-writeup-server-error = Server hat nicht erfolgreich geantwortet
+
+unknown-error = Unbekannter Fehler
+
+sign-out = Abmelden
 
 solves = {$solves ->
   [one] {$solves} Lösung

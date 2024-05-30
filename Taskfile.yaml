@@ -34,5 +34,7 @@ tasks:
     desc: Build the client js bundle in watch mode
     dir: rhombus
     silent: true
+    env:
+      WATCH: true
     cmds:
       - node build.mjs

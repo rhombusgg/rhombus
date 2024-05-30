@@ -1,6 +1,9 @@
 {
-	"devDependencies": {
-		"prettier": "^3.2.5",
-		"prettier-plugin-jinja-template": "^1.3.2"
-	}
+  "scripts": {
+    "check-format": "prettier --check rhombus/**/*.{tsx,html}"
+  },
+  "devDependencies": {
+    "prettier": "^3.2.5",
+    "prettier-plugin-jinja-template": "^1.3.2"
+  }
 }
