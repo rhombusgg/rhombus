@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use tokio::sync::RwLock;
 
 use crate::internal::{
@@ -7,15 +5,15 @@ use crate::internal::{
     ip::IpExtractorFn, locales::Localizations, settings::Settings,
 };
 
-pub type RouterState = Arc<RouterStateInner>;
+pub type RouterState = &'static RouterStateInner;
 
 pub struct RouterStateInner {
     pub db: Connection,
     pub bot: Bot,
-    pub jinja: Arc<minijinja::Environment<'static>>,
-    pub localizer: Arc<Localizations>,
-    pub settings: Arc<RwLock<Settings>>,
+    pub jinja: &'static minijinja::Environment<'static>,
+    pub localizer: &'static Localizations,
+    pub settings: &'static RwLock<Settings>,
     pub ip_extractor: IpExtractorFn,
-    pub mailer: Option<Arc<Mailer>>,
-    pub divisions: Vec<Division>,
+    pub mailer: Option<Mailer>,
+    pub divisions: &'static Vec<Division>,
 }

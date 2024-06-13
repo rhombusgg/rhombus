@@ -9,7 +9,7 @@ use crate::{
     Result,
 };
 
-pub type Connection = Arc<dyn Database + Send + Sync>;
+pub type Connection = &'static (dyn Database + Send + Sync);
 
 #[derive(Debug, Serialize, Clone)]
 pub enum ScoringType {

@@ -12,6 +12,7 @@ use axum::{
     routing::{delete, get, post},
     Router,
 };
+use minijinja::Environment;
 use tokio::sync::RwLock;
 use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::compression::CompressionLayer;
@@ -228,7 +229,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     let database = crate::internal::database::postgres::Postgres::new(pool.clone());
                     database.migrate().await?;
 
-                    return Ok((Arc::new(database), RawDb::Postgres(pool.clone())));
+                    return Ok((Box::leak(Box::new(database)), RawDb::Postgres(pool.clone())));
                 }
 
                 #[cfg(feature = "libsql")]
@@ -238,7 +239,10 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                         connection.clone().into();
                     database.migrate().await?;
 
-                    return Ok((Arc::new(database), RawDb::LibSQL(connection.clone())));
+                    return Ok((
+                        Box::leak(Box::new(database)),
+                        RawDb::LibSQL(connection.clone()),
+                    ));
                 }
             }
         }
@@ -261,7 +265,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     let database = crate::internal::database::postgres::Postgres::new(pool.clone());
                     database.migrate().await?;
 
-                    return Ok((Arc::new(database), RawDb::Postgres(pool)));
+                    return Ok((Box::leak(Box::new(database)), RawDb::Postgres(pool)));
                 }
             }
 
@@ -284,7 +288,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     let inner = database.db.clone();
                     database.migrate().await?;
 
-                    return Ok((Arc::new(database), RawDb::LibSQL(inner)));
+                    return Ok((Box::leak(Box::new(database)), RawDb::LibSQL(inner)));
                 }
             }
 
@@ -324,7 +328,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                         let inner = database.db.clone();
                         database.migrate().await?;
 
-                        return Ok((Arc::new(database), RawDb::LibSQL(inner)));
+                        return Ok((Box::leak(Box::new(database)), RawDb::LibSQL(inner)));
                     }
                 } else {
                     return Err(RhombusError::MissingConfiguration(format!(
@@ -352,7 +356,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     let inner = database.db.clone();
                     database.migrate().await?;
 
-                    return Ok((Arc::new(database), RawDb::LibSQL(inner)));
+                    return Ok((Box::leak(Box::new(database)), RawDb::LibSQL(inner)));
                 }
             }
 
@@ -372,7 +376,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             let inner = database.db.clone();
             database.migrate().await?;
 
-            Ok((Arc::new(database), RawDb::LibSQL(inner)))
+            Ok((Box::leak(Box::new(database)), RawDb::LibSQL(inner)))
         }
 
         #[cfg(not(feature = "libsql"))]
@@ -420,19 +424,19 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
         db.load_settings(&mut settings).await?;
         db.save_settings(&settings).await?;
 
-        let mut divisions = if let Some(ref divisions) = settings.divisions {
+        let mut divisions = if let Some(divisions) = &settings.divisions {
             divisions
                 .iter()
                 .map(|division| {
                     let division_eligibility: DivisionEligibilityProvider =
                         if let Some(email_regex) = &division.email_regex {
-                            Arc::new(EmailDivisionEligibilityProvider::new(
-                                db.clone(),
+                            Box::leak(Box::new(EmailDivisionEligibilityProvider::new(
+                                db,
                                 email_regex,
                                 division.requirement.clone(),
-                            ))
+                            )))
                         } else {
-                            Arc::new(OpenDivisionEligibilityProvider {})
+                            Box::leak(Box::new(OpenDivisionEligibilityProvider {}))
                         };
 
                     let id = hash(division.stable_id.as_ref().unwrap_or(&division.name));
@@ -452,21 +456,21 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 id,
                 name,
                 description: "Open division for everyone".to_owned(),
-                division_eligibility: Arc::new(OpenDivisionEligibilityProvider {}),
+                division_eligibility: Box::leak(Box::new(OpenDivisionEligibilityProvider {})),
             }]
         };
 
         let mut localizer = locales::Localizations::new();
 
-        let mut env = minijinja::Environment::new();
-        minijinja_embed::load_templates!(&mut env);
+        let mut jinja = minijinja::Environment::new();
+        minijinja_embed::load_templates!(&mut jinja);
 
-        env.add_function("timediff", jinja_timediff);
+        jinja.add_function("timediff", jinja_timediff);
 
         let plugin_upload_provider_builder = UploadProviderContext {
             rawdb: &rawdb,
             settings: &settings.clone(),
-            db: db.clone(),
+            db,
         };
         let plugin_upload_provider = self
             .plugins
@@ -479,12 +483,12 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
 
                 let mut plugin_builder = RunContext {
                     upload_provider: &plugin_upload_provider,
-                    env: &mut env,
+                    env: &mut jinja,
                     rawdb: &rawdb,
                     localizations: &mut localizer,
                     settings: &mut settings,
                     divisions: &mut divisions,
-                    db: db.clone(),
+                    db,
                 };
 
                 let plugin_router = self.plugins.run(&mut plugin_builder).await?;
@@ -495,12 +499,12 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
 
                 let mut plugin_builder = RunContext {
                     upload_provider: &upload_provider,
-                    env: &mut env,
+                    env: &mut jinja,
                     rawdb: &rawdb,
                     localizations: &mut localizer,
                     settings: &mut settings,
                     divisions: &mut divisions,
-                    db: db.clone(),
+                    db,
                 };
 
                 let plugin_router = self.plugins.run(&mut plugin_builder).await?;
@@ -529,12 +533,12 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
 
                 let mut plugin_builder = RunContext {
                     upload_provider: &local_upload_provider,
-                    env: &mut env,
+                    env: &mut jinja,
                     rawdb: &rawdb,
                     localizations: &mut localizer,
                     settings: &mut settings,
                     divisions: &mut divisions,
-                    db: db.clone(),
+                    db,
                 };
 
                 let plugin_router = self.plugins.run(&mut plugin_builder).await?;
@@ -551,14 +555,14 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 let duration = 360;
                 info!(duration, "Enabling default in memory cache");
                 database_cache_evictor(duration);
-                Arc::new(DbCache::new(db))
+                Box::leak(Box::new(DbCache::new(db)))
             }
             duration => {
                 if let Ok(duration) = duration.parse::<u64>() {
                     if duration >= 5 {
                         info!(duration, "Enabling default in memory cache");
                         database_cache_evictor(duration);
-                        Arc::new(DbCache::new(db))
+                        Box::leak(Box::new(DbCache::new(db)))
                     } else {
                         info!(
                             duration,
@@ -579,7 +583,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
         discord_cache_evictor();
 
         let ip_extractor = self.ip_extractor.or_else(|| {
-            settings.ip_preset.clone().map(|preset| match preset {
+            settings.ip_preset.as_ref().map(|preset| match preset {
                 IpPreset::RightmostXForwardedFor => {
                     info!("Selecting preset Rightmost X-Forwarded-For");
                     maybe_rightmost_x_forwarded_for
@@ -607,44 +611,42 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             })
         });
 
-        let live_reload = settings.live_reload;
-        let ratelimit = settings.ratelimit.clone();
+        let settings = Box::leak(Box::new(RwLock::new(settings)));
 
-        let s = Arc::new(RwLock::new(settings));
-        let bot = Bot::new(s.clone(), db.clone()).await;
+        let bot = Bot::new(settings, db).await;
 
-        let localizer = Arc::new(localizer);
-        let l = localizer.clone();
-        env.add_function(
+        let localizer = Box::leak(Box::new(localizer));
+        let l = &*localizer;
+        jinja.add_function(
             "t",
             move |msg_id: &str, kwargs: minijinja::value::Kwargs, state: &minijinja::State| {
-                jinja_translate(l.clone(), msg_id, kwargs, state)
+                jinja_translate(l, msg_id, kwargs, state)
             },
         );
 
-        let jinja = Arc::new(env);
+        let jinja: &Environment = Box::leak(Box::new(jinja));
 
-        let mailer = if s.clone().read().await.email.is_some() {
-            let mail_provider = SmtpProvider::new(s.clone()).await.unwrap();
+        let mailer = if settings.read().await.email.is_some() {
+            let mail_provider = Box::leak(Box::new(SmtpProvider::new(settings).await.unwrap()));
 
-            let mailer = Mailer::new(mail_provider, jinja.clone(), s.clone());
-            Some(Arc::new(mailer))
+            let mailer = Mailer::new(mail_provider, jinja, settings);
+            Some(mailer)
         } else {
             None
         };
 
         db.insert_divisions(&divisions).await?;
 
-        let router_state = Arc::new(RouterStateInner {
-            db: db.clone(),
+        let router_state: &RouterStateInner = Box::leak(Box::new(RouterStateInner {
+            db,
             bot,
-            jinja: jinja.clone(),
-            localizer: localizer.clone(),
-            settings: s.clone(),
+            jinja,
+            localizer,
+            settings,
             ip_extractor: ip_extractor.unwrap_or(default_ip_extractor),
             mailer,
-            divisions,
-        });
+            divisions: Box::leak(Box::new(divisions)),
+        }));
 
         let rhombus_router = Router::new()
             .fallback(handler_404)
@@ -685,12 +687,12 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             .route("/user/:id", get(route_public_user))
             .route("/team/:id", get(route_public_team))
             .route("/og-image.png", get(route_default_og_image))
-            .with_state(router_state.clone())
+            .with_state(router_state)
             .merge(
                 upload_router
                     .route_layer(middleware::from_fn(enforce_admin_middleware))
                     .layer(middleware::from_fn_with_state(
-                        router_state.clone(),
+                        router_state,
                         auth_injector_middleware,
                     )),
             );
@@ -698,7 +700,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
         let router = if self.num_plugins > 0 {
             Router::new()
                 .fallback_service(rhombus_router)
-                .nest("/", plugin_router.with_state(router_state.clone()))
+                .nest("/", plugin_router.with_state(router_state))
         } else {
             rhombus_router
         };
@@ -707,25 +709,27 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
 
         let router = router
             .layer(middleware::from_fn_with_state(
-                router_state.clone(),
+                router_state,
                 locale_middleware,
             ))
             .layer(middleware::from_fn(track_middleware))
             .layer(middleware::from_fn_with_state(
-                router_state.clone(),
+                router_state,
                 auth_injector_middleware,
             ));
 
         let router = if ip_extractor.is_some() {
             router.layer(middleware::from_fn_with_state(
-                router_state.clone(),
+                router_state,
                 ip_insert_middleware,
             ))
         } else {
             router.layer(middleware::from_fn(ip_insert_blank_middleware))
         };
 
-        let router = if let (Some(ip_extractor), Some(ratelimit)) = (ip_extractor, ratelimit) {
+        let router = if let (Some(ip_extractor), Some(ratelimit)) =
+            (ip_extractor, settings.read().await.ratelimit.as_ref())
+        {
             let per_millisecond = ratelimit.per_millisecond.unwrap_or(500);
             let burst_size = ratelimit.burst_size.unwrap_or(8);
             info!(per_millisecond, burst_size, "Setting ratelimit");
@@ -747,7 +751,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             router
         };
 
-        let router = if live_reload {
+        let router = if settings.read().await.live_reload {
             router.layer(
                 tower_livereload::LiveReloadLayer::new().request_predicate(not_htmx_predicate),
             )

@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::{
     internal::{email::provider::EmailProvider, settings::Settings},
     Result,
@@ -8,19 +6,19 @@ use minijinja::{context, Environment};
 use tokio::sync::RwLock;
 
 pub struct Mailer {
-    pub inner: Arc<dyn EmailProvider + Send + Sync>,
-    pub jinja: Arc<Environment<'static>>,
-    settings: Arc<RwLock<Settings>>,
+    pub inner: &'static (dyn EmailProvider + Send + Sync),
+    pub jinja: &'static Environment<'static>,
+    settings: &'static RwLock<Settings>,
 }
 
 impl Mailer {
     pub fn new(
-        provider: impl EmailProvider + Send + Sync + 'static,
-        jinja: Arc<Environment<'static>>,
-        settings: Arc<RwLock<Settings>>,
+        provider: &'static (dyn EmailProvider + Send + Sync),
+        jinja: &'static Environment<'static>,
+        settings: &'static RwLock<Settings>,
     ) -> Self {
         Mailer {
-            inner: Arc::new(provider),
+            inner: provider,
             jinja,
             settings,
         }
@@ -33,9 +31,13 @@ impl Mailer {
         to: &str,
         code: &str,
     ) -> Result<()> {
-        let (title, contact_email) = {
+        let (title, contact_email, location_url) = {
             let settings = self.settings.read().await;
-            (settings.title.clone(), settings.contact_email.clone())
+            (
+                settings.title.clone(),
+                settings.contact_email.clone(),
+                settings.location_url.clone(),
+            )
         };
 
         let context = context! {
@@ -44,7 +46,7 @@ impl Mailer {
             username,
             ip,
             email => to,
-            verify_url => format!("{}/account/verify?code={}", self.settings.read().await.location_url, code),
+            verify_url => format!("{}/account/verify?code={}", location_url, code),
             logo => "https://avatars.githubusercontent.com/u/152339298",
         };
 

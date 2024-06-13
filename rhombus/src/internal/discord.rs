@@ -26,11 +26,11 @@ use crate::{
 pub struct Bot {
     http: Arc<Http>,
     db: Connection,
-    settings: Arc<RwLock<Settings>>,
+    settings: &'static RwLock<Settings>,
 }
 
 pub struct Data {
-    settings: Arc<RwLock<Settings>>,
+    settings: &'static RwLock<Settings>,
     db: Connection,
 }
 pub type DiscordError = Box<dyn std::error::Error + Send + Sync>;
@@ -285,20 +285,18 @@ Default Ticket Template
 }
 
 impl Bot {
-    pub async fn new(settings: Arc<RwLock<Settings>>, db: Connection) -> Self {
+    pub async fn new(settings: &'static RwLock<Settings>, db: Connection) -> Self {
         let bot_token = { settings.read().await.discord.bot_token.clone() };
 
-        let s = settings.clone();
-        let d = db.clone();
         let framework = poise::Framework::builder()
             .options(poise::FrameworkOptions {
                 commands: vec![admin(), whois()],
                 ..Default::default()
             })
-            .setup(|ctx, _ready, framework| {
+            .setup(move |ctx, _ready, framework| {
                 Box::pin(async move {
                     poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                    Ok(Data { settings: s, db: d })
+                    Ok(Data { settings, db })
                 })
             })
             .build();

@@ -93,7 +93,7 @@ pub async fn route_account(
     let user_divisions = user_divisions.unwrap();
 
     let mut divisions = vec![];
-    for division in &state.divisions {
+    for division in state.divisions {
         let eligible = division
             .division_eligibility
             .is_user_eligible(user.id)

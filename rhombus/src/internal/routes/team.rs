@@ -62,7 +62,7 @@ pub async fn route_team(
     }
 
     let mut divisions = vec![];
-    for division in &state.divisions {
+    for division in state.divisions {
         let mut ineligible_user_ids = vec![];
         for user_id in team.users.keys() {
             let user_divisions = state.db.get_user_divisions(*user_id).await.unwrap();

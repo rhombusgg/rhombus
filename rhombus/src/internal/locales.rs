@@ -9,10 +9,7 @@ use fluent::{bundle::FluentBundle, FluentArgs, FluentResource, FluentValue};
 use intl_memoizer::concurrent::IntlLangMemoizer;
 use minijinja::{value::Kwargs, State, Value};
 use rust_embed::RustEmbed;
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::collections::{BTreeMap, HashMap};
 use unic_langid::{langid, LanguageIdentifier};
 
 use super::router::RouterState;
@@ -112,7 +109,7 @@ impl Default for Localizations {
 }
 
 pub fn jinja_translate(
-    localizer: Arc<Localizations>,
+    localizer: &'static Localizations,
     msg_id: &str,
     kwargs: Kwargs,
     state: &State,

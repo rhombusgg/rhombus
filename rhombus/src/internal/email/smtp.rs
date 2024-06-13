@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use lettre::{message::MultiPart, AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
 use tokio::sync::RwLock;
@@ -11,19 +9,21 @@ use crate::{
 
 pub struct SmtpProvider {
     pub transport: AsyncSmtpTransport<Tokio1Executor>,
-    pub settings: Arc<RwLock<Settings>>,
+    pub settings: &'static RwLock<Settings>,
 }
 
 impl SmtpProvider {
-    pub async fn new(settings: Arc<RwLock<Settings>>) -> Result<Self> {
-        let connection_url = settings
-            .read()
-            .await
-            .email
-            .as_ref()
-            .unwrap()
-            .connection_url
-            .clone();
+    pub async fn new(settings: &'static RwLock<Settings>) -> Result<Self> {
+        let connection_url = {
+            settings
+                .read()
+                .await
+                .email
+                .as_ref()
+                .unwrap()
+                .connection_url
+                .clone()
+        };
         let transport = AsyncSmtpTransport::<Tokio1Executor>::from_url(&connection_url)?.build();
         Ok(Self {
             transport,
