@@ -227,7 +227,7 @@ pub trait Database {
     async fn save_settings(&self, settings: &Settings) -> Result<()>;
     async fn load_settings(&self, settings: &mut Settings) -> Result<()>;
     async fn get_scoreboard(&self, division_id: i64) -> Result<Scoreboard>;
-    async fn get_leaderboard(&self, division_id: i64, page: u64) -> Result<Leaderboard>;
+    async fn get_leaderboard(&self, division_id: i64, page: Option<u64>) -> Result<Leaderboard>;
     async fn get_emails_for_user_id(&self, user_id: i64) -> Result<Vec<Email>>;
     async fn create_email_callback_code(&self, user_id: i64, email: &str) -> Result<String>;
     async fn verify_email_callback_code(&self, code: &str) -> Result<()>;

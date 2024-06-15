@@ -941,31 +941,7 @@ impl Database for LibSQL {
         Ok(Scoreboard { teams })
     }
 
-    async fn get_leaderboard(&self, division_id: i64, page: u64) -> Result<Leaderboard> {
-        let tx = self.db.transaction().await?;
-
-        let num_teams = tx
-            .query(
-                "
-            SELECT COUNT(*)
-            FROM rhombus_team_division_points
-            WHERE division_id = ?1
-        ",
-                [division_id],
-            )
-            .await?
-            .next()
-            .await?
-            .unwrap()
-            .get::<u64>(0)
-            .unwrap();
-
-        const PAGE_SIZE: u64 = 25;
-
-        let num_pages = (num_teams + (PAGE_SIZE - 1)) / PAGE_SIZE;
-
-        let page = page.min(num_pages);
-
+    async fn get_leaderboard(&self, division_id: i64, page: Option<u64>) -> Result<Leaderboard> {
         #[derive(Debug, Deserialize)]
         struct DbLeaderboard {
             team_id: i64,
@@ -973,11 +949,36 @@ impl Database for LibSQL {
             points: f64,
         }
 
-        let mut rank = page * PAGE_SIZE;
+        if let Some(page) = page {
+            let tx = self.db.transaction().await?;
 
-        let leaderboard_entries = tx
-            .query(
-                "
+            let num_teams = tx
+                .query(
+                    "
+            SELECT COUNT(*)
+            FROM rhombus_team_division_points
+            WHERE division_id = ?1
+        ",
+                    [division_id],
+                )
+                .await?
+                .next()
+                .await?
+                .unwrap()
+                .get::<u64>(0)
+                .unwrap();
+
+            const PAGE_SIZE: u64 = 25;
+
+            let num_pages = (num_teams + (PAGE_SIZE - 1)) / PAGE_SIZE;
+
+            let page = page.min(num_pages);
+
+            let mut rank = page * PAGE_SIZE;
+
+            let leaderboard_entries = tx
+                .query(
+                    "
                 SELECT team_id, name, points
                 FROM rhombus_team_division_points
                 JOIN rhombus_team ON rhombus_team_division_points.team_id = rhombus_team.id
@@ -985,29 +986,64 @@ impl Database for LibSQL {
                 ORDER BY points DESC
                 LIMIT ?3 OFFSET ?2
             ",
-                params!(division_id, page * PAGE_SIZE, PAGE_SIZE),
-            )
-            .await?
-            .into_stream()
-            .map(|row| {
-                let db_leaderboard = de::from_row::<DbLeaderboard>(&row.unwrap()).unwrap();
-                rank += 1;
-                LeaderboardEntry {
-                    rank,
-                    team_id: db_leaderboard.team_id,
-                    team_name: db_leaderboard.name,
-                    score: db_leaderboard.points.round() as i64,
-                }
+                    params!(division_id, page * PAGE_SIZE, PAGE_SIZE),
+                )
+                .await?
+                .into_stream()
+                .map(|row| {
+                    let db_leaderboard = de::from_row::<DbLeaderboard>(&row.unwrap()).unwrap();
+                    rank += 1;
+                    LeaderboardEntry {
+                        rank,
+                        team_id: db_leaderboard.team_id,
+                        team_name: db_leaderboard.name,
+                        score: db_leaderboard.points.round() as i64,
+                    }
+                })
+                .collect::<Vec<_>>()
+                .await;
+
+            tx.commit().await?;
+
+            Ok(Leaderboard {
+                entries: leaderboard_entries,
+                num_pages,
             })
-            .collect::<Vec<_>>()
-            .await;
+        } else {
+            let mut rank = 0;
 
-        tx.commit().await?;
+            let leaderboard_entries = self
+                .db
+                .query(
+                    "
+                SELECT team_id, name, points
+                FROM rhombus_team_division_points
+                JOIN rhombus_team ON rhombus_team_division_points.team_id = rhombus_team.id
+                WHERE division_id = ?1
+                ORDER BY points DESC
+            ",
+                    params!(division_id),
+                )
+                .await?
+                .into_stream()
+                .map(|row| {
+                    let db_leaderboard = de::from_row::<DbLeaderboard>(&row.unwrap()).unwrap();
+                    rank += 1;
+                    LeaderboardEntry {
+                        rank,
+                        team_id: db_leaderboard.team_id,
+                        team_name: db_leaderboard.name,
+                        score: db_leaderboard.points.round() as i64,
+                    }
+                })
+                .collect::<Vec<_>>()
+                .await;
 
-        Ok(Leaderboard {
-            entries: leaderboard_entries,
-            num_pages,
-        })
+            Ok(Leaderboard {
+                entries: leaderboard_entries,
+                num_pages: 1,
+            })
+        }
     }
 
     async fn get_emails_for_user_id(&self, user_id: i64) -> Result<Vec<Email>> {

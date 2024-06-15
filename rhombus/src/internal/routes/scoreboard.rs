@@ -6,6 +6,7 @@ use axum::{
 };
 use minijinja::context;
 use serde::Deserialize;
+use serde_json::json;
 
 use crate::internal::{auth::MaybeUser, locales::Languages, router::RouterState};
 
@@ -44,7 +45,7 @@ pub async fn route_scoreboard_division(
 
     let scoreboard = state.db.get_scoreboard(division_id);
     let challenge_data = state.db.get_challenges();
-    let leaderboard = state.db.get_leaderboard(division_id, page);
+    let leaderboard = state.db.get_leaderboard(division_id, Some(page));
     let (scoreboard, challenge_data, leaderboard) =
         futures::future::try_join3(scoreboard, challenge_data, leaderboard)
             .await
@@ -74,4 +75,33 @@ pub async fn route_scoreboard_division(
             .unwrap(),
     )
     .into_response()
+}
+
+/// Implements the feed as described by https://ctftime.org/json-scoreboard-feed
+pub async fn route_scoreboard_division_ctftime(
+    state: State<RouterState>,
+    Path(division_id): Path<i64>,
+) -> impl IntoResponse {
+    let challenge_data = state.db.get_challenges().await.unwrap();
+    let leaderboard = state.db.get_leaderboard(division_id, None).await.unwrap();
+
+    let tasks = challenge_data
+        .challenges
+        .iter()
+        .map(|challenge| &challenge.name)
+        .collect::<Vec<_>>();
+
+    let standings = leaderboard
+        .entries
+        .iter()
+        .map(|team| {
+            json!({
+                "pos": team.rank,
+                "team": team.team_name,
+                "score": team.score,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    Json(json!({ "tasks": tasks, "standings": standings }))
 }

@@ -199,7 +199,7 @@ impl Database for Postgres {
         todo!()
     }
 
-    async fn get_leaderboard(&self, _division_id: i64, _page: u64) -> Result<Leaderboard> {
+    async fn get_leaderboard(&self, _division_id: i64, _page: Option<u64>) -> Result<Leaderboard> {
         todo!()
     }
 

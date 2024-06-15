@@ -210,7 +210,7 @@ impl Database for DbCache {
         get_scoreboard(&self.inner, division_id).await
     }
 
-    async fn get_leaderboard(&self, division_id: i64, page: u64) -> Result<Leaderboard> {
+    async fn get_leaderboard(&self, division_id: i64, page: Option<u64>) -> Result<Leaderboard> {
         get_leaderboard(&self.inner, division_id, page).await
     }
 
@@ -411,10 +411,14 @@ pub async fn get_scoreboard(db: &Connection, division_id: i64) -> Result<Scorebo
 }
 
 lazy_static::lazy_static! {
-    pub static ref LEADERBOARD_CACHE: DashMap<(i64, u64), Leaderboard> = DashMap::new();
+    pub static ref LEADERBOARD_CACHE: DashMap<(i64, Option<u64>), Leaderboard> = DashMap::new();
 }
 
-pub async fn get_leaderboard(db: &Connection, division_id: i64, page: u64) -> Result<Leaderboard> {
+pub async fn get_leaderboard(
+    db: &Connection,
+    division_id: i64,
+    page: Option<u64>,
+) -> Result<Leaderboard> {
     if let Some(leaderboard) = LEADERBOARD_CACHE.get(&(division_id, page)) {
         return Ok(leaderboard.clone());
     }
