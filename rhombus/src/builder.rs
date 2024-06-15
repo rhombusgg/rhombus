@@ -2,6 +2,7 @@ use std::{
     any::Any,
     env,
     hash::{BuildHasher, BuildHasherDefault, Hasher},
+    num::NonZeroU32,
     sync::Arc,
 };
 
@@ -33,7 +34,7 @@ use crate::{
         discord::Bot,
         division::{
             Division, DivisionEligibilityProvider, EmailDivisionEligibilityProvider,
-            OpenDivisionEligibilityProvider,
+            MaxDivisionPlayers, OpenDivisionEligibilityProvider,
         },
         email::{mailer::Mailer, smtp::SmtpProvider},
         ip::{
@@ -441,10 +442,34 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
 
                     let id = hash(division.stable_id.as_ref().unwrap_or(&division.name));
 
+                    let max_players = if let Some(max_players) = &division.max_players {
+                        match max_players.as_str() {
+                            "unlimited" => MaxDivisionPlayers::Unlimited,
+                            "infinity" => MaxDivisionPlayers::Unlimited,
+                            "infinite" => MaxDivisionPlayers::Unlimited,
+                            "any" => MaxDivisionPlayers::Unlimited,
+                            _ => {
+                                if let Ok(max_players) = max_players.parse::<NonZeroU32>() {
+                                    MaxDivisionPlayers::Limited(max_players)
+                                } else {
+                                    tracing::error!(
+                                        max_players,
+                                        division = division.name,
+                                        "Invalid max players value. Defaulting to unlimited."
+                                    );
+                                    MaxDivisionPlayers::Unlimited
+                                }
+                            }
+                        }
+                    } else {
+                        MaxDivisionPlayers::Unlimited
+                    };
+
                     Division {
                         id,
                         name: division.name.clone(),
                         description: division.description.clone(),
+                        max_players,
                         division_eligibility,
                     }
                 })
@@ -456,6 +481,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 id,
                 name,
                 description: "Open division for everyone".to_owned(),
+                max_players: MaxDivisionPlayers::Unlimited,
                 division_eligibility: Box::leak(Box::new(OpenDivisionEligibilityProvider {})),
             }]
         };

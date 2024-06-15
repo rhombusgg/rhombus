@@ -2353,9 +2353,9 @@ dependencies = [
 
 [[package]]
 name = "minijinja"
-version = "2.0.1"
+version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7165d0e94806d52ad5295e4b54a95176d831814840bc067298ca647e1c956338"
+checksum = "e136ef580d7955019ab0a407b68d77c292a9976907e217900f3f76bc8f6dc1a4"
 dependencies = [
  "serde",
  "serde_json",
@@ -2364,15 +2364,9 @@ dependencies = [
 
 [[package]]
 name = "minijinja-embed"
-version = "1.0.21"
+version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74409d1aaad2ef0d0622d4f3061dd9c248a84b7b3a675d715503db0a1ec91ade"
-
-[[package]]
-name = "minijinja-embed"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0a97808f66af2d75ba83d43f67cec8c30122773017d2dccebae9d6d7bb33116"
+checksum = "0a3d18f55b10a85e7b2995df21fc60991c6964b4e53f36cc7f1095c016aa7ee7"
 
 [[package]]
 name = "minimal-lexical"
@@ -3289,8 +3283,7 @@ dependencies = [
  "listenfd",
  "mime_guess",
  "minijinja",
- "minijinja-embed 1.0.21",
- "minijinja-embed 2.0.1",
+ "minijinja-embed",
  "pin-project-lite",
  "poise",
  "rand",

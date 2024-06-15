@@ -15,10 +15,12 @@ divisions:
     description: Undergraduate university students globally
     email_regex: ^.*.edu$
     requirement: Must verify a valid university .edu email address
+    max_players: 4
   - name: OSU
     description: OSU undergraduate students
     email_regex: ^.*\.\d+@(buckeyemail\.)?osu\.edu$
     requirement: Must verify a valid OSU email address
+    max_players: 1
 discord:
   guild_id: 1160610137703186636
   client_id: 1160076447977848945

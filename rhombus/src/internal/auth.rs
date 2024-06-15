@@ -21,7 +21,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use super::{locales::Languages, router::RouterState};
+use super::{division::MaxDivisionPlayers, locales::Languages, router::RouterState};
 
 #[derive(Debug, Serialize, Clone)]
 pub struct UserInner {
@@ -146,13 +146,31 @@ pub async fn route_signin(
                 return Redirect::to("/team").into_response();
             }
 
-            // you cannot join a new team if you have made some solves
-            if old_team
-                .solves
+            // you cannot join a team if the new team if, as a result of you joining it would
+            // lead to the team having more players than the minimum required by any division
+            let team_divisions = state.db.get_team_divisions(team.id).await.unwrap();
+            let user_divisions = state.db.get_user_divisions(user.id).await.unwrap();
+            let new_team = state.db.get_team_from_id(team.id).await.unwrap();
+            let min_players = state
+                .divisions
                 .iter()
-                .any(|solve| solve.1.user_id == user.id)
-            {
-                return Redirect::to("/team").into_response();
+                .filter(|division| {
+                    team_divisions.contains(&division.id) && user_divisions.contains(&division.id)
+                })
+                .filter_map(|division| match division.max_players {
+                    MaxDivisionPlayers::Unlimited => None,
+                    MaxDivisionPlayers::Limited(max) => Some(max),
+                })
+                .min()
+                .map(MaxDivisionPlayers::Limited)
+                .unwrap_or(MaxDivisionPlayers::Unlimited);
+            match min_players {
+                MaxDivisionPlayers::Unlimited => {}
+                MaxDivisionPlayers::Limited(min_players) => {
+                    if new_team.users.len() >= min_players.get() as usize {
+                        return Redirect::to("/team").into_response();
+                    }
+                }
             }
 
             state

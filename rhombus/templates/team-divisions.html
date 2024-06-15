@@ -1,0 +1,68 @@
+{% import "icons.html" as icons %}
+
+<div
+  id="division-table"
+  {% if oob %}hx-swap-oob="true"{% endif %}
+  class="flex flex-col gap-2"
+>
+  <div class="flex items-center justify-between">
+    <div class="text-muted-foreground">Division Name</div>
+    <div class="text-muted-foreground">Joined</div>
+  </div>
+  {% for division in divisions %}
+    <div class="flex items-center justify-between">
+      <div class="flex items-center">
+        {{ division.name }}
+        <div title="{{ division.description }}">
+          {{ icons.info(class="h-4 ml-2") }}
+        </div>
+      </div>
+      <div class="flex items-center">
+        <!-- prettier-ignore-start -->
+        <input
+          type="checkbox"
+          name="join"
+          class="size-4 accent-primary"
+
+          {% if user.is_team_owner %}
+          hx-post="/team/division/{{ division.id }}"
+          {% else %}
+          disabled
+          {% endif %}
+
+          {% if num_joined_divisions == 1 and division.joined %}
+          disabled
+          title="Cannot leave the last division you are in."
+          {% endif %}
+
+          {% if division.joined %}
+          checked
+          {% elif not division.eligible %}
+          disabled
+          {% endif %}
+
+          {% if not division.joined %}
+          unchecked
+          {% endif %}
+
+          {% if not division.eligible %}
+          title="
+          {%- if team.users | length > division.max_players.Limited -%}
+              Too many players in your team.{%- if division.ineligible_user_ids | length > 0 -%}&nbsp;{% endif %}
+          {%- endif -%}
+          {%- if division.ineligible_user_ids | length > 0 -%}
+              Users not in division:&nbsp;
+              {%- for user_id in division.ineligible_user_ids -%}
+              {{ team.users[user_id].name }}
+              {%- if loop.index < division.ineligible_user_ids | length -%}, {% endif -%}
+              {%- endfor -%}.
+          {%- endif -%}"
+          {% else %}
+          title="Eligible for division."
+          {% endif %}
+        >
+        <!-- prettier-ignore-end -->
+      </div>
+    </div>
+  {% endfor %}
+</div>

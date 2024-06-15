@@ -1,3 +1,5 @@
+use std::num::NonZeroU32;
+
 use async_trait::async_trait;
 use regex::Regex;
 use serde::Serialize;
@@ -59,7 +61,14 @@ pub struct Division {
     pub id: i64,
     pub name: String,
     pub description: String,
+    pub max_players: MaxDivisionPlayers,
 
     #[serde(skip)]
     pub division_eligibility: DivisionEligibilityProvider,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub enum MaxDivisionPlayers {
+    Unlimited,
+    Limited(NonZeroU32),
 }

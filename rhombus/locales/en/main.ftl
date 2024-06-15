@@ -20,6 +20,22 @@ account-discord-integration-join-server-description =
 team-success-set-team-name = Set team name successfully
 team-error-name-length = Team name must be between 3 and 30 characters
 team-error-name-taken = Team name already taken
+team-members-unlimited = {$count -> 
+    [one] {$count} member
+    *[other] {$count} members
+}
+team-members-unlimited-hint = {$count -> 
+    [one] {$count} member
+    *[other] {$count} members
+} in your team
+team-members-limited = {$count} / {$limit -> 
+    [one] {$limit} member
+    *[other] {$limit} members
+}
+team-members-limited-hint = {$count} out of {$limit -> 
+    [one] {$limit} member
+    *[other] {$limit} members
+} in your team
 
 account-check-email = Check your email for a verification link
 account-error-email-length = Email must be between 1 and 255 characters

@@ -71,6 +71,7 @@ pub struct Division {
     pub description: String,
     pub requirement: Option<String>,
     pub email_regex: Option<String>,
+    pub max_players: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

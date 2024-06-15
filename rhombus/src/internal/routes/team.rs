@@ -15,13 +15,15 @@ use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::internal::{auth::User, locales::Languages, router::RouterState};
+use crate::internal::{
+    auth::User, division::MaxDivisionPlayers, locales::Languages, router::RouterState,
+};
 
 pub fn create_team_invite_token() -> String {
     Alphanumeric.sample_string(&mut thread_rng(), 16)
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct TeamDivision<'a> {
     pub id: i64,
     pub name: &'a str,
@@ -29,6 +31,7 @@ pub struct TeamDivision<'a> {
     pub eligible: bool,
     pub ineligible_user_ids: Vec<i64>,
     pub joined: bool,
+    pub max_players: MaxDivisionPlayers,
 }
 
 pub async fn route_team(
@@ -72,15 +75,36 @@ pub async fn route_team(
             }
         }
 
+        let oversized = match division.max_players {
+            MaxDivisionPlayers::Unlimited => true,
+            MaxDivisionPlayers::Limited(max_players) => {
+                team.users.len() <= max_players.get() as usize
+            }
+        };
+
         divisions.push(TeamDivision {
             id: division.id,
             name: &division.name,
             description: &division.description,
-            eligible: ineligible_user_ids.is_empty(),
+            eligible: ineligible_user_ids.is_empty() && oversized,
             ineligible_user_ids,
             joined: team_divisions.contains(&division.id),
+            max_players: division.max_players.clone(),
         })
     }
+
+    let min_players = divisions
+        .iter()
+        .filter(|division| division.joined)
+        .filter_map(|division| match division.max_players {
+            MaxDivisionPlayers::Unlimited => None,
+            MaxDivisionPlayers::Limited(max) => Some(max),
+        })
+        .min()
+        .map(MaxDivisionPlayers::Limited)
+        .unwrap_or(MaxDivisionPlayers::Unlimited);
+
+    let num_joined_divisions = divisions.iter().filter(|d| d.joined).count();
 
     Html(
         state
@@ -92,11 +116,13 @@ pub async fn route_team(
                 user,
                 team,
                 team_invite_url,
+                min_players,
                 uri => uri.to_string(),
                 location_url,
                 now => chrono::Utc::now(),
                 challenges,
                 categories,
+                num_joined_divisions,
                 og_image => format!("{}/og-image.png", location_url),
                 divisions,
                 standings => standings.standings,
@@ -244,6 +270,7 @@ pub struct DivisionSet {
 pub async fn route_team_set_division(
     state: State<RouterState>,
     Extension(user): Extension<User>,
+    Extension(lang): Extension<Languages>,
     Path(division_id): Path<i64>,
     Form(form): Form<DivisionSet>,
 ) -> impl IntoResponse {
@@ -255,6 +282,35 @@ pub async fn route_team_set_division(
     }
 
     let team = state.db.get_team_from_id(user.team_id).await.unwrap();
+    let division = state.divisions.iter().find(|d| d.id == division_id);
+    if let Some(division) = division {
+        match division.max_players {
+            MaxDivisionPlayers::Limited(max_players) => {
+                if team.users.len() > max_players.get() as usize {
+                    return Response::builder()
+                        .status(StatusCode::FORBIDDEN)
+                        .body("".to_owned())
+                        .unwrap();
+                }
+            }
+            MaxDivisionPlayers::Unlimited => {}
+        }
+    } else {
+        return Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body("".to_owned())
+            .unwrap();
+    }
+
+    let team_divisions = state.db.get_team_divisions(team.id).await.unwrap();
+
+    if team_divisions.len() == 1 && team_divisions.contains(&division_id) {
+        tracing::info!("Cannot remove last division");
+        return Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .body("".to_owned())
+            .unwrap();
+    }
 
     let mut eligible = true;
     for user_id in team.users.keys() {
@@ -281,13 +337,63 @@ pub async fn route_team_set_division(
         "Set division"
     );
 
+    let team_divisions = state.db.get_team_divisions(team.id).await.unwrap();
+    let min_players = state
+        .divisions
+        .iter()
+        .filter(|division| team_divisions.contains(&division.id))
+        .filter_map(|division| match division.max_players {
+            MaxDivisionPlayers::Unlimited => None,
+            MaxDivisionPlayers::Limited(max) => Some(max),
+        })
+        .min()
+        .map(MaxDivisionPlayers::Limited)
+        .unwrap_or(MaxDivisionPlayers::Unlimited);
+
+    let team = state.db.get_team_from_id(user.team_id).await.unwrap();
+    let mut divisions = vec![];
+    for division in state.divisions {
+        let mut ineligible_user_ids = vec![];
+        for user_id in team.users.keys() {
+            let user_divisions = state.db.get_user_divisions(*user_id).await.unwrap();
+
+            if !user_divisions.contains(&division.id) {
+                ineligible_user_ids.push(*user_id);
+            }
+        }
+
+        let oversized = match division.max_players {
+            MaxDivisionPlayers::Unlimited => true,
+            MaxDivisionPlayers::Limited(max_players) => {
+                team.users.len() <= max_players.get() as usize
+            }
+        };
+
+        divisions.push(TeamDivision {
+            id: division.id,
+            name: &division.name,
+            description: &division.description,
+            eligible: ineligible_user_ids.is_empty() && oversized,
+            ineligible_user_ids,
+            joined: team_divisions.contains(&division.id),
+            max_players: division.max_players.clone(),
+        })
+    }
+
+    let num_joined_divisions = divisions.iter().filter(|d| d.joined).count();
+
     let html = state
         .jinja
-        .get_template("standing-table.html")
+        .get_template("team-set-division-partial.html")
         .unwrap()
         .render(context! {
-            divisions => state.divisions,
+            lang,
+            team,
+            min_players,
+            user,
+            divisions,
             standings => standings.standings,
+            num_joined_divisions,
             oob => true,
         })
         .unwrap();

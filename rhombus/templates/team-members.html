@@ -1,0 +1,72 @@
+{% import "icons.html" as icons %}
+
+<div id="team-members" {% if oob %}hx-swap-oob="true"{% endif %}>
+  <div class="flex justify-between">
+    <div>
+      <h4 class="text-sm">Members</h4>
+      <p class="mb-2 text-sm text-muted-foreground">Your team members</p>
+    </div>
+    {% with num_members=team.users | length %}
+      {% if min_players == "Unlimited" %}
+        {% if num_members > 1 %}
+          <h4
+            class="text-sm"
+            title="{{ t('team-members-unlimited-hint', count=num_members) }}"
+          >
+            {{ t("team-members-unlimited", count=num_members) }}
+          </h4>
+        {% endif %}
+      {% else %}
+        <h4
+          class="text-sm"
+          title="{{ t('team-members-limited-hint', count=num_members, limit=min_players.Limited) }}"
+        >
+          {{ t('team-members-limited', count=num_members, limit=min_players.Limited) }}
+        </h4>
+      {% endif %}
+    {% endwith %}
+  </div>
+  <ul class="flex flex-col gap-2">
+    {% for player_id, player in team.users | items %}
+      <li class="flex items-center justify-between group">
+        <div class="flex items-center gap-2">
+          <a
+            hx-boost="true"
+            hx-select="#screen"
+            hx-target="#screen"
+            hx-swap="outerHTML"
+            href="/user/{{ player_id }}"
+            class="flex gap-2 items-center"
+            title="Go to public user profile"
+          >
+            <img class="size-8 rounded-full" src="{{ player.avatar_url }}" />
+            <span>{{ player.name }}</span>
+          </a>
+          <div class="flex gap-2">
+            {% if player.is_team_owner %}
+              <div class="text-yellow-300" title="Team owner">
+                {{ icons.crown() }}
+              </div>
+            {% endif %}
+            {% if user.id == player_id %}
+              <div class="text-muted-foreground">(You)</div>
+            {% endif %}
+          </div>
+        </div>
+        {% if user.is_team_owner != (user.id == player_id) %}
+          <button
+            hx-delete="/team/user/{{ player_id }}"
+            title="{%- if user.is_team_owner -%}
+              Kick user
+            {%- else -%}
+              Leave team
+            {%- endif -%}"
+            class="text-destructive hidden group-hover:block"
+          >
+            {{ icons.delete_user() }}
+          </button>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</div>

@@ -167,6 +167,13 @@
             "examples": [
               "Must have a verified email from an @example.com domain"
             ]
+          },
+          "max_players": {
+            "title": "Max Players",
+            "description": "Maximum number of players allowed in this division",
+            "type": ["number", "string"],
+            "minimum": 1,
+            "examples": [4, 1, "any"]
           }
         },
         "required": ["name", "description"]
