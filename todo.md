@@ -40,9 +40,9 @@
   - [x] From discord
   - [ ] Email-only
 - [ ] Onboarding
-- [ ] Email-only accounts
-  - [ ] Email confirmation
-  - [ ] Gravatar lookup
+- [x] Email-only accounts
+  - [x] Email confirmation
+  - [x] Gravatar lookup
 - [x] Challenge loader plugin
 - [ ] API
   - [ ] Access tokens

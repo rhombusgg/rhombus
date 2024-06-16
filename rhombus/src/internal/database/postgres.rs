@@ -43,7 +43,8 @@ impl Database for Postgres {
         name: &str,
         email: &str,
         avatar: &str,
-        discord_id: NonZeroU64,
+        discord_id: Option<NonZeroU64>,
+        _user_id: Option<i64>,
     ) -> Result<(i64, i64)> {
         #[derive(FromRow)]
         struct InsertUserResult {
@@ -61,7 +62,7 @@ impl Database for Postgres {
         .bind(name)
         .bind(email)
         .bind(avatar)
-        .bind(discord_id.get() as i64)
+        .bind(discord_id.map(|id| id.get() as i64))
         .fetch_one(&self.pool)
         .await?;
 
@@ -207,11 +208,22 @@ impl Database for Postgres {
         todo!()
     }
 
-    async fn create_email_callback_code(&self, _user_id: i64, _email: &str) -> Result<String> {
+    async fn create_email_verification_callback_code(
+        &self,
+        _user_id: i64,
+        _email: &str,
+    ) -> Result<String> {
         todo!()
     }
 
-    async fn verify_email_callback_code(&self, _code: &str) -> Result<()> {
+    async fn verify_email_verification_callback_code(&self, _code: &str) -> Result<()> {
+        todo!()
+    }
+
+    async fn create_email_signin_callback_code(&self, _email: &str) -> Result<String> {
+        todo!()
+    }
+    async fn verify_email_signin_callback_code(&self, _code: &str) -> Result<String> {
         todo!()
     }
 

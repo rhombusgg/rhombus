@@ -75,6 +75,16 @@ pub struct Division {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+pub enum AuthProvider {
+    #[serde(rename = "discord")]
+    Discord,
+    #[serde(rename = "email")]
+    Email,
+    #[serde(rename = "ctftime")]
+    CTFtime,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Settings {
     pub title: String,
     pub location_url: String,
@@ -90,6 +100,7 @@ pub struct Settings {
     pub divisions: Option<Vec<Division>>,
     pub email: Option<EmailSettings>,
     pub local_upload_provider: Option<LocalUploadProviderSettings>,
+    pub auth: Vec<AuthProvider>,
 
     /// `false` will disable the in memory cache.
     ///

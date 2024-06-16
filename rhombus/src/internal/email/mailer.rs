@@ -73,4 +73,42 @@ impl Mailer {
             )
             .await
     }
+
+    pub async fn send_email_signin(&self, ip: Option<&str>, to: &str, code: &str) -> Result<()> {
+        let (title, contact_email, location_url) = {
+            let settings = self.settings.read().await;
+            (
+                settings.title.clone(),
+                settings.contact_email.clone(),
+                settings.location_url.clone(),
+            )
+        };
+
+        let context = context! {
+            title,
+            contact_email,
+            ip,
+            email => to,
+            signin_url => format!("{}/signin/email?code={}", location_url, code),
+            logo => "https://avatars.githubusercontent.com/u/152339298",
+        };
+
+        let plaintext = self
+            .jinja
+            .get_template("emails/signin.txt")
+            .unwrap()
+            .render(&context)
+            .unwrap();
+
+        let html = self
+            .jinja
+            .get_template("emails/signin.html")
+            .unwrap()
+            .render(&context)
+            .unwrap();
+
+        self.inner
+            .send_email(to, &format!("{} Sign In", title), plaintext, html)
+            .await
+    }
 }

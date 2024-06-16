@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS rhombus_user (
     id INTEGER PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
     avatar TEXT NOT NULL,
-    discord_id INTEGER NOT NULL UNIQUE,
+    discord_id INTEGER,
     team_id INTEGER NOT NULL,
     owner_team_id INTEGER NOT NULL,
     disabled BOOLEAN NOT NULL DEFAULT(FALSE),
@@ -89,6 +89,20 @@ CREATE TABLE IF NOT EXISTS rhombus_email (
     PRIMARY KEY (email, user_id),
     FOREIGN KEY (user_id) REFERENCES rhombus_user(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS rhombus_email_signin (
+    email TEXT NOT NULL,
+    code TEXT UNIQUE,
+    expires INTEGER NOT NULL DEFAULT(strftime('%s', 'now', '+1 hour')),
+    PRIMARY KEY (email)
+);
+
+CREATE TRIGGER IF NOT EXISTS rhombus_email_signin_autodelete
+    BEFORE INSERT ON rhombus_email_signin
+BEGIN
+    DELETE FROM rhombus_email_signin
+    WHERE expires < strftime('%s', 'now');
+END;
 
 CREATE TABLE IF NOT EXISTS rhombus_writeup (
     user_id INTEGER NOT NULL,

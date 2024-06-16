@@ -419,10 +419,14 @@ impl Bot {
                             .title("Ticket")
                             .field(
                                 ":identification_card: Opened By",
-                                format!(
-                                    "<@{}> [:link:]({}/user/{})",
-                                    user.discord_id, location_url, user.id
-                                ),
+                                if let Some(discord_id) = user.discord_id {
+                                    format!(
+                                        "<@{}> [:link:]({}/user/{})",
+                                        discord_id, location_url, user.id
+                                    )
+                                } else {
+                                    format!("[:link:]({}/user/{})", location_url, user.id)
+                                },
                                 true,
                             )
                             .field(
@@ -463,9 +467,11 @@ impl Bot {
             .send_message(&self.http, CreateMessage::new().content(content.as_ref()))
             .await?;
 
-        self.http
-            .add_thread_channel_member(thread.id, UserId::from(user.discord_id))
-            .await?;
+        if let Some(discord_id) = user.discord_id {
+            self.http
+                .add_thread_channel_member(thread.id, UserId::from(discord_id))
+                .await?;
+        }
 
         self.http
             .add_thread_channel_member(thread.id, UserId::from(author.discord_id))
@@ -537,10 +543,17 @@ impl Bot {
         )
         .send_message(
             &self.http,
-            CreateMessage::new().content(format!(
-                "Congrats to <@{}> on team **{}** for first blood on **{} / {}** in {}! {}",
-                user.discord_id, team.name, category.name, challenge.name, division_string, emoji,
-            )),
+            CreateMessage::new().content(if let Some(discord_id) = user.discord_id {
+                format!(
+                    "Congrats to <@{}> on team **{}** for first blood on **{} / {}** in {}! {}",
+                    discord_id, team.name, category.name, challenge.name, division_string, emoji,
+                )
+            } else {
+                format!(
+                    "Congrats to {} on team **{}** for first blood on **{} / {}** in {}! {}",
+                    user.name, team.name, category.name, challenge.name, division_string, emoji,
+                )
+            }),
         )
         .await?;
         Ok(())

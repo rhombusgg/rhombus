@@ -1,5 +1,6 @@
-use std::{num::NonZeroU64, sync::Arc};
+use std::{fmt::Write, net::IpAddr, num::NonZeroU64, sync::Arc};
 
+use async_hash::{Digest, Sha256};
 use axum::{
     body::Body,
     extract::{Query, State},
@@ -9,7 +10,7 @@ use axum::{
     },
     middleware::Next,
     response::{IntoResponse, Redirect},
-    Extension, Json,
+    Extension, Form, Json,
 };
 use axum_extra::extract::{
     cookie::{Cookie, SameSite},
@@ -28,7 +29,7 @@ pub struct UserInner {
     pub id: i64,
     pub name: String,
     pub avatar: String,
-    pub discord_id: NonZeroU64,
+    pub discord_id: Option<NonZeroU64>,
     pub team_id: i64,
     pub is_team_owner: bool,
     pub disabled: bool,
@@ -200,9 +201,13 @@ pub async fn route_signin(
         )
     };
 
-    let (discord_client_id, location_url) = {
+    let (discord_client_id, location_url, auth) = {
         let settings = state.settings.read().await;
-        (settings.discord.client_id, settings.location_url.clone())
+        (
+            settings.discord.client_id,
+            settings.location_url.clone(),
+            settings.auth.clone(),
+        )
     };
 
     let discord_signin_url = format!(
@@ -221,6 +226,7 @@ pub async fn route_signin(
             uri => uri.to_string(),
             location_url => location_url,
             discord_signin_url => discord_signin_url,
+            auth_options => auth,
             og_image => format!("{}/og-image.png", location_url),
             team_name => team_name
         })
@@ -260,8 +266,9 @@ struct DiscordProfile {
     discriminator: Option<String>,
 }
 
-pub async fn route_discord_callback(
+pub async fn route_signin_discord_callback(
     state: State<RouterState>,
+    user: Extension<MaybeUser>,
     params: Query<DiscordCallback>,
     cookie_jar: CookieJar,
 ) -> impl IntoResponse {
@@ -283,7 +290,6 @@ pub async fn route_discord_callback(
     };
 
     let (
-        jwt_secret,
         discord_client_id,
         discord_client_secret,
         discord_guild_id,
@@ -292,7 +298,6 @@ pub async fn route_discord_callback(
     ) = {
         let settings = state.settings.read().await;
         (
-            settings.jwt_secret.clone(),
             settings.discord.client_id,
             settings.discord.client_secret.clone(),
             settings.discord.guild_id,
@@ -393,9 +398,129 @@ pub async fn route_discord_callback(
 
     let (user_id, team_id) = state
         .db
-        .upsert_user(&profile.global_name, &profile.email, &avatar, discord_id)
+        .upsert_user(
+            &profile.global_name,
+            &profile.email,
+            &avatar,
+            Some(discord_id),
+            user.as_ref().map(|u| u.id),
+        )
         .await
         .unwrap();
+
+    sign_in(&state, user_id, team_id, &cookie_jar).await
+}
+
+#[derive(Deserialize)]
+pub struct EmailSubmit {
+    email: String,
+}
+
+pub async fn route_signin_email(
+    state: State<RouterState>,
+    Extension(lang): Extension<Languages>,
+    Extension(ip): Extension<Option<IpAddr>>,
+    Form(form): Form<EmailSubmit>,
+) -> impl IntoResponse {
+    if form.email.is_empty() || form.email.len() > 255 {
+        return Response::builder()
+            .body(format!(
+                r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
+                state
+                    .localizer
+                    .localize(&lang, "account-error-email-length", None)
+                    .unwrap(),
+            ))
+            .unwrap();
+    }
+
+    let mailer = state.mailer.as_ref().unwrap();
+
+    let code = state
+        .db
+        .create_email_signin_callback_code(&form.email)
+        .await
+        .unwrap();
+
+    if mailer
+        .send_email_signin(ip.map(|ip| ip.to_string()).as_deref(), &form.email, &code)
+        .await
+        .is_err()
+    {
+        return Response::builder()
+            .body(format!(
+                r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
+                state
+                    .localizer
+                    .localize(&lang, "account-error-signin-email", None)
+                    .unwrap(),
+            ))
+            .unwrap();
+    }
+
+    Response::builder()
+        .body(format!(
+            r#"<div id="htmx-toaster" data-toast="success" hx-swap-oob="true">{}</div>"#,
+            state
+                .localizer
+                .localize(&lang, "account-check-email", None)
+                .unwrap(),
+        ))
+        .unwrap()
+}
+
+#[derive(Deserialize)]
+pub struct EmailSignInParams {
+    code: String,
+}
+
+pub async fn route_signin_email_callback(
+    state: State<RouterState>,
+    params: Query<EmailSignInParams>,
+    cookie_jar: CookieJar,
+) -> impl IntoResponse {
+    let email = state
+        .db
+        .verify_email_signin_callback_code(&params.code)
+        .await;
+    if email.is_err() {
+        return Redirect::to("/signin").into_response();
+    }
+    let email = email.unwrap();
+
+    let name = email.split('@').next().unwrap();
+
+    let hash = Sha256::digest(email.trim().to_lowercase().as_bytes())
+        .iter()
+        .fold(String::new(), |mut output, b| {
+            let _ = write!(output, "{:02x}", b);
+            output
+        });
+
+    let avatar = format!(
+        "https://seccdn.libravatar.org/avatar/{}?s=80&default=retro",
+        hash
+    );
+
+    let (user_id, team_id) = state
+        .db
+        .upsert_user(name, &email, &avatar, None, None)
+        .await
+        .unwrap();
+
+    sign_in(&state, user_id, team_id, &cookie_jar).await
+}
+
+async fn sign_in(
+    state: &State<RouterState>,
+    user_id: i64,
+    team_id: i64,
+    cookie_jar: &CookieJar,
+) -> Response<Body> {
+    let jwt_secret = {
+        let settings = state.settings.read().await;
+        settings.jwt_secret.clone()
+    };
 
     let default_division_id = state.divisions[0].id;
     state
@@ -418,7 +543,7 @@ pub async fn route_discord_callback(
         iat,
     };
 
-    let mut response = Redirect::permanent("/team").into_response();
+    let mut response = Redirect::temporary("/team").into_response();
     let headers = response.headers_mut();
 
     if let Some(cookie_invite_token) = cookie_jar.get("rhombus-invite-token").map(|c| c.value()) {

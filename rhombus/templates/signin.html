@@ -14,45 +14,52 @@
     <div class="flex max-w-md flex-col gap-y-2 text-center">
       <h1 class="text-2xl font-semibold tracking-tight">Sign In</h1>
       <p class="text-sm text-muted-foreground">
-        Authenticate below to create or join a team. Sign in with Discord to get
-        rich feature integrations.
+        Authenticate below to create or join a team.
       </p>
     </div>
     <div class="grid gap-4 sm:w-96">
-      <a
-        href="{{ discord_signin_url }}"
-        class="h-10 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center rounded-md text-sm font-medium whitespace-nowrap ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
-        >{{ icons.discord(class="mr-2 h-4 w-4") }} Discord</a
-      >
-      {% if email_signin %}
-        <div class="relative">
-          <div class="absolute inset-0 flex items-center">
-            <span class="w-full border-t"></span>
-          </div>
-          <div class="relative flex justify-center text-xs uppercase">
-            <span class="bg-background px-2 text-muted-foreground">
-              Or continue with Email
-            </span>
-          </div>
-        </div>
-        <form
-          class="grow flex justify-end items-center relative"
-          hx-post="/signin/email"
-          hx-indicator="#loader"
-          hx-swap="none"
-        >
-          <input
-            type="email"
-            required
-            name="email"
-            placeholder="name@example.com"
-            class="bg-background border p-2 rounded-md w-full focus-visible:outline-none"
-          />
-          <div id="loader" class="absolute mr-2 pointer-events-none">
-            {{ icons.spinner(attrs='class="animate-spin"') }}
-          </div>
-        </form>
-      {% endif %}
+      {% for option in auth_options %}
+        {% if option == "discord" %}
+          {% if loop.index > 1 %}
+            {{ bar("Or continue with Discord") }}
+          {% endif %}
+          <a
+            href="{{ discord_signin_url }}"
+            class="h-10 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center rounded-md text-sm font-medium whitespace-nowrap ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+            >{{ icons.discord(class="mr-2 size-4") }} Discord</a
+          >
+        {% elif option == "email" %}
+          {% if loop.index > 1 %}
+            {{ bar("Or continue with Email") }}
+          {% endif %}
+          <form
+            class="grow flex justify-end items-center relative"
+            hx-post="/signin/email"
+            hx-indicator="#loader"
+            hx-swap="none"
+          >
+            <input
+              type="email"
+              required
+              name="email"
+              placeholder="name@example.com"
+              class="bg-background border p-2 rounded-md w-full focus-visible:outline-none"
+            />
+            <div id="loader" class="absolute mr-2 pointer-events-none">
+              {{ icons.spinner(attrs='class="animate-spin"') }}
+            </div>
+          </form>
+        {% elif option == "ctftime" %}
+          {% if loop.index > 1 %}
+            {{ bar("Or continue with CTFtime") }}
+          {% endif %}
+          <a
+            href="https://oauth.ctftime.org/authorize"
+            class="h-10 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center rounded-md text-sm font-medium whitespace-nowrap ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+            >{{ icons.ctftime(class="h-6 stroke-none") }}</a
+          >
+        {% endif %}
+      {% endfor %}
     </div>
     <p class="px-8 text-center text-sm text-muted-foreground">
       By continuing, you agree to our
@@ -60,3 +67,14 @@
     </p>
   </div>
 {% endblock %}
+
+{% macro bar(text) %}
+  <div class="relative">
+    <div class="absolute inset-0 flex items-center">
+      <span class="w-full border-t"></span>
+    </div>
+    <div class="relative flex justify-center text-xs uppercase">
+      <span class="bg-background px-2 text-muted-foreground"> {{ text }} </span>
+    </div>
+  </div>
+{% endmacro %}

@@ -94,7 +94,7 @@ pub struct TeamUser {
     pub name: String,
     pub avatar_url: String,
     pub is_team_owner: bool,
-    pub discord_id: NonZeroU64,
+    pub discord_id: Option<NonZeroU64>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -184,7 +184,8 @@ pub trait Database {
         name: &str,
         email: &str,
         avatar: &str,
-        discord_id: NonZeroU64,
+        discord_id: Option<NonZeroU64>,
+        user_id: Option<i64>,
     ) -> Result<(i64, i64)>;
     async fn insert_track(
         &self,
@@ -229,8 +230,14 @@ pub trait Database {
     async fn get_scoreboard(&self, division_id: i64) -> Result<Scoreboard>;
     async fn get_leaderboard(&self, division_id: i64, page: Option<u64>) -> Result<Leaderboard>;
     async fn get_emails_for_user_id(&self, user_id: i64) -> Result<Vec<Email>>;
-    async fn create_email_callback_code(&self, user_id: i64, email: &str) -> Result<String>;
-    async fn verify_email_callback_code(&self, code: &str) -> Result<()>;
+    async fn create_email_verification_callback_code(
+        &self,
+        user_id: i64,
+        email: &str,
+    ) -> Result<String>;
+    async fn verify_email_verification_callback_code(&self, code: &str) -> Result<()>;
+    async fn create_email_signin_callback_code(&self, email: &str) -> Result<String>;
+    async fn verify_email_signin_callback_code(&self, code: &str) -> Result<String>;
     async fn delete_email(&self, user_id: i64, email: &str) -> Result<()>;
     async fn get_user_divisions(&self, user_id: i64) -> Result<Vec<i64>>;
     async fn set_user_division(

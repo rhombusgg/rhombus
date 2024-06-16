@@ -6,7 +6,7 @@
   <div
     style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0"
   >
-    Verify Email for {{ title }}
+    Sign in to {{ title }}
   </div>
   <body
     style='margin-left:auto;margin-right:auto;margin-top:auto;margin-bottom:auto;background-color:rgb(255,255,255);font-family:ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"'
@@ -48,17 +48,17 @@
               class=""
               style="margin-left:0px;margin-right:0px;margin-top:30px;margin-bottom:30px;padding:0px;text-align:center;font-size:24px;font-weight:400;color:rgb(0,0,0)"
             >
-              Verify Email for <strong>{{ title }}</strong>
+              Sign in to <strong>{{ title }}</strong>
             </h1>
             <p
               style="font-size:14px;line-height:24px;margin:16px 0;color:rgb(0,0,0)"
             >
-              Hello mbund,
+              Hello Participant,
             </p>
             <p
               style="font-size:14px;line-height:24px;margin:16px 0;color:rgb(0,0,0)"
             >
-              To verify this email (<a
+              To sign in with this email (<a
                 href="mailto:{{ email }}"
                 style="color:#067df7;text-decoration:none"
                 target="_blank"
@@ -78,12 +78,12 @@
                 <tr>
                   <td>
                     <a
-                      href="{{ verify_url }}"
+                      href="{{ signin_url }}"
                       style="border-radius:0.25rem;background-color:rgb(0,0,0);padding-left:1.25rem;padding-right:1.25rem;padding-top:0.75rem;padding-bottom:0.75rem;text-align:center;font-size:12px;font-weight:600;color:rgb(255,255,255);text-decoration-line:none;line-height:100%;text-decoration:none;display:inline-block;max-width:100%;padding:12px 20px 12px 20px"
                       target="_blank"
                       ><span
                         style="max-width:100%;display:inline-block;line-height:120%;mso-padding-alt:0px;mso-text-raise:9px"
-                        >Verify Email</span
+                        >Sign In</span
                       ></a
                     >
                   </td>
@@ -95,10 +95,10 @@
             >
               Or, copy and paste this URL into your browser:
               <a
-                href="{{ verify_url }}"
+                href="{{ signin_url }}"
                 style="color:rgb(37,99,235);text-decoration:none;word-break:break-all;text-decoration-line:none"
                 target="_blank"
-                >{{ verify_url }}</a
+                >{{ signin_url }}</a
               >
             </p>
             <hr
@@ -108,7 +108,7 @@
               style="font-size:12px;line-height:24px;margin:16px 0;color:rgb(102,102,102)"
             >
               {% if ip %}
-                This verification request came from
+                This sign in request came from
                 <span style="color:rgb(0,0,0)">{{ ip }}</span>
                 {%- if geo -%}
                   located in {{ geo.city }}, {{ geo.region }}
@@ -116,9 +116,9 @@
                   {{ geo.country_name }}
                 {%- endif -%}.
               {% endif %}
-              If you were not expecting this verification request, you can
-              safely ignore this email. If you are concerned about your
-              account&#x27;s safety, contact an admin or email us at
+              If you were not expecting this sign in request, you can safely
+              ignore this email. If you are concerned about your account&#x27;s
+              safety, contact an admin or email us at
               <a
                 href="mailto:{{ contact_email }}"
                 style="color:#067df7;text-decoration:none"

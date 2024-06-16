@@ -99,29 +99,93 @@ impl Database for LibSQL {
         name: &str,
         email: &str,
         avatar: &str,
-        discord_id: NonZeroU64,
+        discord_id: Option<NonZeroU64>,
+        user_id: Option<i64>,
     ) -> Result<(i64, i64)> {
         let team_name = format!("{}'s team", name);
 
-        let tx = self.db.transaction().await?;
-        let existing_user_row = tx
-            .query(
-                "SELECT id, team_id FROM rhombus_user WHERE discord_id = ?",
-                [discord_id.get()],
-            )
-            .await?
-            .next()
-            .await?;
-        if let Some(existing_user_row) = existing_user_row {
-            #[derive(Debug, Deserialize)]
-            struct ExistingUser {
-                id: i64,
-                team_id: i64,
-            }
+        if let Some(user_id) = user_id {
+            let existing_user_row = self
+                .db
+                .query(
+                    "
+                    UPDATE rhombus_user
+                    SET name = ?1, avatar = ?2, discord_id = ?3
+                    WHERE id = ?4
+                    RETURNING id, team_id
+                ",
+                    params!(name, avatar, discord_id.map(|d| d.get() as i64), user_id),
+                )
+                .await?
+                .next()
+                .await?;
+            if let Some(existing_user_row) = existing_user_row {
+                #[derive(Debug, Deserialize)]
+                struct ExistingUser {
+                    id: i64,
+                    team_id: i64,
+                }
 
-            let existing_user = de::from_row::<ExistingUser>(&existing_user_row).unwrap();
-            return Ok((existing_user.id, existing_user.team_id));
+                self.db
+                    .execute(
+                        "
+                        INSERT OR REPLACE INTO rhombus_email (email, user_id) VALUES (?1, ?2)
+                    ",
+                        params!(email, user_id),
+                    )
+                    .await?;
+
+                let existing_user = de::from_row::<ExistingUser>(&existing_user_row).unwrap();
+                return Ok((existing_user.id, existing_user.team_id));
+            }
         }
+
+        if let Some(discord_id) = discord_id {
+            let existing_user_row = self
+                .db
+                .query(
+                    "SELECT id, team_id FROM rhombus_user WHERE discord_id = ?",
+                    [discord_id.get() as i64],
+                )
+                .await?
+                .next()
+                .await?;
+            if let Some(existing_user_row) = existing_user_row {
+                #[derive(Debug, Deserialize)]
+                struct ExistingUser {
+                    id: i64,
+                    team_id: i64,
+                }
+
+                let existing_user = de::from_row::<ExistingUser>(&existing_user_row).unwrap();
+                return Ok((existing_user.id, existing_user.team_id));
+            }
+        } else {
+            let user_id = self
+                .db
+                .query(
+                    "SELECT user_id FROM rhombus_email WHERE email = ? AND code IS NULL",
+                    [email],
+                )
+                .await?
+                .next()
+                .await?
+                .map(|row| row.get::<i64>(0).unwrap());
+            if let Some(user_id) = user_id {
+                let team_id = self
+                    .db
+                    .query("SELECT team_id FROM rhombus_user WHERE id = ?1", [user_id])
+                    .await?
+                    .next()
+                    .await?
+                    .unwrap()
+                    .get::<i64>(0)
+                    .unwrap();
+                return Ok((user_id, team_id));
+            }
+        }
+
+        let tx = self.db.transaction().await?;
 
         let team_invite_token = create_team_invite_token();
 
@@ -140,7 +204,7 @@ impl Database for LibSQL {
         let user_id = tx
             .query(
                 "INSERT INTO rhombus_user (name, avatar, discord_id, team_id, owner_team_id) VALUES (?1, ?2, ?3, ?4, ?4) RETURNING id",
-                params!(name, avatar, discord_id.get(), team_id),
+                params!(name, avatar, discord_id.map(|id| id.get() as i64), team_id),
             )
             .await?
             .next()
@@ -435,7 +499,7 @@ impl Database for LibSQL {
             id: i64,
             name: String,
             avatar: String,
-            discord_id: NonZeroU64,
+            discord_id: Option<NonZeroU64>,
             owner_team_id: i64,
         }
         let mut query_user_rows = tx
@@ -562,7 +626,7 @@ impl Database for LibSQL {
             id: i64,
             name: String,
             avatar: String,
-            discord_id: NonZeroU64,
+            discord_id: Option<NonZeroU64>,
             team_id: i64,
             owner_team_id: i64,
             disabled: bool,
@@ -596,7 +660,7 @@ impl Database for LibSQL {
             id: i64,
             name: String,
             avatar: String,
-            discord_id: NonZeroU64,
+            discord_id: Option<NonZeroU64>,
             team_id: i64,
             owner_team_id: i64,
             disabled: bool,
@@ -1074,7 +1138,11 @@ impl Database for LibSQL {
         Ok(emails)
     }
 
-    async fn create_email_callback_code(&self, user_id: i64, email: &str) -> Result<String> {
+    async fn create_email_verification_callback_code(
+        &self,
+        user_id: i64,
+        email: &str,
+    ) -> Result<String> {
         let code = generate_email_callback_code();
 
         self.db
@@ -1087,7 +1155,7 @@ impl Database for LibSQL {
         Ok(code)
     }
 
-    async fn verify_email_callback_code(&self, code: &str) -> Result<()> {
+    async fn verify_email_verification_callback_code(&self, code: &str) -> Result<()> {
         self.db
             .execute(
                 "
@@ -1100,6 +1168,40 @@ impl Database for LibSQL {
             .await?;
 
         Ok(())
+    }
+
+    async fn create_email_signin_callback_code(&self, email: &str) -> Result<String> {
+        let code = generate_email_callback_code();
+
+        self.db
+            .execute(
+                "INSERT INTO rhombus_email_signin (email, code) VALUES (?1, ?2)",
+                params!(email, code.as_str()),
+            )
+            .await?;
+
+        Ok(code)
+    }
+
+    async fn verify_email_signin_callback_code(&self, code: &str) -> Result<String> {
+        let email = self
+            .db
+            .query(
+                "
+                DELETE FROM rhombus_email_signin
+                WHERE code = ?1
+                RETURNING email
+            ",
+                [code],
+            )
+            .await?
+            .next()
+            .await?
+            .ok_or(libsql::Error::QueryReturnedNoRows)?
+            .get::<String>(0)
+            .unwrap();
+
+        Ok(email)
     }
 
     async fn delete_email(&self, user_id: i64, email: &str) -> Result<()> {

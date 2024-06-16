@@ -80,17 +80,33 @@ pub async fn route_account(
         )
     };
 
-    let in_server = is_in_server(discord_guild_id, user.discord_id, &discord_bot_token);
-    let challenge_data = state.db.get_challenges();
-    let team = state.db.get_team_from_id(user.team_id);
-    let emails = state.db.get_emails_for_user_id(user.id);
-    let user_divisions = state.db.get_user_divisions(user.id);
     let (challenge_data, team, emails, user_divisions, in_server) =
-        tokio::join!(challenge_data, team, emails, user_divisions, in_server);
-    let challenge_data = challenge_data.unwrap();
-    let team = team.unwrap();
-    let emails = emails.unwrap();
-    let user_divisions = user_divisions.unwrap();
+        if let Some(discord_id) = user.discord_id {
+            let in_server = is_in_server(discord_guild_id, discord_id, &discord_bot_token);
+            let challenge_data = state.db.get_challenges();
+            let team = state.db.get_team_from_id(user.team_id);
+            let emails = state.db.get_emails_for_user_id(user.id);
+            let user_divisions = state.db.get_user_divisions(user.id);
+            let (challenge_data, team, emails, user_divisions, in_server) =
+                tokio::join!(challenge_data, team, emails, user_divisions, in_server);
+            let challenge_data = challenge_data.unwrap();
+            let team = team.unwrap();
+            let emails = emails.unwrap();
+            let user_divisions = user_divisions.unwrap();
+            (challenge_data, team, emails, user_divisions, in_server)
+        } else {
+            let challenge_data = state.db.get_challenges();
+            let team = state.db.get_team_from_id(user.team_id);
+            let emails = state.db.get_emails_for_user_id(user.id);
+            let user_divisions = state.db.get_user_divisions(user.id);
+            let (challenge_data, team, emails, user_divisions) =
+                tokio::join!(challenge_data, team, emails, user_divisions);
+            let challenge_data = challenge_data.unwrap();
+            let team = team.unwrap();
+            let emails = emails.unwrap();
+            let user_divisions = user_divisions.unwrap();
+            (challenge_data, team, emails, user_divisions, false)
+        };
 
     let mut divisions = vec![];
     for division in state.divisions {
@@ -193,7 +209,7 @@ pub async fn route_account_add_email(
     if let Some(ref mailer) = state.mailer {
         let code = state
             .db
-            .create_email_callback_code(user.id, &form.email)
+            .create_email_verification_callback_code(user.id, &form.email)
             .await
             .unwrap();
 
@@ -249,7 +265,7 @@ pub async fn route_account_email_verify_callback(
 ) -> impl IntoResponse {
     state
         .db
-        .verify_email_callback_code(&params.code)
+        .verify_email_verification_callback_code(&params.code)
         .await
         .unwrap();
 

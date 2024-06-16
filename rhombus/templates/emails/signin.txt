@@ -1,0 +1,10 @@
+Hello Participant,
+
+To sign in with this email ({{ email }}) for {{ title }}, follow the link below.
+
+{{ signin_url }}
+{% if ip %}
+This sign in request came from {{ ip }}
+{%- if geo %} located in {{ geo.city }}, {{ geo.region }} {{ geo.postal }}, {{ geo.country_name }}{%- endif -%}.
+{% endif %}
+If you were not expecting this sign in request, you can safely ignore this email. If you are concerned about your account's safety, contact an admin or email us at {{ contact_email }}.

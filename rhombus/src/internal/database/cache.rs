@@ -45,11 +45,12 @@ impl Database for DbCache {
         name: &str,
         email: &str,
         avatar: &str,
-        discord_id: NonZeroU64,
+        discord_id: Option<NonZeroU64>,
+        user_id: Option<i64>,
     ) -> Result<(i64, i64)> {
         let result = self
             .inner
-            .upsert_user(name, email, avatar, discord_id)
+            .upsert_user(name, email, avatar, discord_id, user_id)
             .await;
         if let Ok(result) = result {
             USER_CACHE.remove(&result.0);
@@ -218,20 +219,38 @@ impl Database for DbCache {
         get_emails_for_user_id(&self.inner, user_id).await
     }
 
-    async fn create_email_callback_code(&self, user_id: i64, email: &str) -> Result<String> {
-        let result = self.inner.create_email_callback_code(user_id, email).await;
+    async fn create_email_verification_callback_code(
+        &self,
+        user_id: i64,
+        email: &str,
+    ) -> Result<String> {
+        let result = self
+            .inner
+            .create_email_verification_callback_code(user_id, email)
+            .await;
         if result.is_ok() {
             USER_EMAILS_CACHE.remove(&user_id);
         }
         result
     }
 
-    async fn verify_email_callback_code(&self, code: &str) -> Result<()> {
-        let result = self.inner.verify_email_callback_code(code).await;
+    async fn verify_email_verification_callback_code(&self, code: &str) -> Result<()> {
+        let result = self
+            .inner
+            .verify_email_verification_callback_code(code)
+            .await;
         if result.is_ok() {
             USER_EMAILS_CACHE.clear();
         }
         result
+    }
+
+    async fn create_email_signin_callback_code(&self, email: &str) -> Result<String> {
+        self.inner.create_email_signin_callback_code(email).await
+    }
+
+    async fn verify_email_signin_callback_code(&self, code: &str) -> Result<String> {
+        self.inner.verify_email_signin_callback_code(code).await
     }
 
     async fn delete_email(&self, user_id: i64, email: &str) -> Result<()> {

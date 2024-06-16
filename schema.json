@@ -77,6 +77,15 @@
         "peer-ip"
       ]
     },
+    "auth": {
+      "title": "Authentication Providers",
+      "description": "Enable different authentication providers on the signin page. Each option must be further configured in their respective sections.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["discord", "email", "ctftime"]
+      }
+    },
     "turso": {
       "title": "Turso",
       "description": "Configuration for 3rd party database provider https://turso.tech\ndatabase_url must be a libsql:// scheme url for Turso to have an effect",
