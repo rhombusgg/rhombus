@@ -34,13 +34,7 @@ impl SmtpProvider {
 
 #[async_trait]
 impl EmailProvider for SmtpProvider {
-    async fn send_email(
-        &self,
-        to: &str,
-        subject: &str,
-        plaintext: String,
-        html: String,
-    ) -> Result<()> {
+    async fn send_email(&self, to: &str, subject: &str, plaintext: &str, html: &str) -> Result<()> {
         let from = {
             self.settings
                 .read()
@@ -56,7 +50,10 @@ impl EmailProvider for SmtpProvider {
             .from(from.parse()?)
             .to(to.parse()?)
             .subject(subject)
-            .multipart(MultiPart::alternative_plain_html(plaintext, html))?;
+            .multipart(MultiPart::alternative_plain_html(
+                plaintext.to_owned(),
+                html.to_owned(),
+            ))?;
 
         _ = self.transport.send(message).await?;
 

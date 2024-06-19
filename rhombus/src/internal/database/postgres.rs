@@ -1,6 +1,7 @@
 use std::{net::IpAddr, num::NonZeroU64};
 
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 
 use crate::{
@@ -10,7 +11,7 @@ use crate::{
             cache::Writeups,
             provider::{
                 Challenge, Challenges, Database, Email, FirstBloods, Leaderboard, Scoreboard, Team,
-                TeamMeta, TeamStandings,
+                TeamMeta, TeamStandings, Ticket,
             },
         },
         division::Division,
@@ -184,7 +185,36 @@ impl Database for Postgres {
         todo!()
     }
 
-    async fn create_ticket(&self, _user_id: i64, _challenge_id: i64) -> Result<i64> {
+    async fn get_next_ticket_number(&self) -> Result<u64> {
+        todo!()
+    }
+
+    async fn create_ticket(
+        &self,
+        _ticket_number: u64,
+        _user_id: i64,
+        _challenge_id: i64,
+        _discord_channel_id: NonZeroU64,
+    ) -> Result<()> {
+        todo!()
+    }
+
+    async fn get_ticket_by_ticket_number(&self, _ticket_number: u64) -> Result<Ticket> {
+        todo!()
+    }
+
+    async fn get_ticket_by_discord_channel_id(
+        &self,
+        _discord_channel_id: NonZeroU64,
+    ) -> Result<Ticket> {
+        todo!()
+    }
+
+    async fn close_ticket(&self, _ticket_number: u64, _time: DateTime<Utc>) -> Result<()> {
+        todo!()
+    }
+
+    async fn reopen_ticket(&self, _ticket_number: u64) -> Result<()> {
         todo!()
     }
 

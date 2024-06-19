@@ -14,6 +14,6 @@ pub struct RouterStateInner {
     pub localizer: &'static Localizations,
     pub settings: &'static RwLock<Settings>,
     pub ip_extractor: IpExtractorFn,
-    pub mailer: Option<Mailer>,
+    pub mailer: Option<&'static Mailer>,
     pub divisions: &'static Vec<Division>,
 }

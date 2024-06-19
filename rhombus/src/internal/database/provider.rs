@@ -176,9 +176,20 @@ pub struct TeamStandings {
     pub standings: BTreeMap<i64, TeamStandingEntry>,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct Ticket {
+    pub ticket_number: u64,
+    pub user_id: i64,
+    pub challenge_id: i64,
+    pub closed_at: Option<DateTime<Utc>>,
+    pub discord_channel_id: NonZeroU64,
+    pub discord_last_message_id: Option<NonZeroU64>,
+}
+
 #[async_trait]
 pub trait Database {
     async fn migrate(&self) -> Result<()>;
+    async fn get_challenges(&self) -> Result<Challenges>;
     async fn upsert_user(
         &self,
         name: &str,
@@ -194,7 +205,6 @@ pub trait Database {
         user_id: Option<i64>,
         requests: u64,
     ) -> Result<()>;
-    async fn get_challenges(&self) -> Result<Challenges>;
     async fn get_team_meta_from_invite_token(&self, invite_token: &str)
         -> Result<Option<TeamMeta>>;
     async fn get_team_from_id(&self, team_id: i64) -> Result<Team>;
@@ -224,7 +234,21 @@ pub trait Database {
     ) -> Result<()>;
     async fn get_writeups_from_user_id(&self, user_id: i64) -> Result<Writeups>;
     async fn delete_writeup(&self, challenge_id: i64, user_id: i64, team_id: i64) -> Result<()>;
-    async fn create_ticket(&self, user_id: i64, challenge_id: i64) -> Result<i64>;
+    async fn get_next_ticket_number(&self) -> Result<u64>;
+    async fn create_ticket(
+        &self,
+        ticket_number: u64,
+        user_id: i64,
+        challenge_id: i64,
+        discord_channel_id: NonZeroU64,
+    ) -> Result<()>;
+    async fn get_ticket_by_ticket_number(&self, ticket_number: u64) -> Result<Ticket>;
+    async fn get_ticket_by_discord_channel_id(
+        &self,
+        discord_channel_id: NonZeroU64,
+    ) -> Result<Ticket>;
+    async fn close_ticket(&self, ticket_number: u64, time: DateTime<Utc>) -> Result<()>;
+    async fn reopen_ticket(&self, ticket_number: u64) -> Result<()>;
     async fn save_settings(&self, settings: &Settings) -> Result<()>;
     async fn load_settings(&self, settings: &mut Settings) -> Result<()>;
     async fn get_scoreboard(&self, division_id: i64) -> Result<Scoreboard>;

@@ -206,7 +206,7 @@ pub async fn route_account_add_email(
             .unwrap();
     }
 
-    if let Some(ref mailer) = state.mailer {
+    if let Some(mailer) = state.mailer {
         let code = state
             .db
             .create_email_verification_callback_code(user.id, &form.email)

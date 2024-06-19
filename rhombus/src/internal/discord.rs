@@ -1,23 +1,30 @@
-use std::{collections::BTreeMap, num::NonZeroU64, sync::Arc};
+use std::{
+    collections::{btree_map, BTreeMap},
+    num::NonZeroU64,
+    sync::Arc,
+};
 
+use chrono::{DateTime, Utc};
 use rand::{prelude::SliceRandom, thread_rng, Rng};
 use serde_json::json;
 use serenity::{
     all::{
         ButtonStyle, ChannelId, ChannelType, CreateActionRow, CreateButton, CreateEmbed,
-        CreateMessage, CreateThread, GatewayIntents, Http, UserId,
+        CreateMessage, CreateThread, EditMessage, EditThread, GatewayIntents, GetMessages, Http,
+        UserId,
     },
     Client,
 };
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
 use crate::{
     errors::RhombusError,
     internal::{
         auth::User,
         database::provider::{
-            Author, Category, Challenge, ChallengeDivision, Connection, FirstBloods, Team,
+            Author, Category, Challenge, ChallengeDivision, Connection, FirstBloods, Team, Ticket,
         },
+        email::mailer::Mailer,
         settings::Settings,
     },
     Result,
@@ -32,6 +39,7 @@ pub struct Bot {
 pub struct Data {
     settings: &'static RwLock<Settings>,
     db: Connection,
+    mailer: Option<&'static Mailer>,
 }
 pub type DiscordError = Box<dyn std::error::Error + Send + Sync>;
 pub type Context<'a> = poise::Context<'a, Data, DiscordError>;
@@ -284,19 +292,258 @@ Default Ticket Template
     Ok(())
 }
 
+lazy_static::lazy_static! {
+    pub static ref DIGEST_DEBOUNCER: Mutex<BTreeMap<ChannelId, i64>> = Default::default();
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DigestAuthor {
+    pub name: String,
+    pub image_url: String,
+    pub discord_id: Option<UserId>,
+    pub rhombus_id: Option<i64>,
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DigestMessage<'a> {
+    pub timestamp: DateTime<Utc>,
+    pub author: &'a DigestAuthor,
+    pub content: String,
+    pub edited_timestamp: Option<DateTime<Utc>>,
+}
+
+pub async fn digest_channel(
+    ctx: &serenity::all::Context,
+    data: &Data,
+    channel: ChannelId,
+    ticket: &Ticket,
+) -> Result<()> {
+    // dont send an email digest if we don't have a mailer
+    let mailer = if let Some(mailer) = data.mailer {
+        mailer
+    } else {
+        return Ok(());
+    };
+
+    // dont send a digest if the user who made the ticket has linked their discord
+    let ticket_creator_user = data.db.get_user_from_id(ticket.user_id).await?;
+    if ticket_creator_user.discord_id.is_some() {
+        return Ok(());
+    }
+
+    let now = chrono::Utc::now().timestamp();
+    {
+        _ = DIGEST_DEBOUNCER.lock().await.insert(channel, now);
+    }
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    if let Some(timestamp) = DIGEST_DEBOUNCER.lock().await.remove(&channel) {
+        if timestamp != now {
+            return Ok(());
+        }
+    }
+
+    let messages = channel.messages(ctx, GetMessages::new().limit(100)).await?;
+
+    let rhombus_user_id = data.settings.read().await.discord.client_id;
+
+    let mut authors = BTreeMap::new();
+    for message in &messages {
+        match authors.entry(message.author.id) {
+            btree_map::Entry::Occupied(_) => {}
+            btree_map::Entry::Vacant(entry) => {
+                // Rhombus is acting as the intermediary for the email-only user,
+                // so messages sent by Rhombus should be attributed to the user
+                // who created the thread
+                if rhombus_user_id == message.author.id.into() {
+                    entry.insert(DigestAuthor {
+                        name: ticket_creator_user.name.clone(),
+                        image_url: ticket_creator_user.avatar.clone(),
+                        discord_id: ticket_creator_user.discord_id.map(|id| id.into()),
+                        rhombus_id: Some(ticket_creator_user.id),
+                    });
+                } else if let Ok(user) = data
+                    .db
+                    .get_user_from_discord_id(message.author.id.into())
+                    .await
+                {
+                    entry.insert(DigestAuthor {
+                        name: user.name.clone(),
+                        image_url: user.avatar.clone(),
+                        discord_id: user.discord_id.map(|id| id.into()),
+                        rhombus_id: Some(user.id),
+                    });
+                } else {
+                    entry.insert(DigestAuthor {
+                        name: message.author.name.clone(),
+                        image_url: message.author.avatar_url().unwrap_or_default(),
+                        discord_id: Some(message.author.id),
+                        rhombus_id: None,
+                    });
+                }
+            }
+        }
+    }
+
+    let mut messages = messages
+        .iter()
+        .filter(|message| {
+            matches!(
+                message.kind,
+                serenity::all::MessageType::Regular | serenity::all::MessageType::InlineReply
+            )
+        })
+        .map(|message| DigestMessage {
+            author: authors.get(&message.author.id).unwrap(),
+            content: message.content.clone(),
+            edited_timestamp: message.edited_timestamp.map(|t| t.to_utc()),
+            timestamp: message.timestamp.to_utc(),
+        })
+        .collect::<Vec<_>>();
+    messages.sort();
+
+    mailer.send_digest(ticket, &messages).await?;
+
+    Ok(())
+}
+
+async fn event_handler(
+    ctx: &serenity::all::Context,
+    event: &serenity::all::FullEvent,
+    _framework: poise::FrameworkContext<'_, Data, Box<dyn std::error::Error + Send + Sync>>,
+    data: &Data,
+) -> std::result::Result<(), DiscordError> {
+    let support_channel_id = { data.settings.read().await.discord.support_channel_id };
+    if let Some(support_channel_id) = support_channel_id {
+        let support_channel: ChannelId = support_channel_id.into();
+        match event {
+            serenity::all::FullEvent::Message { new_message } => {
+                if let Some(channel) = new_message.channel(ctx).await?.guild() {
+                    if let Some(parent_id) = channel.parent_id {
+                        if parent_id == support_channel {
+                            let ticket = data
+                                .db
+                                .get_ticket_by_discord_channel_id(channel.id.into())
+                                .await?;
+                            digest_channel(ctx, data, channel.id, &ticket).await?;
+                        }
+                    }
+                }
+            }
+            serenity::all::FullEvent::MessageUpdate {
+                old_if_available: _,
+                new: _,
+                event,
+            } => {
+                if let Some(channel) = event.channel_id.to_channel(ctx).await?.guild() {
+                    if let Some(parent_id) = channel.parent_id {
+                        if parent_id == support_channel {
+                            let ticket = data
+                                .db
+                                .get_ticket_by_discord_channel_id(channel.id.into())
+                                .await?;
+                            digest_channel(ctx, data, channel.id, &ticket).await?;
+                        }
+                    }
+                }
+            }
+            serenity::all::FullEvent::InteractionCreate { interaction } => {
+                if let Some(interaction) = interaction.as_message_component() {
+                    if interaction.data.custom_id.starts_with("close-ticket-") {
+                        let ticket_number = interaction.data.custom_id["close-ticket-".len()..]
+                            .parse::<u64>()
+                            .unwrap();
+
+                        let now = chrono::Utc::now();
+                        data.db.close_ticket(ticket_number, now).await?;
+
+                        interaction
+                            .message
+                            .clone()
+                            .edit(
+                                ctx,
+                                EditMessage::new().components(vec![CreateActionRow::Buttons(
+                                    vec![CreateButton::new(format!(
+                                        "reopen-ticket-{}",
+                                        ticket_number
+                                    ))
+                                    .style(ButtonStyle::Primary)
+                                    .label("Reopen Ticket")
+                                    .emoji('🔓')],
+                                )]),
+                            )
+                            .await?;
+
+                        interaction.defer(ctx).await?;
+
+                        let thread = interaction.channel_id;
+                        thread
+                            .edit_thread(ctx, EditThread::new().archived(true))
+                            .await?;
+                    }
+
+                    if interaction.data.custom_id.starts_with("reopen-ticket-") {
+                        let ticket_number = interaction.data.custom_id["reopen-ticket-".len()..]
+                            .parse::<u64>()
+                            .unwrap();
+
+                        data.db.reopen_ticket(ticket_number).await?;
+
+                        interaction
+                            .message
+                            .clone()
+                            .edit(
+                                ctx,
+                                EditMessage::new().components(vec![CreateActionRow::Buttons(
+                                    vec![CreateButton::new(format!(
+                                        "close-ticket-{}",
+                                        ticket_number
+                                    ))
+                                    .style(ButtonStyle::Primary)
+                                    .label("Close Ticket")
+                                    .emoji('🔒')],
+                                )]),
+                            )
+                            .await?;
+
+                        interaction.defer(ctx).await?;
+
+                        let thread = interaction.channel_id;
+                        thread
+                            .edit_thread(ctx, EditThread::new().archived(false))
+                            .await?;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 impl Bot {
-    pub async fn new(settings: &'static RwLock<Settings>, db: Connection) -> Self {
+    pub async fn new(
+        settings: &'static RwLock<Settings>,
+        db: Connection,
+        mailer: Option<&'static Mailer>,
+    ) -> Self {
         let bot_token = { settings.read().await.discord.bot_token.clone() };
 
         let framework = poise::Framework::builder()
             .options(poise::FrameworkOptions {
                 commands: vec![admin(), whois()],
+                event_handler: |ctx, event, framework, data| {
+                    Box::pin(event_handler(ctx, event, framework, data))
+                },
                 ..Default::default()
             })
             .setup(move |ctx, _ready, framework| {
                 Box::pin(async move {
                     poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                    Ok(Data { settings, db })
+                    Ok(Data {
+                        settings,
+                        db,
+                        mailer,
+                    })
                 })
             })
             .build();
@@ -396,7 +643,7 @@ impl Bot {
             return Ok(());
         }
 
-        let ticket_number = self.db.create_ticket(user.id, challenge.id).await?;
+        let ticket_number = self.db.get_next_ticket_number().await?;
 
         let thread = ChannelId::from(support_channel_id.unwrap())
             .create_thread(
@@ -407,6 +654,10 @@ impl Bot {
                 ))
                 .kind(ChannelType::PrivateThread),
             )
+            .await?;
+
+        self.db
+            .create_ticket(ticket_number, user.id, challenge.id, thread.id.into())
             .await?;
 
         thread
@@ -425,7 +676,10 @@ impl Bot {
                                         discord_id, location_url, user.id
                                     )
                                 } else {
-                                    format!("[:link:]({}/user/{})", location_url, user.id)
+                                    format!(
+                                        "{} [:link:]({}/user/{})",
+                                        user.name, location_url, user.id
+                                    )
                                 },
                                 true,
                             )
@@ -521,6 +775,7 @@ impl Bot {
             "🃏",
             "🍍",
             "🍹",
+            "🚩",
             "🗡",
             "🌪",
             ":crossed_swords:",

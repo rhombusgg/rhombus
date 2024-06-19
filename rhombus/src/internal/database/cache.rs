@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, net::IpAddr, num::NonZeroU64, time::Duration};
 
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use tokio::sync::RwLock;
 
@@ -9,7 +10,7 @@ use crate::{
         auth::User,
         database::provider::{
             Challenge, Challenges, Connection, Database, Email, FirstBloods, Leaderboard,
-            Scoreboard, Team, TeamMeta, TeamStandings, Writeup,
+            Scoreboard, Team, TeamMeta, TeamStandings, Ticket, Writeup,
         },
         division::Division,
         settings::Settings,
@@ -195,8 +196,41 @@ impl Database for DbCache {
         result
     }
 
-    async fn create_ticket(&self, user_id: i64, challenge_id: i64) -> Result<i64> {
-        self.inner.create_ticket(user_id, challenge_id).await
+    async fn get_next_ticket_number(&self) -> Result<u64> {
+        self.inner.get_next_ticket_number().await
+    }
+
+    async fn create_ticket(
+        &self,
+        ticket_number: u64,
+        user_id: i64,
+        challenge_id: i64,
+        discord_channel_id: NonZeroU64,
+    ) -> Result<()> {
+        self.inner
+            .create_ticket(ticket_number, user_id, challenge_id, discord_channel_id)
+            .await
+    }
+
+    async fn get_ticket_by_ticket_number(&self, ticket_number: u64) -> Result<Ticket> {
+        self.inner.get_ticket_by_ticket_number(ticket_number).await
+    }
+
+    async fn get_ticket_by_discord_channel_id(
+        &self,
+        discord_channel_id: NonZeroU64,
+    ) -> Result<Ticket> {
+        self.inner
+            .get_ticket_by_discord_channel_id(discord_channel_id)
+            .await
+    }
+
+    async fn close_ticket(&self, ticket_number: u64, time: DateTime<Utc>) -> Result<()> {
+        self.inner.close_ticket(ticket_number, time).await
+    }
+
+    async fn reopen_ticket(&self, ticket_number: u64) -> Result<()> {
+        self.inner.reopen_ticket(ticket_number).await
     }
 
     async fn save_settings(&self, settings: &Settings) -> Result<()> {

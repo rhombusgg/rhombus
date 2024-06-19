@@ -30,6 +30,8 @@
 - [x] Team pages
 - [ ] Homepage/countdown (plugin integration)
 - [x] Divisions
+  - [ ] Link to discord role
+  - [ ] First blood formatting when there is only 1 division
 - [x] First bloods (per division)
   - [ ] webhooks
 - [x] Scoreboard

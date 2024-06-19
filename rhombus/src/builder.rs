@@ -13,7 +13,6 @@ use axum::{
     routing::{delete, get, post},
     Router,
 };
-use minijinja::Environment;
 use tokio::sync::RwLock;
 use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::compression::CompressionLayer;
@@ -640,29 +639,28 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             })
         });
 
-        let settings = Box::leak(Box::new(RwLock::new(settings)));
+        let settings: &'static _ = Box::leak(Box::new(RwLock::new(settings)));
 
-        let bot = Bot::new(settings, db).await;
-
-        let localizer = Box::leak(Box::new(localizer));
-        let l = &*localizer;
+        let localizer: &'static _ = Box::leak(Box::new(localizer));
         jinja.add_function(
             "t",
             move |msg_id: &str, kwargs: minijinja::value::Kwargs, state: &minijinja::State| {
-                jinja_translate(l, msg_id, kwargs, state)
+                jinja_translate(localizer, msg_id, kwargs, state)
             },
         );
 
-        let jinja: &Environment = Box::leak(Box::new(jinja));
+        let jinja: &'static _ = Box::leak(Box::new(jinja));
 
-        let mailer = if settings.read().await.email.is_some() {
+        let mailer: Option<&'static _> = if settings.read().await.email.is_some() {
             let mail_provider = Box::leak(Box::new(SmtpProvider::new(settings).await.unwrap()));
 
-            let mailer = Mailer::new(mail_provider, jinja, settings);
+            let mailer = Box::leak(Box::new(Mailer::new(mail_provider, jinja, settings, db)));
             Some(mailer)
         } else {
             None
         };
+
+        let bot = Bot::new(settings, db, mailer).await;
 
         db.insert_divisions(&divisions).await?;
 

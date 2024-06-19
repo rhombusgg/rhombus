@@ -128,13 +128,21 @@ CREATE TABLE IF NOT EXISTS rhombus_team_division (
 );
 
 CREATE TABLE IF NOT EXISTS rhombus_ticket (
-    id INTEGER PRIMARY KEY NOT NULL,
     ticket_number INTEGER NOT NULL UNIQUE,
     user_id INTEGER NOT NULL,
     challenge_id INTEGER NOT NULL,
+    closed_at INTEGER,
+    discord_channel_id INTEGER NOT NULL UNIQUE,
+    discord_last_message_id INTEGER,
+    PRIMARY KEY (ticket_number),
     FOREIGN KEY (user_id) REFERENCES rhombus_user(id),
     FOREIGN KEY (challenge_id) REFERENCES rhombus_challenge(id)
 );
+
+CREATE TABLE IF NOT EXISTS rhombus_ticket_number_counter (
+    ticket_number INTEGER NOT NULL
+);
+INSERT OR IGNORE INTO rhombus_ticket_number_counter (ticket_number) VALUES (0);
 
 CREATE TABLE IF NOT EXISTS rhombus_config (
     id INTEGER PRIMARY KEY NOT NULL,

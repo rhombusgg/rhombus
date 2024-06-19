@@ -24,7 +24,7 @@ use crate::{
                 ChallengeDivisionPoints, ChallengeSolve, Challenges, Database, Email, FirstBloods,
                 Leaderboard, LeaderboardEntry, Scoreboard, ScoreboardSeriesPoint, ScoreboardTeam,
                 Team, TeamInner, TeamMeta, TeamMetaInner, TeamStandingEntry, TeamStandings,
-                TeamUser, Writeup,
+                TeamUser, Ticket, Writeup,
             },
         },
         division::Division,
@@ -840,25 +840,157 @@ impl Database for LibSQL {
         Ok(())
     }
 
-    async fn create_ticket(&self, user_id: i64, challenge_id: i64) -> Result<i64> {
+    async fn get_next_ticket_number(&self) -> Result<u64> {
         let ticket_number = self
             .db
             .query(
                 "
-                INSERT INTO rhombus_ticket (ticket_number, user_id, challenge_id)
-                SELECT COUNT(*) + 1, ?1, ?2 FROM rhombus_ticket
+                UPDATE rhombus_ticket_number_counter
+                SET ticket_number = ticket_number + 1
+                WHERE rowid = 1
                 RETURNING ticket_number
             ",
-                [user_id, challenge_id],
+                (),
             )
             .await?
             .next()
             .await?
             .unwrap()
-            .get::<i64>(0)
+            .get::<u64>(0)
             .unwrap();
 
         Ok(ticket_number)
+    }
+
+    async fn create_ticket(
+        &self,
+        ticket_number: u64,
+        user_id: i64,
+        challenge_id: i64,
+        discord_channel_id: NonZeroU64,
+    ) -> Result<()> {
+        self
+            .db
+            .execute(
+                "
+                INSERT INTO rhombus_ticket (ticket_number, user_id, challenge_id, discord_channel_id) VALUES (?1, ?2, ?3, ?4)
+            ",
+                params!(ticket_number, user_id, challenge_id, discord_channel_id.get()),
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    async fn get_ticket_by_ticket_number(&self, ticket_number: u64) -> Result<Ticket> {
+        #[derive(Debug, Deserialize)]
+        struct DbTicket {
+            pub ticket_number: u64,
+            pub user_id: i64,
+            pub challenge_id: i64,
+            pub closed_at: Option<i64>,
+            pub discord_channel_id: NonZeroU64,
+            pub discord_last_message_id: Option<NonZeroU64>,
+        }
+
+        let ticket_row = self
+            .db
+            .query(
+                "
+                SELECT user_id, challenge_id, closed_at, discord_channel_id, discord_last_message_id
+                FROM rhombus_ticket
+                WHERE ticket_number = ?1
+            ",
+                [ticket_number],
+            )
+            .await?
+            .next()
+            .await?;
+
+        let db_ticket = de::from_row::<DbTicket>(&ticket_row.unwrap()).unwrap();
+
+        Ok(Ticket {
+            ticket_number: db_ticket.ticket_number,
+            user_id: db_ticket.user_id,
+            challenge_id: db_ticket.challenge_id,
+            closed_at: db_ticket
+                .closed_at
+                .map(|ts| DateTime::<Utc>::from_timestamp(ts, 0).unwrap()),
+            discord_channel_id: db_ticket.discord_channel_id,
+            discord_last_message_id: db_ticket.discord_last_message_id,
+        })
+    }
+
+    async fn get_ticket_by_discord_channel_id(
+        &self,
+        discord_channel_id: NonZeroU64,
+    ) -> Result<Ticket> {
+        #[derive(Debug, Deserialize)]
+        struct DbTicket {
+            pub ticket_number: u64,
+            pub user_id: i64,
+            pub challenge_id: i64,
+            pub closed_at: Option<i64>,
+            pub discord_channel_id: NonZeroU64,
+            pub discord_last_message_id: Option<NonZeroU64>,
+        }
+
+        let ticket_row = self
+            .db
+            .query(
+                "
+                SELECT ticket_number, user_id, challenge_id, closed_at, discord_channel_id, discord_last_message_id
+                FROM rhombus_ticket
+                WHERE discord_channel_id = ?1
+            ",
+                [discord_channel_id.get()],
+            )
+            .await?
+            .next()
+            .await?;
+
+        let db_ticket = de::from_row::<DbTicket>(&ticket_row.unwrap()).unwrap();
+
+        Ok(Ticket {
+            ticket_number: db_ticket.ticket_number,
+            user_id: db_ticket.user_id,
+            challenge_id: db_ticket.challenge_id,
+            closed_at: db_ticket
+                .closed_at
+                .map(|ts| DateTime::<Utc>::from_timestamp(ts, 0).unwrap()),
+            discord_channel_id: db_ticket.discord_channel_id,
+            discord_last_message_id: db_ticket.discord_last_message_id,
+        })
+    }
+
+    async fn close_ticket(&self, ticket_number: u64, time: DateTime<Utc>) -> Result<()> {
+        self.db
+            .execute(
+                "
+                UPDATE rhombus_ticket
+                SET closed_at = ?1
+                WHERE ticket_number = ?2
+            ",
+                params!(time.timestamp(), ticket_number),
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    async fn reopen_ticket(&self, ticket_number: u64) -> Result<()> {
+        self.db
+            .execute(
+                "
+                UPDATE rhombus_ticket
+                SET closed_at = NULL
+                WHERE ticket_number = ?1
+            ",
+                [ticket_number],
+            )
+            .await?;
+
+        Ok(())
     }
 
     async fn save_settings(&self, settings: &Settings) -> Result<()> {
