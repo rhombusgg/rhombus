@@ -34,7 +34,15 @@ impl SmtpProvider {
 
 #[async_trait]
 impl EmailProvider for SmtpProvider {
-    async fn send_email(&self, to: &str, subject: &str, plaintext: &str, html: &str) -> Result<()> {
+    async fn send_email(
+        &self,
+        to: &str,
+        subject: &str,
+        plaintext: &str,
+        html: &str,
+        in_reply_to: Option<&str>,
+        references: &[String],
+    ) -> Result<String> {
         let from = {
             self.settings
                 .read()
@@ -50,13 +58,29 @@ impl EmailProvider for SmtpProvider {
             .from(from.parse()?)
             .to(to.parse()?)
             .subject(subject)
-            .multipart(MultiPart::alternative_plain_html(
-                plaintext.to_owned(),
-                html.to_owned(),
-            ))?;
+            .message_id(None);
+
+        let message = if let Some(in_reply_to) = in_reply_to {
+            message.in_reply_to(in_reply_to.to_owned())
+        } else {
+            message
+        };
+
+        let message = if !references.is_empty() {
+            message.references(references.join(" "))
+        } else {
+            message
+        };
+
+        let message = message.multipart(MultiPart::alternative_plain_html(
+            plaintext.to_owned(),
+            html.to_owned(),
+        ))?;
+
+        let message_id = message.headers().get_raw("Message-ID").unwrap().to_owned();
 
         _ = self.transport.send(message).await?;
 
-        Ok(())
+        Ok(message_id)
     }
 }

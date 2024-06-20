@@ -183,7 +183,8 @@ pub struct Ticket {
     pub challenge_id: i64,
     pub closed_at: Option<DateTime<Utc>>,
     pub discord_channel_id: NonZeroU64,
-    pub discord_last_message_id: Option<NonZeroU64>,
+    pub email_references: Vec<String>,
+    pub email_in_reply_to: Option<String>,
 }
 
 #[async_trait]
@@ -249,6 +250,12 @@ pub trait Database {
     ) -> Result<Ticket>;
     async fn close_ticket(&self, ticket_number: u64, time: DateTime<Utc>) -> Result<()>;
     async fn reopen_ticket(&self, ticket_number: u64) -> Result<()>;
+    async fn add_email_message_id_to_ticket(
+        &self,
+        ticket_number: u64,
+        message_id: &str,
+        user_sent: bool,
+    ) -> Result<()>;
     async fn save_settings(&self, settings: &Settings) -> Result<()>;
     async fn load_settings(&self, settings: &mut Settings) -> Result<()>;
     async fn get_scoreboard(&self, division_id: i64) -> Result<Scoreboard>;

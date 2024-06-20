@@ -80,8 +80,12 @@ impl Mailer {
                 &format!("{} Email Verification", title),
                 &plaintext,
                 &html,
+                None,
+                &[],
             )
-            .await
+            .await?;
+
+        Ok(())
     }
 
     pub async fn send_email_signin(&self, ip: Option<&str>, to: &str, code: &str) -> Result<()> {
@@ -118,8 +122,17 @@ impl Mailer {
             .unwrap();
 
         self.inner
-            .send_email(to, &format!("{} Sign In", title), &plaintext, &html)
-            .await
+            .send_email(
+                to,
+                &format!("{} Sign In", title),
+                &plaintext,
+                &html,
+                None,
+                &[],
+            )
+            .await?;
+
+        Ok(())
     }
 
     pub async fn send_digest(&self, ticket: &Ticket, messages: &[DigestMessage<'_>]) -> Result<()> {
@@ -159,23 +172,42 @@ impl Mailer {
         }
         let irc = irc.trim();
 
-        let context = context! {
-            irc,
-        };
-
         let plaintext = self
             .jinja
             .get_template("emails/ticket-digest.txt")
             .unwrap()
-            .render(&context)
+            .render(context! {
+                irc,
+            })
             .unwrap();
-
-        println!("{:#?}", messages);
 
         let subject = format!("Ticket #{} Digest", ticket.ticket_number);
 
-        let html = &plaintext;
+        let html = self
+            .jinja
+            .get_template("emails/ticket-digest.html")
+            .unwrap()
+            .render(context! {
+                messages,
+            })
+            .unwrap();
 
-        self.inner.send_email(to, &subject, &plaintext, html).await
+        let message_id = self
+            .inner
+            .send_email(
+                to,
+                &subject,
+                &plaintext,
+                &html,
+                ticket.email_in_reply_to.as_deref(),
+                &ticket.email_references,
+            )
+            .await?;
+
+        self.db
+            .add_email_message_id_to_ticket(ticket.ticket_number, &message_id, false)
+            .await?;
+
+        Ok(())
     }
 }

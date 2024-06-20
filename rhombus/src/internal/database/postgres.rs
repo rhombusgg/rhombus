@@ -218,6 +218,15 @@ impl Database for Postgres {
         todo!()
     }
 
+    async fn add_email_message_id_to_ticket(
+        &self,
+        _ticket_number: u64,
+        _message_id: &str,
+        _user_sent: bool,
+    ) -> Result<()> {
+        todo!()
+    }
+
     async fn load_settings(&self, _settings: &mut Settings) -> Result<()> {
         todo!()
     }

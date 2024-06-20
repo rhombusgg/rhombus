@@ -1,0 +1,9 @@
+<p>Digest:</p>
+
+<ul>
+  {% for message in messages %}
+    <li>&lt;{{ message.author.name }}&gt; {{ message.content }}</li>
+  {% endfor %}
+</ul>
+
+<p>Reply to this email to respond</p>

@@ -890,14 +890,14 @@ impl Database for LibSQL {
             pub challenge_id: i64,
             pub closed_at: Option<i64>,
             pub discord_channel_id: NonZeroU64,
-            pub discord_last_message_id: Option<NonZeroU64>,
         }
 
-        let ticket_row = self
-            .db
+        let tx = self.db.transaction().await?;
+
+        let ticket_row = tx
             .query(
                 "
-                SELECT user_id, challenge_id, closed_at, discord_channel_id, discord_last_message_id
+                SELECT user_id, challenge_id, closed_at, discord_channel_id
                 FROM rhombus_ticket
                 WHERE ticket_number = ?1
             ",
@@ -909,6 +909,29 @@ impl Database for LibSQL {
 
         let db_ticket = de::from_row::<DbTicket>(&ticket_row.unwrap()).unwrap();
 
+        #[derive(Debug, Deserialize)]
+        struct DbTicketEmailMessageIdReference {
+            pub message_id: String,
+            pub user_sent: bool,
+        }
+
+        let email_references = tx
+            .query(
+                "
+                SELECT message_id, user_sent
+                FROM rhombus_ticket_email_message_id_reference
+                WHERE ticket_number = ?1
+            ",
+                [ticket_number],
+            )
+            .await?
+            .into_stream()
+            .map(|row| de::from_row::<DbTicketEmailMessageIdReference>(&row.unwrap()).unwrap())
+            .collect::<Vec<_>>()
+            .await;
+
+        tx.commit().await?;
+
         Ok(Ticket {
             ticket_number: db_ticket.ticket_number,
             user_id: db_ticket.user_id,
@@ -917,7 +940,11 @@ impl Database for LibSQL {
                 .closed_at
                 .map(|ts| DateTime::<Utc>::from_timestamp(ts, 0).unwrap()),
             discord_channel_id: db_ticket.discord_channel_id,
-            discord_last_message_id: db_ticket.discord_last_message_id,
+            email_in_reply_to: email_references
+                .iter()
+                .find(|r| !r.user_sent)
+                .map(|r| r.message_id.clone()),
+            email_references: email_references.into_iter().map(|r| r.message_id).collect(),
         })
     }
 
@@ -932,14 +959,15 @@ impl Database for LibSQL {
             pub challenge_id: i64,
             pub closed_at: Option<i64>,
             pub discord_channel_id: NonZeroU64,
-            pub discord_last_message_id: Option<NonZeroU64>,
         }
+
+        let tx = self.db.transaction().await?;
 
         let ticket_row = self
             .db
             .query(
                 "
-                SELECT ticket_number, user_id, challenge_id, closed_at, discord_channel_id, discord_last_message_id
+                SELECT ticket_number, user_id, challenge_id, closed_at, discord_channel_id
                 FROM rhombus_ticket
                 WHERE discord_channel_id = ?1
             ",
@@ -951,6 +979,29 @@ impl Database for LibSQL {
 
         let db_ticket = de::from_row::<DbTicket>(&ticket_row.unwrap()).unwrap();
 
+        #[derive(Debug, Deserialize)]
+        struct DbTicketEmailMessageIdReference {
+            pub message_id: String,
+            pub user_sent: bool,
+        }
+
+        let email_references = tx
+            .query(
+                "
+                SELECT message_id, user_sent
+                FROM rhombus_ticket_email_message_id_reference
+                WHERE ticket_number = ?1
+            ",
+                [db_ticket.ticket_number],
+            )
+            .await?
+            .into_stream()
+            .map(|row| de::from_row::<DbTicketEmailMessageIdReference>(&row.unwrap()).unwrap())
+            .collect::<Vec<_>>()
+            .await;
+
+        tx.commit().await?;
+
         Ok(Ticket {
             ticket_number: db_ticket.ticket_number,
             user_id: db_ticket.user_id,
@@ -959,7 +1010,11 @@ impl Database for LibSQL {
                 .closed_at
                 .map(|ts| DateTime::<Utc>::from_timestamp(ts, 0).unwrap()),
             discord_channel_id: db_ticket.discord_channel_id,
-            discord_last_message_id: db_ticket.discord_last_message_id,
+            email_in_reply_to: email_references
+                .iter()
+                .find(|r| !r.user_sent)
+                .map(|r| r.message_id.clone()),
+            email_references: email_references.into_iter().map(|r| r.message_id).collect(),
         })
     }
 
@@ -987,6 +1042,24 @@ impl Database for LibSQL {
                 WHERE ticket_number = ?1
             ",
                 [ticket_number],
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    async fn add_email_message_id_to_ticket(
+        &self,
+        ticket_number: u64,
+        message_id: &str,
+        user_sent: bool,
+    ) -> Result<()> {
+        self.db
+            .execute(
+                "
+                INSERT INTO rhombus_ticket_email_message_id_reference (ticket_number, message_id, user_sent) VALUES (?1, ?2, ?3)
+            ",
+                params!(ticket_number, message_id, user_sent),
             )
             .await?;
 

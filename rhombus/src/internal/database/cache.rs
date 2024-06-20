@@ -233,6 +233,17 @@ impl Database for DbCache {
         self.inner.reopen_ticket(ticket_number).await
     }
 
+    async fn add_email_message_id_to_ticket(
+        &self,
+        ticket_number: u64,
+        message_id: &str,
+        user_sent: bool,
+    ) -> Result<()> {
+        self.inner
+            .add_email_message_id_to_ticket(ticket_number, message_id, user_sent)
+            .await
+    }
+
     async fn save_settings(&self, settings: &Settings) -> Result<()> {
         self.inner.save_settings(settings).await
     }

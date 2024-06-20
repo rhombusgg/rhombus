@@ -139,6 +139,14 @@ CREATE TABLE IF NOT EXISTS rhombus_ticket (
     FOREIGN KEY (challenge_id) REFERENCES rhombus_challenge(id)
 );
 
+CREATE TABLE IF NOT EXISTS rhombus_ticket_email_message_id_reference (
+    message_id TEXT NOT NULL,
+    ticket_number INTEGER NOT NULL,
+    user_sent BOOLEAN NOT NULL DEFAULT(FALSE),
+    PRIMARY KEY (message_id),
+    FOREIGN KEY (ticket_number) REFERENCES rhombus_ticket(ticket_number)
+);
+
 CREATE TABLE IF NOT EXISTS rhombus_ticket_number_counter (
     ticket_number INTEGER NOT NULL
 );

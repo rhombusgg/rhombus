@@ -6,6 +6,7 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use rand::{prelude::SliceRandom, thread_rng, Rng};
+use serde::Serialize;
 use serde_json::json;
 use serenity::{
     all::{
@@ -296,7 +297,7 @@ lazy_static::lazy_static! {
     pub static ref DIGEST_DEBOUNCER: Mutex<BTreeMap<ChannelId, i64>> = Default::default();
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DigestAuthor {
     pub name: String,
     pub image_url: String,
@@ -304,7 +305,7 @@ pub struct DigestAuthor {
     pub rhombus_id: Option<i64>,
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DigestMessage<'a> {
     pub timestamp: DateTime<Utc>,
     pub author: &'a DigestAuthor,
