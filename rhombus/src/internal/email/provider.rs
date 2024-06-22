@@ -2,7 +2,7 @@ use crate::Result;
 use axum::async_trait;
 
 #[async_trait]
-pub trait EmailProvider {
+pub trait OutboundEmailProvider {
     async fn send_email(
         &self,
         to: &str,
@@ -12,4 +12,9 @@ pub trait EmailProvider {
         in_reply_to: Option<&str>,
         references: &[String],
     ) -> Result<String>;
+}
+
+#[allow(async_fn_in_trait)]
+pub trait InboundEmail {
+    async fn receive_emails(&self) -> Result<()>;
 }

@@ -227,6 +227,10 @@ impl Database for Postgres {
         todo!()
     }
 
+    async fn get_ticket_number_by_message_id(&self, _message_id: &str) -> Result<u64> {
+        todo!()
+    }
+
     async fn load_settings(&self, _settings: &mut Settings) -> Result<()> {
         todo!()
     }

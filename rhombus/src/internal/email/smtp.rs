@@ -3,7 +3,7 @@ use lettre::{message::MultiPart, AsyncSmtpTransport, AsyncTransport, Message, To
 use tokio::sync::RwLock;
 
 use crate::{
-    internal::{email::provider::EmailProvider, settings::Settings},
+    internal::{email::provider::OutboundEmailProvider, settings::Settings},
     Result,
 };
 
@@ -21,7 +21,9 @@ impl SmtpProvider {
                 .email
                 .as_ref()
                 .unwrap()
-                .connection_url
+                .smtp_connection_url
+                .as_ref()
+                .unwrap()
                 .clone()
         };
         let transport = AsyncSmtpTransport::<Tokio1Executor>::from_url(&connection_url)?.build();
@@ -33,7 +35,7 @@ impl SmtpProvider {
 }
 
 #[async_trait]
-impl EmailProvider for SmtpProvider {
+impl OutboundEmailProvider for SmtpProvider {
     async fn send_email(
         &self,
         to: &str,

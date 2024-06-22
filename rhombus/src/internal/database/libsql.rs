@@ -885,7 +885,6 @@ impl Database for LibSQL {
     async fn get_ticket_by_ticket_number(&self, ticket_number: u64) -> Result<Ticket> {
         #[derive(Debug, Deserialize)]
         struct DbTicket {
-            pub ticket_number: u64,
             pub user_id: i64,
             pub challenge_id: i64,
             pub closed_at: Option<i64>,
@@ -933,7 +932,7 @@ impl Database for LibSQL {
         tx.commit().await?;
 
         Ok(Ticket {
-            ticket_number: db_ticket.ticket_number,
+            ticket_number,
             user_id: db_ticket.user_id,
             challenge_id: db_ticket.challenge_id,
             closed_at: db_ticket
@@ -1064,6 +1063,27 @@ impl Database for LibSQL {
             .await?;
 
         Ok(())
+    }
+
+    async fn get_ticket_number_by_message_id(&self, message_id: &str) -> Result<u64> {
+        let ticket_number = self
+            .db
+            .query(
+                "
+                SELECT ticket_number
+                FROM rhombus_ticket_email_message_id_reference
+                WHERE message_id = ?1
+            ",
+                [message_id],
+            )
+            .await?
+            .next()
+            .await?
+            .unwrap()
+            .get::<u64>(0)
+            .unwrap();
+
+        Ok(ticket_number)
     }
 
     async fn save_settings(&self, settings: &Settings) -> Result<()> {

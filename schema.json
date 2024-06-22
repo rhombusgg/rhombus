@@ -128,7 +128,7 @@
         "per_millisecond": {
           "title": "Per Millisecond",
           "description": "Set the interval after which one element of the quota is replenished in milliseconds",
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "default": 500,
           "examples": [500]
@@ -136,7 +136,7 @@
         "burst_size": {
           "title": "Burst Size",
           "description": "Set quota size that defines how many requests can occur before the governor middleware starts blocking requests from an IP address and clients have to wait until the elements of the quota are replenished",
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "default": 8,
           "examples": [8]
@@ -180,7 +180,7 @@
           "max_players": {
             "title": "Max Players",
             "description": "Maximum number of players allowed in this division",
-            "type": ["number", "string"],
+            "type": ["integer", "string"],
             "minimum": 1,
             "examples": [4, 1, "any"]
           }
@@ -199,11 +199,83 @@
           "type": "string",
           "examples": ["Rhombus <no-reply@rhombus.gg>"]
         },
-        "connection_url": {
-          "title": "Connection URL",
-          "description": "Connection URL for the email provider",
+        "smtp_connection_url": {
+          "title": "SMTP Connection URL",
+          "description": "SMTP Connection URL for the email provider",
           "type": "string",
-          "examples": ["smtp://user:password@localhost"]
+          "examples": ["smtps://user:password@localhost"]
+        },
+        "mailgun": {
+          "title": "Mailgun",
+          "description": "Mailgun configuration as the email provider",
+          "type": "object",
+          "properties": {
+            "api_key": {
+              "title": "API Key",
+              "description": "API key to authenticate with the Mailgun API",
+              "type": "string",
+              "examples": ["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-xxxxxxxx-xxxxxxxx"]
+            },
+            "domain": {
+              "title": "Domain",
+              "description": "Domain to send emails from",
+              "type": "string",
+              "examples": [
+                "sandboxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.mailgun.org"
+              ]
+            }
+          }
+        },
+        "imap": {
+          "title": "IMAP",
+          "description": "IMAP configuration for the email provider",
+          "type": "object",
+          "properties": {
+            "poll_interval": {
+              "title": "Poll Interval",
+              "description": "Interval in seconds to poll the inbox for new emails when IDLE is not supported",
+              "type": "integer",
+              "minimum": 1,
+              "examples": [60]
+            },
+            "idle": {
+              "title": "IDLE",
+              "description": "Override default auto detection of IDLE command to receive emails in real time",
+              "type": "boolean",
+              "examples": [true]
+            },
+            "inbox": {
+              "title": "Inbox",
+              "description": "Inbox to watch for incoming emails",
+              "type": "string",
+              "examples": ["inbox"]
+            },
+            "username": {
+              "title": "Username",
+              "description": "Username to authenticate with the IMAP server",
+              "type": "string",
+              "examples": ["user"]
+            },
+            "password": {
+              "title": "Password",
+              "description": "Password to authenticate with the IMAP server",
+              "type": "string",
+              "examples": ["password"]
+            },
+            "domain": {
+              "title": "Domain",
+              "description": "Domain to find the IMAP server at",
+              "type": "string",
+              "examples": ["example.com"]
+            },
+            "port": {
+              "title": "Port",
+              "description": "Port to connect to the IMAP server on",
+              "type": "integer",
+              "minimum": 1,
+              "examples": [993]
+            }
+          }
         }
       }
     },
@@ -215,7 +287,7 @@
         "guild_id": {
           "title": "Guild ID",
           "description": "Snowflake developer discord ID of guild (server) for support",
-          "type": ["string", "number"],
+          "type": ["string", "integer"],
           "pattern": "^\\d{19}$",
           "minimum": 1000000000000000000,
           "maximum": 9999999999999999999,
@@ -224,7 +296,7 @@
         "client_id": {
           "title": "Client ID",
           "description": "OAuth2 Client ID (discord snowflake)",
-          "type": ["string", "number"],
+          "type": ["string", "integer"],
           "pattern": "^\\d{19}$",
           "minimum": 1000000000000000000,
           "maximum": 9999999999999999999,
@@ -244,7 +316,7 @@
         "first_blood_channel_id": {
           "title": "First Blood Channel ID",
           "description": "Snowflake Discord ID for the channel which first bloods should be sent to",
-          "type": ["string", "number"],
+          "type": ["string", "integer"],
           "pattern": "^\\d{19}$",
           "minimum": 1000000000000000000,
           "maximum": 9999999999999999999
@@ -252,7 +324,7 @@
         "support_channel_id": {
           "title": "Support Channel ID",
           "description": "Snowflake Discord ID for the channel which support threads should be branched off of",
-          "type": ["string", "number"],
+          "type": ["string", "integer"],
           "pattern": "^\\d{19}$",
           "minimum": 1000000000000000000,
           "maximum": 9999999999999999999
@@ -260,7 +332,7 @@
         "author_role_id": {
           "title": "Author Role ID",
           "description": "Snowflake Discord ID for the author role to link authors",
-          "type": ["string", "number"],
+          "type": ["string", "integer"],
           "pattern": "^\\d{19}$",
           "minimum": 1000000000000000000,
           "maximum": 9999999999999999999
@@ -268,7 +340,7 @@
         "verified_role_id": {
           "title": "Author Role ID",
           "description": "Snowflake Discord ID for the verified role to give to users who sign in to the CTF website",
-          "type": ["string", "number"],
+          "type": ["string", "integer"],
           "pattern": "^\\d{19}$",
           "minimum": 1000000000000000000,
           "maximum": 9999999999999999999

@@ -244,6 +244,10 @@ impl Database for DbCache {
             .await
     }
 
+    async fn get_ticket_number_by_message_id(&self, message_id: &str) -> Result<u64> {
+        self.inner.get_ticket_number_by_message_id(message_id).await
+    }
+
     async fn save_settings(&self, settings: &Settings) -> Result<()> {
         self.inner.save_settings(settings).await
     }

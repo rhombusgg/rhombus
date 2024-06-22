@@ -36,7 +36,10 @@ use crate::{
             Division, DivisionEligibilityProvider, EmailDivisionEligibilityProvider,
             MaxDivisionPlayers, OpenDivisionEligibilityProvider,
         },
-        email::{mailer::Mailer, smtp::SmtpProvider},
+        email::{
+            imap::ImapEmailReciever, outbound_mailer::OutboundMailer, provider::InboundEmail,
+            smtp::SmtpProvider,
+        },
         ip::{
             default_ip_extractor, ip_insert_blank_middleware, ip_insert_middleware,
             maybe_cf_connecting_ip, maybe_fly_client_ip, maybe_peer_ip,
@@ -654,13 +657,35 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
         let mailer: Option<&'static _> = if settings.read().await.email.is_some() {
             let mail_provider = Box::leak(Box::new(SmtpProvider::new(settings).await.unwrap()));
 
-            let mailer = Box::leak(Box::new(Mailer::new(mail_provider, jinja, settings, db)));
+            let mailer = Box::leak(Box::new(OutboundMailer::new(
+                mail_provider,
+                jinja,
+                settings,
+                db,
+            )));
             Some(mailer)
         } else {
             None
         };
 
-        let bot = Bot::new(settings, db, mailer).await;
+        let bot: &'static _ = Box::leak(Box::new(Bot::new(settings, db, mailer).await));
+
+        {
+            let locked_settings = settings.read().await;
+            if locked_settings
+                .auth
+                .contains(&crate::internal::settings::AuthProvider::Email)
+                && locked_settings
+                    .email
+                    .as_ref()
+                    .is_some_and(|e| e.imap.is_some() || e.mailgun.is_some())
+            {
+                tracing::info!("Starting email receiver");
+                ImapEmailReciever::new(settings, bot, db)
+                    .receive_emails()
+                    .await?;
+            }
+        }
 
         db.insert_divisions(&divisions).await?;
 
@@ -671,7 +696,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             localizer,
             settings,
             ip_extractor: ip_extractor.unwrap_or(default_ip_extractor),
-            mailer,
+            outbound_mailer: mailer,
             divisions: Box::leak(Box::new(divisions)),
         }));
 

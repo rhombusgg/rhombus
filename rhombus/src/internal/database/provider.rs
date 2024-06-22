@@ -256,6 +256,7 @@ pub trait Database {
         message_id: &str,
         user_sent: bool,
     ) -> Result<()>;
+    async fn get_ticket_number_by_message_id(&self, message_id: &str) -> Result<u64>;
     async fn save_settings(&self, settings: &Settings) -> Result<()>;
     async fn load_settings(&self, settings: &mut Settings) -> Result<()>;
     async fn get_scoreboard(&self, division_id: i64) -> Result<Scoreboard>;

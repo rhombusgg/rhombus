@@ -59,9 +59,28 @@ pub struct LocalUploadProviderSettings {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct MailgunSettings {
+    pub api_key: String,
+    pub domain: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ImapSettings {
+    pub poll_interval: Option<u64>,
+    pub inbox: Option<String>,
+    pub idle: Option<bool>,
+    pub port: Option<u16>,
+    pub domain: String,
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EmailSettings {
-    pub connection_url: String,
     pub from: String,
+    pub mailgun: Option<MailgunSettings>,
+    pub smtp_connection_url: Option<String>,
+    pub imap: Option<ImapSettings>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -74,7 +93,7 @@ pub struct Division {
     pub max_players: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub enum AuthProvider {
     #[serde(rename = "discord")]
     Discord,

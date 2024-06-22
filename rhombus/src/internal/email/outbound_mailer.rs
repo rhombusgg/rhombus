@@ -4,7 +4,7 @@ use crate::{
     internal::{
         database::provider::{Connection, Ticket},
         discord::DigestMessage,
-        email::provider::EmailProvider,
+        email::provider::OutboundEmailProvider,
         settings::Settings,
     },
     Result,
@@ -12,21 +12,21 @@ use crate::{
 use minijinja::{context, Environment};
 use tokio::sync::RwLock;
 
-pub struct Mailer {
-    pub inner: &'static (dyn EmailProvider + Send + Sync),
+pub struct OutboundMailer {
+    pub inner: &'static (dyn OutboundEmailProvider + Send + Sync),
     pub jinja: &'static Environment<'static>,
     pub settings: &'static RwLock<Settings>,
     pub db: Connection,
 }
 
-impl Mailer {
+impl OutboundMailer {
     pub fn new(
-        provider: &'static (dyn EmailProvider + Send + Sync),
+        provider: &'static (dyn OutboundEmailProvider + Send + Sync),
         jinja: &'static Environment<'static>,
         settings: &'static RwLock<Settings>,
         db: Connection,
     ) -> Self {
-        Mailer {
+        OutboundMailer {
             inner: provider,
             jinja,
             settings,

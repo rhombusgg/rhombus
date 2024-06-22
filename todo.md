@@ -45,6 +45,7 @@
 - [x] Email-only accounts
   - [x] Email confirmation
   - [x] Gravatar lookup
+  - [ ] IMAP IDLE
 - [x] Challenge loader plugin
 - [ ] API
   - [ ] Access tokens

@@ -434,7 +434,7 @@ pub async fn route_signin_email(
             .unwrap();
     }
 
-    let mailer = state.mailer.as_ref().unwrap();
+    let mailer = state.outbound_mailer.as_ref().unwrap();
 
     let code = state
         .db

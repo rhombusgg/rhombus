@@ -10,9 +10,9 @@ use serde::Serialize;
 use serde_json::json;
 use serenity::{
     all::{
-        ButtonStyle, ChannelId, ChannelType, CreateActionRow, CreateButton, CreateEmbed,
-        CreateMessage, CreateThread, EditMessage, EditThread, GatewayIntents, GetMessages, Http,
-        UserId,
+        ButtonStyle, ChannelId, ChannelType, CreateActionRow, CreateAttachment, CreateButton,
+        CreateEmbed, CreateEmbedAuthor, CreateMessage, CreateThread, EditMessage, EditThread,
+        GatewayIntents, GetMessages, Http, UserId,
     },
     Client,
 };
@@ -25,7 +25,7 @@ use crate::{
         database::provider::{
             Author, Category, Challenge, ChallengeDivision, Connection, FirstBloods, Team, Ticket,
         },
-        email::mailer::Mailer,
+        email::outbound_mailer::OutboundMailer,
         settings::Settings,
     },
     Result,
@@ -40,7 +40,7 @@ pub struct Bot {
 pub struct Data {
     settings: &'static RwLock<Settings>,
     db: Connection,
-    mailer: Option<&'static Mailer>,
+    outbound_mailer: Option<&'static OutboundMailer>,
 }
 pub type DiscordError = Box<dyn std::error::Error + Send + Sync>;
 pub type Context<'a> = poise::Context<'a, Data, DiscordError>;
@@ -320,8 +320,8 @@ pub async fn digest_channel(
     ticket: &Ticket,
 ) -> Result<()> {
     // dont send an email digest if we don't have a mailer
-    let mailer = if let Some(mailer) = data.mailer {
-        mailer
+    let outbound_mailer = if let Some(outbound_mailer) = data.outbound_mailer {
+        outbound_mailer
     } else {
         return Ok(());
     };
@@ -345,7 +345,7 @@ pub async fn digest_channel(
 
     let messages = channel.messages(ctx, GetMessages::new().limit(100)).await?;
 
-    let rhombus_user_id = data.settings.read().await.discord.client_id;
+    let rhombus_user_id = { data.settings.read().await.discord.client_id };
 
     let mut authors = BTreeMap::new();
     for message in &messages {
@@ -402,7 +402,8 @@ pub async fn digest_channel(
         .collect::<Vec<_>>();
     messages.sort();
 
-    mailer.send_digest(ticket, &messages).await?;
+    outbound_mailer.send_digest(ticket, &messages).await?;
+    tracing::info!("Sent digest");
 
     Ok(())
 }
@@ -413,11 +414,22 @@ async fn event_handler(
     _framework: poise::FrameworkContext<'_, Data, Box<dyn std::error::Error + Send + Sync>>,
     data: &Data,
 ) -> std::result::Result<(), DiscordError> {
-    let support_channel_id = { data.settings.read().await.discord.support_channel_id };
+    let (support_channel_id, rhombus_user_id) = {
+        let settings = data.settings.read().await;
+        (
+            settings.discord.support_channel_id,
+            settings.discord.client_id,
+        )
+    };
+
     if let Some(support_channel_id) = support_channel_id {
         let support_channel: ChannelId = support_channel_id.into();
         match event {
             serenity::all::FullEvent::Message { new_message } => {
+                if rhombus_user_id == new_message.author.id.into() {
+                    return Ok(());
+                }
+
                 if let Some(channel) = new_message.channel(ctx).await?.guild() {
                     if let Some(parent_id) = channel.parent_id {
                         if parent_id == support_channel {
@@ -525,7 +537,7 @@ impl Bot {
     pub async fn new(
         settings: &'static RwLock<Settings>,
         db: Connection,
-        mailer: Option<&'static Mailer>,
+        mailer: Option<&'static OutboundMailer>,
     ) -> Self {
         let bot_token = { settings.read().await.discord.bot_token.clone() };
 
@@ -543,7 +555,7 @@ impl Bot {
                     Ok(Data {
                         settings,
                         db,
-                        mailer,
+                        outbound_mailer: mailer,
                     })
                 })
             })
@@ -838,6 +850,49 @@ impl Bot {
 
         Ok(())
     }
+
+    pub async fn send_external_ticket_message(
+        &self,
+        channel_id: NonZeroU64,
+        user: &User,
+        message: &str,
+        attachments: &[DiscordAttachment<'_>],
+    ) -> Result<()> {
+        let channel_id = ChannelId::from(channel_id);
+
+        let attachments = attachments
+            .iter()
+            .map(|attachment| CreateAttachment::bytes(attachment.data, attachment.filename))
+            .collect::<Vec<_>>();
+
+        channel_id
+            .send_message(
+                &self.http,
+                CreateMessage::new()
+                    .embed(
+                        CreateEmbed::new()
+                            .author(
+                                CreateEmbedAuthor::new(&user.name)
+                                    .icon_url(&user.avatar)
+                                    .url(format!(
+                                        "{}/user/{}",
+                                        self.settings.read().await.location_url,
+                                        user.id
+                                    )),
+                            )
+                            .description(message),
+                    )
+                    .files(attachments),
+            )
+            .await?;
+
+        Ok(())
+    }
+}
+
+pub struct DiscordAttachment<'a> {
+    pub filename: &'a str,
+    pub data: &'a [u8],
 }
 
 pub struct DiscordInviteUrlCache {

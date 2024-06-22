@@ -46,6 +46,9 @@ pub enum RhombusError {
 
     #[error("Email: {0}")]
     Email3(#[from] lettre::error::Error),
+
+    #[error("Email: {0}")]
+    Email4(#[from] imap::Error),
 }
 
 #[derive(Error, Debug)]
