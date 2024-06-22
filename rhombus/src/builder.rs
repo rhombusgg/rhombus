@@ -611,8 +611,6 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             }
         };
 
-        discord_cache_evictor();
-
         let ip_extractor = self.ip_extractor.or_else(|| {
             settings.ip_preset.as_ref().map(|preset| match preset {
                 IpPreset::RightmostXForwardedFor => {
@@ -669,6 +667,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
         };
 
         let bot: &'static _ = Box::leak(Box::new(Bot::new(settings, db, mailer).await));
+        discord_cache_evictor();
 
         {
             let locked_settings = settings.read().await;

@@ -101,6 +101,16 @@ impl InboundEmail for ImapEmailReciever {
                             continue;
                         };
 
+                        let from = message.from().and_then(|f| {
+                            f.first().map(|f| {
+                                format!(
+                                    "{} <{}>",
+                                    f.name().unwrap_or(""),
+                                    f.address().unwrap_or("")
+                                )
+                            })
+                        });
+
                         let attachments = message
                             .attachments()
                             .map(|a| DiscordAttachment {
@@ -113,6 +123,7 @@ impl InboundEmail for ImapEmailReciever {
                             .send_external_ticket_message(
                                 ticket.discord_channel_id,
                                 &user,
+                                from.as_deref(),
                                 &main_message,
                                 &attachments,
                             )

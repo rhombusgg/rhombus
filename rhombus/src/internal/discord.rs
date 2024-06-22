@@ -855,6 +855,7 @@ impl Bot {
         &self,
         channel_id: NonZeroU64,
         user: &User,
+        from: Option<&str>,
         message: &str,
         attachments: &[DiscordAttachment<'_>],
     ) -> Result<()> {
@@ -865,24 +866,29 @@ impl Bot {
             .map(|attachment| CreateAttachment::bytes(attachment.data, attachment.filename))
             .collect::<Vec<_>>();
 
+        let embed = CreateEmbed::new().author(
+            CreateEmbedAuthor::new(&user.name)
+                .icon_url(&user.avatar)
+                .url(format!(
+                    "{}/user/{}",
+                    self.settings.read().await.location_url,
+                    user.id
+                )),
+        );
+
+        let embed = if let Some(from) = from {
+            embed.description(format!("From: {}", from))
+        } else {
+            embed
+        };
+
         channel_id
             .send_message(
                 &self.http,
                 CreateMessage::new()
-                    .embed(
-                        CreateEmbed::new()
-                            .author(
-                                CreateEmbedAuthor::new(&user.name)
-                                    .icon_url(&user.avatar)
-                                    .url(format!(
-                                        "{}/user/{}",
-                                        self.settings.read().await.location_url,
-                                        user.id
-                                    )),
-                            )
-                            .description(message),
-                    )
-                    .files(attachments),
+                    .embed(embed)
+                    .files(attachments)
+                    .content(message),
             )
             .await?;
 
