@@ -666,21 +666,27 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             None
         };
 
-        let bot: &'static _ = Box::leak(Box::new(Bot::new(settings, db, mailer).await));
-        discord_cache_evictor();
+        let bot = if settings.read().await.discord.is_some() {
+            let bot: &'static _ = Box::leak(Box::new(Bot::new(settings, db, mailer).await));
+            discord_cache_evictor();
+            Some(bot)
+        } else {
+            None
+        };
 
         {
             let locked_settings = settings.read().await;
-            if locked_settings
-                .auth
-                .contains(&crate::internal::settings::AuthProvider::Email)
+            if bot.is_some()
+                && locked_settings
+                    .auth
+                    .contains(&crate::internal::settings::AuthProvider::Email)
                 && locked_settings
                     .email
                     .as_ref()
                     .is_some_and(|e| e.imap.is_some() || e.mailgun.is_some())
             {
                 tracing::info!("Starting email receiver");
-                ImapEmailReciever::new(settings, bot, db)
+                ImapEmailReciever::new(settings, bot.unwrap(), db)
                     .receive_emails()
                     .await?;
             }

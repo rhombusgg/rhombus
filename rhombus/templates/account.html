@@ -16,94 +16,96 @@
     </div>
     <div class="grid lg:grid-cols-2 gap-6">
       <div class="flex flex-col gap-6">
-        {% call card.root() %}
-          {% call card.header() %}
-            {% call card.title() %}
-              {% with minijinja_lift=lang %}
-              {% endwith %}
+        {% if discord %}
+          {% call card.root() %}
+            {% call card.header() %}
+              {% call card.title() %}
+                {% with minijinja_lift=lang %}
+                {% endwith %}
 
-              {{ t("account-discord-integration") }}
-            {% endcall %}
-            {% call card.description() %}
-              {% with minijinja_lift=lang %}
-              {% endwith %}
+                {{ t("account-discord-integration") }}
+              {% endcall %}
+              {% call card.description() %}
+                {% with minijinja_lift=lang %}
+                {% endwith %}
 
-              {{ t("account-discord-integration-description") }}
+                {{ t("account-discord-integration-description") }}
+              {% endcall %}
             {% endcall %}
-          {% endcall %}
-          {% call card.content() %}
-            <div class="ml-[18px] mt-1 border-l pl-8">
-              <h3
-                class="flex items-center text-xl font-semibold tracking-tight"
-              >
-                <div
-                  class="absolute ml-[-50px] inline-flex size-9 items-center justify-center rounded-full border-4 {% if user.discord_id %}
-                    bg-green-300 dark:bg-green-500
-                  {% else %}
-                    bg-border
-                  {% endif %}"
+            {% call card.content() %}
+              <div class="ml-[18px] mt-1 border-l pl-8">
+                <h3
+                  class="flex items-center text-xl font-semibold tracking-tight"
                 >
+                  <div
+                    class="absolute ml-[-50px] inline-flex size-9 items-center justify-center rounded-full border-4 {% if user.discord_id %}
+                      bg-green-300 dark:bg-green-500
+                    {% else %}
+                      bg-border
+                    {% endif %}"
+                  >
+                    {% if user.discord_id %}
+                      {{ icons.check(class="size-4") }}
+                    {% else %}
+                      {{ icons.ellipsis(class="size-4") }}
+                    {% endif %}
+                  </div>
                   {% if user.discord_id %}
-                    {{ icons.check(class="size-4") }}
+                    {{ t("account-discord-integration-link-discord") }}
                   {% else %}
-                    {{ icons.ellipsis(class="size-4") }}
-                  {% endif %}
-                </div>
-                {% if user.discord_id %}
-                  {{ t("account-discord-integration-link-discord") }}
-                {% else %}
-                  <a
-                    class="flex items-center gap-2"
-                    href="{{ discord_signin_url }}"
-                  >
-                    <span
-                      >{{ t("account-discord-integration-link-discord") }}</span
+                    <a
+                      class="flex items-center gap-2"
+                      href="{{ discord.signin_url }}"
                     >
-                    {{ icons.external_link(class="size-6") }}
-                  </a>
-                {% endif %}
-              </h3>
-              <p class="mt-2">
-                {{ t("account-discord-integration-link-discord-description") }}
-              </p>
+                      <span
+                        >{{ t("account-discord-integration-link-discord") }}</span
+                      >
+                      {{ icons.external_link(class="size-6") }}
+                    </a>
+                  {% endif %}
+                </h3>
+                <p class="mt-2">
+                  {{ t("account-discord-integration-link-discord-description") }}
+                </p>
 
-              <h3
-                class="mt-8 flex items-center text-xl font-semibold tracking-tight"
-              >
-                <div
-                  class="absolute ml-[-50px] inline-flex size-9 items-center justify-center rounded-full border-4 {% if in_server %}
-                    bg-green-300 dark:bg-green-500
-                  {% else %}
-                    bg-border
-                  {% endif %}"
+                <h3
+                  class="mt-8 flex items-center text-xl font-semibold tracking-tight"
                 >
-                  {% if in_server %}
-                    {{ icons.check(class="size-4") }}
-                  {% else %}
-                    {{ icons.ellipsis(class="size-4") }}
-                  {% endif %}
-                </div>
-
-                {% if in_server %}
-                  {{ t("account-discord-integration-join-server") }}
-                {% else %}
-                  <a
-                    class="flex items-center gap-2"
-                    href="{{ discord_invite_url }}"
+                  <div
+                    class="absolute ml-[-50px] inline-flex size-9 items-center justify-center rounded-full border-4 {% if discord.in_server %}
+                      bg-green-300 dark:bg-green-500
+                    {% else %}
+                      bg-border
+                    {% endif %}"
                   >
-                    <span
-                      >{{ t("account-discord-integration-join-server") }}</span
+                    {% if discord.in_server %}
+                      {{ icons.check(class="size-4") }}
+                    {% else %}
+                      {{ icons.ellipsis(class="size-4") }}
+                    {% endif %}
+                  </div>
+
+                  {% if discord.in_server %}
+                    {{ t("account-discord-integration-join-server") }}
+                  {% else %}
+                    <a
+                      class="flex items-center gap-2"
+                      href="{{ discord.invite_url }}"
                     >
-                    {{ icons.external_link(class="size-6") }}
-                  </a>
-                {% endif %}
-              </h3>
-              <p class="mt-2">
-                {{ t("account-discord-integration-join-server-description") }}
-              </p>
-            </div>
+                      <span
+                        >{{ t("account-discord-integration-join-server") }}</span
+                      >
+                      {{ icons.external_link(class="size-6") }}
+                    </a>
+                  {% endif %}
+                </h3>
+                <p class="mt-2">
+                  {{ t("account-discord-integration-join-server-description") }}
+                </p>
+              </div>
+            {% endcall %}
           {% endcall %}
-        {% endcall %}
+        {% endif %}
 
         {% call card.root() %}
           {% call card.header() %}

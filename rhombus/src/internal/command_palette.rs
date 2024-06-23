@@ -38,17 +38,26 @@ pub async fn route_command_palette_items(
     } else {
         let (discord_client_id, location_url) = {
             let settings = state.settings.read().await;
-            (settings.discord.client_id, settings.location_url.clone())
+            (
+                settings.discord.as_ref().map(|d| d.client_id),
+                settings.location_url.clone(),
+            )
         };
 
-        let discord_signin_url = format!(
-            "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}/signin/discord&response_type=code&scope=identify+guilds.join",
-            discord_client_id,
-            location_url,
-        );
+        if let Some(discord_client_id) = discord_client_id {
+            let discord_signin_url = format!(
+                "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}/signin/discord&response_type=code&scope=identify+guilds.join",
+                discord_client_id,
+                location_url,
+            );
+
+            return Json(json!({
+                "discord_signin_url": discord_signin_url,
+                "divisions": divisions,
+            }));
+        }
 
         Json(json!({
-            "discord_signin_url": discord_signin_url,
             "divisions": divisions,
         }))
     }

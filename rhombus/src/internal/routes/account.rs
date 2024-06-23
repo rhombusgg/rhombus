@@ -14,7 +14,6 @@ use rand::{
 };
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
-use tracing::debug;
 
 use crate::internal::{
     auth::User, database::cache::TimedCache, locales::Languages, router::RouterState,
@@ -70,43 +69,63 @@ pub async fn route_account(
     Extension(lang): Extension<Languages>,
     uri: Uri,
 ) -> impl IntoResponse {
-    let (discord_guild_id, discord_bot_token, discord_client_id, location_url) = {
+    struct DiscordSettings {
+        guild_id: NonZeroU64,
+        bot_token: String,
+        client_id: NonZeroU64,
+    }
+
+    let (discord, location_url) = {
         let settings = state.settings.read().await;
         (
-            settings.discord.guild_id,
-            settings.discord.bot_token.clone(),
-            settings.discord.client_id,
+            settings.discord.as_ref().map(|d| DiscordSettings {
+                guild_id: d.guild_id,
+                bot_token: d.bot_token.clone(),
+                client_id: d.client_id,
+            }),
             settings.location_url.clone(),
         )
     };
 
-    let (challenge_data, team, emails, user_divisions, in_server) =
-        if let Some(discord_id) = user.discord_id {
-            let in_server = is_in_server(discord_guild_id, discord_id, &discord_bot_token);
-            let challenge_data = state.db.get_challenges();
-            let team = state.db.get_team_from_id(user.team_id);
-            let emails = state.db.get_emails_for_user_id(user.id);
-            let user_divisions = state.db.get_user_divisions(user.id);
-            let (challenge_data, team, emails, user_divisions, in_server) =
-                tokio::join!(challenge_data, team, emails, user_divisions, in_server);
-            let challenge_data = challenge_data.unwrap();
-            let team = team.unwrap();
-            let emails = emails.unwrap();
-            let user_divisions = user_divisions.unwrap();
-            (challenge_data, team, emails, user_divisions, in_server)
+    #[derive(Serialize)]
+    struct DiscordData {
+        in_server: bool,
+        signin_url: String,
+        invite_url: String,
+    }
+
+    let discord = if let Some(discord) = discord {
+        let in_server = if let Some(user_discord_id) = user.discord_id {
+            is_in_server(discord.guild_id, user_discord_id, &discord.bot_token).await
         } else {
-            let challenge_data = state.db.get_challenges();
-            let team = state.db.get_team_from_id(user.team_id);
-            let emails = state.db.get_emails_for_user_id(user.id);
-            let user_divisions = state.db.get_user_divisions(user.id);
-            let (challenge_data, team, emails, user_divisions) =
-                tokio::join!(challenge_data, team, emails, user_divisions);
-            let challenge_data = challenge_data.unwrap();
-            let team = team.unwrap();
-            let emails = emails.unwrap();
-            let user_divisions = user_divisions.unwrap();
-            (challenge_data, team, emails, user_divisions, false)
+            false
         };
+
+        Some(DiscordData {
+            in_server,
+            signin_url: format!(
+                "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}/signin/discord&response_type=code&scope=identify+guilds.join",
+                discord.client_id,
+                location_url,
+            ),
+            invite_url: state.bot.unwrap().get_invite_url().await.unwrap(),
+        })
+    } else {
+        None
+    };
+
+    let challenge_data = state.db.get_challenges();
+    let team = state.db.get_team_from_id(user.team_id);
+    let emails = state.db.get_emails_for_user_id(user.id);
+    let user_divisions = state.db.get_user_divisions(user.id);
+    let (challenge_data, team, emails, user_divisions) =
+        tokio::join!(challenge_data, team, emails, user_divisions);
+    let (challenge_data, team, emails, user_divisions) = (
+        challenge_data.unwrap(),
+        team.unwrap(),
+        emails.unwrap(),
+        user_divisions.unwrap(),
+    );
 
     let mut divisions = vec![];
     for division in state.divisions {
@@ -124,8 +143,6 @@ pub async fn route_account(
         })
     }
 
-    debug!(user_id = user.id, in_server, "Discord");
-
     let mut challenges = BTreeMap::new();
     for challenge in &challenge_data.challenges {
         challenges.insert(challenge.id, challenge);
@@ -136,14 +153,6 @@ pub async fn route_account(
         categories.insert(category.id, category);
     }
 
-    let discord_signin_url = format!(
-        "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}/signin/discord&response_type=code&scope=identify+guilds.join",
-        discord_client_id,
-        location_url,
-    );
-
-    let discord_invite_url = state.bot.get_invite_url().await.unwrap();
-
     Html(
         state
             .jinja
@@ -153,8 +162,7 @@ pub async fn route_account(
                 lang,
                 user,
                 uri => uri.to_string(),
-                in_server,
-                location_url,
+                discord,
                 og_image => format!("{}/og-image.png", location_url),
                 now => chrono::Utc::now(),
                 team,
@@ -162,8 +170,6 @@ pub async fn route_account(
                 categories,
                 emails,
                 divisions,
-                discord_signin_url,
-                discord_invite_url,
             })
             .unwrap(),
     )

@@ -83,7 +83,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["discord", "email", "ctftime"]
+        "enum": ["discord", "email", "ctftime", "credentials"]
       }
     },
     "turso": {

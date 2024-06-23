@@ -26,8 +26,17 @@ pub async fn route_challenges(
     let challenge_data = challenge_data.unwrap();
     let team = team.unwrap();
 
+    let ticket_enabled = {
+        let settings = state.settings.read().await;
+        settings
+            .discord
+            .as_ref()
+            .and_then(|d| d.support_channel_id)
+            .is_some()
+    };
+
     let challenge_json = json!({
-        "ticket_enabled": state.settings.read().await.discord.support_channel_id.is_some(),
+        "ticket_enabled": ticket_enabled,
         "challenges": challenge_data.challenges.iter().map(|challenge| json!({
             "id": challenge.id,
             "name": challenge.name,
@@ -199,14 +208,16 @@ pub async fn route_ticket_submit(
     challenge_id: Path<i64>,
     Form(form): Form<TicketSubmit>,
 ) -> impl IntoResponse {
-    if state
-        .settings
-        .read()
-        .await
-        .discord
-        .support_channel_id
-        .is_none()
-    {
+    let ticket_enabled = {
+        let settings = state.settings.read().await;
+        settings
+            .discord
+            .as_ref()
+            .and_then(|d| d.support_channel_id)
+            .is_some()
+    };
+
+    if !ticket_enabled || state.bot.is_none() {
         return Response::builder()
             .header("Content-Type", "text/html")
             .header("HX-Trigger", "closeModal")
@@ -250,6 +261,7 @@ pub async fn route_ticket_submit(
 
     state
         .bot
+        .unwrap()
         .create_support_thread(&user, &team, challenge, author, content.as_str())
         .await
         .unwrap();
@@ -330,40 +342,43 @@ pub async fn route_challenge_submit(
             .unwrap();
     }
 
-    if state
-        .settings
-        .read()
-        .await
-        .discord
-        .first_blood_channel_id
-        .is_some()
-    {
-        let first_bloods = first_bloods.unwrap();
+    if let Some(bot) = state.bot {
+        let first_blood_enabled = {
+            let settings = state.settings.read().await;
+            settings
+                .discord
+                .as_ref()
+                .and_then(|d| d.first_blood_channel_id)
+                .is_some()
+        };
 
-        if !first_bloods.division_ids.is_empty() {
-            let team = state.db.get_team_from_id(user.team_id).await.unwrap();
-            _ = state
-                .bot
-                .send_first_blood(
-                    &user,
-                    &team,
-                    challenge,
-                    &challenge_data.divisions,
-                    &challenge_data.categories,
-                    &first_bloods,
-                )
-                .await;
-            tracing::info!(
-                user_id = user.id,
-                challenge_id = challenge.id,
-                divisions = first_bloods
-                    .division_ids
-                    .iter()
-                    .map(|n| n.to_string())
-                    .collect::<Vec<String>>()
-                    .join(","),
-                "First blooded"
-            );
+        if first_blood_enabled {
+            let first_bloods = first_bloods.unwrap();
+
+            if !first_bloods.division_ids.is_empty() {
+                let team = state.db.get_team_from_id(user.team_id).await.unwrap();
+                _ = bot
+                    .send_first_blood(
+                        &user,
+                        &team,
+                        challenge,
+                        &challenge_data.divisions,
+                        &challenge_data.categories,
+                        &first_bloods,
+                    )
+                    .await;
+                tracing::info!(
+                    user_id = user.id,
+                    challenge_id = challenge.id,
+                    divisions = first_bloods
+                        .division_ids
+                        .iter()
+                        .map(|n| n.to_string())
+                        .collect::<Vec<String>>()
+                        .join(","),
+                    "First blooded"
+                );
+            }
         }
     }
 

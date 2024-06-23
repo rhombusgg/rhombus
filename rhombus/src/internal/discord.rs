@@ -90,7 +90,7 @@ pub async fn firstbloods(
 
     {
         let mut settings = ctx.data().settings.write().await;
-        settings.discord.first_blood_channel_id = Some(channel.id.into());
+        settings.discord.as_mut().unwrap().first_blood_channel_id = Some(channel.id.into());
         ctx.data().db.save_settings(&settings).await?;
     }
 
@@ -126,7 +126,7 @@ pub async fn support_link(
 
     {
         let mut settings = ctx.data().settings.write().await;
-        settings.discord.support_channel_id = Some(channel.id.into());
+        settings.discord.as_mut().unwrap().support_channel_id = Some(channel.id.into());
         ctx.data().db.save_settings(&settings).await?;
     }
 
@@ -145,7 +145,7 @@ pub async fn support_panel(ctx: Context<'_>) -> std::result::Result<(), DiscordE
     let (support_channel_id, location_url) = {
         let settings = ctx.data().settings.read().await;
         (
-            settings.discord.support_channel_id,
+            settings.discord.as_ref().unwrap().support_channel_id,
             settings.location_url.clone(),
         )
     };
@@ -193,7 +193,7 @@ pub async fn author(
 
     {
         let mut settings = ctx.data().settings.write().await;
-        settings.discord.author_role_id = Some(role.id.into());
+        settings.discord.as_mut().unwrap().author_role_id = Some(role.id.into());
         ctx.data().db.save_settings(&settings).await?;
     }
 
@@ -220,7 +220,7 @@ pub async fn verified(
 
     {
         let mut settings = ctx.data().settings.write().await;
-        settings.discord.verified_role_id = Some(role.id.into());
+        settings.discord.as_mut().unwrap().verified_role_id = Some(role.id.into());
         ctx.data().db.save_settings(&settings).await?;
     }
 
@@ -280,10 +280,10 @@ Default Ticket Template
             ",
             format_bool(settings.immutable_config),
             settings.location_url,
-            format_role(settings.discord.verified_role_id),
-            format_role(settings.discord.author_role_id),
-            format_channel(settings.discord.first_blood_channel_id),
-            format_channel(settings.discord.support_channel_id),
+            format_role(settings.discord.as_ref().unwrap().verified_role_id),
+            format_role(settings.discord.as_ref().unwrap().author_role_id),
+            format_channel(settings.discord.as_ref().unwrap().first_blood_channel_id),
+            format_channel(settings.discord.as_ref().unwrap().support_channel_id),
             settings.default_ticket_template
         )
     };
@@ -345,7 +345,15 @@ pub async fn digest_channel(
 
     let messages = channel.messages(ctx, GetMessages::new().limit(100)).await?;
 
-    let rhombus_user_id = { data.settings.read().await.discord.client_id };
+    let rhombus_user_id = {
+        data.settings
+            .read()
+            .await
+            .discord
+            .as_ref()
+            .unwrap()
+            .client_id
+    };
 
     let mut authors = BTreeMap::new();
     for message in &messages {
@@ -417,8 +425,8 @@ async fn event_handler(
     let (support_channel_id, rhombus_user_id) = {
         let settings = data.settings.read().await;
         (
-            settings.discord.support_channel_id,
-            settings.discord.client_id,
+            settings.discord.as_ref().unwrap().support_channel_id,
+            settings.discord.as_ref().unwrap().client_id,
         )
     };
 
@@ -539,7 +547,16 @@ impl Bot {
         db: Connection,
         mailer: Option<&'static OutboundMailer>,
     ) -> Self {
-        let bot_token = { settings.read().await.discord.bot_token.clone() };
+        let bot_token = {
+            settings
+                .read()
+                .await
+                .discord
+                .as_ref()
+                .unwrap()
+                .bot_token
+                .clone()
+        };
 
         let framework = poise::Framework::builder()
             .options(poise::FrameworkOptions {
@@ -583,9 +600,9 @@ impl Bot {
         let (invite_url, guild_id, client_id) = {
             let settings = self.settings.read().await;
             (
-                settings.discord.invite_url.clone(),
-                settings.discord.guild_id,
-                settings.discord.client_id,
+                settings.discord.as_ref().unwrap().invite_url.clone(),
+                settings.discord.as_ref().unwrap().guild_id,
+                settings.discord.as_ref().unwrap().client_id,
             )
         };
         if let Some(invite_url) = invite_url {
@@ -648,7 +665,7 @@ impl Bot {
         let (support_channel_id, location_url) = {
             let settings = self.settings.read().await;
             (
-                settings.discord.support_channel_id,
+                settings.discord.as_ref().unwrap().support_channel_id,
                 settings.location_url.clone(),
             )
         };
@@ -804,6 +821,8 @@ impl Bot {
                 .read()
                 .await
                 .discord
+                .as_ref()
+                .unwrap()
                 .first_blood_channel_id
                 .ok_or(RhombusError::MissingConfiguration(
                     "first blood channel id".to_owned(),
@@ -830,7 +849,10 @@ impl Bot {
     pub async fn verify_user(&self, discord_id: NonZeroU64) -> Result<()> {
         let (verified_role_id, guild_id) = {
             let settings = self.settings.read().await;
-            (settings.discord.verified_role_id, settings.discord.guild_id)
+            (
+                settings.discord.as_ref().unwrap().verified_role_id,
+                settings.discord.as_ref().unwrap().guild_id,
+            )
         };
 
         if verified_role_id.is_none() {

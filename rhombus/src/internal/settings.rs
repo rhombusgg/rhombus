@@ -101,6 +101,8 @@ pub enum AuthProvider {
     Email,
     #[serde(rename = "ctftime")]
     CTFtime,
+    #[serde(rename = "credentials")]
+    Credentials,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -109,7 +111,7 @@ pub struct Settings {
     pub location_url: String,
     pub jwt_secret: String,
     pub database_url: Option<String>,
-    pub discord: DiscordSettings,
+    pub discord: Option<DiscordSettings>,
     pub ratelimit: Option<RateLimitSettings>,
     pub ip_preset: Option<IpPreset>,
     pub live_reload: bool,

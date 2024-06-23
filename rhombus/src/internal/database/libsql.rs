@@ -1105,33 +1105,33 @@ impl Database for LibSQL {
         Ok(())
     }
 
-    async fn load_settings(&self, settings: &mut Settings) -> Result<()> {
-        if settings.immutable_config {
-            return Ok(());
-        }
+    async fn load_settings(&self, _settings: &mut Settings) -> Result<()> {
+        // if settings.immutable_config {
+        //     return Ok(());
+        // }
 
-        let db_settings: Option<Settings> = self
-            .db
-            .query("SELECT config FROM rhombus_config", ())
-            .await?
-            .next()
-            .await?
-            .map(|row| serde_json::from_str(&row.get::<String>(0).unwrap()).unwrap());
+        // let db_settings: Option<Settings> = self
+        //     .db
+        //     .query("SELECT config FROM rhombus_config", ())
+        //     .await?
+        //     .next()
+        //     .await?
+        //     .map(|row| serde_json::from_str(&row.get::<String>(0).unwrap()).unwrap());
 
-        if let Some(db_settings) = db_settings {
-            if settings.discord.first_blood_channel_id.is_none() {
-                settings.discord.first_blood_channel_id =
-                    db_settings.discord.first_blood_channel_id;
-            }
+        // if let Some(db_settings) = db_settings {
+        //     if settings.discord.first_blood_channel_id.is_none() {
+        //         settings.discord.first_blood_channel_id =
+        //             db_settings.discord.first_blood_channel_id;
+        //     }
 
-            if settings.discord.support_channel_id.is_none() {
-                settings.discord.support_channel_id = db_settings.discord.support_channel_id;
-            }
+        //     if settings.discord.support_channel_id.is_none() {
+        //         settings.discord.support_channel_id = db_settings.discord.support_channel_id;
+        //     }
 
-            if settings.discord.author_role_id.is_none() {
-                settings.discord.author_role_id = db_settings.discord.author_role_id;
-            }
-        }
+        //     if settings.discord.author_role_id.is_none() {
+        //         settings.discord.author_role_id = db_settings.discord.author_role_id;
+        //     }
+        // }
 
         Ok(())
     }

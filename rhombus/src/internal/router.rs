@@ -10,7 +10,7 @@ pub type RouterState = &'static RouterStateInner;
 
 pub struct RouterStateInner {
     pub db: Connection,
-    pub bot: &'static Bot,
+    pub bot: Option<&'static Bot>,
     pub jinja: &'static minijinja::Environment<'static>,
     pub localizer: &'static Localizations,
     pub settings: &'static RwLock<Settings>,

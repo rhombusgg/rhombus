@@ -204,17 +204,17 @@ pub async fn route_signin(
     let (discord_client_id, location_url, auth) = {
         let settings = state.settings.read().await;
         (
-            settings.discord.client_id,
+            settings.discord.as_ref().map(|d| d.client_id),
             settings.location_url.clone(),
             settings.auth.clone(),
         )
     };
 
-    let discord_signin_url = format!(
+    let discord_signin_url = discord_client_id.map(|discord_client_id| format!(
         "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}/signin/discord&response_type=code&scope=identify+guilds.join",
         discord_client_id,
         location_url,
-    );
+    ));
 
     let html = state
         .jinja
@@ -289,22 +289,34 @@ pub async fn route_signin_discord_callback(
         return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
     };
 
-    let (
-        discord_client_id,
-        discord_client_secret,
-        discord_guild_id,
-        discord_bot_token,
-        location_url,
-    ) = {
+    struct DiscordOAuthSettings {
+        client_id: NonZeroU64,
+        client_secret: String,
+        guild_id: NonZeroU64,
+        bot_token: String,
+    }
+
+    let (discord, location_url) = {
         let settings = state.settings.read().await;
         (
-            settings.discord.client_id,
-            settings.discord.client_secret.clone(),
-            settings.discord.guild_id,
-            settings.discord.bot_token.clone(),
+            settings.discord.as_ref().map(|d| DiscordOAuthSettings {
+                client_id: d.client_id,
+                client_secret: d.client_secret.clone(),
+                guild_id: d.guild_id,
+                bot_token: d.bot_token.clone(),
+            }),
             settings.location_url.clone(),
         )
     };
+
+    let Some(discord) = discord else {
+        let json_error = ErrorResponse {
+            message: "Discord is not configured".to_string(),
+        };
+        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+    };
+
+    let bot = state.bot.unwrap();
 
     let client = Client::new();
     let res = client
@@ -313,7 +325,7 @@ pub async fn route_signin_discord_callback(
             reqwest::header::CONTENT_TYPE,
             "application/x-www-form-urlencoded",
         )
-        .basic_auth(discord_client_id, Some(&discord_client_secret))
+        .basic_auth(discord.client_id, Some(&discord.client_secret))
         .form(&[
             ("grant_type", "authorization_code"),
             ("code", code),
@@ -352,9 +364,9 @@ pub async fn route_signin_discord_callback(
     let res = client
         .put(format!(
             "https://discord.com/api/guilds/{}/members/{}",
-            discord_guild_id, profile.id
+            discord.guild_id, profile.id
         ))
-        .header("Authorization", format!("Bot {}", discord_bot_token))
+        .header("Authorization", format!("Bot {}", discord.bot_token))
         .json(&json!({
             "access_token": oauth_token.access_token,
         }))
@@ -369,7 +381,7 @@ pub async fn route_signin_discord_callback(
     }
 
     let discord_id = profile.id.parse::<NonZeroU64>().unwrap();
-    if let Err(err) = state.bot.verify_user(discord_id).await {
+    if let Err(err) = bot.verify_user(discord_id).await {
         let json_error = ErrorResponse {
             message: format!("Discord returned an error: {:?}", err),
         };

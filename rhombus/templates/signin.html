@@ -19,7 +19,7 @@
     </div>
     <div class="grid gap-4 sm:w-96">
       {% for option in auth_options %}
-        {% if option == "discord" %}
+        {% if option == "discord" and discord_signin_url %}
           {% if loop.index > 1 %}
             {{ bar("Or continue with Discord") }}
           {% endif %}
