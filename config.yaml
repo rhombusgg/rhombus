@@ -11,8 +11,9 @@ in_memory_cache: 20
 local_upload_provider:
   folder: uploads
 auth:
-  # - discord
+  - discord
   - email
+  - credentials
 divisions:
   - name: Open
     description: Open division for everyone

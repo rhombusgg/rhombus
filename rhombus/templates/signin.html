@@ -33,21 +33,29 @@
             {{ bar("Or continue with Email") }}
           {% endif %}
           <form
-            class="grow flex justify-end items-center relative"
+            class="flex flex-col gap-2"
             hx-post="/signin/email"
             hx-indicator="#loader"
             hx-swap="none"
           >
-            <input
-              type="email"
-              required
-              name="email"
-              placeholder="name@example.com"
-              class="bg-background border p-2 rounded-md w-full focus-visible:outline-none"
-            />
-            <div id="loader" class="absolute mr-2 pointer-events-none">
-              {{ icons.spinner(attrs='class="animate-spin"') }}
+            <div class="grow flex justify-end items-center relative">
+              <input
+                type="email"
+                required
+                name="email"
+                placeholder="name@example.com"
+                class="bg-background border p-2 rounded-md w-full focus-visible:outline-none"
+              />
+              <div id="loader" class="absolute mr-2 pointer-events-none">
+                {{ icons.spinner(attrs='class="animate-spin"') }}
+              </div>
             </div>
+            <button
+              type="submit"
+              class="h-10 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center rounded-md text-sm font-medium whitespace-nowrap ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+            >
+              Send Sign In Email
+            </button>
           </form>
         {% elif option == "ctftime" %}
           {% if loop.index > 1 %}
@@ -58,6 +66,36 @@
             class="h-10 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center rounded-md text-sm font-medium whitespace-nowrap ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
             >{{ icons.ctftime(class="h-6 stroke-none") }}</a
           >
+        {% elif option == "credentials" %}
+          {% if loop.index > 1 %}
+            {{ bar("Or continue with credentials") }}
+          {% endif %}
+          <form
+            class="flex flex-col gap-2"
+            hx-post="/signin/credentials"
+            hx-swap="none"
+          >
+            <input
+              type="text"
+              required
+              name="username"
+              placeholder="username"
+              class="bg-background border p-2 rounded-md w-full focus-visible:outline-none"
+            />
+            <input
+              type="password"
+              required
+              name="password"
+              placeholder="password"
+              class="bg-background border p-2 rounded-md w-full focus-visible:outline-none"
+            />
+            <button
+              type="submit"
+              class="h-10 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center rounded-md text-sm font-medium whitespace-nowrap ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+            >
+              Sign In
+            </button>
+          </form>
         {% endif %}
       {% endfor %}
     </div>

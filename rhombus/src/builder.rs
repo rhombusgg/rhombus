@@ -23,8 +23,8 @@ use crate::{
     internal::{
         auth::{
             auth_injector_middleware, enforce_admin_middleware, enforce_auth_middleware,
-            route_signin, route_signin_discord_callback, route_signin_email,
-            route_signin_email_callback, route_signout,
+            route_signin, route_signin_credentials, route_signin_discord_callback,
+            route_signin_email, route_signin_email_callback, route_signout,
         },
         command_palette::route_command_palette_items,
         database::{
@@ -737,6 +737,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             .route("/command-palette", get(route_command_palette_items))
             .route("/", get(route_home))
             .route("/signout", get(route_signout))
+            .route("/signin/credentials", post(route_signin_credentials))
             .route(
                 "/signin/email",
                 get(route_signin_email_callback).post(route_signin_email),

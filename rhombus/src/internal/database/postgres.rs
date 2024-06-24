@@ -70,6 +70,15 @@ impl Database for Postgres {
         Ok((user.id, user.team_id))
     }
 
+    async fn upsert_user_by_credentials(
+        &self,
+        _username: &str,
+        _avatar: &str,
+        _password: &str,
+    ) -> Result<Option<(i64, i64)>> {
+        todo!()
+    }
+
     async fn insert_track(
         &self,
         ip: IpAddr,

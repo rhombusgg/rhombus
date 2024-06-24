@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS rhombus_user (
     name TEXT NOT NULL,
     avatar TEXT NOT NULL,
     discord_id INTEGER,
+    password TEXT,
     team_id INTEGER NOT NULL,
     owner_team_id INTEGER NOT NULL,
     disabled BOOLEAN NOT NULL DEFAULT(FALSE),

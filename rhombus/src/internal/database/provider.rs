@@ -199,6 +199,12 @@ pub trait Database {
         discord_id: Option<NonZeroU64>,
         user_id: Option<i64>,
     ) -> Result<(i64, i64)>;
+    async fn upsert_user_by_credentials(
+        &self,
+        username: &str,
+        avatar: &str,
+        password: &str,
+    ) -> Result<Option<(i64, i64)>>;
     async fn insert_track(
         &self,
         ip: IpAddr,

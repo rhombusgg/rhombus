@@ -46,7 +46,6 @@ impl InboundEmail for ImapEmailReciever {
                     )
                 };
 
-                tracing::trace!("Receiving emails from IMAP server");
                 let client = imap::ClientBuilder::new(domain, port).connect().unwrap();
 
                 let mut imap_session = client.login(username, password).map_err(|e| e.0).unwrap();
@@ -54,6 +53,11 @@ impl InboundEmail for ImapEmailReciever {
                 imap_session.select(&inbox).unwrap();
 
                 let new_emails = imap_session.search("NOT SEEN").unwrap();
+
+                if !new_emails.is_empty() {
+                    tracing::trace!("Receiving emails from IMAP server");
+                }
+
                 for id in new_emails.iter() {
                     let fetches = imap_session.fetch(id.to_string(), "RFC822").unwrap();
                     for fetch in fetches.iter() {

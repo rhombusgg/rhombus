@@ -280,9 +280,7 @@ pub async fn route_signin_discord_callback(
         return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
     }
 
-    let code = if let Some(code) = &params.code {
-        code
-    } else {
+    let Some(code) = &params.code else {
         let json_error = ErrorResponse {
             message: "Discord did not return a code".to_string(),
         };
@@ -420,7 +418,11 @@ pub async fn route_signin_discord_callback(
         .await
         .unwrap();
 
-    sign_in(&state, user_id, team_id, &cookie_jar).await
+    let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar).await;
+    let mut response = Redirect::temporary("/team").into_response();
+    let headers = response.headers_mut();
+    headers.insert(header::SET_COOKIE, cookie.to_string().parse().unwrap());
+    response
 }
 
 #[derive(Deserialize)]
@@ -482,6 +484,71 @@ pub async fn route_signin_email(
 }
 
 #[derive(Deserialize)]
+pub struct CredentialsSubmit {
+    username: String,
+    password: String,
+}
+
+pub async fn route_signin_credentials(
+    state: State<RouterState>,
+    Extension(lang): Extension<Languages>,
+    cookie_jar: CookieJar,
+    Form(form): Form<CredentialsSubmit>,
+) -> impl IntoResponse {
+    if form.username.is_empty() || form.username.len() > 255 {
+        return Response::builder()
+            .body(format!(
+                r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
+                state
+                    .localizer
+                    .localize(&lang, "account-error-email-length", None)
+                    .unwrap(),
+            ))
+            .unwrap()
+            .into_response();
+    }
+
+    let hash = Sha256::digest(form.username.trim().to_lowercase().as_bytes())
+        .iter()
+        .fold(String::new(), |mut output, b| {
+            let _ = write!(output, "{:02x}", b);
+            output
+        });
+
+    let avatar = format!(
+        "https://seccdn.libravatar.org/avatar/{}?s=80&default=retro",
+        hash
+    );
+
+    let Some((user_id, team_id)) = state
+        .db
+        .upsert_user_by_credentials(&form.username, &avatar, &form.password)
+        .await
+        .unwrap()
+    else {
+        return Response::builder()
+            .body(format!(
+                r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
+                state
+                    .localizer
+                    .localize(&lang, "account-error-invalid-credentials", None)
+                    .unwrap(),
+            ))
+            .unwrap()
+            .into_response();
+    };
+
+    let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar).await;
+
+    Response::builder()
+        .header("HX-Redirect", "/team")
+        .header(header::SET_COOKIE, cookie.to_string())
+        .body("".to_owned())
+        .unwrap()
+        .into_response()
+}
+
+#[derive(Deserialize)]
 pub struct EmailSignInParams {
     code: String,
 }
@@ -520,15 +587,19 @@ pub async fn route_signin_email_callback(
         .await
         .unwrap();
 
-    sign_in(&state, user_id, team_id, &cookie_jar).await
+    let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar).await;
+    let mut response = Redirect::temporary("/team").into_response();
+    let headers = response.headers_mut();
+    headers.insert(header::SET_COOKIE, cookie.to_string().parse().unwrap());
+    response
 }
 
-async fn sign_in(
+async fn sign_in_cookie(
     state: &State<RouterState>,
     user_id: i64,
     team_id: i64,
     cookie_jar: &CookieJar,
-) -> Response<Body> {
+) -> Cookie<'static> {
     let jwt_secret = {
         let settings = state.settings.read().await;
         settings.jwt_secret.clone()
@@ -555,9 +626,6 @@ async fn sign_in(
         iat,
     };
 
-    let mut response = Redirect::temporary("/team").into_response();
-    let headers = response.headers_mut();
-
     if let Some(cookie_invite_token) = cookie_jar.get("rhombus-invite-token").map(|c| c.value()) {
         if let Some(team) = state
             .db
@@ -572,16 +640,12 @@ async fn sign_in(
                 .unwrap();
         }
 
-        let delete_cookie = Cookie::build(("rhombus-invite-token", ""))
+        return Cookie::build(("rhombus-invite-token", ""))
             .path("/")
             .max_age(time::Duration::hours(-1))
             .same_site(SameSite::Lax)
-            .http_only(true);
-
-        headers.append(
-            header::SET_COOKIE,
-            delete_cookie.to_string().parse().unwrap(),
-        );
+            .http_only(true)
+            .build();
     }
 
     let token = encode(
@@ -591,15 +655,12 @@ async fn sign_in(
     )
     .unwrap();
 
-    let cookie = Cookie::build(("rhombus-token", token.to_owned()))
+    Cookie::build(("rhombus-token", token.to_owned()))
         .path("/")
         .max_age(time::Duration::hours(72))
         .same_site(SameSite::Lax)
-        .http_only(true);
-
-    headers.append(header::SET_COOKIE, cookie.to_string().parse().unwrap());
-
-    response
+        .http_only(true)
+        .build()
 }
 
 pub async fn route_signout() -> impl IntoResponse {

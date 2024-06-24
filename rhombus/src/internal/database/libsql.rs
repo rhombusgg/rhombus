@@ -7,10 +7,12 @@ use std::{
     time::Duration,
 };
 
+use argon2::{password_hash::SaltString, Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use futures::stream::StreamExt;
 use libsql::{de, params, Builder};
+use rand::rngs::OsRng;
 use rust_embed::RustEmbed;
 use serde::Deserialize;
 
@@ -102,8 +104,6 @@ impl Database for LibSQL {
         discord_id: Option<NonZeroU64>,
         user_id: Option<i64>,
     ) -> Result<(i64, i64)> {
-        let team_name = format!("{}'s team", name);
-
         if let Some(user_id) = user_id {
             let existing_user_row = self
                 .db
@@ -187,6 +187,7 @@ impl Database for LibSQL {
 
         let tx = self.db.transaction().await?;
 
+        let team_name = format!("{}'s team", name);
         let team_invite_token = create_team_invite_token();
 
         let team_id = tx
@@ -222,6 +223,87 @@ impl Database for LibSQL {
         tx.commit().await?;
 
         return Ok((user_id, team_id));
+    }
+
+    async fn upsert_user_by_credentials(
+        &self,
+        username: &str,
+        avatar: &str,
+        password: &str,
+    ) -> Result<Option<(i64, i64)>> {
+        let tx = self.db.transaction().await?;
+
+        #[derive(Debug, Deserialize)]
+        struct QueryUser {
+            id: i64,
+            team_id: i64,
+            password: String,
+        }
+
+        let existing_user = tx
+            .query(
+                "
+                SELECT id, team_id, password
+                FROM rhombus_user
+                WHERE name = ?1
+            ",
+                [username],
+            )
+            .await?
+            .next()
+            .await?
+            .map(|row| de::from_row::<QueryUser>(&row).unwrap());
+
+        if let Some(existing_user) = existing_user {
+            let parsed_hash = PasswordHash::new(&existing_user.password)?;
+
+            tx.commit().await?;
+
+            if Argon2::default()
+                .verify_password(password.as_bytes(), &parsed_hash)
+                .is_ok()
+            {
+                Ok(Some((existing_user.id, existing_user.team_id)))
+            } else {
+                Ok(None)
+            }
+        } else {
+            let team_name = format!("{}'s team", username);
+            let team_invite_token = create_team_invite_token();
+
+            let team_id = tx
+                .query(
+                    "INSERT INTO rhombus_team (name, invite_token) VALUES (?1, ?2) RETURNING id",
+                    [team_name, team_invite_token],
+                )
+                .await?
+                .next()
+                .await?
+                .unwrap()
+                .get::<i64>(0)
+                .unwrap();
+
+            let salt = SaltString::generate(&mut OsRng);
+            let argon2 = Argon2::default();
+            let hashed_password = argon2
+                .hash_password(password.as_bytes(), &salt)?
+                .to_string();
+
+            let user_id = tx
+                .query(
+                    "INSERT INTO rhombus_user (name, password, avatar, team_id, owner_team_id) VALUES (?1, ?2, ?3, ?4, ?4) RETURNING id",
+                    params!(username, hashed_password, avatar, team_id),
+                )
+                .await?
+                .next()
+                .await?
+                .unwrap()
+                .get::<i64>(0)
+                .unwrap();
+
+            tx.commit().await?;
+            return Ok(Some((user_id, team_id)));
+        }
     }
 
     async fn insert_track(

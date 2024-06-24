@@ -59,6 +59,22 @@ impl Database for DbCache {
         result
     }
 
+    async fn upsert_user_by_credentials(
+        &self,
+        username: &str,
+        avatar: &str,
+        password: &str,
+    ) -> Result<Option<(i64, i64)>> {
+        let result = self
+            .inner
+            .upsert_user_by_credentials(username, avatar, password)
+            .await;
+        if let Ok(Some(result)) = result {
+            USER_CACHE.remove(&result.0);
+        }
+        result
+    }
+
     async fn insert_track(
         &self,
         ip: IpAddr,

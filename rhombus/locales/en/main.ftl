@@ -42,6 +42,7 @@ account-error-email-length = Email must be between 1 and 255 characters
 account-error-email-already-added = Email already added
 account-error-verification-email = Failed to send verification email
 account-error-signin-email = Failed to send sign in email
+account-error-invalid-credentials = Invalid password
 
 challenges-ticket-submitted = Ticket submitted
 challenges-challenge-solved = Challenge solved

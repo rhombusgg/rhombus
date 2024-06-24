@@ -49,6 +49,9 @@ pub enum RhombusError {
 
     #[error("Email: {0}")]
     Email4(#[from] imap::Error),
+
+    #[error("Password hash error")]
+    PasswordHash(#[from] argon2::password_hash::Error),
 }
 
 #[derive(Error, Debug)]
