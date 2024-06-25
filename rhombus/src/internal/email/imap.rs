@@ -1,7 +1,12 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
+use futures::TryStreamExt;
 use mail_parser::{MessageParser, MimeHeaders};
 use tokio::sync::RwLock;
+use tokio_rustls::{
+    rustls::{pki_types, ClientConfig, RootCertStore},
+    TlsConnector,
+};
 
 use crate::{
     internal::{
@@ -46,21 +51,49 @@ impl InboundEmail for ImapEmailReciever {
                     )
                 };
 
-                let client = imap::ClientBuilder::new(domain, port).connect().unwrap();
+                let server_name =
+                    pki_types::ServerName::try_from(domain.as_str().to_owned()).unwrap();
 
-                let mut imap_session = client.login(username, password).map_err(|e| e.0).unwrap();
+                let tcp_stream = tokio::net::TcpStream::connect((domain.as_str(), port))
+                    .await
+                    .unwrap();
 
-                imap_session.select(&inbox).unwrap();
+                let mut root_cert_store = RootCertStore::empty();
+                root_cert_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+                let config = ClientConfig::builder()
+                    .with_root_certificates(root_cert_store)
+                    .with_no_client_auth();
+                let connector = TlsConnector::from(Arc::new(config));
+                let tls_stream = connector.connect(server_name, tcp_stream).await.unwrap();
 
-                let new_emails = imap_session.search("NOT SEEN").unwrap();
+                let client = async_imap::Client::new(tls_stream);
+
+                let mut imap_session = client
+                    .login(username, password)
+                    .await
+                    .map_err(|e| e.0)
+                    .unwrap();
+
+                imap_session.select(&inbox).await.unwrap();
+
+                let new_emails = imap_session.search("NOT SEEN").await.unwrap();
 
                 if !new_emails.is_empty() {
-                    tracing::trace!("Receiving emails from IMAP server");
+                    tracing::trace!(
+                        count = new_emails.len(),
+                        "Receiving emails from IMAP server"
+                    );
                 }
 
                 for id in new_emails.iter() {
-                    let fetches = imap_session.fetch(id.to_string(), "RFC822").unwrap();
-                    for fetch in fetches.iter() {
+                    let fetches: Vec<_> = imap_session
+                        .fetch(id.to_string(), "RFC822")
+                        .await
+                        .unwrap()
+                        .try_collect()
+                        .await
+                        .unwrap();
+                    for fetch in fetches {
                         let Some(text) = fetch.body() else {
                             tracing::error!("No body found in email");
                             continue;
@@ -139,7 +172,7 @@ impl InboundEmail for ImapEmailReciever {
                     }
                 }
 
-                imap_session.logout().unwrap();
+                imap_session.logout().await.unwrap();
 
                 tokio::time::sleep(poll_interval).await;
             }

@@ -12,6 +12,9 @@ keywords = ["web", "ctf", "http"]
 [dependencies]
 argon2 = { version = "0.5.3", features = ["std"] }
 async-hash = "0.5.3"
+async-imap = { version = "0.9.7", default-features = false, features = [
+  "runtime-tokio",
+] }
 async-trait = "0.1.80"
 axum = "0.7.5"
 axum-extra = { version = "0.9.3", features = ["cookie"] }
@@ -21,9 +24,6 @@ dashmap = { version = "5.5.3", features = ["inline"] }
 dotenvy = { version = "0.15.7" }
 fancy-regex = "0.13.0"
 fluent = "0.16.1"
-imap = { version = "3.0.0-alpha.14", default-features = false, features = [
-  "rustls-tls",
-] }
 intl-memoizer = "0.5.1"
 jsonwebtoken = "9.3.0"
 lazy_static = "1.4.0"
@@ -59,6 +59,11 @@ serenity = { version = "0.12.1", features = ["chrono"] }
 thiserror = "1.0.59"
 time = "0.3.36"
 tokio = { version = "1.37.0", features = ["full"] }
+tokio-rustls = { version = "0.26.0", default-features = false, features = [
+  "ring",
+  "logging",
+  "tls12",
+] }
 tokio-util = { version = "0.7.11", features = ["io"] }
 tower = "0.4.13"
 tower_governor = { version = "0.4.2" }
@@ -67,6 +72,7 @@ tower-livereload = "0.9.2"
 tracing = "0.1.40"
 unic-langid = { version = "0.9.4", features = ["unic-langid-macros"] }
 unicode-segmentation = "1.11.0"
+webpki-roots = "0.26.3"
 
 futures = { version = "0.3.30", optional = true }
 libsql = { git = 'https://github.com/tursodatabase/libsql.git', optional = true, features = [
