@@ -1,4 +1,4 @@
-use std::num::NonZeroU64;
+use std::{num::NonZeroU64, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
@@ -141,7 +141,10 @@ pub enum DbConfig {
     RawPostgres(sqlx::PgPool),
 
     #[cfg(feature = "libsql")]
-    RawLibSQL(libsql::Connection),
+    RawLibSQL(Arc<libsql::Database>),
+
+    #[cfg(feature = "libsql")]
+    RawLibSQLConnection(libsql::Connection),
 }
 
 #[cfg(feature = "postgres")]
@@ -152,8 +155,15 @@ impl From<sqlx::PgPool> for DbConfig {
 }
 
 #[cfg(feature = "libsql")]
+impl From<Arc<libsql::Database>> for DbConfig {
+    fn from(value: Arc<libsql::Database>) -> Self {
+        Self::RawLibSQL(value)
+    }
+}
+
+#[cfg(feature = "libsql")]
 impl From<libsql::Connection> for DbConfig {
     fn from(value: libsql::Connection) -> Self {
-        Self::RawLibSQL(value)
+        Self::RawLibSQLConnection(value)
     }
 }

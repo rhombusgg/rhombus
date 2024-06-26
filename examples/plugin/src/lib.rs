@@ -62,7 +62,7 @@ impl Plugin for MyPlugin {
             .await
             .unwrap();
 
-        let core_db = rhombus::internal::database::libsql::LibSQL::new_memory()
+        let core_db = rhombus::internal::database::libsql::LocalLibSQL::new_memory()
             .await
             .unwrap();
         core_db.migrate().await.unwrap();
@@ -88,7 +88,8 @@ impl Plugin for MyPlugin {
         match context.rawdb {
             rhombus::builder::RawDb::Plugin(_) => {}
             rhombus::builder::RawDb::Postgres(db) => {
-                db.execute(include_str!("../migrations/standalone.sql"))
+                db.pool
+                    .execute(include_str!("../migrations/standalone.sql"))
                     .await?;
             }
             rhombus::builder::RawDb::LibSQL(_) => {

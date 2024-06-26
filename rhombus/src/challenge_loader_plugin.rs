@@ -17,7 +17,11 @@ use tokio_util::{
     codec::{BytesCodec, FramedRead},
 };
 
-use crate::{internal::router::RouterState, plugin::RunContext, Plugin, Result, UploadProvider};
+use crate::{
+    internal::{database::libsql::LibSQLConnection, router::RouterState},
+    plugin::RunContext,
+    Plugin, Result, UploadProvider,
+};
 
 pub struct ChallengeLoaderPlugin {
     pub config: ChallengeLoaderConfiguration,
@@ -117,7 +121,7 @@ impl Plugin for ChallengeLoaderPlugin {
 
             #[cfg(feature = "libsql")]
             crate::builder::RawDb::LibSQL(db) => {
-                let tx = db.transaction().await?;
+                let tx = db.connect()?.transaction().await?;
 
                 let new_challenge_ids = self
                     .challenges

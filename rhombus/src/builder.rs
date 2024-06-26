@@ -79,10 +79,10 @@ use crate::{
 
 pub enum RawDb {
     #[cfg(feature = "postgres")]
-    Postgres(sqlx::postgres::PgPool),
+    Postgres(&'static crate::internal::database::postgres::Postgres),
 
     #[cfg(feature = "libsql")]
-    LibSQL(libsql::Connection),
+    LibSQL(&'static crate::internal::database::libsql::LibSQL),
 
     Plugin(Box<dyn Any + Send + Sync>),
 }
@@ -235,20 +235,32 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     let database = crate::internal::database::postgres::Postgres::new(pool.clone());
                     database.migrate().await?;
 
-                    return Ok((Box::leak(Box::new(database)), RawDb::Postgres(pool.clone())));
+                    let db = Box::leak(Box::new(database));
+                    return Ok((db, RawDb::Postgres(db)));
                 }
 
                 #[cfg(feature = "libsql")]
-                DbConfig::RawLibSQL(connection) => {
-                    info!("Using user preconfigured libsql connection");
-                    let database: crate::internal::database::libsql::LibSQL =
-                        connection.clone().into();
+                DbConfig::RawLibSQL(database) => {
+                    let database =
+                        crate::internal::database::libsql::RemoteLibSQL::from(database.clone());
                     database.migrate().await?;
 
-                    return Ok((
-                        Box::leak(Box::new(database)),
-                        RawDb::LibSQL(connection.clone()),
-                    ));
+                    let libsql_database: crate::internal::database::libsql::LibSQL =
+                        database.into();
+                    let db = Box::leak(Box::new(libsql_database));
+                    return Ok((db, RawDb::LibSQL(db)));
+                }
+
+                #[cfg(feature = "libsql")]
+                DbConfig::RawLibSQLConnection(connection) => {
+                    let database =
+                        crate::internal::database::libsql::LocalLibSQL::from(connection.clone());
+                    database.migrate().await?;
+
+                    let libsql_database: crate::internal::database::libsql::LibSQL =
+                        database.into();
+                    let db = Box::leak(Box::new(libsql_database));
+                    return Ok((db, RawDb::LibSQL(db)));
                 }
             }
         }
@@ -271,7 +283,8 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     let database = crate::internal::database::postgres::Postgres::new(pool.clone());
                     database.migrate().await?;
 
-                    return Ok((Box::leak(Box::new(database)), RawDb::Postgres(pool)));
+                    let db = Box::leak(Box::new(database));
+                    return Ok((db, RawDb::Postgres(db)));
                 }
             }
 
@@ -290,11 +303,13 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 {
                     info!(database_url, "Connecting to local file libsql database");
                     let database =
-                        crate::internal::database::libsql::LibSQL::new_local(path).await?;
-                    let inner = database.db.clone();
+                        crate::internal::database::libsql::LocalLibSQL::new_local(path).await?;
                     database.migrate().await?;
 
-                    return Ok((Box::leak(Box::new(database)), RawDb::LibSQL(inner)));
+                    let libsql_database: crate::internal::database::libsql::LibSQL =
+                        database.into();
+                    let db = Box::leak(Box::new(libsql_database));
+                    return Ok((db, RawDb::LibSQL(db)));
                 }
             }
 
@@ -317,7 +332,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                                 database_url,
                                 "Connecting to remote libsql database with local replica"
                             );
-                            crate::internal::database::libsql::LibSQL::new_remote_replica(
+                            crate::internal::database::libsql::RemoteLibSQL::new_remote_replica(
                                 local_replica_path,
                                 database_url.to_owned(),
                                 turso.auth_token.to_owned(),
@@ -325,16 +340,18 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                             .await?
                         } else {
                             info!(database_url, "Connecting to remote libsql database");
-                            crate::internal::database::libsql::LibSQL::new_remote(
+                            crate::internal::database::libsql::RemoteLibSQL::new_remote(
                                 database_url.to_owned(),
                                 turso.auth_token.to_owned(),
                             )
                             .await?
                         };
-                        let inner = database.db.clone();
                         database.migrate().await?;
 
-                        return Ok((Box::leak(Box::new(database)), RawDb::LibSQL(inner)));
+                        let libsql_database: crate::internal::database::libsql::LibSQL =
+                            database.into();
+                        let db = Box::leak(Box::new(libsql_database));
+                        return Ok((db, RawDb::LibSQL(db)));
                     }
                 } else {
                     return Err(RhombusError::MissingConfiguration(format!(
@@ -358,11 +375,14 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 #[cfg(feature = "libsql")]
                 {
                     info!(database_url, "Connecting to in memory libsql database");
-                    let database = crate::internal::database::libsql::LibSQL::new_memory().await?;
-                    let inner = database.db.clone();
+                    let database =
+                        crate::internal::database::libsql::LocalLibSQL::new_memory().await?;
                     database.migrate().await?;
 
-                    return Ok((Box::leak(Box::new(database)), RawDb::LibSQL(inner)));
+                    let libsql_database: crate::internal::database::libsql::LibSQL =
+                        database.into();
+                    let db = Box::leak(Box::new(libsql_database));
+                    return Ok((db, RawDb::LibSQL(db)));
                 }
             }
 
@@ -378,11 +398,12 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 "Falling back to local database"
             );
             let database =
-                crate::internal::database::libsql::LibSQL::new_local("rhombus.db").await?;
-            let inner = database.db.clone();
+                crate::internal::database::libsql::LocalLibSQL::new_local("rhombus.db").await?;
             database.migrate().await?;
 
-            Ok((Box::leak(Box::new(database)), RawDb::LibSQL(inner)))
+            let libsql_database: crate::internal::database::libsql::LibSQL = database.into();
+            let db = Box::leak(Box::new(libsql_database));
+            Ok((db, RawDb::LibSQL(db)))
         }
 
         #[cfg(not(feature = "libsql"))]
@@ -499,7 +520,6 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
         jinja.add_function("timediff", jinja_timediff);
 
         let plugin_upload_provider_builder = UploadProviderContext {
-            rawdb: &rawdb,
             settings: &settings.clone(),
             db,
         };
@@ -515,10 +535,10 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 let mut plugin_builder = RunContext {
                     upload_provider: &plugin_upload_provider,
                     env: &mut jinja,
-                    rawdb: &rawdb,
                     localizations: &mut localizer,
                     settings: &mut settings,
                     divisions: &mut divisions,
+                    rawdb: &rawdb,
                     db,
                 };
 
@@ -531,10 +551,10 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 let mut plugin_builder = RunContext {
                     upload_provider: &upload_provider,
                     env: &mut jinja,
-                    rawdb: &rawdb,
                     localizations: &mut localizer,
                     settings: &mut settings,
                     divisions: &mut divisions,
+                    rawdb: &rawdb,
                     db,
                 };
 
@@ -565,10 +585,10 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 let mut plugin_builder = RunContext {
                     upload_provider: &local_upload_provider,
                     env: &mut jinja,
-                    rawdb: &rawdb,
                     localizations: &mut localizer,
                     settings: &mut settings,
                     divisions: &mut divisions,
+                    rawdb: &rawdb,
                     db,
                 };
 

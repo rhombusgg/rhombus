@@ -42,9 +42,6 @@ pub struct RunContext<'a, U: UploadProvider> {
 }
 
 pub struct UploadProviderContext<'a> {
-    /// Raw database connection for the chosen database which can be used to execute raw queries
-    pub rawdb: &'a RawDb,
-
     /// Base settings for the application.
     pub settings: &'a Settings,
 
