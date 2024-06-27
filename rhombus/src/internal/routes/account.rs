@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, net::IpAddr, num::NonZeroU64, time::Duration};
 
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Query, State},
     http::Uri,
     response::{Html, IntoResponse, Redirect, Response},
     Extension, Form,
@@ -60,7 +60,6 @@ pub struct UserDivision<'a> {
     pub description: &'a str,
     pub eligible: bool,
     pub requirement: Option<String>,
-    pub joined: bool,
 }
 
 pub async fn route_account(
@@ -133,13 +132,23 @@ pub async fn route_account(
             .division_eligibility
             .is_user_eligible(user.id)
             .await;
+
+        let joined = user_divisions.contains(&division.id);
+
+        if eligible.is_ok() != joined {
+            state
+                .db
+                .set_user_division(user.id, team.id, division.id, eligible.is_ok())
+                .await
+                .unwrap();
+        }
+
         divisions.push(UserDivision {
             id: division.id,
             name: &division.name,
             description: &division.description,
             eligible: eligible.is_ok(),
             requirement: eligible.err(),
-            joined: user_divisions.contains(&division.id),
         })
     }
 
@@ -303,54 +312,6 @@ pub async fn route_account_delete_email(
         .header("HX-Trigger", "pageRefresh")
         .body("".to_owned())
         .unwrap()
-}
-
-#[derive(Deserialize)]
-pub struct DivisionSet {
-    join: Option<String>,
-}
-
-pub async fn route_account_set_division(
-    state: State<RouterState>,
-    Extension(user): Extension<User>,
-    Path(division_id): Path<i64>,
-    Form(form): Form<DivisionSet>,
-) -> impl IntoResponse {
-    let eligible = state
-        .divisions
-        .iter()
-        .find(|division| division.id == division_id)
-        .unwrap()
-        .division_eligibility
-        .is_user_eligible(user.id)
-        .await;
-
-    state
-        .db
-        .set_user_division(
-            user.id,
-            user.team_id,
-            division_id,
-            eligible.is_ok() && form.join.is_some(),
-        )
-        .await
-        .unwrap();
-
-    tracing::trace!(
-        user_id = user.id,
-        division_id,
-        joined = form.join.is_some(),
-        "Set division"
-    );
-
-    if eligible.is_err() {
-        Response::builder()
-            .header("HX-Trigger", "pageRefresh")
-            .body("".to_owned())
-            .unwrap()
-    } else {
-        Response::builder().body("".to_owned()).unwrap()
-    }
 }
 
 pub fn discord_cache_evictor() {

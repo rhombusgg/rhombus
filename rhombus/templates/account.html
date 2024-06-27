@@ -135,18 +135,13 @@
                     <!-- prettier-ignore-start -->
                     <input
                       type="checkbox"
-                      hx-post="/account/division/{{ division.id }}"
-                      name="join"
                       class="size-4 accent-primary"
-                      {% if division.joined %}
-                        checked
-                      {% elif not division.eligible %}
-                        disabled
-                      {% endif %}
+                      disabled
                       {% if not division.eligible %}
                         title="Ineligible for division. {{ division.requirement }}"
                       {% else %}
-                        title="Eligible for division"
+                        checked
+                        title="In the division"
                       {% endif %}
                     />
                     <!-- prettier-ignore-end -->

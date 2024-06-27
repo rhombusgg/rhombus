@@ -53,7 +53,6 @@ use crate::{
             account::{
                 discord_cache_evictor, route_account, route_account_add_email,
                 route_account_delete_email, route_account_email_verify_callback,
-                route_account_set_division,
             },
             challenges::{
                 route_challenge_submit, route_challenge_view, route_challenges,
@@ -727,7 +726,6 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
 
         let rhombus_router = Router::new()
             .fallback(handler_404)
-            .route("/account/division/:id", post(route_account_set_division))
             .route("/account/verify", get(route_account_email_verify_callback))
             .route(
                 "/account/email",
