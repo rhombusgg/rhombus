@@ -545,7 +545,7 @@ impl Bot {
     pub async fn new(
         settings: &'static RwLock<Settings>,
         db: Connection,
-        mailer: Option<&'static OutboundMailer>,
+        outbound_mailer: Option<&'static OutboundMailer>,
     ) -> Self {
         let bot_token = {
             settings
@@ -572,7 +572,7 @@ impl Bot {
                     Ok(Data {
                         settings,
                         db,
-                        outbound_mailer: mailer,
+                        outbound_mailer,
                     })
                 })
             })

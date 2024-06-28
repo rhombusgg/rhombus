@@ -62,6 +62,8 @@ pub struct LocalUploadProviderSettings {
 pub struct MailgunSettings {
     pub api_key: String,
     pub domain: String,
+    pub webhook_signing_key: String,
+    pub endpoint: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

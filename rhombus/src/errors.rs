@@ -47,10 +47,11 @@ pub enum RhombusError {
     #[error("Email: {0}")]
     Email3(#[from] lettre::error::Error),
 
-    // #[error("Email: {0}")]
-    // Email4(#[from] imap::Error),
     #[error("Password hash error")]
     PasswordHash(#[from] argon2::password_hash::Error),
+
+    #[error("Reqwest error")]
+    Reqwest(#[from] reqwest::Error),
 }
 
 #[derive(Error, Debug)]

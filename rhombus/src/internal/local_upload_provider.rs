@@ -61,8 +61,8 @@ pub async fn route_local_download(
     response.into_response()
 }
 
-pub fn vec_to_hex_string(vec: Vec<u8>) -> String {
-    vec.iter().fold(String::new(), |mut output, b| {
+pub fn slice_to_hex_string(slice: &[u8]) -> String {
+    slice.iter().fold(String::new(), |mut output, b| {
         let _ = write!(output, "{b:02x}");
         output
     })

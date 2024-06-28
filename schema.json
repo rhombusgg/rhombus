@@ -207,7 +207,7 @@
         },
         "mailgun": {
           "title": "Mailgun",
-          "description": "Mailgun configuration as the email provider",
+          "description": "Mailgun configuration as the email provider (both sending and receiving",
           "type": "object",
           "properties": {
             "api_key": {
@@ -223,6 +223,23 @@
               "examples": [
                 "sandboxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.mailgun.org"
               ]
+            },
+            "endpoint": {
+              "title": "Mailgun API Endpoint",
+              "description": "Mailgun API endpoint to send emails to. Useful to change to EU servers.",
+              "type": "string",
+              "examples": [
+                "https://api.mailgun.net",
+                "https://api.eu.mailgun.net"
+              ],
+              "default": "https://api.mailgun.net"
+            },
+            "webhook_signing_key": {
+              "title": "Webhook Signing Key",
+              "description": "Key to verify incoming webhooks from Mailgun",
+              "type": "string",
+              "examples": ["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"],
+              "pattern": "[0-9a-f]{32}"
             }
           }
         },

@@ -37,8 +37,8 @@ use crate::{
             MaxDivisionPlayers, OpenDivisionEligibilityProvider,
         },
         email::{
-            imap::ImapEmailReciever, outbound_mailer::OutboundMailer, provider::InboundEmail,
-            smtp::SmtpProvider,
+            imap::ImapEmailReciever, mailgun::MailgunProvider, outbound_mailer::OutboundMailer,
+            provider::InboundEmail, smtp::SmtpProvider,
         },
         ip::{
             default_ip_extractor, ip_insert_blank_middleware, ip_insert_middleware,
@@ -48,7 +48,7 @@ use crate::{
         },
         locales::{self, jinja_timediff, jinja_translate, locale_middleware},
         open_graph::route_default_og_image,
-        router::RouterStateInner,
+        router::{RouterState, RouterStateInner},
         routes::{
             account::{
                 discord_cache_evictor, route_account, route_account_add_email,
@@ -671,22 +671,38 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
 
         let jinja: &'static _ = Box::leak(Box::new(jinja));
 
-        let mailer: Option<&'static _> = if settings.read().await.email.is_some() {
-            let mail_provider = Box::leak(Box::new(SmtpProvider::new(settings).await.unwrap()));
-
-            let mailer = Box::leak(Box::new(OutboundMailer::new(
-                mail_provider,
-                jinja,
-                settings,
-                db,
-            )));
-            Some(mailer)
-        } else {
-            None
-        };
+        let (outbound_mailer, mailgun_router): (Option<&'static _>, Router<RouterState>) =
+            if let Some(email) = settings.read().await.email.as_ref() {
+                if email.mailgun.is_some() {
+                    let (mailgun_provider, router) = MailgunProvider::new(settings).await.unwrap();
+                    let mail_provider = Box::leak(Box::new(mailgun_provider));
+                    let mailer = Box::leak(Box::new(OutboundMailer::new(
+                        mail_provider,
+                        jinja,
+                        settings,
+                        db,
+                    )));
+                    (Some(mailer), router)
+                } else if email.smtp_connection_url.is_some() {
+                    let mail_provider =
+                        Box::leak(Box::new(SmtpProvider::new(settings).await.unwrap()));
+                    let mailer = Box::leak(Box::new(OutboundMailer::new(
+                        mail_provider,
+                        jinja,
+                        settings,
+                        db,
+                    )));
+                    (Some(mailer), Router::new())
+                } else {
+                    (None, Router::new())
+                }
+            } else {
+                (None, Router::new())
+            };
 
         let bot = if settings.read().await.discord.is_some() {
-            let bot: &'static _ = Box::leak(Box::new(Bot::new(settings, db, mailer).await));
+            let bot: &'static _ =
+                Box::leak(Box::new(Bot::new(settings, db, outbound_mailer).await));
             discord_cache_evictor();
             Some(bot)
         } else {
@@ -697,14 +713,10 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             let locked_settings = settings.read().await;
             if bot.is_some()
                 && locked_settings
-                    .auth
-                    .contains(&crate::internal::settings::AuthProvider::Email)
-                && locked_settings
                     .email
                     .as_ref()
-                    .is_some_and(|e| e.imap.is_some() || e.mailgun.is_some())
+                    .is_some_and(|e| e.imap.is_some())
             {
-                tracing::info!("Starting email receiver");
                 ImapEmailReciever::new(settings, bot.unwrap(), db)
                     .receive_emails()
                     .await?;
@@ -720,7 +732,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             localizer,
             settings,
             ip_extractor: ip_extractor.unwrap_or(default_ip_extractor),
-            outbound_mailer: mailer,
+            outbound_mailer,
             divisions: Box::leak(Box::new(divisions)),
         }));
 
@@ -754,6 +766,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             .route("/static/:file", get(route_static_serve))
             .route("/command-palette", get(route_command_palette_items))
             .route("/", get(route_home))
+            .merge(mailgun_router)
             .route("/signout", get(route_signout))
             .route("/signin/credentials", post(route_signin_credentials))
             .route(

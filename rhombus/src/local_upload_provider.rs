@@ -16,7 +16,7 @@ use tokio_util::io::StreamReader;
 use crate::{
     errors::RhombusError,
     internal::{
-        local_upload_provider::{route_local_download, vec_to_hex_string, HashRead},
+        local_upload_provider::{route_local_download, slice_to_hex_string, HashRead},
         upload_provider::route_upload_file,
     },
     upload_provider::UploadProvider,
@@ -67,7 +67,7 @@ impl UploadProvider for LocalUploadProvider {
             let mut file = BufWriter::new(File::create(&filepath).await?);
 
             tokio::io::copy(&mut src, &mut file).await?;
-            let hash = vec_to_hex_string(src.hash());
+            let hash = slice_to_hex_string(&src.hash());
             let new_filename = format!("{}-{}", hash, filename);
 
             let new_filepath = std::path::Path::new(&self.base_path).join(&new_filename);

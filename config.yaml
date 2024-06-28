@@ -3,10 +3,6 @@ title: Rhombus Demo
 location_url: http://localhost:3000
 database_url: file://rhombus.db
 contact_email: admin@rhombus.gg
-email:
-  from: Rhombus <nextcloud@mbund.org>
-  imap:
-    poll_interval: 10
 in_memory_cache: 20
 local_upload_provider:
   folder: uploads

@@ -23,9 +23,9 @@ use crate::{
 };
 
 pub struct ImapEmailReciever {
-    bot: &'static Bot,
-    db: Connection,
-    settings: &'static RwLock<Settings>,
+    pub settings: &'static RwLock<Settings>,
+    pub bot: &'static Bot,
+    pub db: Connection,
 }
 
 impl ImapEmailReciever {
