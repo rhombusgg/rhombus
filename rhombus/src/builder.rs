@@ -22,9 +22,9 @@ use crate::{
     errors::{DatabaseConfigurationError, RhombusError},
     internal::{
         auth::{
-            auth_injector_middleware, enforce_auth_middleware, route_signin,
-            route_signin_credentials, route_signin_discord_callback, route_signin_email,
-            route_signin_email_callback, route_signout,
+            auth_injector_middleware, enforce_admin_middleware, enforce_auth_middleware,
+            route_signin, route_signin_credentials, route_signin_discord_callback,
+            route_signin_email, route_signin_email_callback, route_signout,
         },
         command_palette::route_command_palette_items,
         database::{
@@ -757,6 +757,8 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
 
         let rhombus_router = Router::new()
             .fallback(handler_404)
+            .route("/admin", get(|| async { (StatusCode::OK, Html("Admin")) }))
+            .route_layer(middleware::from_fn(enforce_admin_middleware))
             .route("/account/verify", get(route_account_email_verify_callback))
             .route(
                 "/account/email",
