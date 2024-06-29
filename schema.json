@@ -106,19 +106,100 @@
       },
       "required": ["auth_token"]
     },
-    "local_upload_provider": {
-      "title": "Local Upload Provider",
-      "description": "A default upload provider which saves and serves from a specified local folder on the filesystem",
+    "uploads": {
+      "title": "Upload Provider",
+      "description": "Choose where to store and serve challenge assets from",
       "type": "object",
       "properties": {
-        "folder": {
-          "title": "Folder",
-          "description": "Destination folder to save and serve challenge assets from",
-          "type": "string",
-          "examples": ["uploads"]
+        "local": {
+          "title": "Local Upload Provider",
+          "description": "An upload provider which saves and serves from a specified local folder on the filesystem",
+          "type": "object",
+          "properties": {
+            "folder": {
+              "title": "Folder",
+              "description": "Destination folder to save and serve challenge assets from",
+              "type": "string",
+              "examples": ["uploads"]
+            }
+          }
+        },
+        "s3": {
+          "title": "S3 Upload Provider",
+          "description": "An upload provider which saves and serves from an S3 bucket",
+          "type": "object",
+          "properties": {
+            "bucket_name": {
+              "title": "Bucket Name",
+              "description": "S3 bucket name",
+              "type": "string",
+              "examples": ["my-bucket-name"]
+            },
+            "bucket_region": {
+              "title": "Region",
+              "description": "Region of the S3 bucket (does not have to be AWS)",
+              "type": "string",
+              "examples": ["us-east-2"]
+            },
+            "access_key": {
+              "title": "Access Key",
+              "description": "Access key to authenticate with the S3 bucket",
+              "type": "string",
+              "examples": ["xxxxxxxxxxxxxxxxxxxx"]
+            },
+            "secret_key": {
+              "title": "Secret Key",
+              "description": "Secret key to authenticate with the S3 bucket",
+              "type": "string",
+              "examples": ["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
+            },
+            "security_token": {
+              "title": "Security Token",
+              "description": "Security token to authenticate with the S3 bucket",
+              "type": "string",
+              "examples": ["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
+            },
+            "session_token": {
+              "title": "Session Token",
+              "description": "Session token to authenticate with the S3 bucket",
+              "type": "string",
+              "examples": ["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
+            },
+            "profile": {
+              "title": "Profile",
+              "description": "Profile to use from the AWS credentials file",
+              "type": "string",
+              "examples": ["default"]
+            },
+            "endpoint": {
+              "title": "Endpoint",
+              "description": "Endpoint to connect to the S3 bucket at",
+              "type": "string",
+              "examples": ["http://localhost:9000"]
+            },
+            "prefix": {
+              "title": "Path Prefix",
+              "description": "Prefix to prepend to all keys in the S3 bucket",
+              "type": "string",
+              "examples": ["rhombus/"]
+            },
+            "path_style": {
+              "title": "Path Style",
+              "description": "Use path style addressing for S3 requests",
+              "type": "boolean",
+              "examples": [true],
+              "default": false
+            },
+            "presigned_get_expiry": {
+              "title": "Presigned Get Expiry",
+              "description": "If set, creates presign GETs for this many seconds. Otherwise will generate the url for the asset assuming it is public for anonymous users",
+              "type": "integer",
+              "minimum": 1,
+              "examples": [3600]
+            }
+          }
         }
-      },
-      "required": ["folder"]
+      }
     },
     "ratelimit": {
       "title": "Rate limit",

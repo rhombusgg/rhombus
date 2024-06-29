@@ -20,6 +20,7 @@ pub mod builder;
 pub mod challenge_loader_plugin;
 mod local_upload_provider;
 pub mod plugin;
+pub mod s3_upload_provider;
 mod upload_provider;
 
 #[cfg(feature = "systemfd")]

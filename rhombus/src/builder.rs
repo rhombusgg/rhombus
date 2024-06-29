@@ -22,9 +22,9 @@ use crate::{
     errors::{DatabaseConfigurationError, RhombusError},
     internal::{
         auth::{
-            auth_injector_middleware, enforce_admin_middleware, enforce_auth_middleware,
-            route_signin, route_signin_credentials, route_signin_discord_callback,
-            route_signin_email, route_signin_email_callback, route_signout,
+            auth_injector_middleware, enforce_auth_middleware, route_signin,
+            route_signin_credentials, route_signin_discord_callback, route_signin_email,
+            route_signin_email_callback, route_signout,
         },
         command_palette::route_command_palette_items,
         database::{
@@ -72,6 +72,7 @@ use crate::{
         static_serve::route_static_serve,
     },
     plugin::{DatabaseProviderContext, RunContext, UploadProviderContext},
+    s3_upload_provider::S3UploadProvider,
     upload_provider::UploadProvider,
     LocalUploadProvider, Plugin, Result,
 };
@@ -560,22 +561,40 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 let plugin_router = self.plugins.run(&mut plugin_builder).await?;
 
                 (plugin_router, upload_router)
+            } else if let Some(s3) = settings.uploads.as_ref().and_then(|u| u.s3.as_ref()) {
+                let s3_upload_provider = S3UploadProvider::new(s3).await?;
+                let upload_router = s3_upload_provider.routes()?;
+
+                let mut plugin_builder = RunContext {
+                    upload_provider: &s3_upload_provider,
+                    env: &mut jinja,
+                    localizations: &mut localizer,
+                    settings: &mut settings,
+                    divisions: &mut divisions,
+                    rawdb: &rawdb,
+                    db,
+                };
+
+                let plugin_router = self.plugins.run(&mut plugin_builder).await?;
+
+                (plugin_router, upload_router)
             } else {
-                let base_path =
-                    if let Some(local_upload_provider_options) = &settings.local_upload_provider {
-                        let base_path = &local_upload_provider_options.folder;
-                        tracing::info!(
-                            folder = base_path.as_str(),
-                            "Using configured local upload provider"
-                        );
-                        base_path.into()
-                    } else {
-                        tracing::warn!(
-                            folder = "uploads",
-                            "No upload provider set, using local upload provider"
-                        );
-                        "uploads".into()
-                    };
+                let base_path = if let Some(local_upload_provider_options) =
+                    settings.uploads.as_ref().and_then(|u| u.local.as_ref())
+                {
+                    let base_path = &local_upload_provider_options.folder;
+                    tracing::info!(
+                        folder = base_path.as_str(),
+                        "Using configured local upload provider"
+                    );
+                    base_path.into()
+                } else {
+                    tracing::warn!(
+                        folder = "uploads",
+                        "No upload provider set, using local upload provider"
+                    );
+                    "uploads".into()
+                };
 
                 let local_upload_provider = LocalUploadProvider::new(base_path);
 
@@ -785,14 +804,10 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             .route("/team/:id", get(route_public_team))
             .route("/og-image.png", get(route_default_og_image))
             .with_state(router_state)
-            .merge(
-                upload_router
-                    .route_layer(middleware::from_fn(enforce_admin_middleware))
-                    .layer(middleware::from_fn_with_state(
-                        router_state,
-                        auth_injector_middleware,
-                    )),
-            );
+            .merge(upload_router.layer(middleware::from_fn_with_state(
+                router_state,
+                auth_injector_middleware,
+            )));
 
         let router = if self.num_plugins > 0 {
             Router::new()

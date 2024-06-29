@@ -17,8 +17,8 @@ use rhombus::{
         locales::Languages,
         router::RouterState,
     },
-    plugin::{DatabaseProviderContext, RunContext, UploadProviderContext},
-    LocalUploadProvider, Plugin, UploadProvider,
+    plugin::{DatabaseProviderContext, RunContext},
+    Plugin, UploadProvider,
 };
 use sqlx::Executor;
 
@@ -41,18 +41,18 @@ impl MyPlugin {
 }
 
 impl Plugin for MyPlugin {
-    async fn upload_provider(
-        &self,
-        _: &UploadProviderContext<'_>,
-    ) -> Option<impl UploadProvider + Send + Sync> {
-        if self.state.a == 3 {
-            tracing::info!(self.state.a, "Using plugin upload provider");
-            let local = LocalUploadProvider::new("myplugin-uploads".into());
-            Some(local)
-        } else {
-            None
-        }
-    }
+    // async fn upload_provider(
+    //     &self,
+    //     _: &UploadProviderContext<'_>,
+    // ) -> Option<impl UploadProvider + Send + Sync> {
+    //     if self.state.a == 3 {
+    //         tracing::info!(self.state.a, "Using plugin upload provider");
+    //         let local = LocalUploadProvider::new("myplugin-uploads".into());
+    //         Some(local)
+    //     } else {
+    //         None
+    //     }
+    // }
 
     async fn database_provider(
         &self,

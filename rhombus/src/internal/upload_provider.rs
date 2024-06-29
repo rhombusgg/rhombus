@@ -4,12 +4,12 @@ use axum::{
     body::Bytes,
     extract::{Path, Request, State},
     response::IntoResponse,
-    Router,
+    Extension, Router,
 };
 use futures::Stream;
 use reqwest::StatusCode;
 
-use crate::{Result, UploadProvider};
+use crate::{internal::auth::MaybeUser, Result, UploadProvider};
 
 impl UploadProvider for () {
     fn routes(&self) -> Result<Router> {
@@ -31,9 +31,18 @@ impl UploadProvider for () {
 
 pub async fn route_upload_file<U: UploadProvider>(
     State(upload_provider): State<Arc<U>>,
+    Extension(user): Extension<MaybeUser>,
     Path(file_name): Path<String>,
     request: Request,
 ) -> impl IntoResponse {
+    let Some(user) = user else {
+        return (StatusCode::UNAUTHORIZED, "Unauthorized".to_owned()).into_response();
+    };
+
+    if !user.is_admin {
+        return (StatusCode::FORBIDDEN, "Forbidden".to_owned()).into_response();
+    }
+
     if !path_is_valid(&file_name) {
         return (StatusCode::BAD_REQUEST, "Invalid path".to_owned()).into_response();
     }

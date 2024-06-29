@@ -59,6 +59,27 @@ pub struct LocalUploadProviderSettings {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct S3UploadProviderSettings {
+    pub bucket_name: String,
+    pub bucket_region: Option<String>,
+    pub access_key: Option<String>,
+    pub secret_key: Option<String>,
+    pub security_token: Option<String>,
+    pub session_token: Option<String>,
+    pub profile: Option<String>,
+    pub endpoint: Option<String>,
+    pub prefix: Option<String>,
+    pub path_style: Option<bool>,
+    pub presigned_get_expiry: Option<u32>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct UploadProviderSettings {
+    pub local: Option<LocalUploadProviderSettings>,
+    pub s3: Option<S3UploadProviderSettings>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct MailgunSettings {
     pub api_key: String,
     pub domain: String,
@@ -122,7 +143,7 @@ pub struct Settings {
     pub contact_email: Option<String>,
     pub divisions: Option<Vec<Division>>,
     pub email: Option<EmailSettings>,
-    pub local_upload_provider: Option<LocalUploadProviderSettings>,
+    pub uploads: Option<UploadProviderSettings>,
     pub auth: Vec<AuthProvider>,
 
     /// `false` will disable the in memory cache.

@@ -52,6 +52,15 @@ pub enum RhombusError {
 
     #[error("Reqwest error")]
     Reqwest(#[from] reqwest::Error),
+
+    #[error("S3 Error")]
+    S3(#[from] s3::error::S3Error),
+
+    #[error("S3 Credentials Error")]
+    S3Credentials(#[from] s3::creds::error::CredentialsError),
+
+    #[error("IO error")]
+    IO(#[from] std::io::Error),
 }
 
 #[derive(Error, Debug)]
