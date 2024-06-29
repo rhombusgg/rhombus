@@ -41,9 +41,6 @@ pub trait UploadProvider {
     where
         S: Stream<Item = std::result::Result<Bytes, E>> + Send,
         E: Into<axum::BoxError>;
-
-    /// Get the URL to download the file given its filename and hash.
-    async fn get_url(&self, filename: &str, hash: &str) -> Result<String>;
 }
 
 pub enum EitherUploadProvider<L, R> {
@@ -70,13 +67,6 @@ where
         match self {
             EitherUploadProvider::Left(l) => l.upload(filename, stream).await,
             EitherUploadProvider::Right(r) => r.upload(filename, stream).await,
-        }
-    }
-
-    async fn get_url(&self, filename: &str, hash: &str) -> Result<String> {
-        match self {
-            EitherUploadProvider::Left(l) => l.get_url(filename, hash).await,
-            EitherUploadProvider::Right(r) => r.get_url(filename, hash).await,
         }
     }
 }

@@ -109,8 +109,4 @@ impl UploadProvider for S3UploadProvider {
 
         Ok(url)
     }
-
-    async fn get_url(&self, filename: &str, hash: &str) -> Result<String> {
-        Ok(format!("/uploads/{}-{}", hash, filename))
-    }
 }

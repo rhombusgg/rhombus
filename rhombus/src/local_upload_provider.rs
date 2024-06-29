@@ -78,8 +78,4 @@ impl UploadProvider for LocalUploadProvider {
         .await
         .map_err(|_| RhombusError::Unknown())
     }
-
-    async fn get_url(&self, filename: &str, hash: &str) -> Result<String> {
-        Ok(format!("/uploads/{}-{}", hash, filename))
-    }
 }

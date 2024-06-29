@@ -23,10 +23,6 @@ impl UploadProvider for () {
     {
         unreachable!()
     }
-
-    async fn get_url(&self, _filename: &str, _hash: &str) -> Result<String> {
-        unreachable!()
-    }
 }
 
 pub async fn route_upload_file<U: UploadProvider>(
