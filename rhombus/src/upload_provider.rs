@@ -28,9 +28,6 @@ pub trait UploadProvider {
     /// #     S: Stream<Item = std::result::Result<Bytes, E>> + Send,
     /// #     E: Into<axum::BoxError> {
     /// #    Ok("".to_owned())
-    /// }
-    /// # async fn get_url(&self, filename: &str, hash: &str) -> rhombus::Result<String> {
-    /// #     Ok("".to_owned())
     /// # }
     /// # }
     /// ```
