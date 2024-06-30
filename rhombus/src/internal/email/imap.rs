@@ -42,9 +42,17 @@ impl InboundEmail for ImapEmailReciever {
 
         tokio::task::spawn(async move {
             loop {
+                let poll_interval = {
+                    let settings = settings.read().await;
+                    let settings = settings.email.as_ref().unwrap().imap.as_ref().unwrap();
+                    Duration::from_secs(settings.poll_interval.unwrap_or(30))
+                };
+
                 if let Err(e) = receive_emails(bot, db, settings).await {
                     tracing::error!(error = ?e, "Failed to receive emails");
                 }
+
+                tokio::time::sleep(poll_interval).await;
             }
         });
 
@@ -69,7 +77,7 @@ async fn receive_emails(
     db: Connection,
     settings: &'static RwLock<Settings>,
 ) -> std::result::Result<(), ImapError> {
-    let (username, password, domain, port, poll_interval, inbox) = {
+    let (username, password, domain, port, inbox) = {
         let settings = settings.read().await;
         let settings = settings.email.as_ref().unwrap().imap.as_ref().unwrap();
         (
@@ -77,7 +85,6 @@ async fn receive_emails(
             settings.password.clone(),
             settings.domain.clone(),
             settings.port.unwrap_or(993),
-            Duration::from_secs(settings.poll_interval.unwrap_or(30)),
             settings.inbox.clone().unwrap_or("INBOX".to_string()),
         )
     };
@@ -190,8 +197,6 @@ async fn receive_emails(
     }
 
     imap_session.logout().await?;
-
-    tokio::time::sleep(poll_interval).await;
 
     Ok(())
 }
