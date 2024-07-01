@@ -39,12 +39,12 @@ impl Database for Postgres {
             .await?)
     }
 
-    async fn upsert_user(
+    async fn upsert_user_by_discord_id(
         &self,
         name: &str,
         email: &str,
         avatar: &str,
-        discord_id: Option<NonZeroU64>,
+        discord_id: NonZeroU64,
         _user_id: Option<i64>,
     ) -> Result<(i64, i64)> {
         #[derive(FromRow)]
@@ -63,11 +63,20 @@ impl Database for Postgres {
         .bind(name)
         .bind(email)
         .bind(avatar)
-        .bind(discord_id.map(|id| id.get() as i64))
+        .bind(discord_id.get() as i64)
         .fetch_one(&self.pool)
         .await?;
 
         Ok((user.id, user.team_id))
+    }
+
+    async fn upsert_user_by_email(
+        &self,
+        _name: &str,
+        _email: &str,
+        _avatar: &str,
+    ) -> Result<(i64, i64)> {
+        todo!()
     }
 
     async fn upsert_user_by_credentials(

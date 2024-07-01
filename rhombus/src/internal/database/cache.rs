@@ -41,20 +41,35 @@ impl Database for DbCache {
         self.inner.migrate().await
     }
 
-    async fn upsert_user(
+    async fn upsert_user_by_discord_id(
         &self,
         name: &str,
         email: &str,
         avatar: &str,
-        discord_id: Option<NonZeroU64>,
+        discord_id: NonZeroU64,
         user_id: Option<i64>,
     ) -> Result<(i64, i64)> {
         let result = self
             .inner
-            .upsert_user(name, email, avatar, discord_id, user_id)
+            .upsert_user_by_discord_id(name, email, avatar, discord_id, user_id)
             .await;
         if let Ok(result) = result {
             USER_CACHE.remove(&result.0);
+            TEAM_CACHE.remove(&result.1);
+        }
+        result
+    }
+
+    async fn upsert_user_by_email(
+        &self,
+        name: &str,
+        email: &str,
+        avatar: &str,
+    ) -> Result<(i64, i64)> {
+        let result = self.inner.upsert_user_by_email(name, email, avatar).await;
+        if let Ok(result) = result {
+            USER_CACHE.remove(&result.0);
+            TEAM_CACHE.remove(&result.1);
         }
         result
     }
@@ -65,9 +80,16 @@ impl Database for DbCache {
         avatar: &str,
         password: &str,
     ) -> Result<Option<(i64, i64)>> {
-        self.inner
+        let result = self
+            .inner
             .upsert_user_by_credentials(username, avatar, password)
-            .await
+            .await;
+
+        if let Ok(Some(result)) = result {
+            USER_CACHE.remove(&result.0);
+            TEAM_CACHE.remove(&result.1);
+        }
+        result
     }
 
     async fn insert_track(

@@ -191,13 +191,19 @@ pub struct Ticket {
 pub trait Database {
     async fn migrate(&self) -> Result<()>;
     async fn get_challenges(&self) -> Result<Challenges>;
-    async fn upsert_user(
+    async fn upsert_user_by_discord_id(
         &self,
         name: &str,
         email: &str,
         avatar: &str,
-        discord_id: Option<NonZeroU64>,
+        discord_id: NonZeroU64,
         user_id: Option<i64>,
+    ) -> Result<(i64, i64)>;
+    async fn upsert_user_by_email(
+        &self,
+        name: &str,
+        email: &str,
+        avatar: &str,
     ) -> Result<(i64, i64)>;
     async fn upsert_user_by_credentials(
         &self,

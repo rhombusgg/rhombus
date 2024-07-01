@@ -22,7 +22,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use super::{division::MaxDivisionPlayers, locales::Languages, router::RouterState};
+use crate::internal::{division::MaxDivisionPlayers, locales::Languages, router::RouterState};
 
 #[derive(Debug, Serialize, Clone)]
 pub struct UserInner {
@@ -144,7 +144,7 @@ pub async fn route_signin(
             // you cannot join a team if your current team has more than just you on it
             let old_team = state.db.get_team_from_id(user.team_id).await.unwrap();
             if old_team.users.len() > 1 {
-                return Redirect::to("/team").into_response();
+                return Redirect::temporary("/team").into_response();
             }
 
             // you cannot join a team if the new team if, as a result of you joining it would
@@ -169,7 +169,7 @@ pub async fn route_signin(
                 MaxDivisionPlayers::Unlimited => {}
                 MaxDivisionPlayers::Limited(min_players) => {
                     if new_team.users.len() >= min_players.get() as usize {
-                        return Redirect::to("/team").into_response();
+                        return Redirect::temporary("/team").into_response();
                     }
                 }
             }
@@ -386,7 +386,6 @@ pub async fn route_signin_discord_callback(
         return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
     }
 
-    // get the user's avatar
     let avatar = if let Some(avatar) = profile.avatar {
         format!(
             "https://cdn.discordapp.com/avatars/{}/{}.{}",
@@ -406,17 +405,19 @@ pub async fn route_signin_discord_callback(
         )
     };
 
-    let (user_id, team_id) = state
+    let Ok((user_id, team_id)) = state
         .db
-        .upsert_user(
+        .upsert_user_by_discord_id(
             &profile.global_name,
             &profile.email,
             &avatar,
-            Some(discord_id),
+            discord_id,
             user.as_ref().map(|u| u.id),
         )
         .await
-        .unwrap();
+    else {
+        return Redirect::temporary("/signin").into_response();
+    };
 
     let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar).await;
     let mut response = Redirect::temporary("/team").into_response();
@@ -448,7 +449,7 @@ pub async fn route_signin_email(
             .unwrap();
     }
 
-    let mailer = state.outbound_mailer.as_ref().unwrap();
+    let outbound_mailer = state.outbound_mailer.as_ref().unwrap();
 
     let code = state
         .db
@@ -456,7 +457,7 @@ pub async fn route_signin_email(
         .await
         .unwrap();
 
-    if mailer
+    if outbound_mailer
         .send_email_signin(ip.map(|ip| ip.to_string()).as_deref(), &form.email, &code)
         .await
         .is_err()
@@ -558,14 +559,14 @@ pub async fn route_signin_email_callback(
     params: Query<EmailSignInParams>,
     cookie_jar: CookieJar,
 ) -> impl IntoResponse {
-    let email = state
+    let Ok(email) = state
         .db
         .verify_email_signin_callback_code(&params.code)
-        .await;
-    if email.is_err() {
-        return Redirect::to("/signin").into_response();
-    }
-    let email = email.unwrap();
+        .await
+    else {
+        tracing::info!(code = params.code, "invalid email signin callback code");
+        return Redirect::temporary("/signin").into_response();
+    };
 
     let name = email.split('@').next().unwrap();
 
@@ -581,11 +582,10 @@ pub async fn route_signin_email_callback(
         hash
     );
 
-    let (user_id, team_id) = state
-        .db
-        .upsert_user(name, &email, &avatar, None, None)
-        .await
-        .unwrap();
+    let Ok((user_id, team_id)) = state.db.upsert_user_by_email(name, &email, &avatar).await else {
+        tracing::info!(email, "failed to upsert user by email");
+        return Redirect::temporary("/signin").into_response();
+    };
 
     let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar).await;
     let mut response = Redirect::temporary("/team").into_response();
@@ -639,13 +639,6 @@ async fn sign_in_cookie(
                 .await
                 .unwrap();
         }
-
-        return Cookie::build(("rhombus-invite-token", ""))
-            .path("/")
-            .max_age(time::Duration::hours(-1))
-            .same_site(SameSite::Lax)
-            .http_only(true)
-            .build();
     }
 
     let token = encode(

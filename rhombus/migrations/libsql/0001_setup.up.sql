@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS rhombus_user_division (
 );
 
 CREATE TABLE IF NOT EXISTS rhombus_email (
-    email TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
     user_id INTEGER NOT NULL,
     code TEXT UNIQUE,
     PRIMARY KEY (email, user_id),

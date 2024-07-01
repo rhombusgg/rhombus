@@ -222,11 +222,21 @@ pub async fn route_account_add_email(
     }
 
     if let Some(mailer) = state.outbound_mailer {
-        let code = state
+        let Ok(code) = state
             .db
             .create_email_verification_callback_code(user.id, &form.email)
             .await
-            .unwrap();
+        else {
+            return Response::builder()
+                .body(format!(
+                    r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
+                    state
+                        .localizer
+                        .localize(&lang, "account-error-verification-email", None)
+                        .unwrap(),
+                ))
+                .unwrap();
+        };
 
         if mailer
             .send_email_confirmation(

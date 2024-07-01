@@ -4,12 +4,12 @@ location_url: http://localhost:3000
 database_url: file://rhombus.db
 contact_email: admin@rhombus.gg
 in_memory_cache: 20
-uploads:
-  s3:
-    bucket_name: my-test-bucket
-    access_key: VfpJaZlunFoqBkij08se
-    endpoint: http://localhost:9000
-    path_style: true
+# uploads:
+#   s3:
+#     bucket_name: my-test-bucket
+#     access_key: VfpJaZlunFoqBkij08se
+#     endpoint: http://localhost:9000
+#     path_style: true
 auth:
   - discord
   - email

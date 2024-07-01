@@ -11,7 +11,8 @@ use argon2::{password_hash::SaltString, Argon2, PasswordHash, PasswordHasher, Pa
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use futures::stream::StreamExt;
-use libsql::{de, params, Builder};
+use inflector::{cases::titlecase::to_title_case, string::pluralize::to_plural};
+use libsql::{de, params, Builder, Transaction};
 use rand::rngs::OsRng;
 use rust_embed::RustEmbed;
 use serde::Deserialize;
@@ -157,104 +158,67 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
         Ok(())
     }
 
-    async fn upsert_user(
+    async fn upsert_user_by_discord_id(
         &self,
         name: &str,
         email: &str,
         avatar: &str,
-        discord_id: Option<NonZeroU64>,
+        discord_id: NonZeroU64,
         user_id: Option<i64>,
     ) -> Result<(i64, i64)> {
-        if let Some(user_id) = user_id {
-            let existing_user_row = self
-                .connect()?
+        let tx = self.connect()?.transaction().await?;
+
+        let existing_user = if let Some(user_id) = user_id {
+            let team_id = tx
                 .query(
                     "
                     UPDATE rhombus_user
                     SET name = ?1, avatar = ?2, discord_id = ?3
                     WHERE id = ?4
+                    RETURNING team_id
+                ",
+                    params!(name, avatar, discord_id.get(), user_id),
+                )
+                .await?
+                .next()
+                .await?
+                .unwrap()
+                .get::<i64>(0)
+                .unwrap();
+            Some((user_id, team_id))
+        } else {
+            tx.query(
+                "
+                    UPDATE rhombus_user
+                    SET name = ?1, avatar = ?2
+                    WHERE discord_id = ?3
                     RETURNING id, team_id
                 ",
-                    params!(name, avatar, discord_id.map(|d| d.get() as i64), user_id),
-                )
-                .await?
-                .next()
-                .await?;
-            if let Some(existing_user_row) = existing_user_row {
-                #[derive(Debug, Deserialize)]
-                struct ExistingUser {
-                    id: i64,
-                    team_id: i64,
-                }
+                params!(name, avatar, discord_id.get()),
+            )
+            .await?
+            .next()
+            .await?
+            .map(|row| (row.get::<i64>(0).unwrap(), row.get::<i64>(1).unwrap()))
+        };
 
-                self.connect()?
-                    .execute(
-                        "
-                        INSERT OR REPLACE INTO rhombus_email (email, user_id) VALUES (?1, ?2)
-                    ",
-                        params!(email, user_id),
-                    )
-                    .await?;
+        if let Some(existing_user) = existing_user {
+            tx.execute(
+                "INSERT OR REPLACE INTO rhombus_email (email, user_id) VALUES (?1, ?2)",
+                params!(email, existing_user.0),
+            )
+            .await?;
 
-                let existing_user = de::from_row::<ExistingUser>(&existing_user_row).unwrap();
-                return Ok((existing_user.id, existing_user.team_id));
-            }
+            tx.commit().await?;
+            return Ok(existing_user);
         }
 
-        if let Some(discord_id) = discord_id {
-            let existing_user_row = self
-                .connect()?
-                .query(
-                    "SELECT id, team_id FROM rhombus_user WHERE discord_id = ?",
-                    [discord_id.get() as i64],
-                )
-                .await?
-                .next()
-                .await?;
-            if let Some(existing_user_row) = existing_user_row {
-                #[derive(Debug, Deserialize)]
-                struct ExistingUser {
-                    id: i64,
-                    team_id: i64,
-                }
+        let team_id = create_team(&tx).await?;
 
-                let existing_user = de::from_row::<ExistingUser>(&existing_user_row).unwrap();
-                return Ok((existing_user.id, existing_user.team_id));
-            }
-        } else {
-            let user_id = self
-                .connect()?
-                .query(
-                    "SELECT user_id FROM rhombus_email WHERE email = ? AND code IS NULL",
-                    [email],
-                )
-                .await?
-                .next()
-                .await?
-                .map(|row| row.get::<i64>(0).unwrap());
-            if let Some(user_id) = user_id {
-                let team_id = self
-                    .connect()?
-                    .query("SELECT team_id FROM rhombus_user WHERE id = ?1", [user_id])
-                    .await?
-                    .next()
-                    .await?
-                    .unwrap()
-                    .get::<i64>(0)
-                    .unwrap();
-                return Ok((user_id, team_id));
-            }
-        }
-
-        let tx = self.connect()?.transaction().await?;
-
-        let team_name = format!("{}'s team", name);
-        let team_invite_token = create_team_invite_token();
-
-        let team_id = tx
+        let user_id = tx
             .query(
-                "INSERT INTO rhombus_team (name, invite_token) VALUES (?1, ?2) RETURNING id",
-                [team_name, team_invite_token],
+                "INSERT INTO rhombus_user (name, avatar, discord_id, team_id, owner_team_id) VALUES (?1, ?2, ?3, ?4, ?4) RETURNING id",
+                params!(name, avatar, discord_id.get(), team_id),
             )
             .await?
             .next()
@@ -263,10 +227,50 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
             .get::<i64>(0)
             .unwrap();
 
+        tx.execute(
+            "INSERT INTO rhombus_email (email, user_id) VALUES (?1, ?2)",
+            params!(email, user_id),
+        )
+        .await?;
+
+        tx.commit().await?;
+        return Ok((user_id, team_id));
+    }
+
+    async fn upsert_user_by_email(
+        &self,
+        name: &str,
+        email: &str,
+        avatar: &str,
+    ) -> Result<(i64, i64)> {
+        let tx = self.connect()?.transaction().await?;
+
+        let existing_user = tx
+            .query(
+                "
+                SELECT user_id, team_id
+                FROM rhombus_email JOIN rhombus_user ON rhombus_user.id = rhombus_email.user_id
+                WHERE
+                    email = ?1 AND
+                    code IS NULL
+                ",
+                [email],
+            )
+            .await?
+            .next()
+            .await?
+            .map(|row| (row.get::<i64>(0).unwrap(), row.get::<i64>(1).unwrap()));
+        if let Some(existing_user) = existing_user {
+            tx.commit().await?;
+            return Ok(existing_user);
+        }
+
+        let team_id = create_team(&tx).await?;
+
         let user_id = tx
             .query(
-                "INSERT INTO rhombus_user (name, avatar, discord_id, team_id, owner_team_id) VALUES (?1, ?2, ?3, ?4, ?4) RETURNING id",
-                params!(name, avatar, discord_id.map(|id| id.get() as i64), team_id),
+                "INSERT INTO rhombus_user (name, avatar, team_id, owner_team_id) VALUES (?1, ?2, ?3, ?3) RETURNING id",
+                params!(name, avatar, team_id),
             )
             .await?
             .next()
@@ -329,20 +333,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
                 Ok(None)
             }
         } else {
-            let team_name = format!("{}'s team", username);
-            let team_invite_token = create_team_invite_token();
-
-            let team_id = tx
-                .query(
-                    "INSERT INTO rhombus_team (name, invite_token) VALUES (?1, ?2) RETURNING id",
-                    [team_name, team_invite_token],
-                )
-                .await?
-                .next()
-                .await?
-                .unwrap()
-                .get::<i64>(0)
-                .unwrap();
+            let team_id = create_team(&tx).await?;
 
             let salt = SaltString::generate(&mut OsRng);
             let argon2 = Argon2::default();
@@ -1771,6 +1762,26 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
         }
 
         Ok(TeamStandings { standings })
+    }
+}
+
+pub async fn create_team(tx: &Transaction) -> Result<i64> {
+    loop {
+        let team_invite_token = create_team_invite_token();
+
+        let team_name = to_title_case(&to_plural(&petname::petname(3, " ").unwrap()));
+
+        if let Ok(team_id) = tx
+            .query(
+                "INSERT INTO rhombus_team (name, invite_token) VALUES (?1, ?2) RETURNING id",
+                [team_name, team_invite_token],
+            )
+            .await?
+            .next()
+            .await
+        {
+            break Ok(team_id.unwrap().get::<i64>(0).unwrap());
+        }
     }
 }
 
