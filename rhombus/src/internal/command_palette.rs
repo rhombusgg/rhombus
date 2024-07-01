@@ -3,6 +3,8 @@ use serde_json::{json, Value};
 
 use crate::internal::{auth::MaybeUser, router::RouterState};
 
+use super::discord;
+
 pub async fn route_command_palette_items(
     state: State<RouterState>,
     Extension(user): Extension<MaybeUser>,
@@ -36,20 +38,16 @@ pub async fn route_command_palette_items(
             "divisions": divisions,
         }))
     } else {
-        let (discord_client_id, location_url) = {
+        let (location_url, discord) = {
             let settings = state.settings.read().await;
             (
-                settings.discord.as_ref().map(|d| d.client_id),
                 settings.location_url.clone(),
+                settings.discord.as_ref().map(|d| (d.client_id, d.autojoin)),
             )
         };
 
-        if let Some(discord_client_id) = discord_client_id {
-            let discord_signin_url = format!(
-                "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}/signin/discord&response_type=code&scope=identify+guilds.join",
-                discord_client_id,
-                location_url,
-            );
+        if let Some(discord) = discord {
+            let discord_signin_url = discord::signin_url(&location_url, discord.0, discord.1);
 
             return Json(json!({
                 "discord_signin_url": discord_signin_url,

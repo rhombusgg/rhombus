@@ -411,6 +411,13 @@
           "type": "string",
           "pattern": ".+\\..+\\..+"
         },
+        "autojoin": {
+          "title": "Automatically Join Guild",
+          "description": "Uses the \"Join servers for you\" OAuth permission to automatically join users to the configured server when they authenticate with Discord.",
+          "type": "boolean",
+          "default": true,
+          "examples": [false]
+        },
         "first_blood_channel_id": {
           "title": "First Blood Channel ID",
           "description": "Snowflake Discord ID for the channel which first bloods should be sent to",

@@ -22,7 +22,9 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::internal::{division::MaxDivisionPlayers, locales::Languages, router::RouterState};
+use crate::internal::{
+    discord, division::MaxDivisionPlayers, locales::Languages, router::RouterState,
+};
 
 #[derive(Debug, Serialize, Clone)]
 pub struct UserInner {
@@ -201,20 +203,17 @@ pub async fn route_signin(
         )
     };
 
-    let (discord_client_id, location_url, auth) = {
+    let (discord, location_url, auth) = {
         let settings = state.settings.read().await;
         (
-            settings.discord.as_ref().map(|d| d.client_id),
+            settings.discord.as_ref().map(|d| (d.client_id, d.autojoin)),
             settings.location_url.clone(),
             settings.auth.clone(),
         )
     };
 
-    let discord_signin_url = discord_client_id.map(|discord_client_id| format!(
-        "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}/signin/discord&response_type=code&scope=identify+guilds.join",
-        discord_client_id,
-        location_url,
-    ));
+    let discord_signin_url =
+        discord.map(|discord| discord::signin_url(&location_url, discord.0, discord.1));
 
     let html = state
         .jinja

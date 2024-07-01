@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DiscordSettings {
     pub client_id: NonZeroU64,
+    pub autojoin: Option<bool>,
     pub client_secret: String,
     pub bot_token: String,
     pub guild_id: NonZeroU64,
