@@ -18,6 +18,7 @@ pub use minijinja;
 pub mod builder;
 
 pub mod challenge_loader_plugin;
+pub mod database_upload_provider;
 mod local_upload_provider;
 pub mod plugin;
 pub mod s3_upload_provider;

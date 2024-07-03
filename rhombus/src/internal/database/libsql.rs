@@ -16,6 +16,7 @@ use libsql::{de, params, Builder, Transaction};
 use rand::rngs::OsRng;
 use rust_embed::RustEmbed;
 use serde::Deserialize;
+use tokio_util::bytes::Bytes;
 
 use crate::{
     internal::{
@@ -1762,6 +1763,40 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
         }
 
         Ok(TeamStandings { standings })
+    }
+
+    async fn upload_file(&self, hash: &str, filename: &str, bytes: &[u8]) -> Result<()> {
+        self.connect()?
+            .query(
+                "INSERT INTO rhombus_file (hash, filename, contents) VALUES (?1, ?2, ?3)",
+                params!(hash, filename, bytes),
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    async fn download_file(&self, hash: &str) -> Result<(Bytes, String)> {
+        #[derive(Debug, Deserialize)]
+        struct DbFile {
+            filename: String,
+            contents: Vec<u8>,
+        }
+
+        let row = self
+            .connect()?
+            .query(
+                "SELECT filename, contents FROM rhombus_file WHERE hash = ?1",
+                [hash],
+            )
+            .await?
+            .next()
+            .await?
+            .ok_or(libsql::Error::QueryReturnedNoRows)?;
+
+        let file = de::from_row::<DbFile>(&row).unwrap();
+
+        Ok((Bytes::from(file.contents), file.filename))
     }
 }
 

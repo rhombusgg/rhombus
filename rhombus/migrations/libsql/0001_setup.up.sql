@@ -23,6 +23,13 @@ CREATE TABLE IF NOT EXISTS rhombus_file_attachment (
     FOREIGN KEY (challenge_id) REFERENCES rhombus_challenge(id)
 );
 
+CREATE TABLE IF NOT EXISTS rhombus_file (
+    hash TEXT NOT NULL UNIQUE,
+    filename TEXT NOT NULL,
+    contents BLOB NOT NULL,
+    PRIMARY KEY (hash)
+);
+
 CREATE TABLE IF NOT EXISTS rhombus_division (
     id INTEGER PRIMARY KEY NOT NULL,
     name TEXT NOT NULL UNIQUE,

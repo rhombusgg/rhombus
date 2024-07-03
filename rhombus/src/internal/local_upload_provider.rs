@@ -38,18 +38,17 @@ pub async fn route_local_download(
     let filepath = std::path::Path::new(&state.base_path).join(&path);
 
     let filepath = match filepath.canonicalize() {
-        Ok(path) => {
-            tracing::info!(
-                path = path.to_str().unwrap(),
-                user_id = maybe_user.map(|u| u.id),
-                "Downloading"
-            );
-            path
-        }
+        Ok(path) => path,
         Err(_) => {
             return (StatusCode::NOT_FOUND, "Not Found").into_response();
         }
     };
+
+    tracing::info!(
+        path = filepath.to_str().unwrap(),
+        user_id = maybe_user.map(|u| u.id),
+        "Downloading from local file"
+    );
 
     let mut response = ServeFile::new(&filepath).try_call(req).await.unwrap();
     response.headers_mut().insert(

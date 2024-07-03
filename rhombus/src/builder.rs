@@ -19,6 +19,7 @@ use tower_http::compression::CompressionLayer;
 use tracing::info;
 
 use crate::{
+    database_upload_provider::DatabaseUploadProvider,
     errors::{DatabaseConfigurationError, RhombusError},
     internal::{
         auth::{
@@ -567,6 +568,28 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
 
                 let mut plugin_builder = RunContext {
                     upload_provider: &s3_upload_provider,
+                    env: &mut jinja,
+                    localizations: &mut localizer,
+                    settings: &mut settings,
+                    divisions: &mut divisions,
+                    rawdb: &rawdb,
+                    db,
+                };
+
+                let plugin_router = self.plugins.run(&mut plugin_builder).await?;
+
+                (plugin_router, upload_router)
+            } else if settings
+                .uploads
+                .as_ref()
+                .and_then(|u| u.database)
+                .is_some_and(|d| d)
+            {
+                let database_upload_provider = DatabaseUploadProvider::new(db).await;
+                let upload_router = database_upload_provider.routes()?;
+
+                let mut plugin_builder = RunContext {
+                    upload_provider: &database_upload_provider,
                     env: &mut jinja,
                     localizations: &mut localizer,
                     settings: &mut settings,

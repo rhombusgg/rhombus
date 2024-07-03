@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use tokio::sync::RwLock;
+use tokio_util::bytes::Bytes;
 
 use crate::{
     internal::{
@@ -399,6 +400,14 @@ impl Database for DbCache {
 
     async fn get_team_standings(&self, team_id: i64) -> Result<TeamStandings> {
         get_team_standing(&self.inner, team_id).await
+    }
+
+    async fn upload_file(&self, hash: &str, filename: &str, bytes: &[u8]) -> Result<()> {
+        self.inner.upload_file(hash, filename, bytes).await
+    }
+
+    async fn download_file(&self, hash: &str) -> Result<(Bytes, String)> {
+        self.inner.download_file(hash).await
     }
 }
 

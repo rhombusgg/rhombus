@@ -22,13 +22,13 @@
   - [x] Authors without accounts
 - [x] File uploads
   - [x] Local file provider
-  - [ ] In database file provider
-  - [ ] S3 file provider
+  - [x] In database file provider
+  - [x] S3 file provider
 - [x] Single static binary
 - [x] User pages
   - [ ] Admin geoip view
 - [x] Team pages
-- [ ] Homepage/countdown (plugin integration)
+- [ ] Homepage/countdown
 - [x] Divisions
   - [ ] Link to discord role
   - [ ] First blood formatting when there is only 1 division
@@ -40,12 +40,11 @@
 - [x] Tickets
   - [x] From site (markdown editor)
   - [x] From discord
-  - [ ] Email-only
+  - [x] Email-only
 - [ ] Onboarding
 - [x] Email-only accounts
   - [x] Email confirmation
   - [x] Gravatar lookup
-  - [ ] IMAP IDLE
 - [x] Challenge loader plugin
 - [ ] API
   - [ ] Access tokens

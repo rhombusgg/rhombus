@@ -78,6 +78,7 @@ pub struct S3UploadProviderSettings {
 pub struct UploadProviderSettings {
     pub local: Option<LocalUploadProviderSettings>,
     pub s3: Option<S3UploadProviderSettings>,
+    pub database: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

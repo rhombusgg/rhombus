@@ -124,6 +124,11 @@
             }
           }
         },
+        "database": {
+          "title": "Database Upload Provider",
+          "description": "An upload provider which saves and serves from the currently configured database in blobs",
+          "type": "boolean"
+        },
         "s3": {
           "title": "S3 Upload Provider",
           "description": "An upload provider which saves and serves from an S3 bucket",

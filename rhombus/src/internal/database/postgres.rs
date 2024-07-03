@@ -3,6 +3,7 @@ use std::{net::IpAddr, num::NonZeroU64};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
+use tokio_util::bytes::Bytes;
 
 use crate::{
     internal::{
@@ -320,6 +321,14 @@ impl Database for Postgres {
 
     async fn get_team_standings(&self, _team_id: i64) -> Result<TeamStandings> {
         todo!();
+    }
+
+    async fn upload_file(&self, _hash: &str, _filename: &str, _bytes: &[u8]) -> Result<()> {
+        todo!()
+    }
+
+    async fn download_file(&self, _hash: &str) -> Result<(Bytes, String)> {
+        todo!()
     }
 }
 

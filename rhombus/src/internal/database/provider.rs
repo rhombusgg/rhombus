@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, net::IpAddr, num::NonZeroU64, sync::Arc};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
+use tokio_util::bytes::Bytes;
 
 use crate::{
     internal::{auth::User, database::cache::Writeups, division::Division, settings::Settings},
@@ -295,4 +296,6 @@ pub trait Database {
     async fn get_team_divisions(&self, team_id: i64) -> Result<Vec<i64>>;
     async fn set_team_division(&self, team_id: i64, division_id: i64, join: bool) -> Result<()>;
     async fn get_team_standings(&self, team_id: i64) -> Result<TeamStandings>;
+    async fn upload_file(&self, hash: &str, filename: &str, bytes: &[u8]) -> Result<()>;
+    async fn download_file(&self, hash: &str) -> Result<(Bytes, String)>;
 }

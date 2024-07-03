@@ -4,7 +4,8 @@ location_url: http://localhost:3000
 database_url: file://rhombus.db
 contact_email: admin@rhombus.gg
 in_memory_cache: 20
-# uploads:
+uploads:
+  database: true
 #   s3:
 #     bucket_name: my-test-bucket
 #     access_key: VfpJaZlunFoqBkij08se
