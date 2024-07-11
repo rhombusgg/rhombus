@@ -60,8 +60,6 @@
             cmake
             sqlite
             mold
-            rustup
-            cargo-cross
             go-task
             tailwindcss
             cargo-watch

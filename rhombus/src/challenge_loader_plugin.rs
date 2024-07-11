@@ -64,6 +64,7 @@ impl ChallengeLoaderPlugin {
                     ticket_template: challenge.ticket_template,
                     points: challenge.points,
                     files: challenge.files,
+                    healthscript: challenge.healthscript,
                     root,
                 }
             })
@@ -238,8 +239,8 @@ impl Plugin for ChallengeLoaderPlugin {
                     _ = tx
                         .execute(
                             "
-                            INSERT OR REPLACE INTO rhombus_challenge (id, name, description, flag, category_id, author_id, ticket_template, score_type, static_points)
-                            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                            INSERT OR REPLACE INTO rhombus_challenge (id, name, description, flag, category_id, author_id, ticket_template, score_type, static_points, healthscript)
+                            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
                         ",
                             params!(
                                 id,
@@ -250,7 +251,8 @@ impl Plugin for ChallengeLoaderPlugin {
                                 author_id,
                                 challenge.ticket_template.as_str(),
                                 score_type,
-                                static_points
+                                static_points,
+                                challenge.healthscript.as_deref()
                             ),
                         )
                         .await?;
@@ -344,6 +346,7 @@ pub struct Challenge {
     pub ticket_template: String,
     pub points: String,
     pub files: Vec<Attachment>,
+    pub healthscript: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -357,6 +360,7 @@ pub struct ChallengeIntermediate {
     pub ticket_template: String,
     pub points: String,
     pub files: Vec<Attachment>,
+    pub healthscript: Option<String>,
     pub root: PathBuf,
 }
 

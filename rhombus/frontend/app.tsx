@@ -252,8 +252,14 @@ theme = Theme
 light-theme = Light Theme
 dark-theme = Dark Theme
 
-healthy = Challenge is <span class="text-green-500">up</span>
-unhealthy = Challenge is <span class="text-red-500">down</span>
+healthy = Challenge is <span class="text-green-500">up</span>. Last checked {$last_checked ->
+  [one] {$last_checked} minute
+  *[other] {$last_checked} minutes
+} ago
+unhealthy = Challenge is <span class="text-red-500">down</span>. Last checked {$last_checked ->
+  [one] {$last_checked} minute
+  *[other] {$last_checked} minutes
+} ago
 solved-by = Solved by {$name}
 authored-by = Authored by {$name}
 solves = {$solves ->
@@ -283,8 +289,14 @@ theme = Farbdesign
 light-theme = Helles Farbdesign
 dark-theme = Dunkles Farbdesign
 
-healthy = Challenge ist <span class="text-green-500">online</span>
-unhealthy = Challenge ist <span class="text-red-500">offline</span>
+healthy = Challenge ist <span class="text-green-500">online</span> und wurde vor {$last_checked ->
+  [one] {$last_checked} Minute
+  *[other] {$last_checked} Minuten
+} überprüft
+unhealthy = Challenge ist <span class="text-red-500">offline</span> und wurde vor {$last_checked ->
+  [one] {$last_checked} Minute
+  *[other] {$last_checked} Minuten
+} überprüft
 solved-by = Gelöst von {$name}
 authored-by = Geschrieben von {$name}
 solves = {$solves ->
@@ -427,24 +439,46 @@ const ChallengesComponent = ({
                               </span>
                               <span> {challenge.name}</span>
                             </div>
-                            <Tooltip placement="top">
-                              <Tooltip.Portal>
-                                <Tooltip.Content class="tooltip">
-                                  {challenge.healthy ? (
-                                    <div innerHTML={translate("healthy")}></div>
-                                  ) : (
-                                    <div
-                                      innerHTML={translate("unhealthy")}
-                                    ></div>
-                                  )}
-                                  <Tooltip.Arrow class="text-secondary" />
-                                </Tooltip.Content>
-                              </Tooltip.Portal>
-                              <Tooltip.Trigger
-                                as="div"
-                                class={`size-3 rounded-full cursor-pointer ${challenge.healthy ? "bg-green-500" : "bg-red-500"}`}
-                              />
-                            </Tooltip>
+                            <Show when={challenge.health}>
+                              <Tooltip placement="top">
+                                <Tooltip.Portal>
+                                  <Tooltip.Content class="tooltip">
+                                    {challenge.health.healthy ? (
+                                      <div
+                                        innerHTML={translate("healthy", {
+                                          last_checked: Math.ceil(
+                                            (new Date().getTime() -
+                                              new Date(
+                                                challenge.health.last_checked,
+                                              ).getTime()) /
+                                              1000 /
+                                              60,
+                                          ),
+                                        })}
+                                      ></div>
+                                    ) : (
+                                      <div
+                                        innerHTML={translate("unhealthy", {
+                                          last_checked: Math.ceil(
+                                            (new Date().getTime() -
+                                              new Date(
+                                                challenge.health.last_checked,
+                                              ).getTime()) /
+                                              1000 /
+                                              60,
+                                          ),
+                                        })}
+                                      ></div>
+                                    )}
+                                    <Tooltip.Arrow class="text-secondary" />
+                                  </Tooltip.Content>
+                                </Tooltip.Portal>
+                                <Tooltip.Trigger
+                                  as="div"
+                                  class={`size-3 rounded-full cursor-pointer ${challenge.health.healthy ? "bg-green-500" : "bg-red-500"}`}
+                                />
+                              </Tooltip>
+                            </Show>
                           </div>
                           <div class="flex items-center gap-4">
                             <Show when={solve}>
@@ -638,7 +672,10 @@ type ChallengesData = {
     id: number;
     name: string;
     description: string;
-    healthy: boolean;
+    health: {
+      healthy: boolean;
+      last_checked: string;
+    } | null;
     category_id: number;
     author_id: number;
     division_points: {

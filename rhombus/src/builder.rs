@@ -41,6 +41,7 @@ use crate::{
             imap::ImapEmailReciever, mailgun::MailgunProvider, outbound_mailer::OutboundMailer,
             provider::InboundEmail, smtp::SmtpProvider,
         },
+        health::{healthcheck_catch_up, healthcheck_runner},
         ip::{
             default_ip_extractor, ip_insert_blank_middleware, ip_insert_middleware,
             maybe_cf_connecting_ip, maybe_fly_client_ip, maybe_peer_ip,
@@ -764,6 +765,9 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     .await?;
             }
         }
+
+        healthcheck_catch_up(db).await;
+        healthcheck_runner(db);
 
         db.insert_divisions(&divisions).await?;
 

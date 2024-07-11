@@ -10,7 +10,7 @@
   ></div>
 
   <div class="hidden" id="initial-challenge-json">
-    {{- challenge_json | safe -}}
+    {{- challenge_json | tojson -}}
   </div>
   <script>
     (function () {

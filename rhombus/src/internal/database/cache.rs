@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, net::IpAddr, num::NonZeroU64, time::Duration};
+use std::{collections::BTreeMap, net::IpAddr, num::NonZeroU64, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -10,8 +10,8 @@ use crate::{
     internal::{
         auth::User,
         database::provider::{
-            Challenge, Challenges, Connection, Database, Email, FirstBloods, Leaderboard,
-            Scoreboard, Team, TeamMeta, TeamStandings, Ticket, Writeup,
+            Challenge, ChallengeData, Challenges, Connection, Database, Email, FirstBloods,
+            Leaderboard, Scoreboard, Team, TeamMeta, TeamStandings, Ticket, Writeup,
         },
         division::Division,
         settings::Settings,
@@ -107,6 +107,36 @@ impl Database for DbCache {
 
     async fn get_challenges(&self) -> Result<Challenges> {
         get_challenges(&self.inner).await
+    }
+
+    async fn set_challenge_health(
+        &self,
+        challenge_id: i64,
+        healthy: Option<bool>,
+        checked_at: DateTime<Utc>,
+    ) -> Result<()> {
+        self.inner
+            .set_challenge_health(challenge_id, healthy, checked_at)
+            .await?;
+
+        if let Some(ref mut cached) = &mut *CHALLENGES_CACHE.write().await {
+            let mut challenges = cached.challenges.clone();
+            if let Some(challenge) = challenges
+                .iter_mut()
+                .find(|challenge| challenge.id == challenge_id)
+            {
+                challenge.healthy = healthy;
+                challenge.last_healthcheck = Some(checked_at);
+            }
+            *cached = Arc::new(ChallengeData {
+                challenges,
+                authors: cached.authors.clone(),
+                categories: cached.categories.clone(),
+                divisions: cached.divisions.clone(),
+            });
+        }
+
+        Ok(())
     }
 
     async fn get_team_meta_from_invite_token(

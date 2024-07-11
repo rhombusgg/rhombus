@@ -45,9 +45,11 @@ pub struct Challenge {
     pub id: i64,
     pub name: String,
     pub description: String,
-    pub healthy: bool,
     pub category_id: i64,
     pub author_id: i64,
+    pub healthscript: Option<String>,
+    pub healthy: Option<bool>,
+    pub last_healthcheck: Option<DateTime<Utc>>,
     pub division_points: Vec<ChallengeDivisionPoints>,
     pub scoring_type: ScoringType,
     pub flag: String,
@@ -192,6 +194,12 @@ pub struct Ticket {
 pub trait Database {
     async fn migrate(&self) -> Result<()>;
     async fn get_challenges(&self) -> Result<Challenges>;
+    async fn set_challenge_health(
+        &self,
+        challenge_id: i64,
+        healthy: Option<bool>,
+        checked_at: DateTime<Utc>,
+    ) -> Result<()>;
     async fn upsert_user_by_discord_id(
         &self,
         name: &str,

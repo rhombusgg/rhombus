@@ -9,7 +9,7 @@ use std::{
 
 use argon2::{password_hash::SaltString, Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use futures::stream::StreamExt;
 use inflector::{cases::titlecase::to_title_case, string::pluralize::to_plural};
 use libsql::{de, params, Builder, Transaction};
@@ -489,8 +489,10 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
             name: String,
             description: String,
             category_id: i64,
-            healthy: bool,
             author_id: i64,
+            healthy: Option<bool>,
+            healthscript: Option<String>,
+            last_healthcheck: Option<i64>,
             flag: String,
             score_type: i64,
             ticket_template: Option<String>,
@@ -503,8 +505,12 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
                 name: challenge.name,
                 description: challenge.description,
                 category_id: challenge.category_id,
-                healthy: challenge.healthy,
                 author_id: challenge.author_id,
+                healthy: challenge.healthy,
+                healthscript: challenge.healthscript,
+                last_healthcheck: challenge
+                    .last_healthcheck
+                    .map(|t| Utc.timestamp_opt(t, 0).unwrap()),
                 flag: challenge.flag,
                 scoring_type: challenge.score_type.into(),
                 division_points: dbps.get(&challenge.id).unwrap().to_vec(),
@@ -578,6 +584,22 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
             authors,
             divisions,
         }))
+    }
+
+    async fn set_challenge_health(
+        &self,
+        challenge_id: i64,
+        healthy: Option<bool>,
+        checked_at: DateTime<Utc>,
+    ) -> Result<()> {
+        self.connect()?
+            .execute(
+                "UPDATE rhombus_challenge SET healthy = ?2, last_healthcheck = ?3 WHERE id = ?1",
+                params!(challenge_id, healthy, checked_at.timestamp()),
+            )
+            .await?;
+
+        Ok(())
     }
 
     async fn get_team_meta_from_invite_token(

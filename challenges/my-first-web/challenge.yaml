@@ -12,3 +12,4 @@ files:
     dst: statue.svg
 ticket_template: |
   # Web template
+healthscript: https://example.com

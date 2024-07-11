@@ -14,7 +14,7 @@
   - [x] Environment variables
 - [ ] Challenges
   - [x] Categories
-  - [ ] Healthchecks
+  - [x] Healthchecks
   - [x] Writeups
   - [x] Dynamic scoring
   - [ ] Markdown rendering

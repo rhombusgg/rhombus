@@ -137,6 +137,15 @@ impl Database for Postgres {
         todo!()
     }
 
+    async fn set_challenge_health(
+        &self,
+        _challenge_id: i64,
+        _healthy: Option<bool>,
+        _checked_at: DateTime<Utc>,
+    ) -> Result<()> {
+        todo!()
+    }
+
     async fn get_team_meta_from_invite_token(
         &self,
         _invite_token: &str,

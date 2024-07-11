@@ -41,7 +41,14 @@ pub async fn route_challenges(
             "id": challenge.id,
             "name": challenge.name,
             "description": challenge.description,
-            "healthy": challenge.healthy,
+            "health": if let (Some(healthy), Some(last_checked)) = (challenge.healthy, challenge.last_healthcheck) {
+                Some(json!({
+                    "last_checked": last_checked,
+                    "healthy": healthy,
+                }))
+            } else {
+                None
+            },
             "category_id": challenge.category_id,
             "author_id": challenge.author_id,
             "division_points": challenge.division_points.iter().map(|division_points| json!({
