@@ -1,13 +1,12 @@
 use std::any::Any;
 
 use axum::Router;
-use minijinja::Environment;
 
 use crate::{
     builder::RawDb,
     internal::{
         database::provider::Connection, division::Division, locales::Localizations,
-        router::RouterState, settings::Settings,
+        router::RouterState, settings::Settings, templates::Templates,
     },
     upload_provider::EitherUploadProvider,
     Result, UploadProvider,
@@ -19,8 +18,7 @@ pub struct RunContext<'a, U: UploadProvider> {
     /// function of the [Plugin] trait.
     pub upload_provider: &'a U,
 
-    /// [Minijinja](https://github.com/mitsuhiko/minijinja) environment for rendering templates with.
-    pub env: &'a mut Environment<'static>,
+    pub templates: &'a mut Templates<'static>,
 
     /// [Fluent](https://projectfluent.org) localizations to add or modify language strings.
     pub localizations: &'a mut Localizations,

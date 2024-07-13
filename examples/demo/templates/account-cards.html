@@ -1,0 +1,15 @@
+{% import "card.html" as card %}
+
+{% call card.root() %}
+  {% call card.header() %}
+    {% call card.title() %}
+      ⚠ Admin Toggle ⚠
+    {% endcall %}
+    {% call card.description() %}
+      Provided by the Rhombus Demo plugin
+    {% endcall %}
+  {% endcall %}
+  {% call card.content() %}
+    <button>Make yourself admin</button>
+  {% endcall %}
+{% endcall %}

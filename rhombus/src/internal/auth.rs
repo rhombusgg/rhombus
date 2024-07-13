@@ -203,12 +203,13 @@ pub async fn route_signin(
         )
     };
 
-    let (discord, location_url, auth) = {
+    let (discord, location_url, auth, title) = {
         let settings = state.settings.read().await;
         (
             settings.discord.as_ref().map(|d| (d.client_id, d.autojoin)),
             settings.location_url.clone(),
             settings.auth.clone(),
+            settings.title.clone(),
         )
     };
 
@@ -220,14 +221,15 @@ pub async fn route_signin(
         .get_template("signin.html")
         .unwrap()
         .render(context! {
-            lang => lang,
-            user => user,
+            lang,
+            user,
+            location_url,
+            discord_signin_url,
+            title,
             uri => uri.to_string(),
-            location_url => location_url,
-            discord_signin_url => discord_signin_url,
             auth_options => auth,
             og_image => format!("{}/og-image.png", location_url),
-            team_name => team_name
+            team_name,
         })
         .unwrap();
 

@@ -1,6 +1,5 @@
 use std::{
     any::Any,
-    env,
     hash::{BuildHasher, BuildHasherDefault, Hasher},
     num::NonZeroU32,
     sync::Arc,
@@ -72,6 +71,7 @@ use crate::{
         },
         settings::{DbConfig, IpPreset, Settings},
         static_serve::route_static_serve,
+        templates::Templates,
     },
     plugin::{DatabaseProviderContext, RunContext, UploadProviderContext},
     s3_upload_provider::S3UploadProvider,
@@ -156,8 +156,8 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
     pub fn config_from_shuttle(self, secrets_iter: impl Iterator<Item = (String, String)>) -> Self {
         for item in secrets_iter {
             let (key, value) = item;
-            if env::var(&key).is_err() {
-                env::set_var(&key, value);
+            if std::env::var(&key).is_err() {
+                std::env::set_var(&key, value);
             }
         }
 
@@ -516,10 +516,11 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
 
         let mut localizer = locales::Localizations::new();
 
-        let mut jinja = minijinja::Environment::new();
-        minijinja_embed::load_templates!(&mut jinja);
+        let templates = Box::leak(Box::new(Templates::new()));
 
-        jinja.add_function("timediff", jinja_timediff);
+        if let Some(ref logo) = settings.logo {
+            templates.add_template("logo.html".to_owned(), logo.clone());
+        }
 
         let plugin_upload_provider_builder = UploadProviderContext {
             settings: &settings.clone(),
@@ -536,7 +537,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
 
                 let mut plugin_builder = RunContext {
                     upload_provider: &plugin_upload_provider,
-                    env: &mut jinja,
+                    templates,
                     localizations: &mut localizer,
                     settings: &mut settings,
                     divisions: &mut divisions,
@@ -552,7 +553,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
 
                 let mut plugin_builder = RunContext {
                     upload_provider: &upload_provider,
-                    env: &mut jinja,
+                    templates,
                     localizations: &mut localizer,
                     settings: &mut settings,
                     divisions: &mut divisions,
@@ -569,7 +570,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
 
                 let mut plugin_builder = RunContext {
                     upload_provider: &s3_upload_provider,
-                    env: &mut jinja,
+                    templates,
                     localizations: &mut localizer,
                     settings: &mut settings,
                     divisions: &mut divisions,
@@ -591,7 +592,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
 
                 let mut plugin_builder = RunContext {
                     upload_provider: &database_upload_provider,
-                    env: &mut jinja,
+                    templates,
                     localizations: &mut localizer,
                     settings: &mut settings,
                     divisions: &mut divisions,
@@ -626,7 +627,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
 
                 let mut plugin_builder = RunContext {
                     upload_provider: &local_upload_provider,
-                    env: &mut jinja,
+                    templates,
                     localizations: &mut localizer,
                     settings: &mut settings,
                     divisions: &mut divisions,
@@ -705,14 +706,16 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
         let settings: &'static _ = Box::leak(Box::new(RwLock::new(settings)));
 
         let localizer: &'static _ = Box::leak(Box::new(localizer));
+
+        let jinja = Box::leak(Box::new(templates.set_to_env()));
+        jinja.add_function("timediff", jinja_timediff);
+
         jinja.add_function(
             "t",
             move |msg_id: &str, kwargs: minijinja::value::Kwargs, state: &minijinja::State| {
                 jinja_translate(localizer, msg_id, kwargs, state)
             },
         );
-
-        let jinja: &'static _ = Box::leak(Box::new(jinja));
 
         let (outbound_mailer, mailgun_router): (Option<&'static _>, Router<RouterState>) =
             if let Some(email) = settings.read().await.email.as_ref() {

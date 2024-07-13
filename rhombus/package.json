@@ -15,6 +15,7 @@
     "@fluent/bundle": "^0.18.0",
     "@fluent/langneg": "^0.7.0",
     "@kobalte/core": "^0.13.2",
+    "@tailwindcss/typography": "0.5.13",
     "clsx": "^2.1.1",
     "cmdk-solid": "^1.0.1",
     "esbuild": "^0.21.2",

@@ -13,4 +13,5 @@ pub mod router;
 pub mod routes;
 pub mod settings;
 pub mod static_serve;
+pub mod templates;
 pub mod upload_provider;

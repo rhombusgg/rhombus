@@ -13,6 +13,12 @@ tasks:
     cmds:
       - mold -run cargo watch -x 'run -p standalone'
 
+  watch-demo:
+    desc: Start cargo watch
+    dir: examples/demo
+    cmds:
+      - mold -run cargo watch -x run
+
   watch-standalone-release:
     desc: Start cargo watch
     cmds:

@@ -28,7 +28,7 @@
 - [x] User pages
   - [ ] Admin geoip view
 - [x] Team pages
-- [ ] Homepage/countdown
+- [x] Homepage/countdown
 - [x] Divisions
   - [ ] Link to discord role
   - [ ] First blood formatting when there is only 1 division

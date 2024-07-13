@@ -1,0 +1,58 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/rhombusgg/rhombus-rs/main/schema.json
+location_url: http://localhost:3000
+database_url: file://rhombus.db
+contact_email: admin@rhombus.gg
+uploads:
+  database: true
+auth:
+  - discord
+  - email
+  - credentials
+divisions:
+  - name: Open
+    description: Open division for everyone
+  - name: Undergraduate
+    description: Undergraduate university students globally
+    email_regex: ^.*.edu$
+    requirement: Must verify a valid university .edu email address. Max of up to 4 players
+    max_players: 4
+ctftime:
+  client_id: 1
+discord:
+  guild_id: 1160610137703186636
+  client_id: 1160076447977848945
+  author_role_id: 1198496803130183770
+  first_blood_channel_id: 1240422645938389102
+  support_channel_id: 1173026578385617010
+  verified_role_id: 1170429782270431283
+title: Rhombus Demo
+logo: |
+  <svg
+    style="width: 2.25rem"
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    class="lucide lucide-construction"
+  >
+    <rect x="2" y="6" width="20" height="8" rx="1" />
+    <path d="M17 14v7" />
+    <path d="M7 14v7" />
+    <path d="M17 3v3" />
+    <path d="M7 3v3" />
+    <path d="M10 14 2.3 6.3" />
+    <path d="m14 6 7.7 7.7" />
+    <path d="m8 6 8 8" />
+  </svg>
+home:
+  content: |
+    # Welcome to Rhombus Demo
+
+    This is a demo instance of [Rhombus](https://github.com/rhombusgg/rhombus-rs). Feel free to _explore_ the platform and create challenges.
+
+    - It resets every 10 minutes.

@@ -14,6 +14,9 @@ pub use axum;
 pub use config;
 pub use minijinja;
 
+#[cfg(feature = "libsql")]
+pub use libsql;
+
 /// Builder module
 pub mod builder;
 

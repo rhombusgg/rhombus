@@ -13,7 +13,8 @@ module.exports = {
       addVariant("htmx-swapping", ["&.htmx-swapping", ".htmx-swapping &"]);
       addVariant("htmx-added", ["&.htmx-added", ".htmx-added &"]);
     }),
-    require('tailwindcss-animate'),
+    require("tailwindcss-animate"),
+    require("@tailwindcss/typography"),
   ],
   theme: {
     container: {

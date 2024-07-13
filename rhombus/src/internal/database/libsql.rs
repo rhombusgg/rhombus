@@ -513,7 +513,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
                     .map(|t| Utc.timestamp_opt(t, 0).unwrap()),
                 flag: challenge.flag,
                 scoring_type: challenge.score_type.into(),
-                division_points: dbps.get(&challenge.id).unwrap().to_vec(),
+                division_points: dbps.get(&challenge.id).unwrap_or(&vec![]).to_vec(),
                 ticket_template: challenge.ticket_template,
                 attachments: attachments.get(&challenge.id).unwrap_or(&vec![]).to_vec(),
             })

@@ -16,10 +16,10 @@
           class="flex"
         >
           <a href="/" class="mr-6 flex items-center space-x-2">
-            {{ icons.rhombus(attrs='class="size-9"') }}
+            {% include "logo.html" %}
 
             <span class="hidden font-bold sm:inline-block lg:text-base"
-              >Rhombus</span
+              >{{ title }}</span
             >
           </a>
           {{ navbarItem(label=t("scoreboard"), href="/scoreboard", uri=uri) }}

@@ -51,7 +51,10 @@ pub async fn route_team(
     let team_divisions = team_divisions.unwrap();
     let standings = standings.unwrap();
 
-    let location_url = { state.settings.read().await.location_url.clone() };
+    let (location_url, title) = {
+        let settings = state.settings.read().await;
+        (settings.location_url.clone(), settings.title.clone())
+    };
     let team_invite_url = format!("{}/signin?token={}", location_url, team.invite_token);
 
     let mut challenges = BTreeMap::new();
@@ -115,6 +118,7 @@ pub async fn route_team(
                 lang,
                 user,
                 team,
+                title,
                 team_invite_url,
                 min_players,
                 uri => uri.to_string(),

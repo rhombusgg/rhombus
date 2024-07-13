@@ -14,17 +14,44 @@ pub async fn route_home(
     Extension(lang): Extension<Languages>,
     uri: Uri,
 ) -> impl IntoResponse {
-    let location_url = { state.settings.read().await.location_url.clone() };
+    let (location_url, title, home) = {
+        let settings = state.settings.read().await;
+        (
+            settings.location_url.clone(),
+            settings.title.clone(),
+            settings.home.clone(),
+        )
+    };
+
+    let content = home.and_then(|home| {
+        home.content.map(|content| {
+            markdown::to_html_with_options(
+                &content,
+                &markdown::Options {
+                    compile: markdown::CompileOptions {
+                        allow_dangerous_html: true,
+                        allow_dangerous_protocol: true,
+                        ..markdown::CompileOptions::default()
+                    },
+                    ..markdown::Options::default()
+                },
+            )
+            .unwrap()
+        })
+    });
+
     Html(
         state
             .jinja
             .get_template("home.html")
             .unwrap()
             .render(context! {
-                lang => lang,
-                user => user,
+                title,
+                lang,
+                user,
+                location_url,
+                content,
                 uri => uri.to_string(),
-                location_url => location_url,
                 og_image => format!("{}/og-image.png", location_url)
             })
             .unwrap(),

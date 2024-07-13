@@ -34,6 +34,8 @@ pub async fn route_public_user(
         categories.insert(category.id, category);
     }
 
+    let title = { state.settings.read().await.title.clone() };
+
     Html(
         state
             .jinja
@@ -42,6 +44,7 @@ pub async fn route_public_user(
             .render(context! {
                 lang,
                 user,
+                title,
                 uri => uri.to_string(),
                 public_user,
                 public_team => team,
@@ -78,6 +81,8 @@ pub async fn route_public_team(
         categories.insert(category.id, category);
     }
 
+    let title = { state.settings.read().await.title.clone() };
+
     Html(
         state
             .jinja
@@ -86,6 +91,7 @@ pub async fn route_public_team(
             .render(context! {
                 lang,
                 user,
+                title,
                 uri => uri.to_string(),
                 public_team => team,
                 now => chrono::Utc::now(),

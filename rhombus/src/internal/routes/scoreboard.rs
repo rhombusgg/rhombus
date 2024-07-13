@@ -57,6 +57,8 @@ pub async fn route_scoreboard_division(
         }
     }
 
+    let title = { state.settings.read().await.title.clone() };
+
     Html(
         state
             .jinja
@@ -65,6 +67,7 @@ pub async fn route_scoreboard_division(
             .render(context! {
                 lang,
                 user,
+                title,
                 uri => "/scoreboard",
                 scoreboard => scoreboard.teams,
                 divisions => challenge_data.divisions,

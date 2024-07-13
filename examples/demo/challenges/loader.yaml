@@ -1,0 +1,16 @@
+categories:
+  - name: pwn
+    color: "#ef4444"
+  - name: web
+    color: "#22c55e"
+  - name: crypto
+    color: "#f59e0b"
+  - name: misc
+    color: "#a855f7"
+authors:
+  - name: mbund
+    avatar: https://www.gravatar.com/avatar
+    discord_id: 1014305712312172595
+  - name: mbunk
+    avatar: https://www.gravatar.com/avatar
+    discord_id: 290276083687882753

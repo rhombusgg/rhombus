@@ -75,7 +75,7 @@ pub async fn route_account(
         autojoin: Option<bool>,
     }
 
-    let (discord, location_url) = {
+    let (discord, location_url, title) = {
         let settings = state.settings.read().await;
         (
             settings.discord.as_ref().map(|d| DiscordSettings {
@@ -85,6 +85,7 @@ pub async fn route_account(
                 autojoin: d.autojoin,
             }),
             settings.location_url.clone(),
+            settings.title.clone(),
         )
     };
 
@@ -168,6 +169,7 @@ pub async fn route_account(
             .render(context! {
                 lang,
                 user,
+                title,
                 uri => uri.to_string(),
                 discord,
                 og_image => format!("{}/og-image.png", location_url),

@@ -765,3 +765,16 @@ pub fn database_cache_evictor(seconds: u64) {
         }
     });
 }
+
+pub async fn clear_all_caches() {
+    USER_CACHE.clear();
+    TEAM_CACHE.clear();
+    USER_WRITEUP_CACHE.clear();
+    SCOREBOARD_CACHE.clear();
+    LEADERBOARD_CACHE.clear();
+    USER_EMAILS_CACHE.clear();
+    USER_DIVISIONS.clear();
+    TEAM_DIVISIONS.clear();
+    TEAM_STANDINGS.clear();
+    *CHALLENGES_CACHE.write().await = None;
+}

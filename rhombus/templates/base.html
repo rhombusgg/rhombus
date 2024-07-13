@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{% block title %}Rhombus{% endblock %}</title>
+    <title>{% block title %}{{ title }}{% endblock %}</title>
     <meta
       property="og:title"
-      content="{% block og_title %}Rhombus{% endblock %}"
+      content="{% block og_title %}{{ title }}{% endblock %}"
     />
     <!-- prettier-ignore -->
     <meta property="og:description" content="{% block og_description %}Next generation extendable CTF framework with batteries included{% endblock %}" />
@@ -29,6 +29,9 @@
 
     <link rel="stylesheet" href="/static/tailwind.css" />
     <script src="/static/app.js"></script>
+
+    {% include "head.html" %}
+
     <script>
       document.addEventListener("htmx:beforeOnLoad", (e) => {
         if (e.detail.requestConfig.headers["HX-Boosted"]) {
@@ -46,8 +49,6 @@
         }
       });
     </script>
-    {% block head %}{% endblock %}
-
     <script>
       // Dark/light mode theme switcher
 

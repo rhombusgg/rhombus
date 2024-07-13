@@ -3,5 +3,7 @@
 {% block title %}{{ super() }} - Home{% endblock %}
 
 {% block content %}
-  <h1>Home</h1>
+  <div class="container my-4">
+    <div class="max-w-full prose dark:prose-invert">{{ content | safe }}</div>
+  </div>
 {% endblock %}

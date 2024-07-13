@@ -1,0 +1,14 @@
+stable_id: my-first-pwn
+name: my-first-pwn
+description: asjdlfhljasdfhjls
+flag: flag{this_is_a_fake_flag}
+category: pwn
+author: mbund
+points: dynamic
+files:
+  - src: hello.py
+    dst: main.py
+  - url: https://demo.ctfd.io/files/5bb49e6f5bb44f2eaa4c2e4ee76d685c/statue.jpg
+    dst: statue.jpg
+ticket_template: |
+  # Web template

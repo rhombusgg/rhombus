@@ -95,6 +95,8 @@ pub async fn route_challenges(
         }
     }
 
+    let title = { state.settings.read().await.title.clone() };
+
     let html = state
         .jinja
         .get_template("challenges.html")
@@ -102,6 +104,7 @@ pub async fn route_challenges(
         .render(context! {
             lang,
             user,
+            title,
             uri => uri.to_string(),
             challenge_json,
         })
