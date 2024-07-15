@@ -51,8 +51,9 @@ logo: |
   </svg>
 home:
   content: |
-    # Welcome to Rhombus Demo
+    # Welcome to the Rhombus Demo
 
     This is a demo instance of [Rhombus](https://github.com/rhombusgg/rhombus-rs). Feel free to _explore_ the platform and create challenges.
 
     - It resets every 10 minutes.
+    - You can make yourself an admin by going to [your account](/account).

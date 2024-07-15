@@ -10,6 +10,20 @@
     {% endcall %}
   {% endcall %}
   {% call card.content() %}
-    <button>Make yourself admin</button>
+    {% if user.is_admin %}
+      <button
+        class="px-4 py-2 gap-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center rounded-md text-sm font-medium whitespace-nowrap ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+        hx-get="/demo/admin/revoke"
+      >
+        Revoke admin from yourself
+      </button>
+    {% else %}
+      <button
+        class="px-4 py-2 gap-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center rounded-md text-sm font-medium whitespace-nowrap ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+        hx-get="/demo/admin/grant"
+      >
+        Make yourself admin
+      </button>
+    {% endif %}
   {% endcall %}
 {% endcall %}

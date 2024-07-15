@@ -1,12 +1,17 @@
 use std::time::Duration;
 
+use chrono::prelude::*;
 use futures::stream::StreamExt;
 use tracing_subscriber::EnvFilter;
 
 use rhombus::{
-    internal::database::{
-        cache::clear_all_caches,
-        libsql::{LibSQL, LibSQLConnection},
+    axum::{http::Response, response::IntoResponse, routing, Extension, Router},
+    internal::{
+        auth::User,
+        database::{
+            cache::{clear_all_caches, USER_CACHE},
+            libsql::{LibSQL, LibSQLConnection},
+        },
     },
     libsql::params,
     Plugin, Result,
@@ -17,7 +22,7 @@ async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env()
-                .or_else(|_| EnvFilter::try_new("rhombus=trace"))
+                .or_else(|_| EnvFilter::try_new("rhombus=trace,demo=trace"))
                 .unwrap(),
         )
         .init();
@@ -62,16 +67,90 @@ impl Plugin for DemoPlugin {
             include_str!("../templates/account-cards.html").to_string(),
         );
 
-        match context.rawdb {
+        context.templates.add_template(
+            "footer.html".to_string(),
+            include_str!("../templates/footer.html").to_string(),
+        );
+
+        let plugin_state = match context.rawdb {
             rhombus::builder::RawDb::LibSQL(db) => {
                 delayed_backup_tables(db);
                 database_resetter(db);
+                DemoState::new(db)
             }
             _ => panic!("Unsupported database"),
-        }
+        };
 
-        Ok(rhombus::axum::Router::new())
+        let router = Router::new()
+            .route("/demo/admin/grant", routing::get(route_grant_admin))
+            .route("/demo/admin/revoke", routing::get(route_revoke_admin))
+            .layer(Extension(plugin_state));
+
+        Ok(router)
     }
+}
+
+#[derive(Clone)]
+struct DemoState {
+    libsql: &'static LibSQL,
+}
+
+impl DemoState {
+    fn new(libsql: &'static LibSQL) -> Self {
+        Self { libsql }
+    }
+
+    async fn grant_admin(&self, user_id: i64) -> Result<()> {
+        let conn = self.libsql.connect()?;
+
+        conn.execute(
+            "UPDATE rhombus_user SET is_admin = 1 WHERE id = ?",
+            params!(user_id),
+        )
+        .await?;
+
+        USER_CACHE.remove(&user_id);
+
+        Ok(())
+    }
+
+    async fn revoke_admin(&self, user_id: i64) -> Result<()> {
+        let conn = self.libsql.connect()?;
+
+        conn.execute(
+            "UPDATE rhombus_user SET is_admin = 0 WHERE id = ?",
+            params!(user_id),
+        )
+        .await?;
+
+        USER_CACHE.remove(&user_id);
+
+        Ok(())
+    }
+}
+
+async fn route_grant_admin(
+    Extension(plugin): Extension<DemoState>,
+    Extension(user): Extension<User>,
+) -> impl IntoResponse {
+    plugin.grant_admin(user.id).await.unwrap();
+
+    Response::builder()
+        .header("HX-Refresh", "true")
+        .body("".to_owned())
+        .unwrap()
+}
+
+async fn route_revoke_admin(
+    Extension(plugin): Extension<DemoState>,
+    Extension(user): Extension<User>,
+) -> impl IntoResponse {
+    plugin.revoke_admin(user.id).await.unwrap();
+
+    Response::builder()
+        .header("HX-Refresh", "true")
+        .body("".to_owned())
+        .unwrap()
 }
 
 fn delayed_backup_tables(libsql: &'static LibSQL) {
@@ -166,7 +245,12 @@ async fn reset_database(libsql: &'static LibSQL) -> Result<()> {
 fn database_resetter(libsql: &'static LibSQL) {
     tokio::task::spawn(async move {
         loop {
-            tokio::time::sleep(Duration::from_secs(10)).await;
+            let now = Utc::now();
+
+            let seconds_until_next_10_minute_interval =
+                ((10 - now.minute() % 10) * 60 - now.second()) as u64;
+
+            tokio::time::sleep(Duration::from_secs(seconds_until_next_10_minute_interval)).await;
 
             reset_database(libsql).await.unwrap();
         }
