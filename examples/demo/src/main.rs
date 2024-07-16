@@ -234,6 +234,9 @@ async fn reset_database(libsql: &'static LibSQL) -> Result<()> {
     tx.commit().await?;
 
     conn.execute("PRAGMA foreign_keys = 1", params!()).await?;
+
+    // Turso does not support VACUUM in libsql server :( https://github.com/tursodatabase/libsql/issues/1415
+    #[cfg(debug_assertions)]
     conn.execute("VACUUM", params!()).await?;
 
     clear_all_caches().await;

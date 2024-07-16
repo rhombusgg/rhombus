@@ -1,0 +1,7 @@
+/target/
+/node_modules/
+/result
+
+*.env
+*.db*
+uploads/

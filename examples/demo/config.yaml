@@ -1,9 +1,9 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/rhombusgg/rhombus-rs/main/schema.json
 location_url: http://localhost:3000
-database_url: file://rhombus.db
-contact_email: admin@rhombus.gg
+contact_email: demo@rhombus.gg
 uploads:
-  database: true
+  local:
+    folder: uploads
 auth:
   - discord
   - email
