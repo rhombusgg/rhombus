@@ -1,8 +1,6 @@
 app = 'rhombus-demo'
 primary_region = 'ord'
 
-[build]
-
 [env]
 PORT = '3000'
 
