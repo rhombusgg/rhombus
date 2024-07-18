@@ -5,7 +5,10 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4.38"
+fake = { version = "2.9.2", features = ["derive"] }
 futures = "0.3.30"
+sha2 = "0.10.8"
+rand = "0.8.5"
 rhombus = { path = "../../rhombus", features = ["libsql", "internal"] }
 tokio = { version = "1.37.0", features = ["full"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

@@ -405,6 +405,7 @@ impl Database for DbCache {
         if result.is_ok() {
             USER_DIVISIONS.clear();
             TEAM_DIVISIONS.clear();
+            *CHALLENGES_CACHE.write().await = None;
         }
         result
     }

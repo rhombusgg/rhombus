@@ -514,6 +514,40 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             }]
         };
 
+        let cached_db = match settings.in_memory_cache.as_str() {
+            "false" => {
+                info!("Disabling in memory cache");
+                db
+            }
+            "true" => {
+                let duration = 360;
+                info!(duration, "Enabling default in memory cache");
+                database_cache_evictor(duration);
+                Box::leak(Box::new(DbCache::new(db)))
+            }
+            duration => {
+                if let Ok(duration) = duration.parse::<u64>() {
+                    if duration >= 5 {
+                        info!(duration, "Enabling default in memory cache");
+                        database_cache_evictor(duration);
+                        Box::leak(Box::new(DbCache::new(db)))
+                    } else {
+                        info!(
+                            duration,
+                            "Invalid in memory cache duration value, disabling in memory cache"
+                        );
+                        db
+                    }
+                } else {
+                    info!(
+                        duration,
+                        "Invalid in memory cache duration value, disabling in memory cache"
+                    );
+                    db
+                }
+            }
+        };
+
         let mut localizer = locales::Localizations::new();
 
         let templates = Box::leak(Box::new(Templates::new()));
@@ -524,7 +558,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
 
         let plugin_upload_provider_builder = UploadProviderContext {
             settings: &settings.clone(),
-            db,
+            db: cached_db,
         };
         let plugin_upload_provider = self
             .plugins
@@ -542,7 +576,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     settings: &mut settings,
                     divisions: &mut divisions,
                     rawdb: &rawdb,
-                    db,
+                    db: cached_db,
                 };
 
                 let plugin_router = self.plugins.run(&mut plugin_builder).await?;
@@ -558,7 +592,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     settings: &mut settings,
                     divisions: &mut divisions,
                     rawdb: &rawdb,
-                    db,
+                    db: cached_db,
                 };
 
                 let plugin_router = self.plugins.run(&mut plugin_builder).await?;
@@ -575,7 +609,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     settings: &mut settings,
                     divisions: &mut divisions,
                     rawdb: &rawdb,
-                    db,
+                    db: cached_db,
                 };
 
                 let plugin_router = self.plugins.run(&mut plugin_builder).await?;
@@ -597,7 +631,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     settings: &mut settings,
                     divisions: &mut divisions,
                     rawdb: &rawdb,
-                    db,
+                    db: cached_db,
                 };
 
                 let plugin_router = self.plugins.run(&mut plugin_builder).await?;
@@ -632,47 +666,13 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     settings: &mut settings,
                     divisions: &mut divisions,
                     rawdb: &rawdb,
-                    db,
+                    db: cached_db,
                 };
 
                 let plugin_router = self.plugins.run(&mut plugin_builder).await?;
 
                 (plugin_router, upload_router)
             };
-
-        let db = match settings.in_memory_cache.as_str() {
-            "false" => {
-                info!("Disabling in memory cache");
-                db
-            }
-            "true" => {
-                let duration = 360;
-                info!(duration, "Enabling default in memory cache");
-                database_cache_evictor(duration);
-                Box::leak(Box::new(DbCache::new(db)))
-            }
-            duration => {
-                if let Ok(duration) = duration.parse::<u64>() {
-                    if duration >= 5 {
-                        info!(duration, "Enabling default in memory cache");
-                        database_cache_evictor(duration);
-                        Box::leak(Box::new(DbCache::new(db)))
-                    } else {
-                        info!(
-                            duration,
-                            "Invalid in memory cache duration value, disabling in memory cache"
-                        );
-                        db
-                    }
-                } else {
-                    info!(
-                        duration,
-                        "Invalid in memory cache duration value, disabling in memory cache"
-                    );
-                    db
-                }
-            }
-        };
 
         let ip_extractor = self.ip_extractor.or_else(|| {
             settings.ip_preset.as_ref().map(|preset| match preset {
@@ -726,7 +726,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                         mail_provider,
                         jinja,
                         settings,
-                        db,
+                        cached_db,
                     )));
                     (Some(mailer), router)
                 } else if email.smtp_connection_url.is_some() {
@@ -736,7 +736,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                         mail_provider,
                         jinja,
                         settings,
-                        db,
+                        cached_db,
                     )));
                     (Some(mailer), Router::new())
                 } else {
@@ -747,8 +747,9 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             };
 
         let bot = if settings.read().await.discord.is_some() {
-            let bot: &'static _ =
-                Box::leak(Box::new(Bot::new(settings, db, outbound_mailer).await));
+            let bot: &'static _ = Box::leak(Box::new(
+                Bot::new(settings, cached_db, outbound_mailer).await,
+            ));
             discord_cache_evictor();
             Some(bot)
         } else {
@@ -763,19 +764,19 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     .as_ref()
                     .is_some_and(|e| e.imap.is_some())
             {
-                ImapEmailReciever::new(settings, bot.unwrap(), db)
+                ImapEmailReciever::new(settings, bot.unwrap(), cached_db)
                     .receive_emails()
                     .await?;
             }
         }
 
-        healthcheck_catch_up(db).await;
-        healthcheck_runner(db);
+        healthcheck_catch_up(cached_db).await;
+        healthcheck_runner(cached_db);
 
-        db.insert_divisions(&divisions).await?;
+        cached_db.insert_divisions(&divisions).await?;
 
         let router_state: &RouterStateInner = Box::leak(Box::new(RouterStateInner {
-            db,
+            db: cached_db,
             bot,
             jinja,
             localizer,
@@ -849,7 +850,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             rhombus_router
         };
 
-        track_flusher(db);
+        track_flusher(cached_db);
 
         let router = router
             .layer(middleware::from_fn_with_state(
