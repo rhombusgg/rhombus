@@ -5,7 +5,7 @@ edition = "2021"
 description = "Official CLI tool to interact with the Rhombus CTF framework."
 authors = ["Mark Bundschuh <mark@mbund.dev>"]
 license = "MPL-2.0"
-repository = "https://github.com/rhombusgg/rhombus-rs"
+repository = "https://github.com/rhombusgg/rhombus"
 homepage = "https://rhombus.gg"
 keywords = ["ctf", "cli"]
 

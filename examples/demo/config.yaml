@@ -1,6 +1,7 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/rhombusgg/rhombus-rs/main/schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/rhombusgg/rhombus/main/schema.json
 location_url: http://localhost:3000
 contact_email: demo@rhombus.gg
+database_url: file://rhombus.db
 uploads:
   local:
     folder: uploads
@@ -53,7 +54,7 @@ home:
   content: |
     # Welcome to the Rhombus Demo
 
-    This is a demo instance of [Rhombus](https://github.com/rhombusgg/rhombus-rs). Feel free to _explore_ the platform and create challenges.
+    This is a demo instance of [Rhombus](https://github.com/rhombusgg/rhombus). Feel free to _explore_ the platform and create challenges.
 
     - It resets every 10 minutes.
     - You can make yourself an admin by going to [your account](/account).

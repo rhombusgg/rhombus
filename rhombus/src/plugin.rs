@@ -1,6 +1,7 @@
 use std::any::Any;
 
 use axum::Router;
+use tokio::sync::RwLock;
 
 use crate::{
     builder::RawDb,
@@ -30,7 +31,7 @@ pub struct RunContext<'a, U: UploadProvider> {
     ///
     /// Make sure to clearly communicate changes to the user if their settings are modified
     /// to prevent confusion.
-    pub settings: &'a mut Settings,
+    pub settings: &'static RwLock<Settings>,
 
     /// High level database connection used by Rhombus core.
     pub db: Connection,

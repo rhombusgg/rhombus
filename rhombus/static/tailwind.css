@@ -1312,26 +1312,6 @@ body {
   z-index: 50;
 }
 
-.m-0 {
-  margin: 0px;
-}
-
-.m-12 {
-  margin: 3rem;
-}
-
-.m-14 {
-  margin: 3.5rem;
-}
-
-.m-2 {
-  margin: 0.5rem;
-}
-
-.m-3 {
-  margin: 0.75rem;
-}
-
 .mx-4 {
   margin-left: 1rem;
   margin-right: 1rem;
@@ -2108,10 +2088,6 @@ body {
 .outline-none {
   outline: 2px solid transparent;
   outline-offset: 2px;
-}
-
-.outline {
-  outline-style: solid;
 }
 
 .ring {

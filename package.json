@@ -1,9 +1,13 @@
 {
   "scripts": {
-    "check-format": "prettier --check rhombus/**/*.{tsx,html}"
+    "check-format": "prettier --check rhombus/**/*.{tsx,html}",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "devDependencies": {
     "prettier": "^3.2.5",
-    "prettier-plugin-jinja-template": "^1.3.2"
+    "prettier-plugin-jinja-template": "^1.3.2",
+    "vitepress": "^1.3.1"
   }
 }

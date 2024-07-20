@@ -16,6 +16,4 @@
   <text x="200" y="80" font-family="Inter" font-size="18" fill="black">
     Starts YYYY-MM-DD HH:MM EST
   </text>
-
-  {{ icons.rhombus(attrs='x="10" y="10" transform="scale(1.75)"') }}
 </svg>

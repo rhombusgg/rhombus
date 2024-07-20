@@ -565,6 +565,9 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             .upload_provider(&plugin_upload_provider_builder)
             .await;
 
+        let uploads_settings = settings.uploads.clone();
+        let settings: &'static _ = Box::leak(Box::new(RwLock::new(settings)));
+
         let (plugin_router, upload_router) =
             if let Some(plugin_upload_provider) = plugin_upload_provider {
                 let upload_router = plugin_upload_provider.routes()?;
@@ -573,7 +576,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     upload_provider: &plugin_upload_provider,
                     templates,
                     localizations: &mut localizer,
-                    settings: &mut settings,
+                    settings,
                     divisions: &mut divisions,
                     rawdb: &rawdb,
                     db: cached_db,
@@ -589,7 +592,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     upload_provider: &upload_provider,
                     templates,
                     localizations: &mut localizer,
-                    settings: &mut settings,
+                    settings,
                     divisions: &mut divisions,
                     rawdb: &rawdb,
                     db: cached_db,
@@ -598,7 +601,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 let plugin_router = self.plugins.run(&mut plugin_builder).await?;
 
                 (plugin_router, upload_router)
-            } else if let Some(s3) = settings.uploads.as_ref().and_then(|u| u.s3.as_ref()) {
+            } else if let Some(s3) = uploads_settings.as_ref().and_then(|u| u.s3.as_ref()) {
                 let s3_upload_provider = S3UploadProvider::new(s3).await?;
                 let upload_router = s3_upload_provider.routes()?;
 
@@ -606,7 +609,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     upload_provider: &s3_upload_provider,
                     templates,
                     localizations: &mut localizer,
-                    settings: &mut settings,
+                    settings,
                     divisions: &mut divisions,
                     rawdb: &rawdb,
                     db: cached_db,
@@ -615,8 +618,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 let plugin_router = self.plugins.run(&mut plugin_builder).await?;
 
                 (plugin_router, upload_router)
-            } else if settings
-                .uploads
+            } else if uploads_settings
                 .as_ref()
                 .and_then(|u| u.database)
                 .is_some_and(|d| d)
@@ -628,7 +630,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     upload_provider: &database_upload_provider,
                     templates,
                     localizations: &mut localizer,
-                    settings: &mut settings,
+                    settings,
                     divisions: &mut divisions,
                     rawdb: &rawdb,
                     db: cached_db,
@@ -639,7 +641,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                 (plugin_router, upload_router)
             } else {
                 let base_path = if let Some(local_upload_provider_options) =
-                    settings.uploads.as_ref().and_then(|u| u.local.as_ref())
+                    uploads_settings.as_ref().and_then(|u| u.local.as_ref())
                 {
                     let base_path = &local_upload_provider_options.folder;
                     tracing::info!(
@@ -663,7 +665,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                     upload_provider: &local_upload_provider,
                     templates,
                     localizations: &mut localizer,
-                    settings: &mut settings,
+                    settings,
                     divisions: &mut divisions,
                     rawdb: &rawdb,
                     db: cached_db,
@@ -675,35 +677,37 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
             };
 
         let ip_extractor = self.ip_extractor.or_else(|| {
-            settings.ip_preset.as_ref().map(|preset| match preset {
-                IpPreset::RightmostXForwardedFor => {
-                    info!("Selecting preset Rightmost X-Forwarded-For");
-                    maybe_rightmost_x_forwarded_for
-                }
-                IpPreset::XRealIp => {
-                    info!("Selecting preset X-Real-Ip");
-                    maybe_x_real_ip
-                }
-                IpPreset::FlyClientIp => {
-                    info!("Selecting preset Fly-Client-Ip");
-                    maybe_fly_client_ip
-                }
-                IpPreset::TrueClientIp => {
-                    info!("Selecting preset True-Client-Ip");
-                    maybe_true_client_ip
-                }
-                IpPreset::CFConnectingIp => {
-                    info!("Selecting preset CF-Connecting-IP");
-                    maybe_cf_connecting_ip
-                }
-                IpPreset::PeerIp => {
-                    info!("Selecting preset peer ip");
-                    maybe_peer_ip
-                }
-            })
+            settings
+                .blocking_read()
+                .ip_preset
+                .as_ref()
+                .map(|preset| match preset {
+                    IpPreset::RightmostXForwardedFor => {
+                        info!("Selecting preset Rightmost X-Forwarded-For");
+                        maybe_rightmost_x_forwarded_for
+                    }
+                    IpPreset::XRealIp => {
+                        info!("Selecting preset X-Real-Ip");
+                        maybe_x_real_ip
+                    }
+                    IpPreset::FlyClientIp => {
+                        info!("Selecting preset Fly-Client-Ip");
+                        maybe_fly_client_ip
+                    }
+                    IpPreset::TrueClientIp => {
+                        info!("Selecting preset True-Client-Ip");
+                        maybe_true_client_ip
+                    }
+                    IpPreset::CFConnectingIp => {
+                        info!("Selecting preset CF-Connecting-IP");
+                        maybe_cf_connecting_ip
+                    }
+                    IpPreset::PeerIp => {
+                        info!("Selecting preset peer ip");
+                        maybe_peer_ip
+                    }
+                })
         });
-
-        let settings: &'static _ = Box::leak(Box::new(RwLock::new(settings)));
 
         let localizer: &'static _ = Box::leak(Box::new(localizer));
 

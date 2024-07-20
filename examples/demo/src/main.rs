@@ -1,13 +1,18 @@
 use std::time::Duration;
 
 use chrono::prelude::*;
-use fake::faker::internet::en::{Password, Username};
-use fake::{Dummy, Fake, Faker};
+use fake::{
+    faker::internet::en::{Password, Username},
+    Dummy, Fake, Faker,
+};
 use futures::stream::StreamExt;
-use rand::seq::SliceRandom;
-use rand::Rng;
-use rhombus::internal::database::provider::Database;
+use rand::{
+    distributions::{Alphanumeric, DistString},
+    seq::SliceRandom,
+    Rng,
+};
 use sha2::{Digest, Sha256};
+use tokio::sync::RwLock;
 use tracing_subscriber::EnvFilter;
 
 use rhombus::{
@@ -17,8 +22,9 @@ use rhombus::{
         database::{
             cache::{clear_all_caches, USER_CACHE},
             libsql::{LibSQL, LibSQLConnection},
-            provider::Connection,
+            provider::{Connection, Database},
         },
+        settings::Settings,
     },
     libsql::params,
     Plugin, Result,
@@ -126,11 +132,13 @@ impl Plugin for DemoPlugin {
                 }
 
                 delayed_backup_tables(db);
-                database_resetter(db);
+                database_resetter(db, context.settings);
                 db
             }
             _ => panic!("Unsupported database"),
         };
+
+        randomize_jwt(context.settings).await;
 
         solver(libsql, context.db);
         team_creator(libsql, context.db);
@@ -455,7 +463,7 @@ async fn reset_database(libsql: &'static LibSQL) -> Result<()> {
     Ok(())
 }
 
-fn database_resetter(libsql: &'static LibSQL) {
+fn database_resetter(libsql: &'static LibSQL, settings: &'static RwLock<Settings>) {
     tokio::task::spawn(async move {
         loop {
             let now = Utc::now();
@@ -465,7 +473,14 @@ fn database_resetter(libsql: &'static LibSQL) {
 
             tokio::time::sleep(Duration::from_secs(seconds_until_next_10_minute_interval)).await;
 
+            randomize_jwt(settings).await;
             reset_database(libsql).await.unwrap();
         }
     });
+}
+
+async fn randomize_jwt(settings: &'static RwLock<Settings>) {
+    let mut rng = rand::rngs::OsRng;
+    let jwt_secret = Alphanumeric.sample_string(&mut rng, 64);
+    settings.write().await.jwt_secret = jwt_secret;
 }

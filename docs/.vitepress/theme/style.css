@@ -1,0 +1,25 @@
+:root {
+  --c-red-1: hsl(0, 72.22%, 50.59%);
+  --c-red-2: hsl(0, 72.22%, 46.59%);
+  --c-red-3: hsl(0, 72.22%, 48.59%);
+  --c-red-soft: #14b8a629;
+
+  --c-light-red-1: hsl(0, 72.22%, 50.59%);
+  --c-light-red-2: hsl(0, 72.22%, 46.59%);
+  --c-light-red-3: hsl(0, 72.22%, 48.59%);
+  --c-light-red-soft: #14b8a629;
+
+  --vp-c-brand-1: var(--c-light-red-1);
+  --vp-c-brand-2: var(--c-light-red-2);
+  --vp-c-brand-3: var(--c-light-red-3);
+  --vp-c-brand-soft: var(--c-light-red-soft);
+
+  /* --vp-code-color: var(--vp-text-color); */
+}
+
+html.dark:root {
+  --vp-c-brand-1: var(--c-red-1);
+  --vp-c-brand-2: var(--c-red-2);
+  --vp-c-brand-3: var(--c-red-3);
+  --vp-c-brand-soft: var(--c-red-soft);
+}
