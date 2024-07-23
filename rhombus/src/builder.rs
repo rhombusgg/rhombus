@@ -553,7 +553,7 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
         let templates = Box::leak(Box::new(Templates::new()));
 
         if let Some(ref logo) = settings.logo {
-            templates.add_template("logo.html".to_owned(), logo.clone());
+            templates.add_template("logo.html", logo);
         }
 
         let plugin_upload_provider_builder = UploadProviderContext {
@@ -711,9 +711,11 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
 
         let localizer: &'static _ = Box::leak(Box::new(localizer));
 
-        let jinja = Box::leak(Box::new(templates.set_to_env()));
-        jinja.add_function("timediff", jinja_timediff);
+        let jinja = Box::leak(Box::new(templates.build()));
 
+        jinja.set_lstrip_blocks(true);
+        jinja.set_trim_blocks(true);
+        jinja.add_function("timediff", jinja_timediff);
         jinja.add_function(
             "t",
             move |msg_id: &str, kwargs: minijinja::value::Kwargs, state: &minijinja::State| {

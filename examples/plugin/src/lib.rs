@@ -74,10 +74,9 @@ impl Plugin for MyPlugin {
         &self,
         context: &mut RunContext<'_, U>,
     ) -> rhombus::Result<Router<RouterState>> {
-        context.templates.add_template(
-            "home.html".to_string(),
-            include_str!("../templates/home.html").to_string(),
-        );
+        context
+            .templates
+            .add_template("home.html", include_str!("../templates/home.html"));
 
         let res = FluentResource::try_new(
             "challenges = Challs\ntest1 = Hello there\nho = Hol".to_string(),

@@ -70,20 +70,18 @@ impl Plugin for DemoPlugin {
         &self,
         context: &mut rhombus::plugin::RunContext<'_, U>,
     ) -> rhombus::Result<rhombus::axum::Router<rhombus::internal::router::RouterState>> {
-        context.templates.add_template(
-            "head.html".to_string(),
-            include_str!("../templates/head.html").to_string(),
-        );
+        context
+            .templates
+            .add_template("head.html", include_str!("../templates/head.html"));
 
         context.templates.add_template(
-            "account-cards.html".to_string(),
-            include_str!("../templates/account-cards.html").to_string(),
+            "account-cards.html",
+            include_str!("../templates/account-cards.html"),
         );
 
-        context.templates.add_template(
-            "footer.html".to_string(),
-            include_str!("../templates/footer.html").to_string(),
-        );
+        context
+            .templates
+            .add_template("footer.html", include_str!("../templates/footer.html"));
 
         let libsql = match context.rawdb {
             rhombus::builder::RawDb::LibSQL(db) => {
@@ -454,7 +452,7 @@ async fn reset_database(libsql: &'static LibSQL) -> Result<()> {
     conn.execute("PRAGMA foreign_keys = 1", params!()).await?;
 
     // Turso does not support VACUUM in libsql server :( https://github.com/tursodatabase/libsql/issues/1415
-    #[cfg(debug_assertions)]
+    // #[cfg(debug_assertions)]
     conn.execute("VACUUM", params!()).await?;
 
     clear_all_caches().await;

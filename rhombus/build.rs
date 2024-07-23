@@ -7,8 +7,6 @@ fn main() {
     println!("cargo:rerun-if-changed=migrations");
     println!("cargo:rerun-if-changed=static");
 
-    minijinja_embed::embed_templates!("templates");
-
     let channel = match version_meta().unwrap().channel {
         Channel::Stable => "CHANNEL_STABLE",
         Channel::Beta => "CHANNEL_BETA",
