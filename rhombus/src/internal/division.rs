@@ -1,7 +1,7 @@
 use std::num::NonZeroU32;
 
 use async_trait::async_trait;
-use regex::Regex;
+use fancy_regex::Regex;
 use serde::Serialize;
 
 use crate::internal::database::provider::Connection;
@@ -21,7 +21,7 @@ pub struct EmailDivisionEligibilityProvider {
 
 impl EmailDivisionEligibilityProvider {
     pub fn new(db: Connection, regex: &str, requirement: Option<String>) -> Self {
-        let r = regex::Regex::new(regex).unwrap();
+        let r = Regex::new(regex).unwrap();
         Self {
             db,
             regex: r,
@@ -37,7 +37,7 @@ impl DivisionEligible for EmailDivisionEligibilityProvider {
         let eligible = emails
             .iter()
             .filter(|email| email.verified)
-            .any(|email| self.regex.is_match(&email.address));
+            .any(|email| self.regex.is_match(&email.address).unwrap());
 
         if eligible {
             Ok(true)
