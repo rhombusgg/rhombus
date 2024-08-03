@@ -12,20 +12,18 @@ use super::router::RouterState;
 struct Fonts;
 
 lazy_static! {
-    static ref GLOBAL_FONTDB: std::sync::Mutex<usvg::fontdb::Database> = {
-        let mut fontdb = usvg::fontdb::Database::new();
-        fontdb.load_font_data(Fonts::get("inter/Inter.ttc").unwrap().data.to_vec());
-        std::sync::Mutex::new(fontdb)
+    static ref GLOBAL_OPTIONS: usvg::Options<'static> = {
+        let mut opt = usvg::Options::default();
+        opt.fontdb_mut().load_system_fonts();
+        opt.fontdb_mut()
+            .load_font_data(Fonts::get("inter/Inter.ttc").unwrap().data.to_vec());
+        opt
     };
 }
 
 // todo: cache between requests
 fn convert_svg_to_png(svg: &str) -> Vec<u8> {
-    let opt = usvg::Options::default();
-    let tree = {
-        let fontdb = GLOBAL_FONTDB.lock().unwrap();
-        usvg::Tree::from_str(svg, &opt, &fontdb).unwrap()
-    };
+    let tree = usvg::Tree::from_data(svg.as_bytes(), &GLOBAL_OPTIONS).unwrap();
     let zoom = 2.0;
     let pixmap_size = tree.size().to_int_size().scale_by(zoom).unwrap();
     let mut pixmap = tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height()).unwrap();

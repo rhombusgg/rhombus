@@ -15,20 +15,20 @@ async-hash = "0.5.3"
 async-imap = { version = "0.9.7", default-features = false, features = [
   "runtime-tokio",
 ] }
-async-trait = "0.1.80"
+async-trait = "0.1.81"
 axum = { version = "0.7.5", features = ["multipart"] }
 axum-extra = { version = "0.9.3", features = ["cookie"] }
 chrono = { version = "0.4.38", features = ["serde"] }
 config = "0.14.0"
-dashmap = { version = "5.5.3", features = ["inline"] }
-dotenvy = { version = "0.15.7" }
+dashmap = { version = "6.0.1", features = ["inline"] }
+dotenvy = "0.15.7"
 fancy-regex = "0.13.0"
 fluent = "0.16.1"
 healthscript = "1.0.3"
 Inflector = "0.11.4"
-intl-memoizer = "0.5.1"
+intl-memoizer = "0.5.2"
 jsonwebtoken = "9.3.0"
-lazy_static = "1.4.0"
+lazy_static = "1.5.0"
 lettre = { version = "0.11.7", default-features = false, features = [
   "tokio1-rustls-tls",
   "smtp-transport",
@@ -37,9 +37,9 @@ lettre = { version = "0.11.7", default-features = false, features = [
 ] }
 mail-parser = "0.9.3"
 markdown = "1.0.0-alpha.18"
-mime_guess = "2.0.4"
+mime_guess = "2.0.5"
 minify-html-onepass = "0.15.0"
-minijinja = { version = "2.0.3", default-features = false, features = [
+minijinja = { version = "2.1.1", default-features = false, features = [
   "builtins",
   "multi_template",
   "macros",
@@ -50,22 +50,22 @@ petname = "2.0.2"
 pin-project-lite = "0.2.14"
 poise = "0.6.1"
 rand = "0.8.5"
-reqwest = { version = "0.12.4", default-features = false, features = [
+reqwest = { version = "0.12.5", default-features = false, features = [
   "rustls-tls",
   "json",
 ] }
-resvg = "0.41.0"
+resvg = "0.42.0"
 ring = "0.17.8"
-rust-embed = "8.3.0"
+rust-embed = "8.5.0"
 rust-s3 = { version = "0.35.0-alpha.3", default-features = false, features = [
   "tokio-rustls-tls",
 ] }
-serde = { version = "1.0.198", features = ["derive"] }
-serde_json = "1.0.116"
-serenity = { version = "0.12.1", features = ["chrono"] }
-thiserror = "1.0.59"
+serde = { version = "1.0.204", features = ["derive"] }
+serde_json = "1.0.122"
+serenity = { version = "0.12.2", features = ["chrono"] }
+thiserror = "1.0.63"
 time = "0.3.36"
-tokio = { version = "1.37.0", features = ["full"] }
+tokio = { version = "1.39.2", features = ["full"] }
 tokio-rustls = { version = "0.26.0", default-features = false, features = [
   "ring",
   "logging",
@@ -75,9 +75,9 @@ tokio-util = { version = "0.7.11", features = ["io"] }
 tower = "0.4.13"
 tower_governor = "0.4.2"
 tower-http = { version = "0.5.2", features = ["compression-full", "fs"] }
-tower-livereload = "0.9.2"
+tower-livereload = "0.9.3"
 tracing = "0.1.40"
-unic-langid = { version = "0.9.4", features = ["unic-langid-macros"] }
+unic-langid = { version = "0.9.5", features = ["unic-langid-macros"] }
 unicode-segmentation = "1.11.0"
 webpki-roots = "0.26.3"
 
@@ -95,8 +95,8 @@ sqlx = { version = "0.7.4", optional = true, features = [
 rustc_version = "0.4.0"
 
 [dev-dependencies]
-testcontainers = "0.15.0"
-testcontainers-modules = { version = "0.3.7", features = ["postgres"] }
+testcontainers = "0.21.0"
+testcontainers-modules = { version = "0.9.0", features = ["postgres"] }
 
 [features]
 default = ["libsql"]

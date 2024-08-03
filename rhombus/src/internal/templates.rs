@@ -29,7 +29,7 @@ impl<'a> Templates<'a> {
                 minify_js: true,
                 minify_css: true,
             };
-            if file.ends_with(".html") || file.ends_with(".svg") {
+            if file.ends_with(".html") {
                 minify_html_onepass::truncate(&mut bytes, cfg).unwrap();
             }
             let content = String::from_utf8(bytes).unwrap();
@@ -45,7 +45,7 @@ impl<'a> Templates<'a> {
     }
 
     pub fn add_template(&mut self, name: &str, content: &str) {
-        let content = if name.ends_with(".html") || name.ends_with(".svg") {
+        let content = if name.ends_with(".html") {
             let mut bytes = content.as_bytes().to_vec();
             let cfg = &minify_html_onepass::Cfg {
                 minify_js: true,
