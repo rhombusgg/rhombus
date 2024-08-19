@@ -1,5 +1,6 @@
 use std::{
     any::Any,
+    fmt::Debug,
     hash::{BuildHasher, BuildHasherDefault, Hasher},
     num::NonZeroU32,
     sync::Arc,
@@ -10,9 +11,9 @@ use axum::{
     middleware,
     response::{Html, IntoResponse},
     routing::{delete, get, post},
-    Router,
+    Extension,
 };
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::compression::CompressionLayer;
 use tracing::info;
@@ -102,14 +103,13 @@ pub fn builder() -> Builder<(), ()> {
 /// 3. Load settings from database (if mutable configuration is enabled)
 /// 4. Execute plugins
 /// 5. Merge routers and return the final router
-///
-pub struct Builder<P: Plugin, U: UploadProvider + Send + Sync> {
-    plugins: P,
-    num_plugins: u32,
-    database: Option<DbConfig>,
-    upload_provider: Option<U>,
-    config_builder: config::ConfigBuilder<config::builder::DefaultState>,
-    ip_extractor: Option<IpExtractorFn>,
+pub struct Builder<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'static> {
+    pub plugins: P,
+    pub num_plugins: u32,
+    pub database: Option<DbConfig>,
+    pub upload_provider: Option<U>,
+    pub config_builder: config::ConfigBuilder<config::builder::DefaultState>,
+    pub ip_extractor: Option<IpExtractorFn>,
 }
 
 impl Default for Builder<(), ()> {
@@ -125,7 +125,17 @@ impl Default for Builder<(), ()> {
     }
 }
 
-impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
+impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'static> Debug
+    for Builder<P, U>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Builder")
+            .field("ip_extractor", &"...")
+            .finish()
+    }
+}
+
+impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
     pub fn load_env(self) -> Self {
         _ = dotenvy::dotenv();
         self
@@ -217,7 +227,10 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
         }
     }
 
-    pub fn plugin<Pn: Plugin>(self, plugin: Pn) -> Builder<(Pn, P), U> {
+    pub fn plugin<Pn>(self, plugin: Pn) -> Builder<(Pn, P), U>
+    where
+        Pn: Plugin + Send + Sync + 'static,
+    {
         Builder {
             plugins: (plugin, self.plugins),
             num_plugins: self.num_plugins + 1,
@@ -415,122 +428,136 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
         )
     }
 
-    pub async fn build(self) -> Result<Router> {
-        let mut settings: Settings = self
-            .config_builder
-            .clone()
-            .add_source(config::Environment::with_prefix("rhombus").separator("__"))
-            .set_default("live_reload", cfg!(debug_assertions))
-            .unwrap()
-            .set_default("in_memory_cache", true)
-            .unwrap()
-            .set_default(
-                "default_ticket_template",
-                "# Describe the issue with the challenge\n\n",
-            )
-            .unwrap()
-            .set_default("immutable_config", false)
-            .unwrap()
-            .build()?
-            .try_deserialize()?;
+    pub(crate) async fn build_axum_router(
+        self,
+        rr: Arc<crate::internal::router::Router>,
+    ) -> std::result::Result<axum::Router, RhombusError> {
+        let (self_arc, router) = {
+            let self_arc = Arc::new(self);
 
-        let mut database_provider_context = DatabaseProviderContext {
-            settings: &mut settings,
-        };
-        let custom_provider = self
-            .plugins
-            .database_provider(&mut database_provider_context)
-            .await;
+            let mut settings: Settings = self_arc
+                .config_builder
+                .clone()
+                .add_source(config::Environment::with_prefix("rhombus").separator("__"))
+                .set_default("live_reload", cfg!(debug_assertions))
+                .unwrap()
+                .set_default("in_memory_cache", true)
+                .unwrap()
+                .set_default(
+                    "default_ticket_template",
+                    "# Describe the issue with the challenge\n\n",
+                )
+                .unwrap()
+                .set_default("immutable_config", false)
+                .unwrap()
+                .build()?
+                .try_deserialize()?;
 
-        let (db, rawdb) = if let Some(custom_provider) = custom_provider {
-            let rawdb = RawDb::Plugin(custom_provider.1);
-            let db = custom_provider.0;
-            (db, rawdb)
-        } else {
-            self.build_database(&settings).await?
-        };
+            let mut database_provider_context = DatabaseProviderContext {
+                settings: &mut settings,
+            };
 
-        db.load_settings(&mut settings).await?;
-        db.save_settings(&settings).await?;
+            let custom_provider = self_arc
+                .plugins
+                .database_provider(&mut database_provider_context)
+                .await;
 
-        let mut divisions = if let Some(divisions) = &settings.divisions {
-            divisions
-                .iter()
-                .map(|division| {
-                    let division_eligibility: DivisionEligibilityProvider =
-                        if let Some(email_regex) = &division.email_regex {
-                            Box::leak(Box::new(EmailDivisionEligibilityProvider::new(
-                                db,
-                                email_regex,
-                                division.requirement.clone(),
-                            )))
-                        } else {
-                            Box::leak(Box::new(OpenDivisionEligibilityProvider {}))
-                        };
+            let (db, rawdb) = if let Some(custom_provider) = custom_provider {
+                let rawdb = RawDb::Plugin(custom_provider.1);
+                let db = custom_provider.0;
+                (db, rawdb)
+            } else {
+                self_arc.build_database(&settings).await?
+            };
 
-                    let id = hash(division.stable_id.as_ref().unwrap_or(&division.name));
+            db.load_settings(&mut settings).await?;
+            db.save_settings(&settings).await?;
 
-                    let max_players = if let Some(max_players) = &division.max_players {
-                        match max_players.as_str() {
-                            "unlimited" => MaxDivisionPlayers::Unlimited,
-                            "infinity" => MaxDivisionPlayers::Unlimited,
-                            "infinite" => MaxDivisionPlayers::Unlimited,
-                            "any" => MaxDivisionPlayers::Unlimited,
-                            _ => {
-                                if let Ok(max_players) = max_players.parse::<NonZeroU32>() {
-                                    MaxDivisionPlayers::Limited(max_players)
-                                } else {
-                                    tracing::error!(
-                                        max_players,
-                                        division = division.name,
-                                        "Invalid max players value. Defaulting to unlimited."
-                                    );
-                                    MaxDivisionPlayers::Unlimited
+            let mut divisions = if let Some(divisions) = &settings.divisions {
+                divisions
+                    .iter()
+                    .map(|division| {
+                        let division_eligibility: DivisionEligibilityProvider =
+                            if let Some(email_regex) = &division.email_regex {
+                                Box::leak(Box::new(EmailDivisionEligibilityProvider::new(
+                                    db,
+                                    email_regex,
+                                    division.requirement.clone(),
+                                )))
+                            } else {
+                                Box::leak(Box::new(OpenDivisionEligibilityProvider {}))
+                            };
+
+                        let id = hash(division.stable_id.as_ref().unwrap_or(&division.name));
+
+                        let max_players = if let Some(max_players) = &division.max_players {
+                            match max_players.as_str() {
+                                "unlimited" => MaxDivisionPlayers::Unlimited,
+                                "infinity" => MaxDivisionPlayers::Unlimited,
+                                "infinite" => MaxDivisionPlayers::Unlimited,
+                                "any" => MaxDivisionPlayers::Unlimited,
+                                _ => {
+                                    if let Ok(max_players) = max_players.parse::<NonZeroU32>() {
+                                        MaxDivisionPlayers::Limited(max_players)
+                                    } else {
+                                        tracing::error!(
+                                            max_players,
+                                            division = division.name,
+                                            "Invalid max players value. Defaulting to unlimited."
+                                        );
+                                        MaxDivisionPlayers::Unlimited
+                                    }
                                 }
                             }
+                        } else {
+                            MaxDivisionPlayers::Unlimited
+                        };
+
+                        Division {
+                            id,
+                            name: division.name.clone(),
+                            description: division.description.clone(),
+                            max_players,
+                            division_eligibility,
                         }
-                    } else {
-                        MaxDivisionPlayers::Unlimited
-                    };
+                    })
+                    .collect()
+            } else {
+                let name = "Open".to_owned();
+                let id = hash(&name);
+                vec![Division {
+                    id,
+                    name,
+                    description: "Open division for everyone".to_owned(),
+                    max_players: MaxDivisionPlayers::Unlimited,
+                    division_eligibility: Box::leak(Box::new(OpenDivisionEligibilityProvider {})),
+                }]
+            };
 
-                    Division {
-                        id,
-                        name: division.name.clone(),
-                        description: division.description.clone(),
-                        max_players,
-                        division_eligibility,
-                    }
-                })
-                .collect()
-        } else {
-            let name = "Open".to_owned();
-            let id = hash(&name);
-            vec![Division {
-                id,
-                name,
-                description: "Open division for everyone".to_owned(),
-                max_players: MaxDivisionPlayers::Unlimited,
-                division_eligibility: Box::leak(Box::new(OpenDivisionEligibilityProvider {})),
-            }]
-        };
-
-        let cached_db = match settings.in_memory_cache.as_str() {
-            "false" => {
-                info!("Disabling in memory cache");
-                db
-            }
-            "true" => {
-                let duration = 360;
-                info!(duration, "Enabling default in memory cache");
-                database_cache_evictor(duration);
-                Box::leak(Box::new(DbCache::new(db)))
-            }
-            duration => {
-                if let Ok(duration) = duration.parse::<u64>() {
-                    if duration >= 5 {
-                        info!(duration, "Enabling default in memory cache");
-                        database_cache_evictor(duration);
-                        Box::leak(Box::new(DbCache::new(db)))
+            let cached_db = match settings.in_memory_cache.as_str() {
+                "false" => {
+                    info!("Disabling in memory cache");
+                    db
+                }
+                "true" => {
+                    let duration = 360;
+                    info!(duration, "Enabling default in memory cache");
+                    database_cache_evictor(duration);
+                    Box::leak(Box::new(DbCache::new(db)))
+                }
+                duration => {
+                    if let Ok(duration) = duration.parse::<u64>() {
+                        if duration >= 5 {
+                            info!(duration, "Enabling default in memory cache");
+                            database_cache_evictor(duration);
+                            Box::leak(Box::new(DbCache::new(db)))
+                        } else {
+                            info!(
+                                duration,
+                                "Invalid in memory cache duration value, disabling in memory cache"
+                            );
+                            db
+                        }
                     } else {
                         info!(
                             duration,
@@ -538,381 +565,395 @@ impl<P: Plugin, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
                         );
                         db
                     }
-                } else {
-                    info!(
-                        duration,
-                        "Invalid in memory cache duration value, disabling in memory cache"
-                    );
-                    db
                 }
+            };
+
+            let mut localizer = locales::Localizations::new();
+
+            let templates = Box::leak(Box::new(Templates::new()));
+
+            if let Some(ref logo) = settings.logo {
+                templates.add_template("logo.html", logo);
             }
-        };
 
-        let mut localizer = locales::Localizations::new();
+            let uploads_settings = settings.uploads.clone();
+            let old_settings = settings.clone();
+            let settings: &'static _ = Box::leak(Box::new(RwLock::new(settings)));
 
-        let templates = Box::leak(Box::new(Templates::new()));
-
-        if let Some(ref logo) = settings.logo {
-            templates.add_template("logo.html", logo);
-        }
-
-        let plugin_upload_provider_builder = UploadProviderContext {
-            settings: &settings.clone(),
-            db: cached_db,
-        };
-        let plugin_upload_provider = self
-            .plugins
-            .upload_provider(&plugin_upload_provider_builder)
-            .await;
-
-        let uploads_settings = settings.uploads.clone();
-        let settings: &'static _ = Box::leak(Box::new(RwLock::new(settings)));
-
-        let (plugin_router, upload_router) =
-            if let Some(plugin_upload_provider) = plugin_upload_provider {
-                let upload_router = plugin_upload_provider.routes()?;
-
-                let mut plugin_builder = RunContext {
-                    upload_provider: &plugin_upload_provider,
-                    templates,
-                    localizations: &mut localizer,
-                    settings,
-                    divisions: &mut divisions,
-                    rawdb: &rawdb,
+            let (plugin_router, upload_router) = {
+                let plugin_upload_provider_builder = UploadProviderContext {
+                    settings: &old_settings,
                     db: cached_db,
                 };
+                let plugin_upload_provider = self_arc
+                    .plugins
+                    .upload_provider(&plugin_upload_provider_builder)
+                    .await;
 
-                let plugin_router = self.plugins.run(&mut plugin_builder).await?;
+                if let Some(plugin_upload_provider) = plugin_upload_provider {
+                    let upload_router = plugin_upload_provider.routes()?;
 
-                (plugin_router, upload_router)
-            } else if let Some(upload_provider) = self.upload_provider {
-                let upload_router = upload_provider.routes()?;
-
-                let mut plugin_builder = RunContext {
-                    upload_provider: &upload_provider,
-                    templates,
-                    localizations: &mut localizer,
-                    settings,
-                    divisions: &mut divisions,
-                    rawdb: &rawdb,
-                    db: cached_db,
-                };
-
-                let plugin_router = self.plugins.run(&mut plugin_builder).await?;
-
-                (plugin_router, upload_router)
-            } else if let Some(s3) = uploads_settings.as_ref().and_then(|u| u.s3.as_ref()) {
-                let s3_upload_provider = S3UploadProvider::new(s3).await?;
-                let upload_router = s3_upload_provider.routes()?;
-
-                let mut plugin_builder = RunContext {
-                    upload_provider: &s3_upload_provider,
-                    templates,
-                    localizations: &mut localizer,
-                    settings,
-                    divisions: &mut divisions,
-                    rawdb: &rawdb,
-                    db: cached_db,
-                };
-
-                let plugin_router = self.plugins.run(&mut plugin_builder).await?;
-
-                (plugin_router, upload_router)
-            } else if uploads_settings
-                .as_ref()
-                .and_then(|u| u.database)
-                .is_some_and(|d| d)
-            {
-                let database_upload_provider = DatabaseUploadProvider::new(db).await;
-                let upload_router = database_upload_provider.routes()?;
-
-                let mut plugin_builder = RunContext {
-                    upload_provider: &database_upload_provider,
-                    templates,
-                    localizations: &mut localizer,
-                    settings,
-                    divisions: &mut divisions,
-                    rawdb: &rawdb,
-                    db: cached_db,
-                };
-
-                let plugin_router = self.plugins.run(&mut plugin_builder).await?;
-
-                (plugin_router, upload_router)
-            } else {
-                let base_path = if let Some(local_upload_provider_options) =
-                    uploads_settings.as_ref().and_then(|u| u.local.as_ref())
-                {
-                    let base_path = &local_upload_provider_options.folder;
-                    tracing::info!(
-                        folder = base_path.as_str(),
-                        "Using configured local upload provider"
-                    );
-                    base_path.into()
-                } else {
-                    tracing::warn!(
-                        folder = "uploads",
-                        "No upload provider set, using local upload provider"
-                    );
-                    "uploads".into()
-                };
-
-                let local_upload_provider = LocalUploadProvider::new(base_path);
-
-                let upload_router = local_upload_provider.routes()?;
-
-                let mut plugin_builder = RunContext {
-                    upload_provider: &local_upload_provider,
-                    templates,
-                    localizations: &mut localizer,
-                    settings,
-                    divisions: &mut divisions,
-                    rawdb: &rawdb,
-                    db: cached_db,
-                };
-
-                let plugin_router = self.plugins.run(&mut plugin_builder).await?;
-
-                (plugin_router, upload_router)
-            };
-
-        let ip_extractor = self.ip_extractor.or_else(|| {
-            settings
-                .blocking_read()
-                .ip_preset
-                .as_ref()
-                .map(|preset| match preset {
-                    IpPreset::RightmostXForwardedFor => {
-                        info!("Selecting preset Rightmost X-Forwarded-For");
-                        maybe_rightmost_x_forwarded_for
-                    }
-                    IpPreset::XRealIp => {
-                        info!("Selecting preset X-Real-Ip");
-                        maybe_x_real_ip
-                    }
-                    IpPreset::FlyClientIp => {
-                        info!("Selecting preset Fly-Client-Ip");
-                        maybe_fly_client_ip
-                    }
-                    IpPreset::TrueClientIp => {
-                        info!("Selecting preset True-Client-Ip");
-                        maybe_true_client_ip
-                    }
-                    IpPreset::CFConnectingIp => {
-                        info!("Selecting preset CF-Connecting-IP");
-                        maybe_cf_connecting_ip
-                    }
-                    IpPreset::PeerIp => {
-                        info!("Selecting preset peer ip");
-                        maybe_peer_ip
-                    }
-                })
-        });
-
-        let localizer: &'static _ = Box::leak(Box::new(localizer));
-
-        let jinja = Box::leak(Box::new(templates.build()));
-
-        jinja.set_lstrip_blocks(true);
-        jinja.set_trim_blocks(true);
-        jinja.add_function("timediff", jinja_timediff);
-        jinja.add_function(
-            "t",
-            move |msg_id: &str, kwargs: minijinja::value::Kwargs, state: &minijinja::State| {
-                jinja_translate(localizer, msg_id, kwargs, state)
-            },
-        );
-
-        let (outbound_mailer, mailgun_router): (Option<&'static _>, Router<RouterState>) =
-            if let Some(email) = settings.read().await.email.as_ref() {
-                if email.mailgun.is_some() {
-                    let (mailgun_provider, router) = MailgunProvider::new(settings).await.unwrap();
-                    let mail_provider = Box::leak(Box::new(mailgun_provider));
-                    let mailer = Box::leak(Box::new(OutboundMailer::new(
-                        mail_provider,
-                        jinja,
+                    let mut plugin_builder = RunContext {
+                        upload_provider: &plugin_upload_provider,
+                        templates,
+                        localizations: &mut localizer,
                         settings,
-                        cached_db,
-                    )));
-                    (Some(mailer), router)
-                } else if email.smtp_connection_url.is_some() {
-                    let mail_provider =
-                        Box::leak(Box::new(SmtpProvider::new(settings).await.unwrap()));
-                    let mailer = Box::leak(Box::new(OutboundMailer::new(
-                        mail_provider,
-                        jinja,
+                        divisions: &mut divisions,
+                        rawdb: &rawdb,
+                        db: cached_db,
+                    };
+
+                    let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
+
+                    (plugin_router, upload_router)
+                } else if let Some(upload_provider) = &self_arc.upload_provider {
+                    let upload_router = upload_provider.routes()?;
+
+                    let mut plugin_builder = RunContext {
+                        upload_provider,
+                        templates,
+                        localizations: &mut localizer,
                         settings,
-                        cached_db,
-                    )));
-                    (Some(mailer), Router::new())
-                } else {
-                    (None, Router::new())
-                }
-            } else {
-                (None, Router::new())
-            };
+                        divisions: &mut divisions,
+                        rawdb: &rawdb,
+                        db: cached_db,
+                    };
 
-        let bot = if settings.read().await.discord.is_some() {
-            let bot: &'static _ = Box::leak(Box::new(
-                Bot::new(settings, cached_db, outbound_mailer).await,
-            ));
-            discord_cache_evictor();
-            Some(bot)
-        } else {
-            None
-        };
+                    let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
 
-        {
-            let locked_settings = settings.read().await;
-            if bot.is_some()
-                && locked_settings
-                    .email
+                    (plugin_router, upload_router)
+                } else if let Some(s3) = uploads_settings.as_ref().and_then(|u| u.s3.as_ref()) {
+                    let s3_upload_provider = S3UploadProvider::new(s3).await?;
+                    let upload_router = s3_upload_provider.routes()?;
+
+                    let mut plugin_builder = RunContext {
+                        upload_provider: &s3_upload_provider,
+                        templates,
+                        localizations: &mut localizer,
+                        settings,
+                        divisions: &mut divisions,
+                        rawdb: &rawdb,
+                        db: cached_db,
+                    };
+
+                    let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
+
+                    (plugin_router, upload_router)
+                } else if uploads_settings
                     .as_ref()
-                    .is_some_and(|e| e.imap.is_some())
-            {
-                ImapEmailReciever::new(settings, bot.unwrap(), cached_db)
-                    .receive_emails()
-                    .await?;
-            }
-        }
+                    .and_then(|u| u.database)
+                    .is_some_and(|d| d)
+                {
+                    let database_upload_provider = DatabaseUploadProvider::new(db).await;
+                    let upload_router = database_upload_provider.routes()?;
 
-        healthcheck_catch_up(cached_db).await;
-        healthcheck_runner(cached_db);
+                    let mut plugin_builder = RunContext {
+                        upload_provider: &database_upload_provider,
+                        templates,
+                        localizations: &mut localizer,
+                        settings,
+                        divisions: &mut divisions,
+                        rawdb: &rawdb,
+                        db: cached_db,
+                    };
 
-        cached_db.insert_divisions(&divisions).await?;
+                    let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
 
-        let router_state: &RouterStateInner = Box::leak(Box::new(RouterStateInner {
-            db: cached_db,
-            bot,
-            jinja,
-            localizer,
-            settings,
-            ip_extractor: ip_extractor.unwrap_or(default_ip_extractor),
-            outbound_mailer,
-            divisions: Box::leak(Box::new(divisions)),
-        }));
+                    (plugin_router, upload_router)
+                } else {
+                    let base_path = if let Some(local_upload_provider_options) =
+                        uploads_settings.as_ref().and_then(|u| u.local.as_ref())
+                    {
+                        let base_path = &local_upload_provider_options.folder;
+                        tracing::info!(
+                            folder = base_path.as_str(),
+                            "Using configured local upload provider"
+                        );
+                        base_path.into()
+                    } else {
+                        tracing::warn!(
+                            folder = "uploads",
+                            "No upload provider set, using local upload provider"
+                        );
+                        "uploads".into()
+                    };
 
-        let rhombus_router = Router::new()
-            .fallback(handler_404)
-            .route("/admin", get(|| async { (StatusCode::OK, Html("Admin")) }))
-            .route_layer(middleware::from_fn(enforce_admin_middleware))
-            .route("/account/verify", get(route_account_email_verify_callback))
-            .route(
-                "/account/email",
-                post(route_account_add_email).delete(route_account_delete_email),
-            )
-            .route("/account", get(route_account))
-            .route("/team/division/:id", post(route_team_set_division))
-            .route("/team/user/:id", delete(route_user_kick))
-            .route("/team/roll-token", post(route_team_roll_token))
-            .route("/team/name", post(route_team_set_name))
-            .route("/team", get(route_team))
-            .route("/challenges", get(route_challenges))
-            .route(
-                "/challenges/:id/writeup",
-                post(route_writeup_submit).delete(route_writeup_delete),
-            )
-            .route(
-                "/challenges/:id/ticket",
-                get(route_ticket_view).post(route_ticket_submit),
-            )
-            .route(
-                "/challenges/:id",
-                get(route_challenge_view).post(route_challenge_submit),
-            )
-            .route_layer(middleware::from_fn(enforce_auth_middleware))
-            .route("/static/:file", get(route_static_serve))
-            .route("/command-palette", get(route_command_palette_items))
-            .route("/", get(route_home))
-            .merge(mailgun_router)
-            .route("/signout", get(route_signout))
-            .route("/signin/credentials", post(route_signin_credentials))
-            .route(
-                "/signin/email",
-                get(route_signin_email_callback).post(route_signin_email),
-            )
-            .route("/signin/discord", get(route_signin_discord_callback))
-            .route("/signin", get(route_signin))
-            .route(
-                "/scoreboard/:id/ctftime",
-                get(route_scoreboard_division_ctftime),
-            )
-            .route("/scoreboard/:id", get(route_scoreboard_division))
-            .route("/scoreboard", get(route_scoreboard))
-            .route("/user/:id", get(route_public_user))
-            .route("/team/:id", get(route_public_team))
-            .route("/og-image.png", get(route_default_og_image))
-            .with_state(router_state)
-            .merge(upload_router.layer(middleware::from_fn_with_state(
-                router_state,
-                auth_injector_middleware,
-            )));
+                    let local_upload_provider = LocalUploadProvider::new(base_path);
 
-        let router = if self.num_plugins > 0 {
-            Router::new()
-                .fallback_service(rhombus_router)
-                .nest("/", plugin_router.with_state(router_state))
-        } else {
-            rhombus_router
-        };
+                    let upload_router = local_upload_provider.routes()?;
 
-        track_flusher(cached_db);
+                    let mut plugin_builder = RunContext {
+                        upload_provider: &local_upload_provider,
+                        templates,
+                        localizations: &mut localizer,
+                        settings,
+                        divisions: &mut divisions,
+                        rawdb: &rawdb,
+                        db: cached_db,
+                    };
 
-        let router = router
-            .layer(middleware::from_fn_with_state(
-                router_state,
-                locale_middleware,
-            ))
-            .layer(middleware::from_fn(track_middleware))
-            .layer(middleware::from_fn_with_state(
-                router_state,
-                auth_injector_middleware,
-            ));
+                    let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
 
-        let router = if ip_extractor.is_some() {
-            router.layer(middleware::from_fn_with_state(
-                router_state,
-                ip_insert_middleware,
-            ))
-        } else {
-            router.layer(middleware::from_fn(ip_insert_blank_middleware))
-        };
+                    (plugin_router, upload_router)
+                }
+            };
 
-        let router = if let (Some(ip_extractor), Some(ratelimit)) =
-            (ip_extractor, settings.read().await.ratelimit.as_ref())
-        {
-            let per_millisecond = ratelimit.per_millisecond.unwrap_or(500);
-            let burst_size = ratelimit.burst_size.unwrap_or(8);
-            info!(per_millisecond, burst_size, "Setting ratelimit");
+            let ip_extractor = self_arc.ip_extractor.or_else(|| {
+                settings
+                    .blocking_read()
+                    .ip_preset
+                    .as_ref()
+                    .map(|preset| match preset {
+                        IpPreset::RightmostXForwardedFor => {
+                            info!("Selecting preset Rightmost X-Forwarded-For");
+                            maybe_rightmost_x_forwarded_for
+                        }
+                        IpPreset::XRealIp => {
+                            info!("Selecting preset X-Real-Ip");
+                            maybe_x_real_ip
+                        }
+                        IpPreset::FlyClientIp => {
+                            info!("Selecting preset Fly-Client-Ip");
+                            maybe_fly_client_ip
+                        }
+                        IpPreset::TrueClientIp => {
+                            info!("Selecting preset True-Client-Ip");
+                            maybe_true_client_ip
+                        }
+                        IpPreset::CFConnectingIp => {
+                            info!("Selecting preset CF-Connecting-IP");
+                            maybe_cf_connecting_ip
+                        }
+                        IpPreset::PeerIp => {
+                            info!("Selecting preset peer ip");
+                            maybe_peer_ip
+                        }
+                    })
+            });
 
-            let governor_conf = Arc::new(
-                GovernorConfigBuilder::default()
-                    .per_millisecond(per_millisecond)
-                    .burst_size(burst_size)
-                    .key_extractor(KeyExtractorShim::new(ip_extractor))
-                    .use_headers()
-                    .finish()
-                    .unwrap(),
+            let localizer: &'static _ = Box::leak(Box::new(localizer));
+
+            let jinja = Box::leak(Box::new(templates.build()));
+
+            jinja.set_lstrip_blocks(true);
+            jinja.set_trim_blocks(true);
+            jinja.add_function("timediff", jinja_timediff);
+            jinja.add_function(
+                "t",
+                move |msg_id: &str, kwargs: minijinja::value::Kwargs, state: &minijinja::State| {
+                    jinja_translate(localizer, msg_id, kwargs, state)
+                },
             );
 
-            router.layer(GovernorLayer {
-                config: governor_conf,
-            })
-        } else {
-            router
+            let (outbound_mailer, mailgun_router): (Option<&'static _>, axum::Router<RouterState>) =
+                if let Some(email) = settings.read().await.email.as_ref() {
+                    if email.mailgun.is_some() {
+                        let (mailgun_provider, router) =
+                            MailgunProvider::new(settings).await.unwrap();
+                        let mail_provider = Box::leak(Box::new(mailgun_provider));
+                        let mailer = Box::leak(Box::new(OutboundMailer::new(
+                            mail_provider,
+                            jinja,
+                            settings,
+                            cached_db,
+                        )));
+                        (Some(mailer), router)
+                    } else if email.smtp_connection_url.is_some() {
+                        let mail_provider =
+                            Box::leak(Box::new(SmtpProvider::new(settings).await.unwrap()));
+                        let mailer = Box::leak(Box::new(OutboundMailer::new(
+                            mail_provider,
+                            jinja,
+                            settings,
+                            cached_db,
+                        )));
+                        (Some(mailer), axum::Router::new())
+                    } else {
+                        (None, axum::Router::new())
+                    }
+                } else {
+                    (None, axum::Router::new())
+                };
+
+            let bot = if settings.read().await.discord.is_some() {
+                let bot: &'static _ = Box::leak(Box::new(
+                    Bot::new(settings, cached_db, outbound_mailer).await,
+                ));
+                discord_cache_evictor();
+                Some(bot)
+            } else {
+                None
+            };
+
+            {
+                let locked_settings = settings.read().await;
+                if bot.is_some()
+                    && locked_settings
+                        .email
+                        .as_ref()
+                        .is_some_and(|e| e.imap.is_some())
+                {
+                    ImapEmailReciever::new(settings, bot.unwrap(), cached_db)
+                        .receive_emails()
+                        .await?;
+                }
+            }
+
+            healthcheck_catch_up(cached_db).await;
+            healthcheck_runner(cached_db);
+
+            cached_db.insert_divisions(&divisions).await?;
+
+            let router_state: &RouterStateInner = Box::leak(Box::new(RouterStateInner {
+                db: cached_db,
+                bot,
+                jinja,
+                localizer,
+                settings,
+                ip_extractor: ip_extractor.unwrap_or(default_ip_extractor),
+                outbound_mailer,
+                divisions: Box::leak(Box::new(divisions)),
+                router: rr.clone(),
+            }));
+
+            let rhombus_router = axum::Router::new()
+                .fallback(handler_404)
+                .route("/admin", get(|| async { (StatusCode::OK, Html("Admin")) }))
+                .route_layer(middleware::from_fn(enforce_admin_middleware))
+                .route("/account/verify", get(route_account_email_verify_callback))
+                .route(
+                    "/account/email",
+                    post(route_account_add_email).delete(route_account_delete_email),
+                )
+                .route("/account", get(route_account))
+                .route("/team/division/:id", post(route_team_set_division))
+                .route("/team/user/:id", delete(route_user_kick))
+                .route("/team/roll-token", post(route_team_roll_token))
+                .route("/team/name", post(route_team_set_name))
+                .route("/team", get(route_team))
+                .route("/challenges", get(route_challenges))
+                .route(
+                    "/challenges/:id/writeup",
+                    post(route_writeup_submit).delete(route_writeup_delete),
+                )
+                .route(
+                    "/challenges/:id/ticket",
+                    get(route_ticket_view).post(route_ticket_submit),
+                )
+                .route(
+                    "/challenges/:id",
+                    get(route_challenge_view).post(route_challenge_submit),
+                )
+                .route_layer(middleware::from_fn(enforce_auth_middleware))
+                .route("/static/:file", get(route_static_serve))
+                .route("/command-palette", get(route_command_palette_items))
+                .route("/", get(route_home::<P, U>))
+                .merge(mailgun_router)
+                .route("/signout", get(route_signout))
+                .route("/signin/credentials", post(route_signin_credentials))
+                .route(
+                    "/signin/email",
+                    get(route_signin_email_callback).post(route_signin_email),
+                )
+                .route("/signin/discord", get(route_signin_discord_callback))
+                .route("/signin", get(route_signin))
+                .route(
+                    "/scoreboard/:id/ctftime",
+                    get(route_scoreboard_division_ctftime),
+                )
+                .route("/scoreboard/:id", get(route_scoreboard_division))
+                .route("/scoreboard", get(route_scoreboard))
+                .route("/user/:id", get(route_public_user))
+                .route("/team/:id", get(route_public_team))
+                .route("/og-image.png", get(route_default_og_image))
+                .with_state(router_state)
+                .merge(upload_router.layer(middleware::from_fn_with_state(
+                    router_state,
+                    auth_injector_middleware,
+                )));
+
+            let router = if self_arc.num_plugins > 0 {
+                axum::Router::new()
+                    .fallback_service(rhombus_router)
+                    .nest("/", plugin_router.with_state(router_state))
+            } else {
+                rhombus_router
+            };
+
+            track_flusher(cached_db);
+
+            let router = router
+                .layer(middleware::from_fn_with_state(
+                    router_state,
+                    locale_middleware,
+                ))
+                .layer(middleware::from_fn(track_middleware))
+                .layer(middleware::from_fn_with_state(
+                    router_state,
+                    auth_injector_middleware,
+                ));
+
+            let router = if ip_extractor.is_some() {
+                router.layer(middleware::from_fn_with_state(
+                    router_state,
+                    ip_insert_middleware,
+                ))
+            } else {
+                router.layer(middleware::from_fn(ip_insert_blank_middleware))
+            };
+
+            let router = if let (Some(ip_extractor), Some(ratelimit)) =
+                (ip_extractor, settings.read().await.ratelimit.as_ref())
+            {
+                let per_millisecond = ratelimit.per_millisecond.unwrap_or(500);
+                let burst_size = ratelimit.burst_size.unwrap_or(8);
+                info!(per_millisecond, burst_size, "Setting ratelimit");
+
+                let governor_conf = Arc::new(
+                    GovernorConfigBuilder::default()
+                        .per_millisecond(per_millisecond)
+                        .burst_size(burst_size)
+                        .key_extractor(KeyExtractorShim::new(ip_extractor))
+                        .use_headers()
+                        .finish()
+                        .unwrap(),
+                );
+
+                router.layer(GovernorLayer {
+                    config: governor_conf,
+                })
+            } else {
+                router
+            };
+
+            let router = if settings.read().await.live_reload {
+                router.layer(
+                    tower_livereload::LiveReloadLayer::new().request_predicate(not_htmx_predicate),
+                )
+            } else {
+                router
+            };
+
+            let router = router.layer(CompressionLayer::new());
+
+            (self_arc, router)
         };
 
-        let router = if settings.read().await.live_reload {
-            router.layer(
-                tower_livereload::LiveReloadLayer::new().request_predicate(not_htmx_predicate),
-            )
-        } else {
-            router
-        };
-
-        let router = router.layer(CompressionLayer::new());
+        let builder = Arc::try_unwrap(self_arc).unwrap();
+        let builder = Arc::new(Mutex::new(Some(builder)));
+        let router = router.layer(Extension(builder));
 
         Ok(router)
+    }
+
+    pub async fn build(self) -> Result<Arc<crate::internal::router::Router>> {
+        let rr = Arc::new(crate::internal::router::Router::new());
+
+        let router = self.build_axum_router(rr.clone()).await?;
+
+        rr.update(router);
+
+        Ok(rr)
     }
 }
 

@@ -767,6 +767,7 @@ pub fn database_cache_evictor(seconds: u64) {
     });
 }
 
+#[allow(unused)]
 pub async fn clear_all_caches() {
     USER_CACHE.clear();
     TEAM_CACHE.clear();
