@@ -60,9 +60,9 @@ pub struct DatabaseProviderContext<'a> {
 /// First, review and understand the [Builder Order of Execution](crate::builder::Builder#order-of-execution).
 ///
 /// 1. The [upload_provider](Plugin::upload_provider) function is called for each plugin in reverse
-/// order of plugins defined until the first plugin is found which implements a custom upload provider, which is then used.
-/// If no plugin implements a custom upload provider, the default upload provider creation process will happen.
-/// 1. The [run](Plugin::run) function is called for each plugin in the order they are defined.
+///    order of plugins defined until the first plugin is found which implements a custom upload provider, which is then used.
+///    If no plugin implements a custom upload provider, the default upload provider creation process will happen.
+/// 2. The [run](Plugin::run) function is called for each plugin in the order they are defined.
 #[allow(async_fn_in_trait)]
 pub trait Plugin {
     /// Supply a custom [UploadProvider].

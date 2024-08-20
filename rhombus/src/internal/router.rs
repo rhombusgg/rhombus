@@ -31,6 +31,12 @@ pub struct Router {
     pub service: Arc<AtomicPtr<axum::Router>>,
 }
 
+impl Default for Router {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Router {
     pub fn new() -> Self {
         Self {
@@ -93,12 +99,14 @@ pub fn rebuild_router<
     });
 }
 
+pub type BuilderExtension<P, U> = Extension<Arc<Mutex<Option<crate::Builder<P, U>>>>>;
+
 pub async fn route_reload<
     P: Plugin + Send + Sync + 'static,
     U: UploadProvider + Send + Sync + 'static,
 >(
     state: State<RouterState>,
-    Extension(builder): Extension<Arc<Mutex<Option<crate::Builder<P, U>>>>>,
+    Extension(builder): BuilderExtension<P, U>,
 ) -> impl IntoResponse {
     if let Some(builder) = builder.lock().await.take() {
         let builder = builder.config_override("auth", vec!["discord"]);

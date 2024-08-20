@@ -798,7 +798,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 {
                     ImapEmailReciever::new(
                         Arc::downgrade(&settings),
-                        Arc::downgrade(&bot.as_ref().unwrap()),
+                        Arc::downgrade(bot.as_ref().unwrap()),
                         Arc::downgrade(&cached_db),
                     )
                     .receive_emails()
