@@ -1,4 +1,4 @@
-use std::num::NonZeroU32;
+use std::{num::NonZeroU32, sync::Arc};
 
 use async_trait::async_trait;
 use fancy_regex::Regex;
@@ -6,7 +6,7 @@ use serde::Serialize;
 
 use crate::internal::database::provider::Connection;
 
-pub type DivisionEligibilityProvider = &'static (dyn DivisionEligible + Send + Sync);
+pub type DivisionEligibilityProvider = Arc<dyn DivisionEligible + Send + Sync>;
 
 #[async_trait]
 pub trait DivisionEligible {

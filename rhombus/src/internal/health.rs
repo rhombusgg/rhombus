@@ -4,6 +4,8 @@ use chrono::{TimeZone, Utc};
 
 use crate::internal::database::provider::Connection;
 
+use super::database::provider::WeakConnection;
+
 pub async fn healthcheck_catch_up(db: Connection) {
     tracing::info!("Running healthcheck catch-up");
     let challenges = db.get_challenges().await.unwrap();
@@ -34,11 +36,15 @@ pub async fn healthcheck_catch_up(db: Connection) {
     }
 }
 
-pub fn healthcheck_runner(db: Connection) {
+pub fn healthcheck_runner(db: WeakConnection) {
     tokio::task::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(60)).await;
 
+            tracing::info!(strong_count = db.strong_count(), "Running healthcheck");
+            let Some(db) = db.upgrade() else {
+                break;
+            };
             let challenges = db.get_challenges().await.unwrap();
 
             if let Some(challenge) = challenges

@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use chrono::prelude::*;
 use fake::{
@@ -55,12 +55,13 @@ async fn main() {
         .unwrap();
 
     let listener = tokio::net::TcpListener::bind(":::3000").await.unwrap();
-    rhombus::axum::serve(
-        listener,
-        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
-    )
-    .await
-    .unwrap();
+    app.serve(listener).await;
+    // rhombus::axum::serve(
+    //     listener,
+    //     app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    // )
+    // .await
+    // .unwrap();
 }
 
 struct DemoPlugin;
@@ -129,19 +130,19 @@ impl Plugin for DemoPlugin {
                         .await;
                 }
 
-                delayed_backup_tables(db);
-                database_resetter(db, context.settings);
+                delayed_backup_tables(db.clone());
+                database_resetter(db.clone(), context.settings.clone());
                 db
             }
             _ => panic!("Unsupported database"),
         };
 
-        randomize_jwt(context.settings).await;
+        randomize_jwt(context.settings.clone()).await;
 
-        solver(libsql, context.db);
-        team_creator(libsql, context.db);
+        solver(libsql.clone(), context.db.clone());
+        team_creator(libsql.clone(), context.db.clone());
 
-        let plugin_state = DemoState::new(libsql);
+        let plugin_state = DemoState::new(libsql.clone());
         let router = Router::new()
             .route("/demo/admin/grant", routing::get(route_grant_admin))
             .route("/demo/admin/revoke", routing::get(route_revoke_admin))
@@ -178,7 +179,7 @@ fn create_dummy_user() -> DummyUser {
     dummy_user
 }
 
-async fn set_user_to_bot(libsql: &'static LibSQL, user_id: i64) -> Result<()> {
+async fn set_user_to_bot(libsql: Arc<LibSQL>, user_id: i64) -> Result<()> {
     let conn = libsql.connect()?;
 
     conn.execute(
@@ -205,7 +206,7 @@ async fn join_to_divisons(
     Ok(())
 }
 
-async fn create_team(libsql: &'static LibSQL, db: Connection) -> Result<()> {
+async fn create_team(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
     let dummy_user = create_dummy_user();
 
     let division_ids = db
@@ -234,8 +235,8 @@ async fn create_team(libsql: &'static LibSQL, db: Connection) -> Result<()> {
         panic!()
     };
 
-    join_to_divisons(db, &division_ids, user_id, team_id).await?;
-    set_user_to_bot(libsql, user_id).await?;
+    join_to_divisons(db.clone(), &division_ids, user_id, team_id).await?;
+    set_user_to_bot(libsql.clone(), user_id).await?;
 
     let num_members = rng.gen_range(0..3);
 
@@ -251,15 +252,15 @@ async fn create_team(libsql: &'static LibSQL, db: Connection) -> Result<()> {
         else {
             continue;
         };
-        join_to_divisons(db, &division_ids, user_id, team_id).await?;
-        set_user_to_bot(libsql, user_id).await?;
+        join_to_divisons(db.clone(), &division_ids, user_id, team_id).await?;
+        set_user_to_bot(libsql.clone(), user_id).await?;
         db.add_user_to_team(user_id, team_id, None).await?;
     }
 
     Ok(())
 }
 
-async fn solve_challenge(libsql: &'static LibSQL, db: Connection) -> Result<()> {
+async fn solve_challenge(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
     let conn = libsql.connect()?;
 
     if let Some((user_id, team_id)) = conn
@@ -287,31 +288,31 @@ async fn solve_challenge(libsql: &'static LibSQL, db: Connection) -> Result<()> 
     Ok(())
 }
 
-fn solver(libsql: &'static LibSQL, db: Connection) {
+fn solver(libsql: Arc<LibSQL>, db: Connection) {
     tokio::task::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(10)).await;
-            _ = solve_challenge(libsql, db).await;
+            _ = solve_challenge(libsql.clone(), db.clone()).await;
         }
     });
 }
 
-fn team_creator(libsql: &'static LibSQL, db: Connection) {
+fn team_creator(libsql: Arc<LibSQL>, db: Connection) {
     tokio::task::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(30)).await;
-            _ = create_team(libsql, db).await;
+            _ = create_team(libsql.clone(), db.clone()).await;
         }
     });
 }
 
 #[derive(Clone)]
 struct DemoState {
-    libsql: &'static LibSQL,
+    libsql: Arc<LibSQL>,
 }
 
 impl DemoState {
-    fn new(libsql: &'static LibSQL) -> Self {
+    fn new(libsql: Arc<LibSQL>) -> Self {
         Self { libsql }
     }
 
@@ -368,7 +369,7 @@ async fn route_revoke_admin(
         .unwrap()
 }
 
-fn delayed_backup_tables(libsql: &'static LibSQL) {
+fn delayed_backup_tables(libsql: Arc<LibSQL>) {
     tokio::task::spawn(async move {
         // jankily wait for the database to be fully initialized (specifically, the divisions to be added to the database)
         tokio::time::sleep(Duration::from_secs(5)).await;
@@ -376,7 +377,7 @@ fn delayed_backup_tables(libsql: &'static LibSQL) {
     });
 }
 
-async fn backup_tables(libsql: &'static LibSQL) -> Result<()> {
+async fn backup_tables(libsql: Arc<LibSQL>) -> Result<()> {
     let conn = libsql.connect()?;
 
     let tx = conn.transaction().await?;
@@ -415,7 +416,7 @@ async fn backup_tables(libsql: &'static LibSQL) -> Result<()> {
     Ok(())
 }
 
-async fn reset_database(libsql: &'static LibSQL) -> Result<()> {
+async fn reset_database(libsql: Arc<LibSQL>) -> Result<()> {
     let conn = libsql.connect()?;
 
     conn.execute("PRAGMA foreign_keys = 0", params!()).await?;
@@ -461,7 +462,7 @@ async fn reset_database(libsql: &'static LibSQL) -> Result<()> {
     Ok(())
 }
 
-fn database_resetter(libsql: &'static LibSQL, settings: &'static RwLock<Settings>) {
+fn database_resetter(libsql: Arc<LibSQL>, settings: Arc<RwLock<Settings>>) {
     tokio::task::spawn(async move {
         loop {
             let now = Utc::now();
@@ -471,13 +472,13 @@ fn database_resetter(libsql: &'static LibSQL, settings: &'static RwLock<Settings
 
             tokio::time::sleep(Duration::from_secs(seconds_until_next_10_minute_interval)).await;
 
-            randomize_jwt(settings).await;
-            reset_database(libsql).await.unwrap();
+            randomize_jwt(settings.clone()).await;
+            reset_database(libsql.clone()).await.unwrap();
         }
     });
 }
 
-async fn randomize_jwt(settings: &'static RwLock<Settings>) {
+async fn randomize_jwt(settings: Arc<RwLock<Settings>>) {
     let mut rng = rand::rngs::OsRng;
     let jwt_secret = Alphanumeric.sample_string(&mut rng, 64);
     settings.write().await.jwt_secret = jwt_secret;

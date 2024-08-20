@@ -106,7 +106,7 @@ pub async fn route_account(
         Some(DiscordData {
             in_server,
             signin_url: discord::signin_url(&location_url, discord.client_id, discord.autojoin),
-            invite_url: state.bot.unwrap().get_invite_url().await.unwrap(),
+            invite_url: state.bot.as_ref().unwrap().get_invite_url().await.unwrap(),
         })
     } else {
         None
@@ -126,7 +126,7 @@ pub async fn route_account(
     );
 
     let mut divisions = vec![];
-    for division in state.divisions {
+    for division in state.divisions.iter() {
         let eligible = division
             .division_eligibility
             .is_user_eligible(user.id)
@@ -221,7 +221,7 @@ pub async fn route_account_add_email(
             .unwrap();
     }
 
-    if let Some(mailer) = state.outbound_mailer {
+    if let Some(ref mailer) = state.outbound_mailer {
         let Ok(code) = state
             .db
             .create_email_verification_callback_code(user.id, &form.email)

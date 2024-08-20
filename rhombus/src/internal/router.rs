@@ -1,25 +1,29 @@
+use axum::{extract::State, response::IntoResponse, Extension};
 use std::sync::{atomic::AtomicPtr, Arc};
 use tower::{make::Shared, ServiceExt};
 
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
-use crate::internal::{
-    database::provider::Connection, discord::Bot, division::Division,
-    email::outbound_mailer::OutboundMailer, ip::IpExtractorFn, locales::Localizations,
-    settings::Settings,
+use crate::{
+    internal::{
+        database::provider::Connection, discord::Bot, division::Division,
+        email::outbound_mailer::OutboundMailer, ip::IpExtractorFn, locales::Localizations,
+        settings::Settings,
+    },
+    Plugin, UploadProvider,
 };
 
-pub type RouterState = &'static RouterStateInner;
+pub type RouterState = Arc<RouterStateInner>;
 
 pub struct RouterStateInner {
     pub db: Connection,
-    pub bot: Option<&'static Bot>,
-    pub jinja: &'static minijinja::Environment<'static>,
-    pub localizer: &'static Localizations,
-    pub settings: &'static RwLock<Settings>,
+    pub bot: Option<Arc<Bot>>,
+    pub jinja: Arc<minijinja::Environment<'static>>,
+    pub localizer: Arc<Localizations>,
+    pub settings: Arc<RwLock<Settings>>,
     pub ip_extractor: IpExtractorFn,
-    pub outbound_mailer: Option<&'static OutboundMailer>,
-    pub divisions: &'static Vec<Division>,
+    pub outbound_mailer: Option<Arc<OutboundMailer>>,
+    pub divisions: Arc<Vec<Division>>,
     pub router: Arc<Router>,
 }
 
@@ -58,5 +62,46 @@ impl Router {
         });
 
         axum::serve(listener, Shared::new(service)).await.unwrap();
+    }
+}
+
+pub fn rebuild_router<
+    P: Plugin + Send + Sync + 'static,
+    U: UploadProvider + Send + Sync + 'static,
+>(
+    builder: crate::Builder<P, U>,
+    rr: Arc<crate::internal::router::Router>,
+) {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    std::thread::spawn(move || {
+        let local = tokio::task::LocalSet::new();
+
+        local.spawn_local(async move {
+            tokio::task::spawn_local(async move {
+                let router = builder.build_axum_router(rr.clone()).await.unwrap();
+                rr.update(router);
+            })
+            .await
+            .unwrap();
+        });
+
+        rt.block_on(local);
+    });
+}
+
+pub async fn route_reload<
+    P: Plugin + Send + Sync + 'static,
+    U: UploadProvider + Send + Sync + 'static,
+>(
+    state: State<RouterState>,
+    Extension(builder): Extension<Arc<Mutex<Option<crate::Builder<P, U>>>>>,
+) -> impl IntoResponse {
+    if let Some(builder) = builder.lock().await.take() {
+        let builder = builder.config_override("auth", vec!["discord"]);
+        rebuild_router(builder, state.router.clone());
     }
 }

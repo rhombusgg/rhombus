@@ -1,4 +1,4 @@
-use std::any::Any;
+use std::{any::Any, sync::Arc};
 
 use axum::Router;
 use tokio::sync::RwLock;
@@ -19,7 +19,7 @@ pub struct RunContext<'a, U: UploadProvider> {
     /// function of the [Plugin] trait.
     pub upload_provider: &'a U,
 
-    pub templates: &'a mut Templates<'static>,
+    pub templates: &'a mut Templates,
 
     /// [Fluent](https://projectfluent.org) localizations to add or modify language strings.
     pub localizations: &'a mut Localizations,
@@ -31,7 +31,7 @@ pub struct RunContext<'a, U: UploadProvider> {
     ///
     /// Make sure to clearly communicate changes to the user if their settings are modified
     /// to prevent confusion.
-    pub settings: &'static RwLock<Settings>,
+    pub settings: Arc<RwLock<Settings>>,
 
     /// High level database connection used by Rhombus core.
     pub db: Connection,

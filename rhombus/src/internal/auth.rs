@@ -315,7 +315,7 @@ pub async fn route_signin_discord_callback(
         return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
     };
 
-    let bot = state.bot.unwrap();
+    let bot = state.bot.as_ref().unwrap();
 
     let client = Client::new();
     let res = client

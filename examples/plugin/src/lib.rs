@@ -1,4 +1,4 @@
-use std::any::Any;
+use std::{any::Any, sync::Arc};
 
 use axum::{
     async_trait,
@@ -67,7 +67,7 @@ impl Plugin for MyPlugin {
             .unwrap();
         core_db.migrate().await.unwrap();
 
-        Some((Box::leak(Box::new(core_db)), Box::new(mysql)))
+        Some((Arc::new(core_db), Box::new(mysql)))
     }
 
     async fn run<U: UploadProvider>(
@@ -100,9 +100,9 @@ impl Plugin for MyPlugin {
         let osu_division = context.divisions.iter_mut().find(|d| d.name == "OSU");
         if let Some(osu_division) = osu_division {
             tracing::info!("Found OSU division");
-            let osu_division_eligibility_provider = OsuDivisionEligibilityProvider::new(context.db);
-            osu_division.division_eligibility =
-                Box::leak(Box::new(osu_division_eligibility_provider));
+            let osu_division_eligibility_provider =
+                OsuDivisionEligibilityProvider::new(context.db.clone());
+            osu_division.division_eligibility = Arc::new(osu_division_eligibility_provider);
         }
 
         let plugin_state = self.state.clone();

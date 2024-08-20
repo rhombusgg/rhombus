@@ -1,25 +1,26 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use rust_embed::RustEmbed;
-use tokio::sync::RwLock;
 
 #[derive(RustEmbed)]
 #[folder = "templates"]
 struct EmbeddedTemplates;
 
-pub struct Templates<'a> {
-    pub plugin_map: HashMap<String, String>,
-    pub core_map: HashMap<String, String>,
-    pub jinja: RwLock<minijinja::Environment<'a>>,
+pub struct Templates {
+    pub plugin_map: Arc<Mutex<HashMap<String, String>>>,
+    pub core_map: Arc<Mutex<HashMap<String, String>>>,
 }
 
-impl<'a> Default for Templates<'a> {
+impl Default for Templates {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a> Templates<'a> {
+impl Templates {
     pub fn new() -> Self {
         let mut map = HashMap::new();
 
@@ -38,9 +39,8 @@ impl<'a> Templates<'a> {
         }
 
         Self {
-            core_map: map,
-            plugin_map: HashMap::new(),
-            jinja: RwLock::new(minijinja::Environment::new()),
+            core_map: Arc::new(Mutex::new(map)),
+            plugin_map: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -58,6 +58,8 @@ impl<'a> Templates<'a> {
         };
 
         self.plugin_map
+            .lock()
+            .unwrap()
             .entry(name.to_string())
             .and_modify(|previous_content| {
                 *previous_content = format!("{}\n{}", previous_content, content);
@@ -65,16 +67,20 @@ impl<'a> Templates<'a> {
             .or_insert(content);
     }
 
-    pub fn build(&'a self) -> minijinja::Environment<'a> {
+    pub fn build(&self) -> minijinja::Environment<'static> {
         let mut jinja = minijinja::Environment::new();
+        let core_map = self.core_map.clone();
+        let plugin_map = self.plugin_map.clone();
 
-        for (name, content) in &self.core_map {
-            jinja.add_template(name, content).unwrap();
-        }
-
-        for (name, content) in &self.plugin_map {
-            jinja.add_template(name, content).unwrap();
-        }
+        jinja.set_loader(move |name| {
+            if let Some(s) = plugin_map.lock().unwrap().remove(name) {
+                Ok(Some(s))
+            } else if let Some(s) = core_map.lock().unwrap().remove(name) {
+                Ok(Some(s))
+            } else {
+                Ok(None)
+            }
+        });
 
         jinja
     }

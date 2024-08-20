@@ -34,13 +34,13 @@ use crate::{
 pub struct Bot {
     http: Arc<Http>,
     db: Connection,
-    settings: &'static RwLock<Settings>,
+    settings: Arc<RwLock<Settings>>,
 }
 
 pub struct Data {
-    settings: &'static RwLock<Settings>,
+    settings: Arc<RwLock<Settings>>,
     db: Connection,
-    outbound_mailer: Option<&'static OutboundMailer>,
+    outbound_mailer: Option<Arc<OutboundMailer>>,
 }
 pub type DiscordError = Box<dyn std::error::Error + Send + Sync>;
 pub type Context<'a> = poise::Context<'a, Data, DiscordError>;
@@ -329,7 +329,7 @@ pub async fn digest_channel(
     ticket: &Ticket,
 ) -> Result<()> {
     // dont send an email digest if we don't have a mailer
-    let outbound_mailer = if let Some(outbound_mailer) = data.outbound_mailer {
+    let outbound_mailer = if let Some(ref outbound_mailer) = data.outbound_mailer {
         outbound_mailer
     } else {
         return Ok(());
@@ -552,9 +552,9 @@ async fn event_handler(
 
 impl Bot {
     pub async fn new(
-        settings: &'static RwLock<Settings>,
+        settings: Arc<RwLock<Settings>>,
         db: Connection,
-        outbound_mailer: Option<&'static OutboundMailer>,
+        outbound_mailer: Option<Arc<OutboundMailer>>,
     ) -> Self {
         let bot_token = {
             settings
@@ -566,6 +566,9 @@ impl Bot {
                 .bot_token
                 .clone()
         };
+
+        let framework_rhombus_settings = settings.clone();
+        let framework_rhombus_db = db.clone();
 
         let framework = poise::Framework::builder()
             .options(poise::FrameworkOptions {
@@ -579,8 +582,8 @@ impl Bot {
                 Box::pin(async move {
                     poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                     Ok(Data {
-                        settings,
-                        db,
+                        settings: framework_rhombus_settings,
+                        db: framework_rhombus_db,
                         outbound_mailer,
                     })
                 })

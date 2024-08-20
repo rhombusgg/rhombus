@@ -50,7 +50,7 @@ use crate::{
         },
         locales::{self, jinja_timediff, jinja_translate, locale_middleware},
         open_graph::route_default_og_image,
-        router::{RouterState, RouterStateInner},
+        router::{route_reload, RouterState, RouterStateInner},
         routes::{
             account::{
                 discord_cache_evictor, route_account, route_account_add_email,
@@ -82,10 +82,10 @@ use crate::{
 
 pub enum RawDb {
     #[cfg(feature = "postgres")]
-    Postgres(&'static crate::internal::database::postgres::Postgres),
+    Postgres(Arc<crate::internal::database::postgres::Postgres>),
 
     #[cfg(feature = "libsql")]
-    LibSQL(&'static crate::internal::database::libsql::LibSQL),
+    LibSQL(Arc<crate::internal::database::libsql::LibSQL>),
 
     Plugin(Box<dyn Any + Send + Sync>),
 }
@@ -250,8 +250,8 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     let database = crate::internal::database::postgres::Postgres::new(pool.clone());
                     database.migrate().await?;
 
-                    let db = Box::leak(Box::new(database));
-                    return Ok((db, RawDb::Postgres(db)));
+                    let db = Arc::new(database);
+                    return Ok((db.clone(), RawDb::Postgres(db)));
                 }
 
                 #[cfg(feature = "libsql")]
@@ -262,8 +262,8 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
                     let libsql_database: crate::internal::database::libsql::LibSQL =
                         database.into();
-                    let db = Box::leak(Box::new(libsql_database));
-                    return Ok((db, RawDb::LibSQL(db)));
+                    let db = Arc::new(libsql_database);
+                    return Ok((db.clone(), RawDb::LibSQL(db)));
                 }
 
                 #[cfg(feature = "libsql")]
@@ -274,8 +274,8 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
                     let libsql_database: crate::internal::database::libsql::LibSQL =
                         database.into();
-                    let db = Box::leak(Box::new(libsql_database));
-                    return Ok((db, RawDb::LibSQL(db)));
+                    let db = Arc::new(libsql_database);
+                    return Ok((db.clone(), RawDb::LibSQL(db)));
                 }
             }
         }
@@ -298,8 +298,8 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     let database = crate::internal::database::postgres::Postgres::new(pool.clone());
                     database.migrate().await?;
 
-                    let db = Box::leak(Box::new(database));
-                    return Ok((db, RawDb::Postgres(db)));
+                    let db = Arc::new(database);
+                    return Ok((db.clone(), RawDb::Postgres(db)));
                 }
             }
 
@@ -323,8 +323,8 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
                     let libsql_database: crate::internal::database::libsql::LibSQL =
                         database.into();
-                    let db = Box::leak(Box::new(libsql_database));
-                    return Ok((db, RawDb::LibSQL(db)));
+                    let db = Arc::new(libsql_database);
+                    return Ok((db.clone(), RawDb::LibSQL(db)));
                 }
             }
 
@@ -365,8 +365,8 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
                         let libsql_database: crate::internal::database::libsql::LibSQL =
                             database.into();
-                        let db = Box::leak(Box::new(libsql_database));
-                        return Ok((db, RawDb::LibSQL(db)));
+                        let db = Arc::new(libsql_database);
+                        return Ok((db.clone(), RawDb::LibSQL(db)));
                     }
                 } else {
                     return Err(RhombusError::MissingConfiguration(format!(
@@ -396,8 +396,8 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
                     let libsql_database: crate::internal::database::libsql::LibSQL =
                         database.into();
-                    let db = Box::leak(Box::new(libsql_database));
-                    return Ok((db, RawDb::LibSQL(db)));
+                    let db = Arc::new(libsql_database);
+                    return Ok((db.clone(), RawDb::LibSQL(db)));
                 }
             }
 
@@ -417,8 +417,8 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
             database.migrate().await?;
 
             let libsql_database: crate::internal::database::libsql::LibSQL = database.into();
-            let db = Box::leak(Box::new(libsql_database));
-            Ok((db, RawDb::LibSQL(db)))
+            let db = Arc::new(libsql_database);
+            Ok((db.clone(), RawDb::LibSQL(db)))
         }
 
         #[cfg(not(feature = "libsql"))]
@@ -479,13 +479,13 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     .map(|division| {
                         let division_eligibility: DivisionEligibilityProvider =
                             if let Some(email_regex) = &division.email_regex {
-                                Box::leak(Box::new(EmailDivisionEligibilityProvider::new(
-                                    db,
+                                Arc::new(EmailDivisionEligibilityProvider::new(
+                                    db.clone(),
                                     email_regex,
                                     division.requirement.clone(),
-                                )))
+                                ))
                             } else {
-                                Box::leak(Box::new(OpenDivisionEligibilityProvider {}))
+                                Arc::new(OpenDivisionEligibilityProvider {})
                             };
 
                         let id = hash(division.stable_id.as_ref().unwrap_or(&division.name));
@@ -530,60 +530,61 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     name,
                     description: "Open division for everyone".to_owned(),
                     max_players: MaxDivisionPlayers::Unlimited,
-                    division_eligibility: Box::leak(Box::new(OpenDivisionEligibilityProvider {})),
+                    division_eligibility: Arc::new(OpenDivisionEligibilityProvider {}),
                 }]
             };
 
             let cached_db = match settings.in_memory_cache.as_str() {
                 "false" => {
                     info!("Disabling in memory cache");
-                    db
+                    db.clone()
                 }
                 "true" => {
                     let duration = 360;
                     info!(duration, "Enabling default in memory cache");
                     database_cache_evictor(duration);
-                    Box::leak(Box::new(DbCache::new(db)))
+                    Arc::new(DbCache::new(db.clone()))
                 }
                 duration => {
                     if let Ok(duration) = duration.parse::<u64>() {
                         if duration >= 5 {
                             info!(duration, "Enabling default in memory cache");
                             database_cache_evictor(duration);
-                            Box::leak(Box::new(DbCache::new(db)))
+                            Arc::new(DbCache::new(db.clone()))
                         } else {
                             info!(
                                 duration,
                                 "Invalid in memory cache duration value, disabling in memory cache"
                             );
-                            db
+                            db.clone()
                         }
                     } else {
                         info!(
                             duration,
                             "Invalid in memory cache duration value, disabling in memory cache"
                         );
-                        db
+                        db.clone()
                     }
                 }
             };
 
             let mut localizer = locales::Localizations::new();
 
-            let templates = Box::leak(Box::new(Templates::new()));
+            let mut templates = Templates::new();
 
             if let Some(ref logo) = settings.logo {
                 templates.add_template("logo.html", logo);
             }
 
             let uploads_settings = settings.uploads.clone();
+
             let old_settings = settings.clone();
-            let settings: &'static _ = Box::leak(Box::new(RwLock::new(settings)));
+            let settings = Arc::new(RwLock::new(settings));
 
             let (plugin_router, upload_router) = {
                 let plugin_upload_provider_builder = UploadProviderContext {
                     settings: &old_settings,
-                    db: cached_db,
+                    db: cached_db.clone(),
                 };
                 let plugin_upload_provider = self_arc
                     .plugins
@@ -595,12 +596,12 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
                     let mut plugin_builder = RunContext {
                         upload_provider: &plugin_upload_provider,
-                        templates,
+                        templates: &mut templates,
                         localizations: &mut localizer,
-                        settings,
+                        settings: settings.clone(),
                         divisions: &mut divisions,
                         rawdb: &rawdb,
-                        db: cached_db,
+                        db: cached_db.clone(),
                     };
 
                     let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
@@ -611,12 +612,12 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
                     let mut plugin_builder = RunContext {
                         upload_provider,
-                        templates,
+                        templates: &mut templates,
                         localizations: &mut localizer,
-                        settings,
+                        settings: settings.clone(),
                         divisions: &mut divisions,
                         rawdb: &rawdb,
-                        db: cached_db,
+                        db: cached_db.clone(),
                     };
 
                     let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
@@ -628,12 +629,12 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
                     let mut plugin_builder = RunContext {
                         upload_provider: &s3_upload_provider,
-                        templates,
+                        templates: &mut templates,
                         localizations: &mut localizer,
-                        settings,
+                        settings: settings.clone(),
                         divisions: &mut divisions,
                         rawdb: &rawdb,
-                        db: cached_db,
+                        db: cached_db.clone(),
                     };
 
                     let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
@@ -649,12 +650,12 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
                     let mut plugin_builder = RunContext {
                         upload_provider: &database_upload_provider,
-                        templates,
+                        templates: &mut templates,
                         localizations: &mut localizer,
-                        settings,
+                        settings: settings.clone(),
                         divisions: &mut divisions,
                         rawdb: &rawdb,
-                        db: cached_db,
+                        db: cached_db.clone(),
                     };
 
                     let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
@@ -684,12 +685,12 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
                     let mut plugin_builder = RunContext {
                         upload_provider: &local_upload_provider,
-                        templates,
+                        templates: &mut templates,
                         localizations: &mut localizer,
-                        settings,
+                        settings: settings.clone(),
                         divisions: &mut divisions,
                         rawdb: &rawdb,
-                        db: cached_db,
+                        db: cached_db.clone(),
                     };
 
                     let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
@@ -731,42 +732,44 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     })
             });
 
-            let localizer: &'static _ = Box::leak(Box::new(localizer));
-
-            let jinja = Box::leak(Box::new(templates.build()));
+            let mut jinja = templates.build();
 
             jinja.set_lstrip_blocks(true);
             jinja.set_trim_blocks(true);
             jinja.add_function("timediff", jinja_timediff);
+            let localizer = Arc::new(localizer);
+            let loc = localizer.clone();
             jinja.add_function(
                 "t",
                 move |msg_id: &str, kwargs: minijinja::value::Kwargs, state: &minijinja::State| {
-                    jinja_translate(localizer, msg_id, kwargs, state)
+                    jinja_translate(loc.clone(), msg_id, kwargs, state)
                 },
             );
 
-            let (outbound_mailer, mailgun_router): (Option<&'static _>, axum::Router<RouterState>) =
-                if let Some(email) = settings.read().await.email.as_ref() {
+            let jinja = Arc::new(jinja);
+
+            let (outbound_mailer, mailgun_router): (Option<Arc<_>>, axum::Router<RouterState>) =
+                if let Some(email) = settings.clone().read().await.email.as_ref() {
                     if email.mailgun.is_some() {
                         let (mailgun_provider, router) =
-                            MailgunProvider::new(settings).await.unwrap();
-                        let mail_provider = Box::leak(Box::new(mailgun_provider));
-                        let mailer = Box::leak(Box::new(OutboundMailer::new(
+                            MailgunProvider::new(settings.clone()).await.unwrap();
+                        let mail_provider = Arc::new(mailgun_provider);
+                        let mailer = Arc::new(OutboundMailer::new(
                             mail_provider,
-                            jinja,
-                            settings,
-                            cached_db,
-                        )));
+                            jinja.clone(),
+                            settings.clone(),
+                            cached_db.clone(),
+                        ));
                         (Some(mailer), router)
                     } else if email.smtp_connection_url.is_some() {
                         let mail_provider =
-                            Box::leak(Box::new(SmtpProvider::new(settings).await.unwrap()));
-                        let mailer = Box::leak(Box::new(OutboundMailer::new(
+                            Arc::new(SmtpProvider::new(settings.clone()).await.unwrap());
+                        let mailer = Arc::new(OutboundMailer::new(
                             mail_provider,
-                            jinja,
-                            settings,
-                            cached_db,
-                        )));
+                            jinja.clone(),
+                            settings.clone(),
+                            cached_db.clone(),
+                        ));
                         (Some(mailer), axum::Router::new())
                     } else {
                         (None, axum::Router::new())
@@ -775,10 +778,10 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     (None, axum::Router::new())
                 };
 
-            let bot = if settings.read().await.discord.is_some() {
-                let bot: &'static _ = Box::leak(Box::new(
-                    Bot::new(settings, cached_db, outbound_mailer).await,
-                ));
+            let bot = if settings.clone().read().await.discord.is_some() {
+                let bot = Arc::new(
+                    Bot::new(settings.clone(), cached_db.clone(), outbound_mailer.clone()).await,
+                );
                 discord_cache_evictor();
                 Some(bot)
             } else {
@@ -793,28 +796,32 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                         .as_ref()
                         .is_some_and(|e| e.imap.is_some())
                 {
-                    ImapEmailReciever::new(settings, bot.unwrap(), cached_db)
-                        .receive_emails()
-                        .await?;
+                    ImapEmailReciever::new(
+                        Arc::downgrade(&settings),
+                        Arc::downgrade(&bot.as_ref().unwrap()),
+                        Arc::downgrade(&cached_db),
+                    )
+                    .receive_emails()
+                    .await?;
                 }
             }
 
-            healthcheck_catch_up(cached_db).await;
-            healthcheck_runner(cached_db);
+            healthcheck_catch_up(cached_db.clone()).await;
+            healthcheck_runner(Arc::downgrade(&cached_db));
 
             cached_db.insert_divisions(&divisions).await?;
 
-            let router_state: &RouterStateInner = Box::leak(Box::new(RouterStateInner {
-                db: cached_db,
+            let router_state = Arc::new(RouterStateInner {
+                db: cached_db.clone(),
                 bot,
                 jinja,
                 localizer,
-                settings,
+                settings: settings.clone(),
                 ip_extractor: ip_extractor.unwrap_or(default_ip_extractor),
                 outbound_mailer,
-                divisions: Box::leak(Box::new(divisions)),
+                divisions: Arc::new(divisions),
                 router: rr.clone(),
-            }));
+            });
 
             let rhombus_router = axum::Router::new()
                 .fallback(handler_404)
@@ -847,7 +854,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 .route_layer(middleware::from_fn(enforce_auth_middleware))
                 .route("/static/:file", get(route_static_serve))
                 .route("/command-palette", get(route_command_palette_items))
-                .route("/", get(route_home::<P, U>))
+                .route("/", get(route_home))
                 .merge(mailgun_router)
                 .route("/signout", get(route_signout))
                 .route("/signin/credentials", post(route_signin_credentials))
@@ -863,19 +870,20 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 )
                 .route("/scoreboard/:id", get(route_scoreboard_division))
                 .route("/scoreboard", get(route_scoreboard))
+                .route("/reload", get(route_reload::<P, U>))
                 .route("/user/:id", get(route_public_user))
                 .route("/team/:id", get(route_public_team))
                 .route("/og-image.png", get(route_default_og_image))
-                .with_state(router_state)
+                .with_state(router_state.clone())
                 .merge(upload_router.layer(middleware::from_fn_with_state(
-                    router_state,
+                    router_state.clone(),
                     auth_injector_middleware,
                 )));
 
             let router = if self_arc.num_plugins > 0 {
                 axum::Router::new()
                     .fallback_service(rhombus_router)
-                    .nest("/", plugin_router.with_state(router_state))
+                    .nest("/", plugin_router.with_state(router_state.clone()))
             } else {
                 rhombus_router
             };
@@ -884,27 +892,28 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
             let router = router
                 .layer(middleware::from_fn_with_state(
-                    router_state,
+                    router_state.clone(),
                     locale_middleware,
                 ))
                 .layer(middleware::from_fn(track_middleware))
                 .layer(middleware::from_fn_with_state(
-                    router_state,
+                    router_state.clone(),
                     auth_injector_middleware,
                 ));
 
             let router = if ip_extractor.is_some() {
                 router.layer(middleware::from_fn_with_state(
-                    router_state,
+                    router_state.clone(),
                     ip_insert_middleware,
                 ))
             } else {
                 router.layer(middleware::from_fn(ip_insert_blank_middleware))
             };
 
-            let router = if let (Some(ip_extractor), Some(ratelimit)) =
-                (ip_extractor, settings.read().await.ratelimit.as_ref())
-            {
+            let router = if let (Some(ip_extractor), Some(ratelimit)) = (
+                ip_extractor,
+                settings.clone().read().await.ratelimit.as_ref(),
+            ) {
                 let per_millisecond = ratelimit.per_millisecond.unwrap_or(500);
                 let burst_size = ratelimit.burst_size.unwrap_or(8);
                 info!(per_millisecond, burst_size, "Setting ratelimit");

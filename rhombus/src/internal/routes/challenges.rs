@@ -271,6 +271,7 @@ pub async fn route_ticket_submit(
 
     state
         .bot
+        .as_ref()
         .unwrap()
         .create_support_thread(&user, &team, challenge, author, content.as_str())
         .await
@@ -352,7 +353,7 @@ pub async fn route_challenge_submit(
             .unwrap();
     }
 
-    if let Some(bot) = state.bot {
+    if let Some(ref bot) = state.bot {
         let first_blood_enabled = {
             let settings = state.settings.read().await;
             settings

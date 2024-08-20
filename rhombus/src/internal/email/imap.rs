@@ -1,4 +1,7 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{Arc, Weak},
+    time::Duration,
+};
 
 use futures::TryStreamExt;
 use mail_parser::{MessageParser, MimeHeaders};
@@ -14,7 +17,7 @@ use tokio_rustls::{
 
 use crate::{
     internal::{
-        database::provider::Connection,
+        database::provider::{Connection, WeakConnection},
         discord::{Bot, DiscordAttachment},
         email::{provider::InboundEmail, reply_parser},
         settings::Settings,
@@ -23,32 +26,46 @@ use crate::{
 };
 
 pub struct ImapEmailReciever {
-    pub settings: &'static RwLock<Settings>,
-    pub bot: &'static Bot,
-    pub db: Connection,
+    pub settings: Weak<RwLock<Settings>>,
+    pub bot: Weak<Bot>,
+    pub db: WeakConnection,
 }
 
 impl ImapEmailReciever {
-    pub fn new(settings: &'static RwLock<Settings>, bot: &'static Bot, db: Connection) -> Self {
+    pub fn new(settings: Weak<RwLock<Settings>>, bot: Weak<Bot>, db: WeakConnection) -> Self {
         ImapEmailReciever { settings, bot, db }
     }
 }
 
 impl InboundEmail for ImapEmailReciever {
     async fn receive_emails(&self) -> Result<()> {
-        let db = self.db;
-        let bot = self.bot;
-        let settings = self.settings;
+        let db = self.db.clone();
+        let bot = self.bot.clone();
+        let settings = self.settings.clone();
 
         tokio::task::spawn(async move {
             loop {
-                let poll_interval = {
-                    let settings = settings.read().await;
-                    let settings = settings.email.as_ref().unwrap().imap.as_ref().unwrap();
-                    Duration::from_secs(settings.poll_interval.unwrap_or(30))
+                let (Some(db), Some(bot), Some(settings)) =
+                    (db.upgrade(), bot.upgrade(), settings.upgrade())
+                else {
+                    break;
                 };
 
-                if let Err(e) = receive_emails(bot, db, settings).await {
+                let poll_interval = Duration::from_secs(
+                    settings
+                        .read()
+                        .await
+                        .email
+                        .as_ref()
+                        .unwrap()
+                        .imap
+                        .as_ref()
+                        .unwrap()
+                        .poll_interval
+                        .unwrap_or(30),
+                );
+
+                if let Err(e) = receive_emails(bot.clone(), db.clone(), settings.clone()).await {
                     tracing::error!(error = ?e, "Failed to receive emails");
                 }
 
@@ -73,9 +90,9 @@ pub enum ImapError {
 }
 
 async fn receive_emails(
-    bot: &'static Bot,
+    bot: Arc<Bot>,
     db: Connection,
-    settings: &'static RwLock<Settings>,
+    settings: Arc<RwLock<Settings>>,
 ) -> std::result::Result<(), ImapError> {
     let (username, password, domain, port, inbox) = {
         let settings = settings.read().await;

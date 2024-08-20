@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use axum::{
     body::{Body, Bytes},
@@ -24,7 +26,7 @@ use crate::{
 };
 
 pub struct MailgunProvider {
-    pub settings: &'static RwLock<Settings>,
+    pub settings: Arc<RwLock<Settings>>,
 }
 
 pub fn mailgun_error(error: &str) -> Response<Body> {
@@ -42,7 +44,7 @@ pub async fn route_mailgun_receive_email(
 ) -> impl IntoResponse {
     tracing::info!("recieving mailgun");
 
-    let Some(bot) = state.bot else {
+    let Some(ref bot) = state.bot else {
         return mailgun_error("Discord bot not configured");
     };
 
@@ -219,7 +221,7 @@ pub struct MailgunForm {
 }
 
 impl MailgunProvider {
-    pub async fn new(settings: &'static RwLock<Settings>) -> Result<(Self, Router<RouterState>)> {
+    pub async fn new(settings: Arc<RwLock<Settings>>) -> Result<(Self, Router<RouterState>)> {
         _ = settings
             .read()
             .await

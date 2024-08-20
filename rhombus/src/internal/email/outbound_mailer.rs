@@ -1,4 +1,4 @@
-use std::fmt::Write;
+use std::{fmt::Write, sync::Arc};
 
 use crate::{
     internal::{
@@ -13,17 +13,17 @@ use minijinja::{context, Environment};
 use tokio::sync::RwLock;
 
 pub struct OutboundMailer {
-    pub inner: &'static (dyn OutboundEmailProvider + Send + Sync),
-    pub jinja: &'static Environment<'static>,
-    pub settings: &'static RwLock<Settings>,
+    pub inner: Arc<dyn OutboundEmailProvider + Send + Sync>,
+    pub jinja: Arc<Environment<'static>>,
+    pub settings: Arc<RwLock<Settings>>,
     pub db: Connection,
 }
 
 impl OutboundMailer {
     pub fn new(
-        provider: &'static (dyn OutboundEmailProvider + Send + Sync),
-        jinja: &'static Environment<'static>,
-        settings: &'static RwLock<Settings>,
+        provider: Arc<dyn OutboundEmailProvider + Send + Sync>,
+        jinja: Arc<Environment<'static>>,
+        settings: Arc<RwLock<Settings>>,
         db: Connection,
     ) -> Self {
         OutboundMailer {

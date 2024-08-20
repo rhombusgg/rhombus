@@ -96,6 +96,20 @@ jobs:
         run: |
           cargo clippy --benches --examples --tests --all-features -- -D warnings
 
+  miri:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Miri
+        run: |
+          rustup toolchain install nightly --component miri
+          rustup override set nightly
+          cargo miri setup
+
+      - name: Test with Miri
+        run: cargo miri test
+
   format:
     name: Check Format
     runs-on: ubuntu-latest

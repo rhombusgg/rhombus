@@ -1,4 +1,9 @@
-use std::{collections::BTreeMap, net::IpAddr, num::NonZeroU64, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    net::IpAddr,
+    num::NonZeroU64,
+    sync::{Arc, Weak},
+};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -10,7 +15,8 @@ use crate::{
     Result,
 };
 
-pub type Connection = &'static (dyn Database + Send + Sync);
+pub type Connection = Arc<dyn Database + Send + Sync>;
+pub type WeakConnection = Weak<dyn Database + Send + Sync>;
 
 #[derive(Debug, Serialize, Clone)]
 pub enum ScoringType {
