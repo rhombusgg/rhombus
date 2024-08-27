@@ -14,6 +14,7 @@ uploads:
 auth:
   - discord
   - email
+  - ctftime
   - credentials
 divisions:
   - name: Open
@@ -28,8 +29,6 @@ divisions:
     email_regex: ^.*\.\d+@(buckeyemail\.)?osu\.edu$
     requirement: Must verify a valid OSU email address
     max_players: 1
-ctftime:
-  client_id: 1
 discord:
   guild_id: 1160610137703186636
   client_id: 1160076447977848945

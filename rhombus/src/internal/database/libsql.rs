@@ -359,6 +359,137 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
         }
     }
 
+    async fn upsert_user_by_ctftime(
+        &self,
+        name: &str,
+        email: &str,
+        avatar: &str,
+        ctftime_user_id: i64,
+        ctftime_team_id: i64,
+        team_name: &str,
+    ) -> Result<(i64, i64, Option<String>)> {
+        let tx = self.connect()?.transaction().await?;
+
+        #[derive(Debug, Deserialize)]
+        struct QueryUser {
+            user_id: i64,
+            team_id: i64,
+            team_ctftime_id: i64,
+        }
+
+        let existing_user = tx
+            .query(
+                "
+                SELECT rhombus_user.id AS user_id, rhombus_user.team_id, rhombus_team.ctftime_id AS team_ctftime_id
+                FROM rhombus_user JOIN rhombus_team ON rhombus_user.team_id = rhombus_team.id
+                WHERE rhombus_user.ctftime_id = ?1
+            ",
+                [ctftime_user_id],
+            )
+            .await?
+            .next()
+            .await?
+            .map(|row| de::from_row::<QueryUser>(&row).unwrap());
+
+        if let Some(ref existing_user) = existing_user {
+            if existing_user.team_ctftime_id == ctftime_team_id {
+                // if the user exists and is on the team, just auth in
+                tx.commit().await?;
+                return Ok((existing_user.user_id, existing_user.team_id, None));
+            }
+        }
+
+        #[derive(Debug, Deserialize)]
+        struct QueryTeam {
+            invite_token: String,
+        }
+
+        let existing_team = tx
+            .query(
+                "
+                    SELECT invite_token
+                    FROM rhombus_team
+                    WHERE ctftime_id = ?1
+                ",
+                [ctftime_team_id],
+            )
+            .await?
+            .next()
+            .await?
+            .map(|row| de::from_row::<QueryTeam>(&row).unwrap());
+
+        if let Some(existing_team) = existing_team {
+            if let Some(ref existing_user) = existing_user {
+                // if the team exists and the user exists, but the user is not on the team, add the user to the team
+                tx.commit().await?;
+                return Ok((
+                    existing_user.user_id,
+                    existing_user.team_id,
+                    Some(existing_team.invite_token),
+                ));
+            }
+
+            let scratch_team_id = create_team(&tx).await?;
+
+            let user_id = tx
+                .query(
+                    "INSERT INTO rhombus_user (name, avatar, ctftime_id, team_id, owner_team_id) VALUES (?1, ?2, ?3, ?4, ?4) RETURNING id",
+                    params!(name, avatar, ctftime_user_id, scratch_team_id),
+                )
+                .await?
+                .next()
+                .await?
+                .unwrap()
+                .get::<i64>(0)
+                .unwrap();
+
+            tx.execute(
+                "INSERT INTO rhombus_email (email, user_id) VALUES (?1, ?2)",
+                params!(email, user_id),
+            )
+            .await?;
+
+            tx.commit().await?;
+            return Ok((user_id, scratch_team_id, Some(existing_team.invite_token)));
+        }
+
+        // if the team does not exist, create the team and add the user to the team
+
+        let team_invite_token = create_team_invite_token();
+
+        let team_id = tx
+            .query(
+                "INSERT INTO rhombus_team (name, invite_token, ctftime_id) VALUES (?1, ?2, ?3) RETURNING id",
+                params!(team_name, team_invite_token.as_str(), ctftime_team_id),
+            )
+            .await?
+            .next()
+            .await?
+            .unwrap()
+            .get::<i64>(0)?;
+
+        let user_id = tx
+            .query(
+                "INSERT INTO rhombus_user (name, avatar, ctftime_id, team_id, owner_team_id) VALUES (?1, ?2, ?3, ?4, ?4) RETURNING id",
+                params!(name, avatar, ctftime_user_id, team_id),
+            )
+            .await?
+            .next()
+            .await?
+            .unwrap()
+            .get::<i64>(0)
+            .unwrap();
+
+        tx.execute(
+            "INSERT INTO rhombus_email (email, user_id) VALUES (?1, ?2)",
+            params!(email, user_id),
+        )
+        .await?;
+
+        tx.commit().await?;
+        Ok((user_id, team_id, None))
+    }
+
     async fn insert_track(
         &self,
         ip: IpAddr,

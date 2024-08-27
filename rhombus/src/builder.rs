@@ -24,8 +24,9 @@ use crate::{
     internal::{
         auth::{
             auth_injector_middleware, enforce_admin_middleware, enforce_auth_middleware,
-            route_signin, route_signin_credentials, route_signin_discord_callback,
-            route_signin_email, route_signin_email_callback, route_signout,
+            route_signin, route_signin_credentials, route_signin_ctftime_callback,
+            route_signin_discord_callback, route_signin_email, route_signin_email_callback,
+            route_signout,
         },
         command_palette::route_command_palette_items,
         database::{
@@ -826,6 +827,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
             let rhombus_router = axum::Router::new()
                 .fallback(handler_404)
                 .route("/admin", get(|| async { (StatusCode::OK, Html("Admin")) }))
+                .route("/reload", get(route_reload::<P, U>))
                 .route_layer(middleware::from_fn(enforce_admin_middleware))
                 .route("/account/verify", get(route_account_email_verify_callback))
                 .route(
@@ -862,6 +864,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     "/signin/email",
                     get(route_signin_email_callback).post(route_signin_email),
                 )
+                .route("/signin/ctftime", get(route_signin_ctftime_callback))
                 .route("/signin/discord", get(route_signin_discord_callback))
                 .route("/signin", get(route_signin))
                 .route(
@@ -870,7 +873,6 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 )
                 .route("/scoreboard/:id", get(route_scoreboard_division))
                 .route("/scoreboard", get(route_scoreboard))
-                .route("/reload", get(route_reload::<P, U>))
                 .route("/user/:id", get(route_public_user))
                 .route("/team/:id", get(route_public_team))
                 .route("/og-image.png", get(route_default_og_image))

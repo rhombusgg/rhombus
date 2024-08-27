@@ -226,6 +226,15 @@ pub trait Database {
         avatar: &str,
         password: &str,
     ) -> Result<Option<(i64, i64)>>;
+    async fn upsert_user_by_ctftime(
+        &self,
+        name: &str,
+        email: &str,
+        avatar: &str,
+        ctftime_user_id: i64,
+        ctftime_team_id: i64,
+        team_name: &str,
+    ) -> Result<(i64, i64, Option<String>)>;
     async fn insert_track(
         &self,
         ip: IpAddr,

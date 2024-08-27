@@ -136,6 +136,12 @@ pub struct HomeSettings {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct CTFtimeSettings {
+    pub client_id: String,
+    pub client_secret: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Settings {
     pub title: String,
     pub logo: Option<String>,
@@ -154,6 +160,7 @@ pub struct Settings {
     pub email: Option<EmailSettings>,
     pub uploads: Option<UploadProviderSettings>,
     pub auth: Vec<AuthProvider>,
+    pub ctftime: Option<CTFtimeSettings>,
 
     /// `false` will disable the in memory cache.
     ///

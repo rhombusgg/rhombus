@@ -7,7 +7,7 @@
       <p class="mb-2 text-sm text-muted-foreground">Your team members</p>
     </div>
     {% with num_members=team.users | length %}
-      {% if min_players == "Unlimited" %}
+      {% if max_players == "Unlimited" %}
         {% if num_members > 1 %}
           <h4
             class="text-sm"
@@ -19,9 +19,9 @@
       {% else %}
         <h4
           class="text-sm"
-          title="{{ t('team-members-limited-hint', count=num_members, limit=min_players.Limited) }}"
+          title="{{ t('team-members-limited-hint', count=num_members, limit=max_players.Limited) }}"
         >
-          {{ t('team-members-limited', count=num_members, limit=min_players.Limited) }}
+          {{ t('team-members-limited', count=num_members, limit=max_players.Limited) }}
         </h4>
       {% endif %}
     {% endwith %}

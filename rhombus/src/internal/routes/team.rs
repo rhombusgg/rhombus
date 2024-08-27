@@ -96,7 +96,7 @@ pub async fn route_team(
         })
     }
 
-    let min_players = divisions
+    let max_players = divisions
         .iter()
         .filter(|division| division.joined)
         .filter_map(|division| match division.max_players {
@@ -120,7 +120,7 @@ pub async fn route_team(
                 team,
                 title,
                 team_invite_url,
-                min_players,
+                max_players,
                 uri => uri.to_string(),
                 location_url,
                 now => chrono::Utc::now(),

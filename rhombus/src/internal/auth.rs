@@ -216,6 +216,20 @@ pub async fn route_signin(
     let discord_signin_url =
         discord.map(|discord| discord::signin_url(&location_url, discord.0, discord.1));
 
+    let ctftime_signin_url = {
+        let settings = state.settings.read().await;
+        settings
+            .ctftime
+            .as_ref()
+            .map(|ctftime| {
+                format!(
+                    "https://oauth.ctftime.org/authorize?response_type=code&client_id={}&redirect_uri={}/signin/ctftime&scope=profile%20team&state=a",
+                    ctftime.client_id,
+                    settings.location_url,
+                )
+            })
+    };
+
     let html = state
         .jinja
         .get_template("signin.html")
@@ -225,6 +239,7 @@ pub async fn route_signin(
             user,
             location_url,
             discord_signin_url,
+            ctftime_signin_url,
             title,
             uri => uri.to_string(),
             auth_options => auth,
@@ -428,6 +443,144 @@ pub async fn route_signin_discord_callback(
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
+pub struct CTFtimeCallback {
+    code: String,
+    state: String,
+}
+
+#[derive(Deserialize)]
+#[allow(dead_code)]
+struct CTFtimeOAuthToken {
+    access_token: String,
+    expires_in: i64,
+    token_type: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct CTFtimeUserData {
+    country: String,
+    email: String,
+    id: i64,
+    name: String,
+    team: CTFtimeTeamData,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct CTFtimeTeamData {
+    id: i64,
+    name: String,
+    country: String,
+    logo: String,
+}
+
+pub async fn route_signin_ctftime_callback(
+    state: State<RouterState>,
+    user: Extension<MaybeUser>,
+    params: Query<CTFtimeCallback>,
+    cookie_jar: CookieJar,
+) -> impl IntoResponse {
+    if user.is_some() {
+        return Redirect::temporary("/signin").into_response();
+    }
+
+    let Some(ref ctftime_settings) = state.settings.read().await.ctftime else {
+        let json_error = ErrorResponse {
+            message: "CTFtime is not configured".to_string(),
+        };
+        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+    };
+
+    let client = Client::new();
+    let res = client
+        .post("https://oauth.ctftime.org/token")
+        .header(
+            reqwest::header::CONTENT_TYPE,
+            "application/x-www-form-urlencoded",
+        )
+        .basic_auth(
+            &ctftime_settings.client_id,
+            Some(&ctftime_settings.client_secret),
+        )
+        .form(&[
+            ("code", params.code.as_str()),
+            ("client_id", ctftime_settings.client_id.as_str()),
+            ("client_secret", ctftime_settings.client_secret.as_str()),
+            ("grant_type", "authorization_code"),
+        ])
+        .send()
+        .await
+        .unwrap();
+
+    if res.status() != StatusCode::OK {
+        let json_error = ErrorResponse {
+            message: format!("Invalid CTFtime oauth token: {:?}", res.text().await),
+        };
+        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+    }
+
+    let Ok(oauth_token) = res.json::<CTFtimeOAuthToken>().await else {
+        let json_error = ErrorResponse {
+            message: "Invalid CTFtime oauth token".to_string(),
+        };
+        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+    };
+
+    let res = client
+        .get("https://oauth.ctftime.org/user")
+        .bearer_auth(&oauth_token.access_token)
+        .send()
+        .await
+        .unwrap();
+    if !res.status().is_success() {
+        let json_error = ErrorResponse {
+            message: format!("Discord returned an error: {:?}", res.text().await),
+        };
+        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+    }
+
+    let user_data = res.json::<CTFtimeUserData>().await.unwrap();
+
+    tracing::info!("{:#?}", user_data);
+
+    let Ok((user_id, team_id, invite_token)) = state
+        .db
+        .upsert_user_by_ctftime(
+            &user_data.name,
+            &user_data.email,
+            &if user_data.team.logo.is_empty() {
+                avatar_from_email(&user_data.name)
+            } else {
+                user_data.team.logo
+            },
+            user_data.id,
+            user_data.team.id,
+            &user_data.team.name,
+        )
+        .await
+    else {
+        tracing::info!(
+            ctftime_user_id = user_data.id,
+            ctftime_team_id = user_data.team.id,
+            "failed to upsert user by ctftime"
+        );
+        return Redirect::temporary("/signin").into_response();
+    };
+
+    let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar).await;
+    let mut response = if let Some(invite_token) = invite_token {
+        Redirect::temporary(format!("/signin?token={}", invite_token).as_str()).into_response()
+    } else {
+        Redirect::temporary("/team").into_response()
+    };
+    let headers = response.headers_mut();
+    headers.insert(header::SET_COOKIE, cookie.to_string().parse().unwrap());
+    response
+}
+
+#[derive(Deserialize)]
 pub struct EmailSubmit {
     email: String,
 }
@@ -510,17 +663,7 @@ pub async fn route_signin_credentials(
             .into_response();
     }
 
-    let hash = Sha256::digest(form.username.trim().to_lowercase().as_bytes())
-        .iter()
-        .fold(String::new(), |mut output, b| {
-            let _ = write!(output, "{:02x}", b);
-            output
-        });
-
-    let avatar = format!(
-        "https://seccdn.libravatar.org/avatar/{}?s=80&default=retro",
-        hash
-    );
+    let avatar = avatar_from_email(&form.username.trim().to_lowercase());
 
     let Some((user_id, team_id)) = state
         .db
@@ -555,6 +698,20 @@ pub struct EmailSignInParams {
     code: String,
 }
 
+pub fn avatar_from_email(email: &str) -> String {
+    let hash = Sha256::digest(email.trim().to_lowercase().as_bytes())
+        .iter()
+        .fold(String::new(), |mut output, b| {
+            let _ = write!(output, "{:02x}", b);
+            output
+        });
+
+    format!(
+        "https://seccdn.libravatar.org/avatar/{}?s=80&default=retro",
+        hash
+    )
+}
+
 pub async fn route_signin_email_callback(
     state: State<RouterState>,
     params: Query<EmailSignInParams>,
@@ -571,17 +728,7 @@ pub async fn route_signin_email_callback(
 
     let name = email.split('@').next().unwrap();
 
-    let hash = Sha256::digest(email.trim().to_lowercase().as_bytes())
-        .iter()
-        .fold(String::new(), |mut output, b| {
-            let _ = write!(output, "{:02x}", b);
-            output
-        });
-
-    let avatar = format!(
-        "https://seccdn.libravatar.org/avatar/{}?s=80&default=retro",
-        hash
-    );
+    let avatar = avatar_from_email(&email);
 
     let Ok((user_id, team_id)) = state.db.upsert_user_by_email(name, &email, &avatar).await else {
         tracing::info!(email, "failed to upsert user by email");

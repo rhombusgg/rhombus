@@ -74,7 +74,8 @@ CREATE TABLE IF NOT EXISTS rhombus_user (
     id INTEGER PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
     avatar TEXT NOT NULL,
-    discord_id INTEGER,
+    discord_id INTEGER UNIQUE,
+    ctftime_id INTEGER UNIQUE,
     password TEXT,
     team_id INTEGER NOT NULL,
     owner_team_id INTEGER NOT NULL,
@@ -126,7 +127,8 @@ CREATE TABLE IF NOT EXISTS rhombus_writeup (
 CREATE TABLE IF NOT EXISTS rhombus_team (
     id INTEGER PRIMARY KEY NOT NULL,
     name TEXT NOT NULL UNIQUE,
-    invite_token TEXT NOT NULL
+    invite_token TEXT NOT NULL,
+    ctftime_id INTEGER UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS rhombus_team_division (

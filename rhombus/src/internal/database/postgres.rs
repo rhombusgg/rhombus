@@ -89,6 +89,18 @@ impl Database for Postgres {
         todo!()
     }
 
+    async fn upsert_user_by_ctftime(
+        &self,
+        _name: &str,
+        _email: &str,
+        _avatar: &str,
+        _ctftime_user_id: i64,
+        _ctftime_team_id: i64,
+        _team_name: &str,
+    ) -> Result<(i64, i64, Option<String>)> {
+        todo!()
+    }
+
     async fn insert_track(
         &self,
         ip: IpAddr,

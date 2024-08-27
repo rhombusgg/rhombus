@@ -93,6 +93,33 @@ impl Database for DbCache {
         result
     }
 
+    async fn upsert_user_by_ctftime(
+        &self,
+        name: &str,
+        email: &str,
+        avatar: &str,
+        ctftime_user_id: i64,
+        ctftime_team_id: i64,
+        team_name: &str,
+    ) -> Result<(i64, i64, Option<String>)> {
+        let result = self
+            .inner
+            .upsert_user_by_ctftime(
+                name,
+                email,
+                avatar,
+                ctftime_user_id,
+                ctftime_team_id,
+                team_name,
+            )
+            .await;
+        if let Ok(ref result) = result {
+            USER_CACHE.remove(&result.0);
+            TEAM_CACHE.remove(&result.1);
+        }
+        result
+    }
+
     async fn insert_track(
         &self,
         ip: IpAddr,
