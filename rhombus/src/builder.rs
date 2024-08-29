@@ -24,9 +24,9 @@ use crate::{
     internal::{
         auth::{
             auth_injector_middleware, enforce_admin_middleware, enforce_auth_middleware,
-            route_signin, route_signin_credentials, route_signin_ctftime_callback,
-            route_signin_discord_callback, route_signin_email, route_signin_email_callback,
-            route_signout,
+            route_signin, route_signin_credentials, route_signin_ctftime,
+            route_signin_ctftime_callback, route_signin_discord, route_signin_discord_callback,
+            route_signin_email, route_signin_email_callback, route_signout,
         },
         command_palette::route_command_palette_items,
         database::{
@@ -864,8 +864,16 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     "/signin/email",
                     get(route_signin_email_callback).post(route_signin_email),
                 )
-                .route("/signin/ctftime", get(route_signin_ctftime_callback))
-                .route("/signin/discord", get(route_signin_discord_callback))
+                .route(
+                    "/signin/ctftime/callback",
+                    get(route_signin_ctftime_callback),
+                )
+                .route("/signin/ctftime", get(route_signin_ctftime))
+                .route(
+                    "/signin/discord/callback",
+                    get(route_signin_discord_callback),
+                )
+                .route("/signin/discord", get(route_signin_discord))
                 .route("/signin", get(route_signin))
                 .route(
                     "/scoreboard/:id/ctftime",

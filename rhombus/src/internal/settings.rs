@@ -137,7 +137,7 @@ pub struct HomeSettings {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct CTFtimeSettings {
-    pub client_id: String,
+    pub client_id: NonZeroU64,
     pub client_secret: String,
 }
 

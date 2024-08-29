@@ -19,12 +19,12 @@
     </div>
     <div class="grid gap-4 sm:w-96">
       {% for option in auth_options %}
-        {% if option == "discord" and discord_signin_url %}
+        {% if option == "discord" %}
           {% if loop.index > 1 %}
             {{ bar("Or continue with Discord") }}
           {% endif %}
           <a
-            href="{{ discord_signin_url }}"
+            href="/signin/discord"
             class="h-10 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center rounded-md text-sm font-medium whitespace-nowrap ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
             >{{ icons.discord(class="mr-2 size-4") }} Discord</a
           >
@@ -57,12 +57,12 @@
               Send Sign In Email
             </button>
           </form>
-        {% elif option == "ctftime" and ctftime_signin_url %}
+        {% elif option == "ctftime" %}
           {% if loop.index > 1 %}
             {{ bar("Or continue with CTFtime") }}
           {% endif %}
           <a
-            href="{{ ctftime_signin_url }}"
+            href="/signin/ctftime"
             class="h-10 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center rounded-md text-sm font-medium whitespace-nowrap ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
             >{{ icons.ctftime(class="h-6 stroke-none") }}</a
           >

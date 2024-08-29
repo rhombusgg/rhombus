@@ -23,7 +23,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::internal::{
-    discord, division::MaxDivisionPlayers, locales::Languages, router::RouterState,
+    division::MaxDivisionPlayers, locales::Languages, router::RouterState,
+    routes::team::create_team_invite_token,
 };
 
 #[derive(Debug, Serialize, Clone)]
@@ -203,31 +204,13 @@ pub async fn route_signin(
         )
     };
 
-    let (discord, location_url, auth, title) = {
+    let (location_url, auth, title) = {
         let settings = state.settings.read().await;
         (
-            settings.discord.as_ref().map(|d| (d.client_id, d.autojoin)),
             settings.location_url.clone(),
             settings.auth.clone(),
             settings.title.clone(),
         )
-    };
-
-    let discord_signin_url =
-        discord.map(|discord| discord::signin_url(&location_url, discord.0, discord.1));
-
-    let ctftime_signin_url = {
-        let settings = state.settings.read().await;
-        settings
-            .ctftime
-            .as_ref()
-            .map(|ctftime| {
-                format!(
-                    "https://oauth.ctftime.org/authorize?response_type=code&client_id={}&redirect_uri={}/signin/ctftime&scope=profile%20team&state=a",
-                    ctftime.client_id,
-                    settings.location_url,
-                )
-            })
     };
 
     let html = state
@@ -238,8 +221,6 @@ pub async fn route_signin(
             lang,
             user,
             location_url,
-            discord_signin_url,
-            ctftime_signin_url,
             title,
             uri => uri.to_string(),
             auth_options => auth,
@@ -255,13 +236,75 @@ pub async fn route_signin(
         .unwrap()
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DiscordOAuthStateClaims {
+    state: String,
+    iat: i64,
+    exp: i64,
+}
+
+pub async fn route_signin_discord(state: State<RouterState>) -> impl IntoResponse {
+    let (jwt_secret, location_url, client_id, autojoin) = {
+        let settings = state.settings.read().await;
+
+        if let Some(ref discord) = settings.discord {
+            (
+                settings.jwt_secret.clone(),
+                settings.location_url.clone(),
+                discord.client_id,
+                discord.autojoin,
+            )
+        } else {
+            return Redirect::temporary("/signin").into_response();
+        }
+    };
+
+    let oauth_state = create_team_invite_token();
+
+    let now = chrono::Utc::now();
+    let iat = now.timestamp();
+    let exp = (now + chrono::Duration::try_hours(1).unwrap()).timestamp();
+
+    let signed_oauth_state = encode(
+        &Header::default(),
+        &DiscordOAuthStateClaims {
+            state: oauth_state,
+            iat,
+            exp,
+        },
+        &EncodingKey::from_secret(jwt_secret.as_ref()),
+    )
+    .unwrap();
+
+    let signin_url = format!(
+        "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}/signin/discord/callback&response_type=code&scope=identify{}&state={}",
+        client_id,
+        location_url,
+        if autojoin.unwrap_or(true) { "+guilds.join" } else { "" },
+        signed_oauth_state,
+    );
+
+    let cookie = Cookie::build(("rhombus-oauth-discord", signed_oauth_state))
+        .path("/")
+        .max_age(time::Duration::hours(1))
+        .same_site(SameSite::Lax)
+        .http_only(true)
+        .build();
+
+    let mut response = Redirect::temporary(&signin_url).into_response();
+    let headers = response.headers_mut();
+    headers.insert(header::SET_COOKIE, cookie.to_string().parse().unwrap());
+    response
+}
+
+#[derive(Debug, Deserialize)]
 pub struct DiscordCallback {
     code: Option<String>,
+    state: Option<String>,
     error: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 struct DiscordOAuthToken {
     access_token: String,
@@ -288,6 +331,16 @@ pub async fn route_signin_discord_callback(
     params: Query<DiscordCallback>,
     cookie_jar: CookieJar,
 ) -> impl IntoResponse {
+    let Some(discord_oauth_cookie) = cookie_jar
+        .get("rhombus-oauth-discord")
+        .map(|cookie| cookie.value())
+    else {
+        let json_error = ErrorResponse {
+            message: "State not set".to_string(),
+        };
+        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+    };
+
     if let Some(error) = &params.error {
         tracing::error!("Discord returned an error: {}", error);
         let json_error = ErrorResponse {
@@ -303,6 +356,20 @@ pub async fn route_signin_discord_callback(
         return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
     };
 
+    let Some(discord_oauth_state) = &params.state else {
+        let json_error = ErrorResponse {
+            message: "Discord did not return a state".to_string(),
+        };
+        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+    };
+
+    if discord_oauth_cookie != discord_oauth_state {
+        let json_error = ErrorResponse {
+            message: "State mismatch".to_string(),
+        };
+        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+    }
+
     struct DiscordOAuthSettings {
         client_id: NonZeroU64,
         client_secret: String,
@@ -310,7 +377,7 @@ pub async fn route_signin_discord_callback(
         bot_token: String,
     }
 
-    let (discord, location_url) = {
+    let (discord, location_url, jwt_secret) = {
         let settings = state.settings.read().await;
         (
             settings.discord.as_ref().map(|d| DiscordOAuthSettings {
@@ -320,7 +387,21 @@ pub async fn route_signin_discord_callback(
                 bot_token: d.bot_token.clone(),
             }),
             settings.location_url.clone(),
+            settings.jwt_secret.clone(),
         )
+    };
+
+    if decode::<DiscordOAuthStateClaims>(
+        discord_oauth_cookie,
+        &DecodingKey::from_secret(jwt_secret.as_ref()),
+        &Validation::default(),
+    )
+    .is_err()
+    {
+        let json_error = ErrorResponse {
+            message: "Invalid state".to_string(),
+        };
+        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
     };
 
     let Some(discord) = discord else {
@@ -343,7 +424,10 @@ pub async fn route_signin_discord_callback(
         .form(&[
             ("grant_type", "authorization_code"),
             ("code", code),
-            ("redirect_uri", &format!("{}/signin/discord", location_url)),
+            (
+                "redirect_uri",
+                &format!("{}/signin/discord/callback", location_url),
+            ),
         ])
         .send()
         .await
@@ -435,10 +519,20 @@ pub async fn route_signin_discord_callback(
         return Redirect::temporary("/signin").into_response();
     };
 
+    let unset_oauth_state_cookie = Cookie::build(("rhombus-oauth-discord", ""))
+        .path("/")
+        .max_age(time::Duration::hours(-1))
+        .same_site(SameSite::Lax)
+        .http_only(true);
+
     let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar).await;
     let mut response = Redirect::temporary("/team").into_response();
     let headers = response.headers_mut();
     headers.insert(header::SET_COOKIE, cookie.to_string().parse().unwrap());
+    headers.append(
+        header::SET_COOKIE,
+        unset_oauth_state_cookie.to_string().parse().unwrap(),
+    );
     response
 }
 
@@ -486,7 +580,44 @@ pub async fn route_signin_ctftime_callback(
         return Redirect::temporary("/signin").into_response();
     }
 
-    let Some(ref ctftime_settings) = state.settings.read().await.ctftime else {
+    let Some(ctftime_oauth_cookie) = cookie_jar
+        .get("rhombus-oauth-ctftime")
+        .map(|cookie| cookie.value())
+    else {
+        let json_error = ErrorResponse {
+            message: "State not set".to_string(),
+        };
+        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+    };
+
+    if ctftime_oauth_cookie != params.state {
+        let json_error = ErrorResponse {
+            message: "State mismatch".to_string(),
+        };
+        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+    }
+
+    let (ctftime_settings, jwt_secret) = {
+        let settings = state.settings.read().await;
+        (settings.ctftime.clone(), settings.jwt_secret.clone())
+    };
+
+    if decode::<DiscordOAuthStateClaims>(
+        ctftime_oauth_cookie
+            .replace("______________________________________", ".")
+            .as_str(),
+        &DecodingKey::from_secret(jwt_secret.as_ref()),
+        &Validation::default(),
+    )
+    .is_err()
+    {
+        let json_error = ErrorResponse {
+            message: "Invalid state".to_string(),
+        };
+        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+    };
+
+    let Some(ctftime_settings) = ctftime_settings else {
         let json_error = ErrorResponse {
             message: "CTFtime is not configured".to_string(),
         };
@@ -501,12 +632,12 @@ pub async fn route_signin_ctftime_callback(
             "application/x-www-form-urlencoded",
         )
         .basic_auth(
-            &ctftime_settings.client_id,
+            ctftime_settings.client_id,
             Some(&ctftime_settings.client_secret),
         )
         .form(&[
             ("code", params.code.as_str()),
-            ("client_id", ctftime_settings.client_id.as_str()),
+            ("client_id", ctftime_settings.client_id.to_string().as_str()),
             ("client_secret", ctftime_settings.client_secret.as_str()),
             ("grant_type", "authorization_code"),
         ])
@@ -543,8 +674,6 @@ pub async fn route_signin_ctftime_callback(
 
     let user_data = res.json::<CTFtimeUserData>().await.unwrap();
 
-    tracing::info!("{:#?}", user_data);
-
     let Ok((user_id, team_id, invite_token)) = state
         .db
         .upsert_user_by_ctftime(
@@ -575,6 +704,71 @@ pub async fn route_signin_ctftime_callback(
     } else {
         Redirect::temporary("/team").into_response()
     };
+    let headers = response.headers_mut();
+    headers.insert(header::SET_COOKIE, cookie.to_string().parse().unwrap());
+    response
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CTFtimeOAuthStateClaims {
+    state: String,
+    iat: i64,
+    exp: i64,
+}
+
+pub async fn route_signin_ctftime(state: State<RouterState>) -> impl IntoResponse {
+    let (jwt_secret, location_url, client_id) = {
+        let settings = state.settings.read().await;
+
+        if let Some(ref ctftime) = settings.ctftime {
+            (
+                settings.jwt_secret.clone(),
+                settings.location_url.clone(),
+                ctftime.client_id,
+            )
+        } else {
+            return Redirect::temporary("/signin").into_response();
+        }
+    };
+
+    let oauth_state = create_team_invite_token();
+
+    let now = chrono::Utc::now();
+    let iat = now.timestamp();
+    let exp = (now + chrono::Duration::try_hours(1).unwrap()).timestamp();
+
+    let signed_oauth_state = encode(
+        &Header::default(),
+        &CTFtimeOAuthStateClaims {
+            state: oauth_state,
+            iat,
+            exp,
+        },
+        &EncodingKey::from_secret(jwt_secret.as_ref()),
+    )
+    .unwrap();
+
+    // ctftime doesn't like dots in the state (or any non-base64url-encoded characters)
+    // so we replace them with a statistically unlikely sequence of underscores. This is
+    // then re-replaced in [[route_signin_discord_callback]]
+    let signed_oauth_state =
+        signed_oauth_state.replace('.', "______________________________________");
+
+    let signin_url = format!(
+        "https://oauth.ctftime.org/authorize?response_type=code&client_id={}&redirect_uri={}/signin/ctftime/callback&scope=profile%20team&state={}",
+        client_id,
+        location_url,
+        signed_oauth_state,
+    );
+
+    let cookie = Cookie::build(("rhombus-oauth-ctftime", signed_oauth_state))
+        .path("/")
+        .max_age(time::Duration::hours(1))
+        .same_site(SameSite::Lax)
+        .http_only(true)
+        .build();
+
+    let mut response = Redirect::temporary(&signin_url).into_response();
     let headers = response.headers_mut();
     headers.insert(header::SET_COOKIE, cookie.to_string().parse().unwrap());
     response
@@ -796,7 +990,7 @@ async fn sign_in_cookie(
     )
     .unwrap();
 
-    Cookie::build(("rhombus-token", token.to_owned()))
+    Cookie::build(("rhombus-token", token))
         .path("/")
         .max_age(time::Duration::hours(72))
         .same_site(SameSite::Lax)

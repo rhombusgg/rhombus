@@ -187,7 +187,7 @@ const CommandMenu = () => {
             <CommandItem
               onSelect={() => {
                 // @ts-ignore
-                window.location = data().discord_signin_url;
+                window.location = "/signin/discord";
               }}
             >
               <LogInIcon class="mr-2 h-4 w-4" />
@@ -662,7 +662,6 @@ const ChallengesComponent = ({
 
 type CommandPaletteData = {
   challenges?: Record<string, string[]>;
-  discord_signin_url?: string;
   divisions: Record<string, string>;
 };
 

@@ -16,7 +16,7 @@ use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 
 use crate::internal::{
-    auth::User, database::cache::TimedCache, discord, locales::Languages, router::RouterState,
+    auth::User, database::cache::TimedCache, locales::Languages, router::RouterState,
 };
 
 pub fn generate_email_callback_code() -> String {
@@ -71,8 +71,6 @@ pub async fn route_account(
     struct DiscordSettings {
         guild_id: NonZeroU64,
         bot_token: String,
-        client_id: NonZeroU64,
-        autojoin: Option<bool>,
     }
 
     let (discord, location_url, title) = {
@@ -81,8 +79,6 @@ pub async fn route_account(
             settings.discord.as_ref().map(|d| DiscordSettings {
                 guild_id: d.guild_id,
                 bot_token: d.bot_token.clone(),
-                client_id: d.client_id,
-                autojoin: d.autojoin,
             }),
             settings.location_url.clone(),
             settings.title.clone(),
@@ -92,7 +88,6 @@ pub async fn route_account(
     #[derive(Serialize)]
     struct DiscordData {
         in_server: bool,
-        signin_url: String,
         invite_url: String,
     }
 
@@ -105,7 +100,6 @@ pub async fn route_account(
 
         Some(DiscordData {
             in_server,
-            signin_url: discord::signin_url(&location_url, discord.client_id, discord.autojoin),
             invite_url: state.bot.as_ref().unwrap().get_invite_url().await.unwrap(),
         })
     } else {

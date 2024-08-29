@@ -45,15 +45,6 @@ pub struct Data {
 pub type DiscordError = Box<dyn std::error::Error + Send + Sync>;
 pub type Context<'a> = poise::Context<'a, Data, DiscordError>;
 
-pub fn signin_url(location_url: &str, client_id: NonZeroU64, autojoin: Option<bool>) -> String {
-    format!(
-        "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}/signin/discord&response_type=code&scope=identify{}",
-        client_id,
-        location_url,
-        if autojoin.unwrap_or(true) { "+guilds.join" } else { "" }
-    )
-}
-
 /// Go to the CTF profile page of a corresponding user
 #[poise::command(slash_command, ephemeral)]
 pub async fn whois(
