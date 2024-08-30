@@ -56,12 +56,6 @@ async fn main() {
 
     let listener = tokio::net::TcpListener::bind(":::3000").await.unwrap();
     app.serve(listener).await;
-    // rhombus::axum::serve(
-    //     listener,
-    //     app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
-    // )
-    // .await
-    // .unwrap();
 }
 
 struct DemoPlugin;
@@ -467,10 +461,10 @@ fn database_resetter(libsql: Arc<LibSQL>, settings: Arc<RwLock<Settings>>) {
         loop {
             let now = Utc::now();
 
-            let seconds_until_next_10_minute_interval =
-                ((10 - now.minute() % 10) * 60 - now.second()) as u64;
+            let seconds_until_next_30_minute_interval =
+                ((30 - now.minute() % 30) * 60 - now.second()) as u64;
 
-            tokio::time::sleep(Duration::from_secs(seconds_until_next_10_minute_interval)).await;
+            tokio::time::sleep(Duration::from_secs(seconds_until_next_30_minute_interval)).await;
 
             randomize_jwt(settings.clone()).await;
             reset_database(libsql.clone()).await.unwrap();

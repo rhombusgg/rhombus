@@ -1033,8 +1033,13 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
             INSERT INTO rhombus_points_snapshot
             SELECT team_id, division_id, ?1, points
             FROM rhombus_team_division_points
+            WHERE division_id IN (
+                SELECT division_id
+                FROM rhombus_team_division
+                WHERE team_id = ?2
+            )
             ",
-            [now],
+            [now, team_id],
         )
         .await?;
 
@@ -1495,12 +1500,27 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
             .await?;
 
         let mut teams: BTreeMap<i64, ScoreboardTeam> = BTreeMap::new();
+        let mut current_timestamp = 0;
+        let mut current_hash = 0;
+        let mut old_hash = 0;
         while let Some(row) = db_scoreboard.next().await? {
             let scoreboard = de::from_row::<DbScoreboard>(&row).unwrap();
             let series_point = ScoreboardSeriesPoint {
                 timestamp: scoreboard.at,
                 total_score: scoreboard.points,
             };
+
+            if current_timestamp != scoreboard.at {
+                current_timestamp = scoreboard.at;
+                if current_hash == old_hash {
+                    for team in teams.values_mut() {
+                        team.series.pop();
+                    }
+                }
+                old_hash = current_hash;
+                current_hash = 0;
+            }
+            current_hash += scoreboard.points;
 
             match teams.entry(scoreboard.team_id) {
                 Entry::Vacant(entry) => {

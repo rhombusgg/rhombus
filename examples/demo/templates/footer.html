@@ -14,17 +14,17 @@
     <div class="text-center flex flex-col md:text-right">
       <pre class="font-mono" id="reset-countdown">&nbsp;</pre>
       <span id="reset-time">&nbsp;</span>
-      <div>The demo instance resets every 10 minutes</div>
+      <div>The demo instance resets every 30 minutes</div>
     </div>
   </div>
   <script>
     function getNextInterval() {
       const now = new Date();
       const minutes = now.getMinutes();
-      const next10MinuteIntervalMinutes = Math.ceil((minutes + 1) / 10) * 10;
+      const next30MinuteIntervalMinutes = Math.ceil((minutes + 1) / 30) * 30;
 
       const nextInterval = new Date(now);
-      nextInterval.setMinutes(next10MinuteIntervalMinutes);
+      nextInterval.setMinutes(next30MinuteIntervalMinutes);
       nextInterval.setSeconds(0);
       nextInterval.setMilliseconds(0);
 
@@ -36,8 +36,8 @@
 
     function updateCountdown() {
       const now = new Date();
-      const next10MinuteInterval = getNextInterval();
-      const diff = next10MinuteInterval - now;
+      const next30MinuteInterval = getNextInterval();
+      const diff = next30MinuteInterval - now;
 
       const minutes = Math.floor(diff / 60000);
       let seconds = Math.floor((diff % 60000) / 1000);

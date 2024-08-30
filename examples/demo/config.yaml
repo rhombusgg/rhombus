@@ -17,8 +17,6 @@ divisions:
     email_regex: ^.*.edu$
     requirement: Must verify a valid university .edu email address. Max of up to 4 players
     max_players: 4
-ctftime:
-  client_id: 1
 discord:
   guild_id: 1160610137703186636
   client_id: 1160076447977848945
