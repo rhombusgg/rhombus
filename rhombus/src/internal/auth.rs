@@ -177,11 +177,7 @@ pub async fn route_signin(
                 }
             }
 
-            state
-                .db
-                .add_user_to_team(user.id, team.id, Some(user.team_id))
-                .await
-                .unwrap();
+            state.db.add_user_to_team(user.id, team.id).await.unwrap();
             return Redirect::to("/team").into_response();
         }
 
@@ -975,11 +971,7 @@ async fn sign_in_cookie(
             .await
             .unwrap_or(None)
         {
-            state
-                .db
-                .add_user_to_team(user_id, team.id, None)
-                .await
-                .unwrap();
+            state.db.add_user_to_team(user_id, team.id).await.unwrap();
         }
     }
 

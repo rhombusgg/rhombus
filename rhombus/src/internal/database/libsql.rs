@@ -820,7 +820,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
             .query(
                 "
                 SELECT challenge_id, user_id, solved_at
-                FROM rhombus_solve JOIN rhombus_user ON rhombus_solve.user_id = rhombus_user.id
+                FROM rhombus_solve
                 WHERE team_id = ?1
             ",
                 [team_id],
@@ -888,23 +888,30 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
         }))
     }
 
-    async fn add_user_to_team(
-        &self,
-        user_id: i64,
-        team_id: i64,
-        _old_team_id: Option<i64>,
-    ) -> Result<()> {
-        self.connect()?
-            .execute(
-                r#"
+    async fn add_user_to_team(&self, user_id: i64, team_id: i64) -> Result<()> {
+        let tx = self.connect()?.transaction().await?;
+
+        tx.execute(
+            "
                 UPDATE rhombus_user
                 SET team_id = ?2
                 WHERE id = ?1
-            "#,
-                [user_id, team_id],
-            )
-            .await?;
+            ",
+            [user_id, team_id],
+        )
+        .await?;
 
+        tx.execute(
+            "
+                UPDATE rhombus_solve
+                SET team_id = ?2
+                WHERE user_id = ?1
+            ",
+            [user_id, team_id],
+        )
+        .await?;
+
+        tx.commit().await?;
         Ok(())
     }
 
@@ -1023,8 +1030,8 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
         let now = chrono::Utc::now().timestamp();
 
         tx.execute(
-            "INSERT INTO rhombus_solve (challenge_id, user_id, solved_at) VALUES (?1, ?2, ?3)",
-            [challenge.id, user_id, now],
+            "INSERT INTO rhombus_solve (challenge_id, user_id, team_id, solved_at) VALUES (?1, ?2, ?3, ?4)",
+            [challenge.id, user_id, team_id, now],
         )
         .await?;
 
@@ -1451,7 +1458,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
                 SELECT team_id
                 FROM rhombus_team_division_points
                 WHERE division_id = ?1
-                ORDER BY points DESC
+                ORDER BY points DESC, last_solved_at ASC
                 LIMIT 10
             ",
                 [division_id],
@@ -1501,7 +1508,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
 
         let mut teams: BTreeMap<i64, ScoreboardTeam> = BTreeMap::new();
         let mut current_timestamp = 0;
-        let mut current_hash = 0;
+        let mut current_hash: i64 = 0;
         let mut old_hash = 0;
         while let Some(row) = db_scoreboard.next().await? {
             let scoreboard = de::from_row::<DbScoreboard>(&row).unwrap();
@@ -1520,7 +1527,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
                 old_hash = current_hash;
                 current_hash = 0;
             }
-            current_hash += scoreboard.points;
+            current_hash = current_hash.wrapping_add(scoreboard.points * scoreboard.team_id * 31);
 
             match teams.entry(scoreboard.team_id) {
                 Entry::Vacant(entry) => {
@@ -1580,7 +1587,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
                 FROM rhombus_team_division_points
                 JOIN rhombus_team ON rhombus_team_division_points.team_id = rhombus_team.id
                 WHERE division_id = ?1
-                ORDER BY points DESC
+                ORDER BY points DESC, last_solved_at ASC
                 LIMIT ?3 OFFSET ?2
             ",
                     params!(division_id, page * PAGE_SIZE, PAGE_SIZE),
