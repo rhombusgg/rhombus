@@ -1,6 +1,9 @@
 stable_id: my-first-web
 name: my-first-web
-description: asjdlfhljasdfhjls
+description: |
+  this is a super [cool](https://example.com) *web* challenge
+
+  hi!
 flag: flag{this_is_a_fake_flag}
 category: web
 author: mbund

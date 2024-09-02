@@ -139,20 +139,34 @@ pub async fn route_challenge_view(
         .find(|c| challenge.category_id.eq(&c.id))
         .unwrap();
 
+    let description = markdown::to_html_with_options(
+        &challenge.description,
+        &markdown::Options {
+            compile: markdown::CompileOptions {
+                allow_dangerous_html: true,
+                allow_dangerous_protocol: true,
+                ..markdown::CompileOptions::default()
+            },
+            ..markdown::Options::default()
+        },
+    )
+    .unwrap();
+
     Html(
         state
             .jinja
             .get_template("challenge.html")
             .unwrap()
             .render(context! {
-                lang => lang,
-                user => user,
+                lang,
+                user,
                 uri => uri.to_string(),
-                challenge => challenge,
-                category => category,
-                team => team,
+                challenge,
+                description,
+                category,
+                team,
                 divisions => challenge_data.divisions,
-                user_writeups => user_writeups,
+                user_writeups,
             })
             .unwrap(),
     )
@@ -188,6 +202,19 @@ pub async fn route_ticket_view(
         state.settings.read().await.default_ticket_template.clone()
     };
 
+    let description = markdown::to_html_with_options(
+        &challenge.description,
+        &markdown::Options {
+            compile: markdown::CompileOptions {
+                allow_dangerous_html: true,
+                allow_dangerous_protocol: true,
+                ..markdown::CompileOptions::default()
+            },
+            ..markdown::Options::default()
+        },
+    )
+    .unwrap();
+
     Html(
         state
             .jinja
@@ -198,6 +225,7 @@ pub async fn route_ticket_view(
                 user,
                 uri => uri.to_string(),
                 challenge,
+                description,
                 category,
                 team,
                 ticket_template,

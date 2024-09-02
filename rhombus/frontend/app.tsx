@@ -10,6 +10,7 @@ import {
   onCleanup,
 } from "solid-js";
 import { customElement } from "solid-element";
+import { SolidMarkdown } from "solid-markdown";
 import {
   SunIcon,
   MoonIcon,
@@ -646,7 +647,10 @@ const ChallengesComponent = ({
                             </button>
                           </div>
                         </div>
-                        <div>{challenge.description}</div>
+                        <SolidMarkdown
+                          class="prose dark:prose-invert"
+                          children={challenge.description}
+                        />
                       </li>
                     );
                   }}

@@ -34,7 +34,7 @@
       </rhombus-tooltip>
     </div>
   </div>
-  <div class="mb-4">{{ challenge.description | safe }}</div>
+  <div class="mb-4 prose dark:prose-invert">{{ description | safe }}</div>
   {% with solve=team.solves[challenge.id] %}
     {% if not solve %}
       <form

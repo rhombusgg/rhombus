@@ -1449,6 +1449,10 @@ body {
   height: 100%;
 }
 
+.h-1 {
+  height: 0.25rem;
+}
+
 .h-10 {
   height: 2.5rem;
 }
