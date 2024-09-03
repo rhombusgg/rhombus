@@ -12,12 +12,12 @@
   - [x] YAML
   - [x] JSON Schema
   - [x] Environment variables
-- [ ] Challenges
+- [x] Challenges
   - [x] Categories
   - [x] Healthchecks
   - [x] Writeups
   - [x] Dynamic scoring
-  - [ ] Markdown rendering
+  - [x] Markdown rendering
   - [x] Raw html rendering
   - [x] Authors without accounts
 - [x] File uploads
@@ -48,7 +48,7 @@
 - [x] Challenge loader plugin
 - [ ] API
   - [ ] Access tokens
-- [ ] Documentation/marketing site
+- [x] Documentation/marketing site
 - [ ] Admin challenges
   - [ ] Creation
   - [ ] List
@@ -63,4 +63,3 @@
 - [ ] CLI challenge templating
 - [ ] CLI api integration
 - [ ] Serverless mode
-- [ ] WASM compilation

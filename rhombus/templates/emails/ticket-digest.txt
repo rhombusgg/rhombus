@@ -1,5 +1,3 @@
-Digest:
-
 {{ irc }}
 
 Reply to this email to respond

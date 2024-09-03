@@ -41,7 +41,7 @@ pub fn healthcheck_runner(db: WeakConnection) {
         loop {
             tokio::time::sleep(Duration::from_secs(60)).await;
 
-            tracing::info!(strong_count = db.strong_count(), "Running healthcheck");
+            tracing::trace!("Running healthcheck");
             let Some(db) = db.upgrade() else {
                 break;
             };

@@ -817,6 +817,8 @@ pub async fn route_signin_email(
             .unwrap();
     }
 
+    tracing::info!(email = form.email, "sent email signin");
+
     Response::builder()
         .body(format!(
             r#"<div id="htmx-toaster" data-toast="success" hx-swap-oob="true">{}</div>"#,

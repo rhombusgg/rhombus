@@ -1,14 +1,11 @@
 # Rhombus
 
+See [documentation for deployment](https://rhombus.gg), and a [hosted demo](https://demo.rhombus.gg).
+
 ## Development
+
+A [Nix Flake](https://nixos.org) is provided for development.
 
 ```
 task dev
-```
-
-Configurable via environment variables:
-
-```bash
-RHOMBUS__LOCATION_URL="http://localhost:3000"
-RHOMBUS__DISCORD__CLIENT_ID="1160076447977848945"
 ```

@@ -1,9 +1,36 @@
-<p>Digest:</p>
-
-<ul>
-  {% for message in messages %}
-    <li>&lt;{{ message.author.name }}&gt; {{ message.content }}</li>
-  {% endfor %}
-</ul>
-
-<p>Reply to this email to respond</p>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><!--$-->
+<html dir="ltr" lang="en">
+  <body
+    style='margin-left:auto;margin-right:auto;margin-top:auto;margin-bottom:auto;background-color:rgb(255,255,255);font-family:ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"'
+  >
+    <table
+      align="center"
+      width="100%"
+      border="0"
+      cellpadding="0"
+      cellspacing="0"
+      role="presentation"
+      style="max-width:37.5em;margin-left:auto;margin-right:auto;margin-top:40px;margin-bottom:40px;width:465px;border-radius:0.25rem;border-width:1px;border-style:solid;border-color:rgb(234,234,234);padding:20px"
+    >
+      <tbody>
+        <tr style="width:100%">
+          <td>
+            {% for message in messages %}
+              <div style="display:flex;align-items:flex-start;column-gap:1rem"><img alt="User avatar" height="40" src="{{ message.author.image_url }}" style="border-radius:9999px;display:block;outline:none;border:none;text-decoration:none" width="40" />
+                <div style="flex:1 1 0%;min-width:0px">
+                  <div style="display:flex;align-items:center;column-gap:0.75rem;margin-bottom:0.125rem">
+                    <p style="font-size:1rem;line-height:1.5rem;font-weight:600;color:rgb(88,101,242);margin:0px">{{ message.author.name }}</p>
+                    <p style="font-size:0.75rem;line-height:1rem;color:rgb(107,114,128);margin:0px">{{ message.timestamp }}{% if message.edited_timestamp %}<!-- --> <span style="font-style:italic">(edited {{ message.edited_timestamp }})</span>{% endif %}</p>
+                  </div>
+                  <div style="font-size:0.875rem;line-height:1.25rem;color:rgb(55,65,81);overflow-wrap:break-word;margin:0px;margin-top:0.125rem;transform:translateY(-10px)">{{ message.content | safe }}</div>
+                </div>
+              </div>
+            {% endfor %}
+            <hr style="border-width:1px;border-style:solid;border-color:rgb(234,234,234);margin-top:20px;margin-bottom:20px;margin-left:0px;margin-right:0px;width:100%;border:none;border-top:1px solid #eaeaea" />
+            <p style="font-size:0.75rem;line-height:1rem;color:rgb(107,114,128);text-align:center;margin:0px">Reply to this email to respond</p>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </body>
+</html><!--/$-->

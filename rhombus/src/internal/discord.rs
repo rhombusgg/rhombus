@@ -394,7 +394,7 @@ pub async fn digest_channel(
     }
 
     let mut messages = messages
-        .iter()
+        .into_iter()
         .filter(|message| {
             matches!(
                 message.kind,
@@ -403,15 +403,14 @@ pub async fn digest_channel(
         })
         .map(|message| DigestMessage {
             author: authors.get(&message.author.id).unwrap(),
-            content: message.content.clone(),
+            content: message.content,
             edited_timestamp: message.edited_timestamp.map(|t| t.to_utc()),
             timestamp: message.timestamp.to_utc(),
         })
         .collect::<Vec<_>>();
     messages.sort();
 
-    outbound_mailer.send_digest(ticket, &messages).await?;
-    tracing::info!("Sent digest");
+    outbound_mailer.send_digest(ticket, &messages[1..]).await?;
 
     Ok(())
 }

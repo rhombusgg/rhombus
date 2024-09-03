@@ -181,6 +181,27 @@ impl OutboundMailer {
             })
             .unwrap();
 
+        let messages = messages
+            .into_iter()
+            .map(|m| DigestMessage {
+                author: m.author,
+                edited_timestamp: m.edited_timestamp,
+                timestamp: m.timestamp,
+                content: markdown::to_html_with_options(
+                    &m.content,
+                    &markdown::Options {
+                        compile: markdown::CompileOptions {
+                            allow_dangerous_html: true,
+                            allow_dangerous_protocol: true,
+                            ..markdown::CompileOptions::default()
+                        },
+                        ..markdown::Options::default()
+                    },
+                )
+                .unwrap(),
+            })
+            .collect::<Vec<_>>();
+
         let subject = format!("Ticket #{} Digest", ticket.ticket_number);
 
         let html = self
@@ -207,6 +228,8 @@ impl OutboundMailer {
         self.db
             .add_email_message_id_to_ticket(ticket.ticket_number, &message_id, false)
             .await?;
+
+        tracing::trace!(user_id = ticket.user_id, to, "Sent digest");
 
         Ok(())
     }

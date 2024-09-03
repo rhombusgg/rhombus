@@ -10,6 +10,7 @@ tasks:
 
   watch-standalone:
     desc: Start cargo watch
+    dir: examples/standalone
     cmds:
       - mold -run cargo watch -x 'run -p standalone'
 
