@@ -146,6 +146,8 @@ pub struct Settings {
     pub title: String,
     pub logo: Option<String>,
     pub home: Option<HomeSettings>,
+    pub start_time: Option<chrono::DateTime<chrono::Utc>>,
+    pub end_time: Option<chrono::DateTime<chrono::Utc>>,
     pub location_url: String,
     pub jwt_secret: String,
     pub database_url: Option<String>,

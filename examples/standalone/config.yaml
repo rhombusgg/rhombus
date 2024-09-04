@@ -4,6 +4,8 @@ location_url: http://localhost:3000
 database_url: file://rhombus.db
 contact_email: admin@rhombus.gg
 in_memory_cache: 20
+start_time: 2024-09-04T03:14:00Z
+end_time: 2024-09-04T03:16:00Z
 uploads:
   database: true
 #   s3:

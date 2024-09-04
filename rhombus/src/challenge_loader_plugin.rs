@@ -24,20 +24,28 @@ use crate::{
 };
 
 pub struct ChallengeLoaderPlugin {
-    pub config: ChallengeLoaderConfiguration,
-    pub challenges: Vec<ChallengeIntermediate>,
+    pub path: PathBuf,
 }
 
 impl Default for ChallengeLoaderPlugin {
     fn default() -> Self {
-        ChallengeLoaderPlugin::new(Path::new("."))
+        ChallengeLoaderPlugin::new(PathBuf::from("."))
     }
 }
 
 impl ChallengeLoaderPlugin {
-    pub fn new(path: &Path) -> Self {
+    pub fn new(path: PathBuf) -> Self {
+        Self { path }
+    }
+}
+
+impl Plugin for ChallengeLoaderPlugin {
+    async fn run<U: UploadProvider>(
+        &self,
+        context: &mut RunContext<'_, U>,
+    ) -> Result<Router<RouterState>> {
         let config = Config::builder()
-            .add_source(config::File::from(path.join("loader.yaml")))
+            .add_source(config::File::from(self.path.join("loader.yaml")))
             .build()
             .unwrap()
             .try_deserialize::<ChallengeLoaderConfiguration>()
@@ -94,15 +102,6 @@ impl ChallengeLoaderPlugin {
                 });
         });
 
-        Self { config, challenges }
-    }
-}
-
-impl Plugin for ChallengeLoaderPlugin {
-    async fn run<U: UploadProvider>(
-        &self,
-        context: &mut RunContext<'_, U>,
-    ) -> Result<Router<RouterState>> {
         match context.rawdb {
             #[allow(unused_labels)]
             crate::builder::RawDb::Plugin(d) => 'raw: {
@@ -124,8 +123,7 @@ impl Plugin for ChallengeLoaderPlugin {
             crate::builder::RawDb::LibSQL(db) => {
                 let tx = db.connect()?.transaction().await?;
 
-                let new_challenge_ids = self
-                    .challenges
+                let new_challenge_ids = challenges
                     .iter()
                     .map(|challenge| {
                         hash(challenge.stable_id.as_ref().unwrap_or(&challenge.name)) as i64
@@ -150,8 +148,7 @@ impl Plugin for ChallengeLoaderPlugin {
                     }
                 }
 
-                let new_author_ids = self
-                    .config
+                let new_author_ids = config
                     .authors
                     .iter()
                     .map(|author| hash(author.stable_id.as_ref().unwrap_or(&author.name)) as i64)
@@ -165,8 +162,7 @@ impl Plugin for ChallengeLoaderPlugin {
                     }
                 }
 
-                let new_category_ids = self
-                    .config
+                let new_category_ids = config
                     .categories
                     .iter()
                     .map(|category| {
@@ -183,7 +179,7 @@ impl Plugin for ChallengeLoaderPlugin {
                     }
                 }
 
-                for author in &self.config.authors {
+                for author in &config.authors {
                     let id = hash(author.stable_id.as_ref().unwrap_or(&author.name));
                     _ = tx
                         .execute(
@@ -193,7 +189,7 @@ impl Plugin for ChallengeLoaderPlugin {
                         .await?;
                 }
 
-                for category in &self.config.categories {
+                for category in &config.categories {
                     let color = category
                         .color
                         .as_deref()
@@ -207,9 +203,9 @@ impl Plugin for ChallengeLoaderPlugin {
                         .await?;
                 }
 
-                for challenge in &self.challenges {
+                for challenge in &challenges {
                     let category_id = hash(
-                        self.config
+                        config
                             .categories
                             .iter()
                             .find(|category| category.name == challenge.category)
@@ -219,7 +215,7 @@ impl Plugin for ChallengeLoaderPlugin {
                             .unwrap_or(&challenge.category),
                     );
                     let author_id = hash(
-                        self.config
+                        config
                             .authors
                             .iter()
                             .find(|author| author.name == challenge.author)
@@ -235,6 +231,8 @@ impl Plugin for ChallengeLoaderPlugin {
                     } else {
                         (1, Some(challenge.points.parse::<i64>().unwrap()))
                     };
+
+                    tracing::info!(name = challenge.name, description = challenge.description);
 
                     _ = tx
                         .execute(

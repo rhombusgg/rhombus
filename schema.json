@@ -18,6 +18,20 @@
       "type": "string",
       "examples": ["long_random_value"]
     },
+    "start_time": {
+      "title": "Start Time",
+      "description": "Time when the CTF starts. If not set, the CTF is considered to be running",
+      "type": "string",
+      "format": "date-time",
+      "examples": ["2024-01-01T00:00:00Z"]
+    },
+    "end_time": {
+      "title": "End Time",
+      "description": "Time when the CTF ends",
+      "type": "string",
+      "format": "date-time",
+      "examples": ["2024-01-02T00:00:00Z"]
+    },
     "database_url": {
       "title": "Database URL",
       "description": "Database connection url. Will automatically detect from scheme",

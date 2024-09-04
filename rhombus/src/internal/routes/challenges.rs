@@ -20,6 +20,29 @@ pub async fn route_challenges(
     uri: Uri,
     req: Request<Body>,
 ) -> impl IntoResponse {
+    if let Some(start_time) = state.settings.read().await.start_time {
+        if !user.is_admin && chrono::Utc::now() < start_time {
+            let html = state
+                .jinja
+                .get_template("locked.html")
+                .unwrap()
+                .render(context! {
+                    lang,
+                    user,
+                    uri => uri.to_string(),
+                    title => state.settings.read().await.title,
+                })
+                .unwrap();
+
+            return Response::builder()
+                .header("content-type", "text/html")
+                .status(200)
+                .body(html)
+                .unwrap()
+                .into_response();
+        }
+    }
+
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
     let (challenge_data, team) = tokio::join!(challenge_data, team);
@@ -120,6 +143,17 @@ pub async fn route_challenge_view(
     challenge_id: Path<i64>,
     uri: Uri,
 ) -> impl IntoResponse {
+    if let Some(start_time) = state.settings.read().await.start_time {
+        if !user.is_admin && chrono::Utc::now() < start_time {
+            return Response::builder()
+                .header("content-type", "text/html")
+                .status(403)
+                .body("CTF not started yet".to_owned())
+                .unwrap()
+                .into_response();
+        }
+    }
+
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
     let user_writeups = state.db.get_writeups_from_user_id(user.id);
@@ -170,6 +204,7 @@ pub async fn route_challenge_view(
             })
             .unwrap(),
     )
+    .into_response()
 }
 
 pub async fn route_ticket_view(
@@ -179,6 +214,17 @@ pub async fn route_ticket_view(
     challenge_id: Path<i64>,
     uri: Uri,
 ) -> impl IntoResponse {
+    if let Some(start_time) = state.settings.read().await.start_time {
+        if !user.is_admin && chrono::Utc::now() < start_time {
+            return Response::builder()
+                .header("content-type", "text/html")
+                .status(403)
+                .body("CTF not started yet".to_owned())
+                .unwrap()
+                .into_response();
+        }
+    }
+
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
     let (challenge_data, team) = tokio::join!(challenge_data, team);
@@ -232,6 +278,7 @@ pub async fn route_ticket_view(
             })
             .unwrap(),
     )
+    .into_response()
 }
 
 #[derive(Deserialize)]
@@ -246,6 +293,16 @@ pub async fn route_ticket_submit(
     challenge_id: Path<i64>,
     Form(form): Form<TicketSubmit>,
 ) -> impl IntoResponse {
+    if let Some(start_time) = state.settings.read().await.start_time {
+        if !user.is_admin && chrono::Utc::now() < start_time {
+            return Response::builder()
+                .header("content-type", "text/html")
+                .status(403)
+                .body("CTF not started yet".to_owned())
+                .unwrap();
+        }
+    }
+
     let ticket_enabled = {
         let settings = state.settings.read().await;
         settings
@@ -336,6 +393,16 @@ pub async fn route_challenge_submit(
     challenge_id: Path<i64>,
     Form(form): Form<SubmitChallenge>,
 ) -> impl IntoResponse {
+    if let Some(start_time) = state.settings.read().await.start_time {
+        if !user.is_admin && chrono::Utc::now() < start_time {
+            return Response::builder()
+                .header("content-type", "text/html")
+                .status(403)
+                .body("CTF not started yet".to_owned())
+                .unwrap();
+        }
+    }
+
     let challenge_data = state.db.get_challenges().await.unwrap();
     let challenge = challenge_data
         .challenges
@@ -357,6 +424,25 @@ pub async fn route_challenge_submit(
             .header("content-type", "text/html")
             .body(html)
             .unwrap();
+    }
+
+    if let Some(end_time) = state.settings.read().await.end_time {
+        if chrono::Utc::now() > end_time {
+            let html = state
+                .jinja
+                .get_template("challenge-submit.html")
+                .unwrap()
+                .render(context! {
+                    lang => lang,
+                    error => "CTF has ended (correct flag!)",
+                })
+                .unwrap();
+
+            return Response::builder()
+                .header("content-type", "text/html")
+                .body(html)
+                .unwrap();
+        }
     }
 
     let first_bloods = state
@@ -453,6 +539,16 @@ pub async fn route_writeup_submit(
     challenge_id: Path<i64>,
     Form(form): Form<SubmitWriteup>,
 ) -> impl IntoResponse {
+    if let Some(start_time) = state.settings.read().await.start_time {
+        if !user.is_admin && chrono::Utc::now() < start_time {
+            return Response::builder()
+                .header("content-type", "text/html")
+                .status(403)
+                .body("CTF not started yet".to_owned())
+                .unwrap();
+        }
+    }
+
     if form.url.len() > 256 {
         let html = state
             .jinja
@@ -555,6 +651,16 @@ pub async fn route_writeup_delete(
     Extension(user): Extension<User>,
     challenge_id: Path<i64>,
 ) -> impl IntoResponse {
+    if let Some(start_time) = state.settings.read().await.start_time {
+        if !user.is_admin && chrono::Utc::now() < start_time {
+            return Response::builder()
+                .header("content-type", "text/html")
+                .status(403)
+                .body("CTF not started yet".to_owned())
+                .unwrap();
+        }
+    }
+
     state
         .db
         .delete_writeup(challenge_id.0, user.id, user.team_id)

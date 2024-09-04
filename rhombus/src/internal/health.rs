@@ -11,7 +11,7 @@ pub async fn healthcheck_catch_up(db: Connection) {
     let challenges = db.get_challenges().await.unwrap();
 
     for challenge in &challenges.challenges {
-        tracing::info!(hs=?challenge.healthscript, healthy=?challenge.healthy, "Healthcheck");
+        tracing::trace!(hs=?challenge.healthscript, healthy=?challenge.healthy, "Healthcheck");
         if challenge.healthscript.is_none() {
             continue;
         }

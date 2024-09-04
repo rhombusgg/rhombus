@@ -20,7 +20,7 @@ async fn main() {
         .plugin(())
         .plugin(plugin::MyPlugin::new(3))
         .plugin(
-            rhombus::challenge_loader_plugin::ChallengeLoaderPlugin::new(std::path::Path::new(
+            rhombus::challenge_loader_plugin::ChallengeLoaderPlugin::new(std::path::PathBuf::from(
                 "challenges",
             )),
         )

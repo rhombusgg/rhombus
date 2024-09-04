@@ -182,7 +182,7 @@ impl OutboundMailer {
             .unwrap();
 
         let messages = messages
-            .into_iter()
+            .iter()
             .map(|m| DigestMessage {
                 author: m.author,
                 edited_timestamp: m.edited_timestamp,

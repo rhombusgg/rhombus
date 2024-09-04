@@ -46,7 +46,7 @@ async fn main() {
         .extractor(rhombus::ip::maybe_peer_ip)
         .plugin(DemoPlugin)
         .plugin(
-            rhombus::challenge_loader_plugin::ChallengeLoaderPlugin::new(std::path::Path::new(
+            rhombus::challenge_loader_plugin::ChallengeLoaderPlugin::new(std::path::PathBuf::from(
                 "challenges",
             )),
         )

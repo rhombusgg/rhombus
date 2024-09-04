@@ -17,7 +17,7 @@ async fn main() {
         .extractor(rhombus::ip::maybe_peer_ip)
         // .upload_provider(rhombus::LocalUploadProvider::new("uploads".into()))
         .plugin(
-            rhombus::challenge_loader_plugin::ChallengeLoaderPlugin::new(std::path::Path::new(
+            rhombus::challenge_loader_plugin::ChallengeLoaderPlugin::new(std::path::PathBuf::from(
                 "challenges",
             )),
         )
@@ -27,10 +27,4 @@ async fn main() {
 
     let listener = tokio::net::TcpListener::bind(":::3000").await.unwrap();
     app.serve(listener).await;
-    // rhombus::axum::serve(
-    //     listener,
-    //     app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
-    // )
-    // .await
-    // .unwrap();
 }
