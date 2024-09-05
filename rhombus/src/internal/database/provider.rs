@@ -257,6 +257,12 @@ pub trait Database {
     async fn kick_user(&self, user_id: i64, team_id: i64) -> Result<()>;
     async fn roll_invite_token(&self, team_id: i64) -> Result<String>;
     async fn set_team_name(&self, team_id: i64, new_team_name: &str) -> Result<()>;
+    async fn set_account_name(
+        &self,
+        user_id: i64,
+        team_id: i64,
+        new_account_name: &str,
+    ) -> Result<()>;
     async fn add_writeup(
         &self,
         user_id: i64,

@@ -221,6 +221,23 @@ impl Database for DbCache {
         result
     }
 
+    async fn set_account_name(
+        &self,
+        user_id: i64,
+        team_id: i64,
+        new_account_name: &str,
+    ) -> Result<()> {
+        let result = self
+            .inner
+            .set_account_name(user_id, team_id, new_account_name)
+            .await;
+        if result.is_ok() {
+            USER_CACHE.remove(&user_id);
+            TEAM_CACHE.remove(&team_id);
+        }
+        result
+    }
+
     async fn solve_challenge(
         &self,
         user_id: i64,

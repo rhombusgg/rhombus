@@ -1019,6 +1019,21 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
         Ok(())
     }
 
+    async fn set_account_name(
+        &self,
+        user_id: i64,
+        _team_id: i64,
+        new_account_name: &str,
+    ) -> Result<()> {
+        self.connect()?
+            .execute(
+                "UPDATE rhombus_user SET name = ?2 WHERE id = ?1",
+                params!(user_id, new_account_name),
+            )
+            .await?;
+        Ok(())
+    }
+
     async fn solve_challenge(
         &self,
         user_id: i64,

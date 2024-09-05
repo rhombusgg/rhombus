@@ -43,6 +43,9 @@ account-error-email-already-added = Email already added
 account-error-verification-email = Failed to send verification email
 account-error-signin-email = Failed to send sign in email
 account-error-invalid-credentials = Invalid password
+account-success-set-account-name = Set account name successfully
+account-error-name-length = Account name must be between 3 and 30 characters
+account-error-name-taken = Account name already taken
 
 challenges-ticket-submitted = Ticket submitted
 challenges-challenge-solved = Challenge solved

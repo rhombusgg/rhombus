@@ -14,6 +14,7 @@ use rand::{
 };
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::internal::{
     auth::User, database::cache::TimedCache, locales::Languages, router::RouterState,
@@ -328,4 +329,64 @@ pub fn discord_cache_evictor() {
             IS_IN_SERVER_CACHE.retain(|_, v| v.insert_timestamp > evict_threshold);
         }
     });
+}
+
+#[derive(Deserialize)]
+pub struct SetAccountName {
+    name: String,
+}
+
+pub async fn route_account_set_name(
+    state: State<RouterState>,
+    Extension(user): Extension<User>,
+    Extension(lang): Extension<Languages>,
+    Form(form): Form<SetAccountName>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let mut errors = vec![];
+    let graphemes = form.name.graphemes(true).count();
+    if !(3..=30).contains(&graphemes) {
+        errors.push(
+            state
+                .localizer
+                .localize(&lang, "account-error-name-length", None),
+        );
+    } else if state
+        .db
+        .set_account_name(user.id, user.team_id, &form.name)
+        .await
+        .is_err()
+    {
+        errors.push(
+            state
+                .localizer
+                .localize(&lang, "account-error-name-taken", None),
+        );
+    }
+
+    let account_name_template = state.jinja.get_template("account-set-name.html").unwrap();
+
+    if errors.is_empty() {
+        let html = account_name_template
+            .render(context! {
+                lang => lang,
+                new_account_name => &form.name,
+            })
+            .unwrap();
+
+        Ok(Response::builder()
+            .header("Content-Type", "text/html")
+            .body(html)
+            .unwrap())
+    } else {
+        let html = account_name_template
+            .render(context! {
+                lang => lang,
+                errors => errors,
+            })
+            .unwrap();
+        Ok(Response::builder()
+            .header("Content-Type", "text/html")
+            .body(html)
+            .unwrap())
+    }
 }

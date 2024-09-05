@@ -205,6 +205,32 @@
             </form>
           {% endcall %}
         {% endcall %}
+
+        {% call card.root() %}
+          {% call card.header() %}
+            {% call card.title() %}
+              Settings
+            {% endcall %}
+            {% call card.description() %}
+              Change settings about your account
+            {% endcall %}
+          {% endcall %}
+          {% call card.content() %}
+            <h4 class="text-sm">Change name</h4>
+            <p class="text-sm text-muted-foreground mb-2">
+              Must be between 3 and 30 characters
+            </p>
+            <input
+              type="text"
+              name="name"
+              value="{{ user.name }}"
+              class="bg-background border p-2 rounded-md w-full focus-visible:outline-none"
+              hx-post="/account/name"
+              hx-target="next"
+            />
+            <div></div>
+          {% endcall %}
+        {% endcall %}
         {% include "account-cards.html" %}
       </div>
       <div>

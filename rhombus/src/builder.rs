@@ -56,6 +56,7 @@ use crate::{
             account::{
                 discord_cache_evictor, route_account, route_account_add_email,
                 route_account_delete_email, route_account_email_verify_callback,
+                route_account_set_name,
             },
             challenges::{
                 route_challenge_submit, route_challenge_view, route_challenges,
@@ -834,6 +835,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     "/account/email",
                     post(route_account_add_email).delete(route_account_delete_email),
                 )
+                .route("/account/name", post(route_account_set_name))
                 .route("/account", get(route_account))
                 .route("/team/division/:id", post(route_team_set_division))
                 .route("/team/user/:id", delete(route_user_kick))

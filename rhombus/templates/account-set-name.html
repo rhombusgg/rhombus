@@ -1,0 +1,11 @@
+{% if errors %}
+  {% for error in errors %}
+    <div class="text-red-500">{{ error }}</div>
+  {% endfor %}
+{% endif %}
+
+{% if new_account_name %}
+  <div id="htmx-toaster" data-toast="success" hx-swap-oob="true">
+    {{- t("account-success-set-account-name") -}}
+  </div>
+{% endif %}

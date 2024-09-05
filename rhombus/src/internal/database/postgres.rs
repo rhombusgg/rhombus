@@ -193,6 +193,15 @@ impl Database for Postgres {
         todo!()
     }
 
+    async fn set_account_name(
+        &self,
+        _user_id: i64,
+        _team_id: i64,
+        _new_account_name: &str,
+    ) -> Result<()> {
+        todo!()
+    }
+
     async fn solve_challenge(
         &self,
         _user_id: i64,
