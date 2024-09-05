@@ -21,6 +21,7 @@ use minijinja::context;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::internal::{
     division::MaxDivisionPlayers, locales::Languages, router::RouterState,
@@ -842,13 +843,28 @@ pub async fn route_signin_credentials(
     cookie_jar: CookieJar,
     Form(form): Form<CredentialsSubmit>,
 ) -> impl IntoResponse {
-    if form.username.is_empty() || form.username.len() > 255 {
+    let username_graphemes = form.username.graphemes(true).count();
+    if !(3..=30).contains(&username_graphemes) {
         return Response::builder()
             .body(format!(
                 r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
                 state
                     .localizer
-                    .localize(&lang, "account-error-email-length", None)
+                    .localize(&lang, "account-error-name-length", None)
+                    .unwrap(),
+            ))
+            .unwrap()
+            .into_response();
+    }
+
+    let password_graphemes = form.password.graphemes(true).count();
+    if !(8..=256).contains(&password_graphemes) {
+        return Response::builder()
+            .body(format!(
+                r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
+                state
+                    .localizer
+                    .localize(&lang, "account-error-password-length", None)
                     .unwrap(),
             ))
             .unwrap()
@@ -995,17 +1011,18 @@ async fn sign_in_cookie(
         settings.jwt_secret.clone()
     };
 
-    let default_division_id = state.divisions[0].id;
-    state
-        .db
-        .set_user_division(user_id, team_id, default_division_id, true)
-        .await
-        .unwrap();
-    state
-        .db
-        .set_team_division(team_id, default_division_id, true)
-        .await
-        .unwrap();
+    for division in state.divisions.iter() {
+        let eligible = division
+            .division_eligibility
+            .is_user_eligible(user_id)
+            .await;
+
+        state
+            .db
+            .set_user_division(user_id, team_id, division.id, eligible.is_ok())
+            .await
+            .unwrap();
+    }
 
     let now = chrono::Utc::now();
     let iat = now.timestamp();

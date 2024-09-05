@@ -45,6 +45,7 @@ account-error-signin-email = Failed to send sign in email
 account-error-invalid-credentials = Invalid password
 account-success-set-account-name = Set account name successfully
 account-error-name-length = Account name must be between 3 and 30 characters
+account-error-password-length = Password must be at least 8 characters
 account-error-name-taken = Account name already taken
 
 challenges-ticket-submitted = Ticket submitted

@@ -342,7 +342,7 @@ pub async fn route_team_set_division(
     );
 
     let team_divisions = state.db.get_team_divisions(team.id).await.unwrap();
-    let min_players = state
+    let max_players = state
         .divisions
         .iter()
         .filter(|division| team_divisions.contains(&division.id))
@@ -393,7 +393,7 @@ pub async fn route_team_set_division(
         .render(context! {
             lang,
             team,
-            min_players,
+            max_players,
             user,
             divisions,
             standings => standings.standings,
