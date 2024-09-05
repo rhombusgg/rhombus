@@ -1725,12 +1725,33 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
         Ok(())
     }
 
+    async fn get_email_verification_by_callback_code(&self, code: &str) -> Result<String> {
+        let email = self
+            .connect()?
+            .query(
+                "
+                SELECT email
+                FROM rhombus_email
+                WHERE code = ?1
+            ",
+                [code],
+            )
+            .await?
+            .next()
+            .await?
+            .ok_or(libsql::Error::QueryReturnedNoRows)?
+            .get::<String>(0)
+            .unwrap();
+
+        Ok(email)
+    }
+
     async fn create_email_signin_callback_code(&self, email: &str) -> Result<String> {
         let code = generate_email_callback_code();
 
         self.connect()?
             .execute(
-                "INSERT INTO rhombus_email_signin (email, code) VALUES (?1, ?2)",
+                "INSERT OR REPLACE INTO rhombus_email_signin (email, code) VALUES (?1, ?2)",
                 params!(email, code.as_str()),
             )
             .await?;
@@ -1746,6 +1767,27 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
                 DELETE FROM rhombus_email_signin
                 WHERE code = ?1
                 RETURNING email
+            ",
+                [code],
+            )
+            .await?
+            .next()
+            .await?
+            .ok_or(libsql::Error::QueryReturnedNoRows)?
+            .get::<String>(0)
+            .unwrap();
+
+        Ok(email)
+    }
+
+    async fn get_email_signin_by_callback_code(&self, code: &str) -> Result<String> {
+        let email = self
+            .connect()?
+            .query(
+                "
+                SELECT email
+                FROM rhombus_email_signin
+                WHERE code = ?1
             ",
                 [code],
             )

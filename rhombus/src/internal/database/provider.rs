@@ -305,8 +305,10 @@ pub trait Database {
         email: &str,
     ) -> Result<String>;
     async fn verify_email_verification_callback_code(&self, code: &str) -> Result<()>;
+    async fn get_email_verification_by_callback_code(&self, code: &str) -> Result<String>;
     async fn create_email_signin_callback_code(&self, email: &str) -> Result<String>;
     async fn verify_email_signin_callback_code(&self, code: &str) -> Result<String>;
+    async fn get_email_signin_by_callback_code(&self, code: &str) -> Result<String>;
     async fn delete_email(&self, user_id: i64, email: &str) -> Result<()>;
     async fn get_user_divisions(&self, user_id: i64) -> Result<Vec<i64>>;
     async fn set_user_division(

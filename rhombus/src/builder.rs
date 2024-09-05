@@ -26,7 +26,8 @@ use crate::{
             auth_injector_middleware, enforce_admin_middleware, enforce_auth_middleware,
             route_signin, route_signin_credentials, route_signin_ctftime,
             route_signin_ctftime_callback, route_signin_discord, route_signin_discord_callback,
-            route_signin_email, route_signin_email_callback, route_signout,
+            route_signin_email, route_signin_email_callback, route_signin_email_confirm_callback,
+            route_signout,
         },
         command_palette::route_command_palette_items,
         database::{
@@ -56,7 +57,7 @@ use crate::{
             account::{
                 discord_cache_evictor, route_account, route_account_add_email,
                 route_account_delete_email, route_account_email_verify_callback,
-                route_account_set_name,
+                route_account_email_verify_confirm, route_account_set_name,
             },
             challenges::{
                 route_challenge_submit, route_challenge_view, route_challenges,
@@ -830,6 +831,10 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 .route("/admin", get(|| async { (StatusCode::OK, Html("Admin")) }))
                 .route("/reload", get(route_reload::<P, U>))
                 .route_layer(middleware::from_fn(enforce_admin_middleware))
+                .route(
+                    "/account/verify/confirm",
+                    get(route_account_email_verify_confirm),
+                )
                 .route("/account/verify", get(route_account_email_verify_callback))
                 .route(
                     "/account/email",
@@ -862,6 +867,10 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 .merge(mailgun_router)
                 .route("/signout", get(route_signout))
                 .route("/signin/credentials", post(route_signin_credentials))
+                .route(
+                    "/signin/email/confirm",
+                    get(route_signin_email_confirm_callback),
+                )
                 .route(
                     "/signin/email",
                     get(route_signin_email_callback).post(route_signin_email),

@@ -9,7 +9,7 @@ use axum::{
         Request, Response, StatusCode, Uri,
     },
     middleware::Next,
-    response::{IntoResponse, Redirect},
+    response::{Html, IntoResponse, Redirect},
     Extension, Form, Json,
 };
 use axum_extra::extract::{
@@ -905,6 +905,56 @@ pub fn avatar_from_email(email: &str) -> String {
 }
 
 pub async fn route_signin_email_callback(
+    state: State<RouterState>,
+    Extension(user): Extension<MaybeUser>,
+    Extension(lang): Extension<Languages>,
+    params: Query<EmailSignInParams>,
+    uri: Uri,
+) -> impl IntoResponse {
+    let Ok(email) = state
+        .db
+        .get_email_signin_by_callback_code(&params.code)
+        .await
+    else {
+        return Response::builder()
+            .status(404)
+            .header("Content-Type", "application/json")
+            .body(Body::from(
+                json!({
+                    "message": "Invalid email signin callback code. Please try again."
+                })
+                .to_string(),
+            ))
+            .unwrap()
+            .into_response();
+    };
+
+    let (location_url, title) = {
+        let settings = state.settings.read().await;
+        (settings.location_url.clone(), settings.title.clone())
+    };
+
+    Html(
+        state
+            .jinja
+            .get_template("email-signin.html")
+            .unwrap()
+            .render(context! {
+                title,
+                lang,
+                title,
+                user,
+                email,
+                code => params.code,
+                uri => uri.to_string(),
+                og_image => format!("{}/og-image.png", location_url)
+            })
+            .unwrap(),
+    )
+    .into_response()
+}
+
+pub async fn route_signin_email_confirm_callback(
     state: State<RouterState>,
     params: Query<EmailSignInParams>,
     cookie_jar: CookieJar,

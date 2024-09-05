@@ -281,6 +281,50 @@ pub struct EmailVerifyParams {
 
 pub async fn route_account_email_verify_callback(
     state: State<RouterState>,
+    Extension(user): Extension<User>,
+    Extension(lang): Extension<Languages>,
+    params: Query<EmailVerifyParams>,
+    uri: Uri,
+) -> impl IntoResponse {
+    let Ok(email) = state
+        .db
+        .get_email_verification_by_callback_code(&params.code)
+        .await
+    else {
+        tracing::info!(
+            code = params.code,
+            "invalid email verification callback code"
+        );
+        return Redirect::temporary("/account").into_response();
+    };
+
+    let (location_url, title) = {
+        let settings = state.settings.read().await;
+        (settings.location_url.clone(), settings.title.clone())
+    };
+
+    Html(
+        state
+            .jinja
+            .get_template("email-verify.html")
+            .unwrap()
+            .render(context! {
+                title,
+                lang,
+                title,
+                user,
+                email,
+                code => params.code,
+                uri => uri.to_string(),
+                og_image => format!("{}/og-image.png", location_url)
+            })
+            .unwrap(),
+    )
+    .into_response()
+}
+
+pub async fn route_account_email_verify_confirm(
+    state: State<RouterState>,
     params: Query<EmailVerifyParams>,
 ) -> impl IntoResponse {
     state

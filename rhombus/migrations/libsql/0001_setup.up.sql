@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS rhombus_email (
 CREATE TABLE IF NOT EXISTS rhombus_email_signin (
     email TEXT NOT NULL,
     code TEXT UNIQUE,
-    expires INTEGER NOT NULL DEFAULT(strftime('%s', 'now', '+1 hour')),
+    expires INTEGER NOT NULL DEFAULT(strftime('%s', 'now', '+10 minutes')),
     PRIMARY KEY (email)
 );
 

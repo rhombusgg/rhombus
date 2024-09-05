@@ -391,12 +391,22 @@ impl Database for DbCache {
         result
     }
 
+    async fn get_email_verification_by_callback_code(&self, code: &str) -> Result<String> {
+        self.inner
+            .get_email_verification_by_callback_code(code)
+            .await
+    }
+
     async fn create_email_signin_callback_code(&self, email: &str) -> Result<String> {
         self.inner.create_email_signin_callback_code(email).await
     }
 
     async fn verify_email_signin_callback_code(&self, code: &str) -> Result<String> {
         self.inner.verify_email_signin_callback_code(code).await
+    }
+
+    async fn get_email_signin_by_callback_code(&self, code: &str) -> Result<String> {
+        self.inner.get_email_signin_by_callback_code(code).await
     }
 
     async fn delete_email(&self, user_id: i64, email: &str) -> Result<()> {

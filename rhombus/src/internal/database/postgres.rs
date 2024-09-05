@@ -307,10 +307,19 @@ impl Database for Postgres {
         todo!()
     }
 
+    async fn get_email_verification_by_callback_code(&self, _code: &str) -> Result<String> {
+        todo!()
+    }
+
     async fn create_email_signin_callback_code(&self, _email: &str) -> Result<String> {
         todo!()
     }
+
     async fn verify_email_signin_callback_code(&self, _code: &str) -> Result<String> {
+        todo!()
+    }
+
+    async fn get_email_signin_by_callback_code(&self, _code: &str) -> Result<String> {
         todo!()
     }
 
