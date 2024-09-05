@@ -1,8 +1,10 @@
 use std::{
     collections::{btree_map::Entry, BTreeMap},
+    future::Future,
     net::IpAddr,
     num::NonZeroU64,
     path::Path,
+    pin::Pin,
     sync::Arc,
     time::Duration,
 };
@@ -115,6 +117,26 @@ impl LibSQLConnection for RemoteLibSQL {
 
 pub trait LibSQLConnection {
     fn connect(&self) -> Result<libsql::Connection>;
+    fn transaction(&self) -> Pin<Box<dyn Future<Output = Result<libsql::Transaction>> + Send>> {
+        let conn = self.connect();
+        Box::pin(async move {
+            let conn = conn?;
+            let mut count = 0;
+            loop {
+                match conn.transaction().await {
+                    Ok(tx) => {
+                        return Ok(tx);
+                    }
+                    Err(e) => {
+                        count += 1;
+                        if count > 5 {
+                            return Err(crate::errors::RhombusError::LibSQL(e));
+                        }
+                    }
+                }
+            }
+        })
+    }
 }
 
 pub enum LibSQL {
@@ -167,7 +189,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
         discord_id: NonZeroU64,
         user_id: Option<i64>,
     ) -> Result<(i64, i64)> {
-        let tx = self.connect()?.transaction().await?;
+        let tx = self.transaction().await?;
 
         let existing_user = if let Some(user_id) = user_id {
             let team_id = tx
@@ -244,7 +266,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
         email: &str,
         avatar: &str,
     ) -> Result<(i64, i64)> {
-        let tx = self.connect()?.transaction().await?;
+        let tx = self.transaction().await?;
 
         let existing_user = tx
             .query(
@@ -297,7 +319,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
         avatar: &str,
         password: &str,
     ) -> Result<Option<(i64, i64)>> {
-        let tx = self.connect()?.transaction().await?;
+        let tx = self.transaction().await?;
 
         #[derive(Debug, Deserialize)]
         struct QueryUser {
@@ -368,7 +390,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
         ctftime_team_id: i64,
         team_name: &str,
     ) -> Result<(i64, i64, Option<String>)> {
-        let tx = self.connect()?.transaction().await?;
+        let tx = self.transaction().await?;
 
         #[derive(Debug, Deserialize)]
         struct QueryUser {
@@ -540,7 +562,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
     }
 
     async fn get_challenges(&self) -> Result<Challenges> {
-        let tx = self.connect()?.transaction().await?;
+        let tx = self.transaction().await?;
 
         let rhombus_challenge_division_points = tx
             .query(
@@ -764,7 +786,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
     }
 
     async fn get_team_from_id(&self, team_id: i64) -> Result<Team> {
-        let tx = self.connect()?.transaction().await?;
+        let tx = self.transaction().await?;
 
         #[derive(Debug, Deserialize)]
         struct QueryTeam {
@@ -889,7 +911,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
     }
 
     async fn add_user_to_team(&self, user_id: i64, team_id: i64) -> Result<()> {
-        let tx = self.connect()?.transaction().await?;
+        let tx = self.transaction().await?;
 
         tx.execute(
             "
@@ -1040,7 +1062,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
         team_id: i64,
         challenge: &Challenge,
     ) -> Result<FirstBloods> {
-        let tx = self.connect()?.transaction().await?;
+        let tx = self.transaction().await?;
 
         let now = chrono::Utc::now().timestamp();
 
@@ -1206,7 +1228,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
             pub discord_channel_id: NonZeroU64,
         }
 
-        let tx = self.connect()?.transaction().await?;
+        let tx = self.transaction().await?;
 
         let ticket_row = tx
             .query(
@@ -1275,7 +1297,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
             pub discord_channel_id: NonZeroU64,
         }
 
-        let tx = self.connect()?.transaction().await?;
+        let tx = self.transaction().await?;
 
         let ticket_row = self
             .connect()?
@@ -1452,7 +1474,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
     }
 
     async fn get_scoreboard(&self, division_id: i64) -> Result<Scoreboard> {
-        let tx = self.connect()?.transaction().await?;
+        let tx = self.transaction().await?;
 
         #[derive(Debug, Deserialize)]
         struct DbTeam {
@@ -1569,7 +1591,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
         }
 
         if let Some(page) = page {
-            let tx = self.connect()?.transaction().await?;
+            let tx = self.transaction().await?;
 
             let num_teams = tx
                 .query(
@@ -1835,7 +1857,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
         division_id: i64,
         join: bool,
     ) -> Result<()> {
-        let tx = self.connect()?.transaction().await?;
+        let tx = self.transaction().await?;
 
         if join {
             let num_users_in_team = tx
@@ -1886,7 +1908,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
     }
 
     async fn insert_divisions(&self, divisions: &[Division]) -> Result<()> {
-        let tx = self.connect()?.transaction().await?;
+        let tx = self.transaction().await?;
 
         let current_division_ids = tx
             .query("SELECT id FROM rhombus_division", ())
