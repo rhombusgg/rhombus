@@ -575,8 +575,103 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
             let mut templates = Templates::new();
 
-            if let Some(ref logo) = settings.logo {
-                templates.add_template("logo.html", logo);
+            match (
+                find_image_file("static/logo"),
+                find_image_file("static/logo-dark"),
+            ) {
+                (Some(logo), Some(logo_dark)) => {
+                    tracing::info!(light=?logo, dark=?logo_dark, "Using custom logo");
+                    templates.set_template(
+                        "logo.html",
+                        &format!(
+                            r#"<div><img style="height: 1.75rem" class="dark:hidden" src="/{}" alt="logo"><img style="height: 1.75rem" class="hidden dark:block" src="/{}" alt="logo"></div>"#,
+                            logo.to_str().unwrap(),
+                            logo_dark.to_str().unwrap()
+                        )
+                    );
+                    templates.set_template("favicon.html", &format!(
+                        r#"<link rel="icon" media="(prefers-color-scheme: light)" href="/{}"><link rel="icon" media="(prefers-color-scheme: dark)" href="/{}">"#,
+                        logo.to_str().unwrap(),
+                        logo_dark.to_str().unwrap()
+                    ));
+                }
+                (Some(logo), None) => {
+                    tracing::info!(logo=?logo, "Using custom logo");
+                    templates.set_template(
+                        "logo.html",
+                        &format!(
+                            r#"<img style="height: 1.75rem" src="/{}" alt="logo">"#,
+                            logo.to_str().unwrap()
+                        ),
+                    );
+                    templates.set_template(
+                        "favicon.html",
+                        &format!(r#"<link rel="icon" href="/{}">"#, logo.to_str().unwrap()),
+                    );
+                }
+                (None, Some(logo_dark)) => {
+                    tracing::info!(logo=?logo_dark, "Using custom logo");
+                    templates.set_template(
+                        "logo.html",
+                        &format!(
+                            r#"<img style="height: 1.75rem" src="/{}" alt="logo">"#,
+                            logo_dark.to_str().unwrap()
+                        ),
+                    );
+                    templates.set_template(
+                        "favicon.html",
+                        &format!(
+                            r#"<link rel="icon" href="/{}">"#,
+                            logo_dark.to_str().unwrap()
+                        ),
+                    );
+                }
+                (None, None) => {
+                    templates.set_template(
+                        "logo.html",
+                        r#"<img style="height: 1.75rem" src="/static/logo.svg" alt="logo">"#,
+                    );
+                    templates.set_template(
+                        "favicon.html",
+                        r#"<link rel="icon" href="/static/logo.svg">"#,
+                    );
+                }
+            }
+
+            match (
+                find_image_file("static/favicon"),
+                find_image_file("static/favicon-dark"),
+            ) {
+                (Some(favicon), Some(favicon_dark)) => {
+                    tracing::info!(light=?favicon, dark=?favicon_dark, "Using custom favicon");
+                    templates.set_template(
+                        "favicon.html",
+                        format!(
+                            r#"<link rel="icon" media="(prefers-color-scheme: light)" href="/{}"><link rel="icon" media="(prefers-color-scheme: dark)" href="/{}">"#,
+                            favicon.to_str().unwrap(),
+                            favicon_dark.to_str().unwrap()
+                        )
+                        .trim(),
+                    );
+                }
+                (Some(favicon), None) => {
+                    tracing::info!(favicon=?favicon, "Using custom favicon");
+                    templates.set_template(
+                        "favicon.html",
+                        &format!(r#"<link rel="icon" href="/{}">"#, favicon.to_str().unwrap()),
+                    );
+                }
+                (None, Some(favicon_dark)) => {
+                    tracing::info!(favicon=?favicon_dark, "Using custom favicon");
+                    templates.set_template(
+                        "favicon.html",
+                        &format!(
+                            r#"<link rel="icon" href="/{}">"#,
+                            favicon_dark.to_str().unwrap()
+                        ),
+                    );
+                }
+                (None, None) => {}
             }
 
             let uploads_settings = settings.uploads.clone();
@@ -861,7 +956,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     get(route_challenge_view).post(route_challenge_submit),
                 )
                 .route_layer(middleware::from_fn(enforce_auth_middleware))
-                .route("/static/:file", get(route_static_serve))
+                .nest_service("/static", get(route_static_serve))
                 .route("/command-palette", get(route_command_palette_items))
                 .route("/", get(route_home))
                 .merge(mailgun_router)
@@ -1002,4 +1097,29 @@ pub fn hash(s: impl AsRef<str>) -> i64 {
     hasher.write(s.as_bytes());
     let hash_value = hasher.finish();
     (hash_value >> 11) as i64
+}
+
+fn find_image_file(partial_path: &str) -> Option<std::path::PathBuf> {
+    let exact_path = std::path::Path::new(partial_path);
+    if exact_path.exists() {
+        return Some(exact_path.to_path_buf());
+    }
+
+    let extensions = ["svg", "png", "jpg", "jpeg", "gif", "ico"];
+
+    let dir = exact_path.parent().unwrap_or(std::path::Path::new("."));
+    let base_name = exact_path
+        .file_stem()
+        .unwrap_or(exact_path.file_name().unwrap())
+        .to_str()
+        .unwrap();
+
+    for ext in &extensions {
+        let file_path = dir.join(format!("{}.{ext}", base_name));
+        if file_path.exists() {
+            return Some(file_path);
+        }
+    }
+
+    None
 }

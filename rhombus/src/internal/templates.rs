@@ -67,6 +67,25 @@ impl Templates {
             .or_insert(content);
     }
 
+    pub fn set_template(&mut self, name: &str, content: &str) {
+        let content = if name.ends_with(".html") {
+            let mut bytes = content.as_bytes().to_vec();
+            let cfg = &minify_html_onepass::Cfg {
+                minify_js: true,
+                minify_css: true,
+            };
+            minify_html_onepass::truncate(&mut bytes, cfg).unwrap();
+            String::from_utf8(bytes).unwrap()
+        } else {
+            content.to_string()
+        };
+
+        self.plugin_map
+            .lock()
+            .unwrap()
+            .insert(name.to_string(), content);
+    }
+
     pub fn build(&self) -> minijinja::Environment<'static> {
         let mut jinja = minijinja::Environment::new();
         let core_map = self.core_map.clone();

@@ -2,7 +2,13 @@ import plugin from "tailwindcss/plugin";
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ["./static/**/*.js", "./templates/**/*.html", "./frontend/**/*.tsx"],
+  content: [
+    "./static/**/*.js",
+    "./templates/**/*.html",
+    "./frontend/**/*.tsx",
+    "./src/**/*.rs",
+  ],
+  darkMode: "selector",
   theme: {
     extend: {},
   },

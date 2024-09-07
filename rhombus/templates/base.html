@@ -15,6 +15,8 @@
       content="{% block og_url %}{{ location_url | safe }}{{ uri | safe }}{% endblock %}"
     />
 
+    {% include "favicon.html" %}
+
     {% if og_image %}
       <meta property="og:image" content="{{ og_image | safe }}" />
     {% endif %}

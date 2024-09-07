@@ -145,6 +145,7 @@ pub struct CTFtimeSettings {
 pub struct Settings {
     pub title: String,
     pub logo: Option<String>,
+    pub logo_dark: Option<String>,
     pub home: Option<HomeSettings>,
     pub start_time: Option<chrono::DateTime<chrono::Utc>>,
     pub end_time: Option<chrono::DateTime<chrono::Utc>>,

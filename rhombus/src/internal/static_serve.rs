@@ -1,22 +1,39 @@
-// use rust embed to create a route which serves static files underneath it
-
-use axum::{extract::Path, http::HeaderValue, response::IntoResponse};
+use axum::{
+    body::Body,
+    extract::Request,
+    http::{HeaderValue, Uri},
+    response::IntoResponse,
+};
 use reqwest::StatusCode;
 use rust_embed::RustEmbed;
+use tower::ServiceExt;
+use tower_http::services::ServeDir;
 
-use super::upload_provider::path_is_valid;
+use crate::internal::upload_provider::path_is_valid;
 
 #[derive(RustEmbed)]
 #[folder = "static"]
 struct StaticDir;
 
-pub async fn route_static_serve(Path(file): Path<String>) -> impl IntoResponse {
-    if !path_is_valid(&file) {
+pub async fn route_static_serve(uri: Uri, req: Request<Body>) -> impl IntoResponse {
+    let file = uri.path().trim_start_matches("/");
+
+    if !path_is_valid(file) {
         return (StatusCode::BAD_REQUEST, "Invalid path".to_owned()).into_response();
     }
 
-    if let Some(content) = StaticDir::get(&file) {
-        let guess = mime_guess::from_path(&file);
+    let service = ServeDir::new("static");
+    if let Ok(response) = service.oneshot(req).await {
+        if response.status().is_informational()
+            || response.status().is_success()
+            || response.status().is_redirection()
+        {
+            return response.into_response();
+        }
+    }
+
+    if let Some(content) = StaticDir::get(file) {
+        let guess = mime_guess::from_path(file);
         let mime = guess
             .first_raw()
             .map(HeaderValue::from_static)
@@ -33,8 +50,8 @@ pub async fn route_static_serve(Path(file): Path<String>) -> impl IntoResponse {
             HeaderValue::from_static("public, max-age=604800"),
         );
 
-        response
-    } else {
-        (StatusCode::NOT_FOUND, "Not Found").into_response()
+        return response.into_response();
     }
+
+    (StatusCode::NOT_FOUND, "Not Found").into_response()
 }
