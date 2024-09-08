@@ -177,14 +177,21 @@ SELECT
     rhombus_division.id AS division_id,
     CASE
         WHEN rhombus_challenge.score_type = 0 THEN
-            MAX(ROUND((((100 - 500) / POWER(50, 2)) * POWER(COUNT(DISTINCT rhombus_solve.team_id), 2)) + 500), 100)
+            MAX(ROUND((((100 - 500) / POWER(50, 2)) * POWER(COUNT(DISTINCT rhombus_team.id), 2)) + 500), 100)
         ELSE rhombus_challenge.static_points
     END AS points,
-    COUNT(DISTINCT rhombus_solve.team_id) AS solves
+    COUNT(DISTINCT rhombus_team.id) AS solves
 FROM rhombus_challenge
 CROSS JOIN rhombus_division
 LEFT JOIN rhombus_solve ON
-    rhombus_challenge.id = rhombus_solve.challenge_id
+    rhombus_challenge.id = rhombus_solve.challenge_id AND
+    rhombus_solve.team_id IN (
+        SELECT rhombus_team.id
+        FROM rhombus_team
+        JOIN rhombus_team_division ON rhombus_team.id = rhombus_team_division.team_id
+        WHERE rhombus_team_division.division_id = rhombus_division.id
+    )
+LEFT JOIN rhombus_team ON rhombus_solve.team_id = rhombus_team.id
 GROUP BY rhombus_challenge.id, rhombus_division.id;
 
 CREATE VIEW IF NOT EXISTS rhombus_team_division_points AS
