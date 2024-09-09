@@ -64,6 +64,7 @@ use crate::{
                 route_ticket_submit, route_ticket_view, route_writeup_delete, route_writeup_submit,
             },
             home::route_home,
+            meta::{page_meta_middleware, route_robots_txt, GlobalPageMeta},
             public::{route_public_team, route_public_user},
             scoreboard::{
                 route_scoreboard, route_scoreboard_division, route_scoreboard_division_ctftime,
@@ -909,6 +910,16 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
             cached_db.insert_divisions(&divisions).await?;
 
+            let global_page_meta = Arc::new(GlobalPageMeta {
+                title: settings.read().await.title.clone(),
+                description: settings.read().await.description.clone().unwrap_or(
+                    "Next generation extendable CTF framework with batteries included".to_owned(),
+                ),
+                location_url: settings.read().await.location_url.clone(),
+                organizer: settings.read().await.organizer.clone(),
+                generator: concat!("Rhombus v", env!("CARGO_PKG_VERSION")),
+            });
+
             let router_state = Arc::new(RouterStateInner {
                 db: cached_db.clone(),
                 bot,
@@ -919,6 +930,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 outbound_mailer,
                 divisions: Arc::new(divisions),
                 router: rr.clone(),
+                global_page_meta,
             });
 
             let rhombus_router = axum::Router::new()
@@ -990,6 +1002,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 .route("/user/:id", get(route_public_user))
                 .route("/team/:id", get(route_public_team))
                 .route("/og-image.png", get(route_default_og_image))
+                .route("/robots.txt", get(route_robots_txt))
                 .with_state(router_state.clone())
                 .merge(upload_router.layer(middleware::from_fn_with_state(
                     router_state.clone(),
@@ -1007,6 +1020,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
             track_flusher(cached_db);
 
             let router = router
+                .layer(middleware::from_fn(page_meta_middleware))
                 .layer(middleware::from_fn_with_state(
                     router_state.clone(),
                     locale_middleware,

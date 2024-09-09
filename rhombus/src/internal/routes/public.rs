@@ -2,22 +2,27 @@ use std::collections::BTreeMap;
 
 use axum::{
     extract::{Path, State},
-    http::Uri,
     response::{Html, IntoResponse},
-    Extension,
+    Extension, Json,
 };
 use minijinja::context;
+use serde_json::json;
 
-use crate::internal::{auth::MaybeUser, locales::Languages, router::RouterState};
+use crate::internal::{auth::MaybeUser, router::RouterState, routes::meta::PageMeta};
 
 pub async fn route_public_user(
     state: State<RouterState>,
     Extension(user): Extension<MaybeUser>,
-    Extension(lang): Extension<Languages>,
+    Extension(page): Extension<PageMeta>,
     user_id: Path<i64>,
-    uri: Uri,
 ) -> impl IntoResponse {
-    let public_user = state.db.get_user_from_id(user_id.0).await.unwrap();
+    let Ok(public_user) = state.db.get_user_from_id(user_id.0).await else {
+        return Json(json!({
+            "error": "User not found",
+        }))
+        .into_response();
+    };
+
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(public_user.team_id);
     let (challenge_data, team) = tokio::join!(challenge_data, team);
@@ -34,18 +39,16 @@ pub async fn route_public_user(
         categories.insert(category.id, category);
     }
 
-    let title = { state.settings.read().await.title.clone() };
-
     Html(
         state
             .jinja
             .get_template("public-user.html")
             .unwrap()
             .render(context! {
-                lang,
+                global => state.global_page_meta,
+                page,
+                title => format!("{} | {}", public_user.name, state.global_page_meta.title),
                 user,
-                title,
-                uri => uri.to_string(),
                 public_user,
                 public_team => team,
                 now => chrono::Utc::now(),
@@ -54,21 +57,26 @@ pub async fn route_public_user(
             })
             .unwrap(),
     )
+    .into_response()
 }
 
 pub async fn route_public_team(
     state: State<RouterState>,
     Extension(user): Extension<MaybeUser>,
-    Extension(lang): Extension<Languages>,
+    Extension(page): Extension<PageMeta>,
     team_id: Path<i64>,
-    uri: Uri,
 ) -> impl IntoResponse {
+    let Ok(team) = state.db.get_team_from_id(team_id.0).await else {
+        return Json(json!({
+            "error": "User not found",
+        }))
+        .into_response();
+    };
+
     let challenge_data = state.db.get_challenges();
-    let team = state.db.get_team_from_id(team_id.0);
     let standings = state.db.get_team_standings(team_id.0);
-    let (challenge_data, team, standings) = tokio::join!(challenge_data, team, standings);
+    let (challenge_data, standings) = tokio::join!(challenge_data, standings);
     let challenge_data = challenge_data.unwrap();
-    let team = team.unwrap();
     let standings = standings.unwrap();
 
     let mut challenges = BTreeMap::new();
@@ -81,18 +89,16 @@ pub async fn route_public_team(
         categories.insert(category.id, category);
     }
 
-    let title = { state.settings.read().await.title.clone() };
-
     Html(
         state
             .jinja
             .get_template("public-team.html")
             .unwrap()
             .render(context! {
-                lang,
+                global => state.global_page_meta,
+                page,
+                title => format!("{} | {}", team.name, state.global_page_meta.title),
                 user,
-                title,
-                uri => uri.to_string(),
                 public_team => team,
                 now => chrono::Utc::now(),
                 challenges,
@@ -102,4 +108,5 @@ pub async fn route_public_team(
             })
             .unwrap(),
     )
+    .into_response()
 }

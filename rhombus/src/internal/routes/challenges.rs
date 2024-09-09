@@ -3,7 +3,7 @@ use std::time::Duration;
 use axum::{
     body::Body,
     extract::{Path, State},
-    http::{Request, Uri},
+    http::Request,
     response::{Html, IntoResponse, Response},
     Extension, Form, Json,
 };
@@ -11,13 +11,12 @@ use minijinja::context;
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::internal::{auth::User, locales::Languages, router::RouterState};
+use crate::internal::{auth::User, router::RouterState, routes::meta::PageMeta};
 
 pub async fn route_challenges(
     state: State<RouterState>,
     Extension(user): Extension<User>,
-    Extension(lang): Extension<Languages>,
-    uri: Uri,
+    Extension(page): Extension<PageMeta>,
     req: Request<Body>,
 ) -> impl IntoResponse {
     if let Some(start_time) = state.settings.read().await.start_time {
@@ -27,10 +26,10 @@ pub async fn route_challenges(
                 .get_template("locked.html")
                 .unwrap()
                 .render(context! {
-                    lang,
+                    global => state.global_page_meta,
+                    page,
+                    title => format!("Challenges | {}", state.global_page_meta.title),
                     user,
-                    uri => uri.to_string(),
-                    title => state.settings.read().await.title,
                 })
                 .unwrap();
 
@@ -118,17 +117,15 @@ pub async fn route_challenges(
         }
     }
 
-    let title = { state.settings.read().await.title.clone() };
-
     let html = state
         .jinja
         .get_template("challenges.html")
         .unwrap()
         .render(context! {
-            lang,
+            global => state.global_page_meta,
+            page,
+            title => format!("Challenges | {}", state.global_page_meta.title),
             user,
-            title,
-            uri => uri.to_string(),
             challenge_json,
         })
         .unwrap();
@@ -139,9 +136,8 @@ pub async fn route_challenges(
 pub async fn route_challenge_view(
     state: State<RouterState>,
     Extension(user): Extension<User>,
-    Extension(lang): Extension<Languages>,
+    Extension(page): Extension<PageMeta>,
     challenge_id: Path<i64>,
-    uri: Uri,
 ) -> impl IntoResponse {
     if let Some(start_time) = state.settings.read().await.start_time {
         if !user.is_admin && chrono::Utc::now() < start_time {
@@ -192,9 +188,9 @@ pub async fn route_challenge_view(
             .get_template("challenge.html")
             .unwrap()
             .render(context! {
-                lang,
+                global => state.global_page_meta,
+                page,
                 user,
-                uri => uri.to_string(),
                 challenge,
                 description,
                 category,
@@ -210,9 +206,8 @@ pub async fn route_challenge_view(
 pub async fn route_ticket_view(
     state: State<RouterState>,
     Extension(user): Extension<User>,
-    Extension(lang): Extension<Languages>,
+    Extension(page): Extension<PageMeta>,
     challenge_id: Path<i64>,
-    uri: Uri,
 ) -> impl IntoResponse {
     if let Some(start_time) = state.settings.read().await.start_time {
         if !user.is_admin && chrono::Utc::now() < start_time {
@@ -267,9 +262,9 @@ pub async fn route_ticket_view(
             .get_template("ticket.html")
             .unwrap()
             .render(context! {
-                lang,
+                global => state.global_page_meta,
+                page,
                 user,
-                uri => uri.to_string(),
                 challenge,
                 description,
                 category,
@@ -289,7 +284,7 @@ pub struct TicketSubmit {
 pub async fn route_ticket_submit(
     state: State<RouterState>,
     Extension(user): Extension<User>,
-    Extension(lang): Extension<Languages>,
+    Extension(page): Extension<PageMeta>,
     challenge_id: Path<i64>,
     Form(form): Form<TicketSubmit>,
 ) -> impl IntoResponse {
@@ -328,9 +323,9 @@ pub async fn route_ticket_submit(
             .get_template("challenge-submit.html")
             .unwrap()
             .render(context! {
-                lang => lang,
-                user => user,
-                error => state.localizer.localize(&lang, "challenges-error-ticket-too-long", None),
+                page,
+                user,
+                error => state.localizer.localize(&page.lang, "challenges-error-ticket-too-long", None),
             })
             .unwrap();
 
@@ -375,7 +370,7 @@ pub async fn route_ticket_submit(
             r#"<div id="htmx-toaster" data-toast="success" hx-swap-oob="true">{}</div>"#,
             state
                 .localizer
-                .localize(&lang, "challenges-ticket-submitted", None)
+                .localize(&page.lang, "challenges-ticket-submitted", None)
                 .unwrap()
         ))
         .unwrap()
@@ -389,7 +384,7 @@ pub struct SubmitChallenge {
 pub async fn route_challenge_submit(
     state: State<RouterState>,
     Extension(user): Extension<User>,
-    Extension(lang): Extension<Languages>,
+    Extension(page): Extension<PageMeta>,
     challenge_id: Path<i64>,
     Form(form): Form<SubmitChallenge>,
 ) -> impl IntoResponse {
@@ -416,8 +411,8 @@ pub async fn route_challenge_submit(
             .get_template("challenge-submit.html")
             .unwrap()
             .render(context! {
-                lang => lang,
-                error => state.localizer.localize(&lang, "challenges-error-incorrect-flag", None),
+                page,
+                error => state.localizer.localize(&page.lang, "challenges-error-incorrect-flag", None),
             })
             .unwrap();
         return Response::builder()
@@ -433,7 +428,7 @@ pub async fn route_challenge_submit(
                 .get_template("challenge-submit.html")
                 .unwrap()
                 .render(context! {
-                    lang => lang,
+                    page,
                     error => "CTF has ended (correct flag!)",
                 })
                 .unwrap();
@@ -457,8 +452,8 @@ pub async fn route_challenge_submit(
             .get_template("challenge-submit.html")
             .unwrap()
             .render(context! {
-                lang => lang,
-                error => state.localizer.localize(&lang, "unknown-error", None),
+                page,
+                error => state.localizer.localize(&page.lang, "unknown-error", None),
             })
             .unwrap();
         return Response::builder()
@@ -521,7 +516,7 @@ pub async fn route_challenge_submit(
             r#"<div id="htmx-toaster" data-toast="success" hx-swap-oob="true">{}</div>"#,
             state
                 .localizer
-                .localize(&lang, "challenges-challenge-solved", None)
+                .localize(&page.lang, "challenges-challenge-solved", None)
                 .unwrap(),
         ))
         .unwrap()
@@ -535,7 +530,7 @@ pub struct SubmitWriteup {
 pub async fn route_writeup_submit(
     state: State<RouterState>,
     Extension(user): Extension<User>,
-    Extension(lang): Extension<Languages>,
+    Extension(page): Extension<PageMeta>,
     challenge_id: Path<i64>,
     Form(form): Form<SubmitWriteup>,
 ) -> impl IntoResponse {
@@ -555,9 +550,9 @@ pub async fn route_writeup_submit(
             .get_template("challenge-submit.html")
             .unwrap()
             .render(context! {
-                lang => lang,
-                user => user,
-                error => state.localizer.localize(&lang, "error-writeup-url-too-long", None)
+                page,
+                user,
+                error => state.localizer.localize(&page.lang, "error-writeup-url-too-long", None)
             })
             .unwrap();
 
@@ -574,9 +569,9 @@ pub async fn route_writeup_submit(
             .get_template("challenge-submit.html")
             .unwrap()
             .render(context! {
-                lang => lang,
-                user => user,
-                error => state.localizer.localize(&lang, "challenges-error-writeup-invalid-url", None),
+                page,
+                user,
+                error => state.localizer.localize(&page.lang, "challenges-error-writeup-invalid-url", None),
             })
             .unwrap();
 
@@ -601,8 +596,8 @@ pub async fn route_writeup_submit(
             .get_template("challenge-submit.html")
             .unwrap()
             .render(context! {
-                lang => lang,
-                user => user,
+                page,
+                user,
                 error => "Unknown error",
             })
             .unwrap();
@@ -621,9 +616,9 @@ pub async fn route_writeup_submit(
             .get_template("challenge-submit.html")
             .unwrap()
             .render(context! {
-                lang => lang,
-                user => user,
-                error => state.localizer.localize(&lang, "challenges-error-writeup-server-error", None),
+                page,
+                user,
+                error => state.localizer.localize(&page.lang, "challenges-error-writeup-server-error", None),
             })
             .unwrap();
 

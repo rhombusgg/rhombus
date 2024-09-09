@@ -144,6 +144,8 @@ pub struct CTFtimeSettings {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Settings {
     pub title: String,
+    pub description: Option<String>,
+    pub organizer: Option<String>,
     pub logo: Option<String>,
     pub logo_dark: Option<String>,
     pub home: Option<HomeSettings>,

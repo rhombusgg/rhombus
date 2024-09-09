@@ -117,13 +117,16 @@ pub fn jinja_translate(
     kwargs: Kwargs,
     state: &State,
 ) -> String {
-    let langs = state.lookup("lang");
-    if langs.is_none() {
-        tracing::error!(msg_id, "Must specify `lang` in template");
-        return "Must specify `lang` in template".to_owned();
-    }
+    let Some(page) = state.lookup("page") else {
+        tracing::error!(msg_id, "Must specify `page` in template");
+        return "Must specify `page` in template".to_owned();
+    };
 
-    let langs = langs.unwrap();
+    let Ok(langs) = page.get_item(&Value::from("lang")) else {
+        tracing::error!(msg_id, "Must specify `page.lang` in template");
+        return "Must specify `page.lang` in template".to_owned();
+    };
+
     let langs = langs
         .as_object()
         .unwrap()

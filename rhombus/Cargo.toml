@@ -39,14 +39,7 @@ mail-parser = "0.9.3"
 markdown = "1.0.0-alpha.18"
 mime_guess = "2.0.5"
 minify-html-onepass = "0.15.0"
-minijinja = { version = "2.1.2", default-features = false, features = [
-  "builtins",
-  "multi_template",
-  "macros",
-  "speedups",
-  "json",
-  "loader",
-] }
+minijinja = { version = "2.2.0", features = ["json", "loader"] }
 petname = "2.0.2"
 pin-project-lite = "0.2.14"
 poise = "0.6.1"
@@ -55,7 +48,7 @@ reqwest = { version = "0.12.5", default-features = false, features = [
   "rustls-tls",
   "json",
 ] }
-resvg = "0.42.0"
+resvg = "0.43.0"
 ring = "0.17.8"
 rust-embed = "8.5.0"
 rust-s3 = { version = "0.35.0-alpha.3", default-features = false, features = [

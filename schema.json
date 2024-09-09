@@ -5,6 +5,24 @@
   "description": "Configuration format for the Rhombus CTF platform",
   "type": "object",
   "properties": {
+    "title": {
+      "title": "Title",
+      "description": "Title of the CTF",
+      "type": "string",
+      "examples": ["Rhombus CTF"]
+    },
+    "description": {
+      "title": "Description",
+      "description": "Description of the CTF",
+      "type": "string",
+      "examples": ["A CTF platform built with Rust"]
+    },
+    "organizer": {
+      "title": "Organizer",
+      "description": "Name of the organizer of the CTF",
+      "type": "string",
+      "examples": ["Rhombus"]
+    },
     "location_url": {
       "title": "Location URL",
       "description": "Base URL where the site is hosted at",

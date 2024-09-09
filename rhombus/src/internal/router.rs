@@ -8,7 +8,7 @@ use crate::{
     internal::{
         database::provider::Connection, discord::Bot, division::Division,
         email::outbound_mailer::OutboundMailer, ip::IpExtractorFn, locales::Localizations,
-        settings::Settings,
+        routes::meta::GlobalPageMeta, settings::Settings,
     },
     Plugin, UploadProvider,
 };
@@ -25,6 +25,7 @@ pub struct RouterStateInner {
     pub outbound_mailer: Option<Arc<OutboundMailer>>,
     pub divisions: Arc<Vec<Division>>,
     pub router: Arc<Router>,
+    pub global_page_meta: Arc<GlobalPageMeta>,
 }
 
 pub struct Router {

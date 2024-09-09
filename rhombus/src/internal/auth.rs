@@ -6,7 +6,7 @@ use axum::{
     extract::{Query, State},
     http::{
         header::{self, AUTHORIZATION},
-        Request, Response, StatusCode, Uri,
+        Request, Response, StatusCode,
     },
     middleware::Next,
     response::{Html, IntoResponse, Redirect},
@@ -24,8 +24,10 @@ use serde_json::json;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::internal::{
-    division::MaxDivisionPlayers, locales::Languages, router::RouterState,
-    routes::team::create_team_invite_token,
+    division::MaxDivisionPlayers,
+    locales::Languages,
+    router::RouterState,
+    routes::{meta::PageMeta, team::create_team_invite_token},
 };
 
 #[derive(Debug, Serialize, Clone)]
@@ -133,8 +135,7 @@ pub struct SignInParams {
 pub async fn route_signin(
     state: State<RouterState>,
     Extension(user): Extension<MaybeUser>,
-    Extension(lang): Extension<Languages>,
-    uri: Uri,
+    Extension(page): Extension<PageMeta>,
     params: Query<SignInParams>,
 ) -> Response<Body> {
     let (invite_token_cookie, team_name) = if let Some(url_invite_token) = &params.token {
@@ -201,27 +202,18 @@ pub async fn route_signin(
         )
     };
 
-    let (location_url, auth, title) = {
-        let settings = state.settings.read().await;
-        (
-            settings.location_url.clone(),
-            settings.auth.clone(),
-            settings.title.clone(),
-        )
-    };
+    let auth_options = state.settings.read().await.auth.clone();
 
     let html = state
         .jinja
         .get_template("signin.html")
         .unwrap()
         .render(context! {
-            lang,
+            global => state.global_page_meta,
+            page,
+            title => format!("Sign In | {}", state.global_page_meta.title),
             user,
-            location_url,
-            title,
-            uri => uri.to_string(),
-            auth_options => auth,
-            og_image => format!("{}/og-image.png", location_url),
+            auth_options,
             team_name,
         })
         .unwrap();
@@ -923,9 +915,8 @@ pub fn avatar_from_email(email: &str) -> String {
 pub async fn route_signin_email_callback(
     state: State<RouterState>,
     Extension(user): Extension<MaybeUser>,
-    Extension(lang): Extension<Languages>,
+    Extension(page): Extension<PageMeta>,
     params: Query<EmailSignInParams>,
-    uri: Uri,
 ) -> impl IntoResponse {
     let Ok(email) = state
         .db
@@ -945,25 +936,18 @@ pub async fn route_signin_email_callback(
             .into_response();
     };
 
-    let (location_url, title) = {
-        let settings = state.settings.read().await;
-        (settings.location_url.clone(), settings.title.clone())
-    };
-
     Html(
         state
             .jinja
             .get_template("email-signin.html")
             .unwrap()
             .render(context! {
-                title,
-                lang,
-                title,
+                global => state.global_page_meta,
+                page,
+                title => format!("Email Sign In | {}", state.global_page_meta.title),
                 user,
                 email,
                 code => params.code,
-                uri => uri.to_string(),
-                og_image => format!("{}/og-image.png", location_url)
             })
             .unwrap(),
     )

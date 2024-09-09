@@ -3,7 +3,6 @@ use std::{any::Any, sync::Arc};
 use axum::{
     async_trait,
     extract::State,
-    http::Uri,
     response::{Html, IntoResponse},
     routing, Extension, Router,
 };
@@ -14,8 +13,8 @@ use rhombus::{
         auth::MaybeUser,
         database::provider::{Connection, Database},
         division::DivisionEligible,
-        locales::Languages,
         router::RouterState,
+        routes::meta::PageMeta,
     },
     plugin::{DatabaseProviderContext, RunContext},
     Plugin, UploadProvider,
@@ -119,23 +118,18 @@ async fn route_home(
     State(rhombus): State<RouterState>,
     Extension(plugin): Extension<MyPluginRouterState>,
     Extension(user): Extension<MaybeUser>,
-    Extension(lang): Extension<Languages>,
-    uri: Uri,
+    Extension(page): Extension<PageMeta>,
 ) -> impl IntoResponse {
-    let location_url = { rhombus.settings.read().await.location_url.clone() };
-
     Html(
         rhombus
             .jinja
             .get_template("home.html")
             .unwrap()
             .render(context! {
-                lang => lang,
-                user => user,
-                uri => uri.to_string(),
-                location_url => location_url,
+                global => rhombus.global_page_meta,
+                page,
+                user,
                 a => &plugin.a,
-                og_image => format!("{}/og-image.png", location_url)
             })
             .unwrap(),
     )

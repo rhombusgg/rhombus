@@ -2,7 +2,6 @@ use std::{collections::BTreeMap, net::IpAddr, num::NonZeroU64, time::Duration};
 
 use axum::{
     extract::{Query, State},
-    http::Uri,
     response::{Html, IntoResponse, Redirect, Response},
     Extension, Form,
 };
@@ -17,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::internal::{
-    auth::User, database::cache::TimedCache, locales::Languages, router::RouterState,
+    auth::User, database::cache::TimedCache, router::RouterState, routes::meta::PageMeta,
 };
 
 pub fn generate_email_callback_code() -> String {
@@ -66,25 +65,23 @@ pub struct UserDivision<'a> {
 pub async fn route_account(
     state: State<RouterState>,
     Extension(user): Extension<User>,
-    Extension(lang): Extension<Languages>,
-    uri: Uri,
+    Extension(page): Extension<PageMeta>,
 ) -> impl IntoResponse {
     struct DiscordSettings {
         guild_id: NonZeroU64,
         bot_token: String,
     }
 
-    let (discord, location_url, title) = {
-        let settings = state.settings.read().await;
-        (
-            settings.discord.as_ref().map(|d| DiscordSettings {
-                guild_id: d.guild_id,
-                bot_token: d.bot_token.clone(),
-            }),
-            settings.location_url.clone(),
-            settings.title.clone(),
-        )
-    };
+    let discord = state
+        .settings
+        .read()
+        .await
+        .discord
+        .as_ref()
+        .map(|d| DiscordSettings {
+            guild_id: d.guild_id,
+            bot_token: d.bot_token.clone(),
+        });
 
     #[derive(Serialize)]
     struct DiscordData {
@@ -162,12 +159,11 @@ pub async fn route_account(
             .get_template("account.html")
             .unwrap()
             .render(context! {
-                lang,
+                global => state.global_page_meta,
+                page,
+                title => format!("Account | {}", state.global_page_meta.title),
                 user,
-                title,
-                uri => uri.to_string(),
                 discord,
-                og_image => format!("{}/og-image.png", location_url),
                 now => chrono::Utc::now(),
                 team,
                 challenges,
@@ -188,7 +184,7 @@ pub async fn route_account_add_email(
     state: State<RouterState>,
     Extension(user): Extension<User>,
     Extension(ip): Extension<Option<IpAddr>>,
-    Extension(lang): Extension<Languages>,
+    Extension(page): Extension<PageMeta>,
     Form(form): Form<EmailSubmit>,
 ) -> impl IntoResponse {
     if form.email.is_empty() || form.email.len() > 255 {
@@ -197,7 +193,7 @@ pub async fn route_account_add_email(
                 r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
                 state
                     .localizer
-                    .localize(&lang, "account-error-email-length", None)
+                    .localize(&page.lang, "account-error-email-length", None)
                     .unwrap(),
             ))
             .unwrap();
@@ -210,7 +206,7 @@ pub async fn route_account_add_email(
                 r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
                 state
                     .localizer
-                    .localize(&lang, "account-error-email-already-added", None)
+                    .localize(&page.lang, "account-error-email-already-added", None)
                     .unwrap(),
             ))
             .unwrap();
@@ -227,7 +223,7 @@ pub async fn route_account_add_email(
                     r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
                     state
                         .localizer
-                        .localize(&lang, "account-error-verification-email", None)
+                        .localize(&page.lang, "account-error-verification-email", None)
                         .unwrap(),
                 ))
                 .unwrap();
@@ -250,7 +246,7 @@ pub async fn route_account_add_email(
                     r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
                     state
                         .localizer
-                        .localize(&lang, "account-error-verification-email", None)
+                        .localize(&page.lang, "account-error-verification-email", None)
                         .unwrap(),
                 ))
                 .unwrap();
@@ -268,7 +264,7 @@ pub async fn route_account_add_email(
             r#"<div id="htmx-toaster" data-toast="success" hx-swap-oob="true">{}</div>"#,
             state
                 .localizer
-                .localize(&lang, "account-check-email", None)
+                .localize(&page.lang, "account-check-email", None)
                 .unwrap(),
         ))
         .unwrap()
@@ -282,9 +278,8 @@ pub struct EmailVerifyParams {
 pub async fn route_account_email_verify_callback(
     state: State<RouterState>,
     Extension(user): Extension<User>,
-    Extension(lang): Extension<Languages>,
+    Extension(page): Extension<PageMeta>,
     params: Query<EmailVerifyParams>,
-    uri: Uri,
 ) -> impl IntoResponse {
     let Ok(email) = state
         .db
@@ -298,25 +293,18 @@ pub async fn route_account_email_verify_callback(
         return Redirect::temporary("/account").into_response();
     };
 
-    let (location_url, title) = {
-        let settings = state.settings.read().await;
-        (settings.location_url.clone(), settings.title.clone())
-    };
-
     Html(
         state
             .jinja
             .get_template("email-verify.html")
             .unwrap()
             .render(context! {
-                title,
-                lang,
-                title,
+                global => state.global_page_meta,
+                title => format!("Verify Email | {}", state.global_page_meta.title),
+                page,
                 user,
                 email,
                 code => params.code,
-                uri => uri.to_string(),
-                og_image => format!("{}/og-image.png", location_url)
             })
             .unwrap(),
     )
@@ -383,7 +371,7 @@ pub struct SetAccountName {
 pub async fn route_account_set_name(
     state: State<RouterState>,
     Extension(user): Extension<User>,
-    Extension(lang): Extension<Languages>,
+    Extension(page): Extension<PageMeta>,
     Form(form): Form<SetAccountName>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let mut errors = vec![];
@@ -392,7 +380,7 @@ pub async fn route_account_set_name(
         errors.push(
             state
                 .localizer
-                .localize(&lang, "account-error-name-length", None),
+                .localize(&page.lang, "account-error-name-length", None),
         );
     } else if state
         .db
@@ -403,7 +391,7 @@ pub async fn route_account_set_name(
         errors.push(
             state
                 .localizer
-                .localize(&lang, "account-error-name-taken", None),
+                .localize(&page.lang, "account-error-name-taken", None),
         );
     }
 
@@ -412,7 +400,7 @@ pub async fn route_account_set_name(
     if errors.is_empty() {
         let html = account_name_template
             .render(context! {
-                lang => lang,
+                page,
                 new_account_name => &form.name,
             })
             .unwrap();
@@ -424,8 +412,8 @@ pub async fn route_account_set_name(
     } else {
         let html = account_name_template
             .render(context! {
-                lang => lang,
-                errors => errors,
+                page,
+                errors,
             })
             .unwrap();
         Ok(Response::builder()

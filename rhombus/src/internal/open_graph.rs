@@ -11,19 +11,39 @@ use super::router::RouterState;
 #[folder = "fonts"]
 struct Fonts;
 
-lazy_static! {
-    static ref GLOBAL_OPTIONS: usvg::Options<'static> = {
-        let mut opt = usvg::Options::default();
-        opt.fontdb_mut().load_system_fonts();
-        opt.fontdb_mut()
-            .load_font_data(Fonts::get("inter/Inter.ttc").unwrap().data.to_vec());
-        opt
-    };
-}
+// lazy_static! {
+//     static ref GLOBAL_OPTIONS: usvg::Options<'static> = {
+//         let mut opt = usvg::Options::default();
+//         opt.fontdb_mut().load_system_fonts();
+//         opt.fontdb_mut()
+//             .load_font_data(Fonts::get("inter/Inter.ttc").unwrap().data.to_vec());
+//         opt
+//     };
+// }
 
 // todo: cache between requests
 fn convert_svg_to_png(svg: &str) -> Vec<u8> {
-    let tree = usvg::Tree::from_data(svg.as_bytes(), &GLOBAL_OPTIONS).unwrap();
+    let ferris_image = std::sync::Arc::new(std::fs::read("./static/logo.svg").unwrap());
+
+    let resolve_data = Box::new(|_: &str, _: std::sync::Arc<Vec<u8>>, _: &usvg::Options| None);
+
+    let resolve_string = Box::new(move |href: &str, _: &usvg::Options| match href {
+        "ferris_image" => Some(usvg::ImageKind::SVG(
+            usvg::Tree::from_data(&ferris_image, &usvg::Options::default()).unwrap(),
+        )),
+        _ => None,
+    });
+
+    let mut opt = usvg::Options::default();
+    opt.fontdb_mut().load_system_fonts();
+    opt.fontdb_mut()
+        .load_font_data(Fonts::get("inter/Inter.ttc").unwrap().data.to_vec());
+    opt.image_href_resolver = usvg::ImageHrefResolver {
+        resolve_data,
+        resolve_string,
+    };
+
+    let tree = usvg::Tree::from_data(svg.as_bytes(), &opt).unwrap();
     let zoom = 2.0;
     let pixmap_size = tree.size().to_int_size().scale_by(zoom).unwrap();
     let mut pixmap = tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height()).unwrap();

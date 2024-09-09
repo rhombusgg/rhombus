@@ -8,19 +8,19 @@ use minijinja::context;
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::internal::{auth::MaybeUser, locales::Languages, router::RouterState};
+use crate::internal::{auth::MaybeUser, router::RouterState, routes::meta::PageMeta};
 
 pub async fn route_scoreboard(
     state: State<RouterState>,
     user: Extension<MaybeUser>,
-    lang: Extension<Languages>,
+    page: Extension<PageMeta>,
     params: Query<PageParams>,
     req: Request<Body>,
 ) -> impl IntoResponse {
     let challenge_data = state.db.get_challenges().await.unwrap();
     let default_division = challenge_data.divisions.keys().next().unwrap();
     if challenge_data.divisions.len() == 1 {
-        return route_scoreboard_division(state, user, lang, Path(*default_division), params, req)
+        return route_scoreboard_division(state, user, page, Path(*default_division), params, req)
             .await
             .into_response();
     }
@@ -36,16 +36,16 @@ pub struct PageParams {
 pub async fn route_scoreboard_division(
     state: State<RouterState>,
     Extension(user): Extension<MaybeUser>,
-    Extension(lang): Extension<Languages>,
+    Extension(page): Extension<PageMeta>,
     Path(division_id): Path<i64>,
     params: Query<PageParams>,
     req: Request<Body>,
 ) -> impl IntoResponse {
-    let page = params.page.unwrap_or(1).saturating_sub(1);
+    let page_num = params.page.unwrap_or(1).saturating_sub(1);
 
     let scoreboard = state.db.get_scoreboard(division_id);
     let challenge_data = state.db.get_challenges();
-    let leaderboard = state.db.get_leaderboard(division_id, Some(page));
+    let leaderboard = state.db.get_leaderboard(division_id, Some(page_num));
     let (scoreboard, challenge_data, leaderboard) =
         futures::future::try_join3(scoreboard, challenge_data, leaderboard)
             .await
@@ -57,23 +57,22 @@ pub async fn route_scoreboard_division(
         }
     }
 
-    let title = { state.settings.read().await.title.clone() };
-
     Html(
         state
             .jinja
             .get_template("scoreboard.html")
             .unwrap()
             .render(context! {
-                lang,
+                global => state.global_page_meta,
+                page,
                 user,
-                title,
                 uri => "/scoreboard",
+                title => format!("Scoreboard | {}", state.global_page_meta.title),
                 scoreboard => scoreboard.teams,
                 divisions => challenge_data.divisions,
                 leaderboard,
                 selected_division_id => division_id,
-                page,
+                page_num,
             })
             .unwrap(),
     )

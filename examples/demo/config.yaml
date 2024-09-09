@@ -25,6 +25,8 @@ discord:
   support_channel_id: 1173026578385617010
   verified_role_id: 1170429782270431283
 title: Rhombus Demo
+description: A fully featured demo instance of the Rhombus CTF platform.
+organizer: Team Rhombus
 home:
   content: |
     # Welcome to the Rhombus Demo

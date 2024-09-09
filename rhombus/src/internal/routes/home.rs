@@ -1,27 +1,18 @@
 use axum::{
     extract::State,
-    http::Uri,
     response::{Html, IntoResponse},
     Extension,
 };
 use minijinja::context;
 
-use crate::internal::{auth::MaybeUser, locales::Languages, router::RouterState};
+use crate::internal::{auth::MaybeUser, router::RouterState, routes::meta::PageMeta};
 
 pub async fn route_home(
     state: State<RouterState>,
     Extension(user): Extension<MaybeUser>,
-    Extension(lang): Extension<Languages>,
-    uri: Uri,
+    Extension(page): Extension<PageMeta>,
 ) -> impl IntoResponse {
-    let (location_url, title, home) = {
-        let settings = state.settings.read().await;
-        (
-            settings.location_url.clone(),
-            settings.title.clone(),
-            settings.home.clone(),
-        )
-    };
+    let home = state.settings.read().await.home.clone();
 
     let content = home.and_then(|home| {
         home.content.map(|content| {
@@ -46,13 +37,10 @@ pub async fn route_home(
             .get_template("home.html")
             .unwrap()
             .render(context! {
-                title,
-                lang,
+                global => state.global_page_meta,
+                page,
                 user,
-                location_url,
                 content,
-                uri => uri.to_string(),
-                og_image => format!("{}/og-image.png", location_url)
             })
             .unwrap(),
     )

@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 
 use axum::{
     extract::{Path, State},
-    http::Uri,
     response::{Html, IntoResponse, Response},
     Extension, Form,
 };
@@ -16,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::internal::{
-    auth::User, division::MaxDivisionPlayers, locales::Languages, router::RouterState,
+    auth::User, division::MaxDivisionPlayers, router::RouterState, routes::meta::PageMeta,
 };
 
 pub fn create_team_invite_token() -> String {
@@ -37,8 +36,7 @@ pub struct TeamDivision<'a> {
 pub async fn route_team(
     state: State<RouterState>,
     Extension(user): Extension<User>,
-    Extension(lang): Extension<Languages>,
-    uri: Uri,
+    Extension(page): Extension<PageMeta>,
 ) -> impl IntoResponse {
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
@@ -51,10 +49,8 @@ pub async fn route_team(
     let team_divisions = team_divisions.unwrap();
     let standings = standings.unwrap();
 
-    let (location_url, title) = {
-        let settings = state.settings.read().await;
-        (settings.location_url.clone(), settings.title.clone())
-    };
+    let location_url = state.settings.read().await.location_url.clone();
+
     let team_invite_url = format!("{}/signin?token={}", location_url, team.invite_token);
 
     let mut challenges = BTreeMap::new();
@@ -115,19 +111,17 @@ pub async fn route_team(
             .get_template("team.html")
             .unwrap()
             .render(context! {
-                lang,
+                global => state.global_page_meta,
+                page,
+                title => format!("Team | {}", state.global_page_meta.title),
                 user,
                 team,
-                title,
                 team_invite_url,
                 max_players,
-                uri => uri.to_string(),
-                location_url,
                 now => chrono::Utc::now(),
                 challenges,
                 categories,
                 num_joined_divisions,
-                og_image => format!("{}/og-image.png", location_url),
                 divisions,
                 standings => standings.standings,
             })
@@ -138,7 +132,7 @@ pub async fn route_team(
 pub async fn route_team_roll_token(
     state: State<RouterState>,
     Extension(user): Extension<User>,
-    Extension(lang): Extension<Languages>,
+    Extension(page): Extension<PageMeta>,
 ) -> Result<impl IntoResponse, StatusCode> {
     if !user.is_team_owner {
         return Err(StatusCode::UNAUTHORIZED);
@@ -155,7 +149,7 @@ pub async fn route_team_roll_token(
             .get_template("team-token.html")
             .unwrap()
             .render(context! {
-                lang => lang,
+                page,
                 team_invite_url => team_invite_url,
             })
             .unwrap(),
@@ -170,7 +164,7 @@ pub struct SetTeamName {
 pub async fn route_team_set_name(
     state: State<RouterState>,
     Extension(user): Extension<User>,
-    Extension(lang): Extension<Languages>,
+    Extension(page): Extension<PageMeta>,
     Form(form): Form<SetTeamName>,
 ) -> Result<impl IntoResponse, StatusCode> {
     if !user.is_team_owner {
@@ -183,7 +177,7 @@ pub async fn route_team_set_name(
         errors.push(
             state
                 .localizer
-                .localize(&lang, "team-error-name-length", None),
+                .localize(&page.lang, "team-error-name-length", None),
         );
     } else if state
         .db
@@ -194,7 +188,7 @@ pub async fn route_team_set_name(
         errors.push(
             state
                 .localizer
-                .localize(&lang, "team-error-name-taken", None),
+                .localize(&page.lang, "team-error-name-taken", None),
         );
     }
 
@@ -203,7 +197,7 @@ pub async fn route_team_set_name(
     if errors.is_empty() {
         let html = team_name_template
             .render(context! {
-                lang => lang,
+                page,
                 new_team_name => &form.name,
             })
             .unwrap();
@@ -215,8 +209,8 @@ pub async fn route_team_set_name(
     } else {
         let html = team_name_template
             .render(context! {
-                lang => lang,
-                errors => errors,
+                page,
+                errors,
             })
             .unwrap();
         Ok(Response::builder()
@@ -274,7 +268,7 @@ pub struct DivisionSet {
 pub async fn route_team_set_division(
     state: State<RouterState>,
     Extension(user): Extension<User>,
-    Extension(lang): Extension<Languages>,
+    Extension(page): Extension<PageMeta>,
     Path(division_id): Path<i64>,
     Form(form): Form<DivisionSet>,
 ) -> impl IntoResponse {
@@ -391,7 +385,7 @@ pub async fn route_team_set_division(
         .get_template("team-set-division-partial.html")
         .unwrap()
         .render(context! {
-            lang,
+            page,
             team,
             max_players,
             user,

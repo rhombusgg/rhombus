@@ -2,8 +2,6 @@
 {% import "icons.html" as icons %}
 {% import "card.html" as card %}
 
-{% block title %}{{ super() }} - {{ t("scoreboard") }}{% endblock %}
-
 {% block content %}
   <div class="container mb-6">
     <div class="w-full mt-4 relative" style="height: 600px">
@@ -120,7 +118,7 @@
                 <div class="flex justify-center">
                   <div>
                     {% for i in range(leaderboard.num_pages) %}
-                      {% if i == 0 and page != 0 %}
+                      {% if i == 0 and page_num != 0 %}
                         <a
                           hx-boost="true"
                           hx-select="#screen"
@@ -130,7 +128,7 @@
                           href="/scoreboard/{{ selected_division_id }}"
                           >1</a
                         >
-                      {% elif i != page %}
+                      {% elif i != page_num %}
                         <a
                           hx-boost="true"
                           hx-select="#screen"
