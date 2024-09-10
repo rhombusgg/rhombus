@@ -18,6 +18,7 @@ WORKDIR /app
 COPY --from=builder /app/target/release/demo /app/demo
 COPY examples/demo/challenges /app/challenges
 COPY examples/demo/config.yaml /app/config.yaml
+COPY examples/demo/static /app/static
 CMD ["/app/demo"]
 
 EXPOSE 3000
