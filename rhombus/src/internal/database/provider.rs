@@ -196,6 +196,22 @@ pub struct Ticket {
     pub email_in_reply_to: Option<String>,
 }
 
+#[derive(Debug, Serialize, Clone, PartialEq, PartialOrd)]
+pub struct StatisticsCategory {
+    pub num: u64,
+    pub name: String,
+    pub color: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct SiteStatistics {
+    pub total_users: u64,
+    pub total_teams: u64,
+    pub total_challenges: u64,
+    pub total_solves: u64,
+    pub categories: Vec<StatisticsCategory>,
+}
+
 #[async_trait]
 pub trait Database {
     async fn migrate(&self) -> Result<()>;
@@ -324,4 +340,5 @@ pub trait Database {
     async fn get_team_standings(&self, team_id: i64) -> Result<TeamStandings>;
     async fn upload_file(&self, hash: &str, filename: &str, bytes: &[u8]) -> Result<()>;
     async fn download_file(&self, hash: &str) -> Result<(Bytes, String)>;
+    async fn get_site_statistics(&self) -> Result<SiteStatistics>;
 }

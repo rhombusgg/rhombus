@@ -11,7 +11,8 @@ use crate::{
         auth::User,
         database::provider::{
             Challenge, ChallengeData, Challenges, Connection, Database, Email, FirstBloods,
-            Leaderboard, Scoreboard, Team, TeamMeta, TeamStandings, Ticket, Writeup,
+            Leaderboard, Scoreboard, SiteStatistics, Team, TeamMeta, TeamStandings, Ticket,
+            Writeup,
         },
         division::Division,
         settings::Settings,
@@ -482,6 +483,10 @@ impl Database for DbCache {
 
     async fn download_file(&self, hash: &str) -> Result<(Bytes, String)> {
         self.inner.download_file(hash).await
+    }
+
+    async fn get_site_statistics(&self) -> Result<SiteStatistics> {
+        self.inner.get_site_statistics().await
     }
 }
 

@@ -15,7 +15,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use futures::stream::StreamExt;
 use inflector::{cases::titlecase::to_title_case, string::pluralize::to_plural};
 use libsql::{de, params, Builder, Transaction};
-use rand::rngs::OsRng;
+use rand::{rngs::OsRng, Rng};
 use rust_embed::RustEmbed;
 use serde::Deserialize;
 use tokio_util::bytes::Bytes;
@@ -29,8 +29,8 @@ use crate::{
                 Author, Category, Challenge, ChallengeAttachment, ChallengeData, ChallengeDivision,
                 ChallengeDivisionPoints, ChallengeSolve, Challenges, Database, Email, FirstBloods,
                 Leaderboard, LeaderboardEntry, Scoreboard, ScoreboardSeriesPoint, ScoreboardTeam,
-                Team, TeamInner, TeamMeta, TeamMetaInner, TeamStandingEntry, TeamStandings,
-                TeamUser, Ticket, Writeup,
+                SiteStatistics, StatisticsCategory, Team, TeamInner, TeamMeta, TeamMetaInner,
+                TeamStandingEntry, TeamStandings, TeamUser, Ticket, Writeup,
             },
         },
         division::Division,
@@ -132,6 +132,7 @@ pub trait LibSQLConnection {
                         if count > 5 {
                             return Err(crate::errors::RhombusError::LibSQL(e));
                         }
+                        tokio::time::sleep(Duration::from_millis(10)).await;
                     }
                 }
             }
@@ -2057,13 +2058,95 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
 
         Ok((Bytes::from(file.contents), file.filename))
     }
+
+    async fn get_site_statistics(&self) -> Result<SiteStatistics> {
+        let tx = self.transaction().await?;
+
+        let total_users = tx
+            .query("SELECT COUNT(*) FROM rhombus_user", ())
+            .await?
+            .next()
+            .await?
+            .unwrap()
+            .get::<i64>(0)
+            .unwrap();
+
+        let total_teams = tx
+            .query("SELECT COUNT(DISTINCT team_id) FROM rhombus_user", ())
+            .await?
+            .next()
+            .await?
+            .unwrap()
+            .get::<i64>(0)
+            .unwrap();
+
+        let total_challenges = tx
+            .query("SELECT COUNT(*) FROM rhombus_challenge", ())
+            .await?
+            .next()
+            .await?
+            .unwrap()
+            .get::<i64>(0)
+            .unwrap();
+
+        let total_solves = tx
+            .query("SELECT COUNT(*) FROM rhombus_solve", ())
+            .await?
+            .next()
+            .await?
+            .unwrap()
+            .get::<i64>(0)
+            .unwrap();
+
+        #[derive(Debug, Deserialize)]
+        struct QueryCategory {
+            name: String,
+            color: String,
+            challenge_count: i64,
+        }
+
+        let categories = tx
+            .query(
+                "
+            SELECT rhombus_category.name, rhombus_category.color, COUNT(*) AS challenge_count
+            FROM rhombus_category
+            JOIN rhombus_challenge ON rhombus_challenge.category_id = rhombus_category.id
+            GROUP BY rhombus_category.id
+            ORDER BY challenge_count DESC
+            ",
+                (),
+            )
+            .await?
+            .into_stream()
+            .map(|row| {
+                let category = de::from_row::<QueryCategory>(&row.unwrap()).unwrap();
+                StatisticsCategory {
+                    name: category.name,
+                    color: category.color,
+                    num: category.challenge_count as u64,
+                }
+            })
+            .collect::<Vec<_>>()
+            .await;
+
+        tx.commit().await?;
+        Ok(SiteStatistics {
+            total_users: total_users as u64,
+            total_teams: total_teams as u64,
+            total_challenges: total_challenges as u64,
+            total_solves: total_solves as u64,
+            categories,
+        })
+    }
 }
 
 pub async fn create_team(tx: &Transaction) -> Result<i64> {
     loop {
         let team_invite_token = create_team_invite_token();
 
-        let team_name = to_title_case(&to_plural(&petname::petname(3, " ").unwrap()));
+        let petname = to_title_case(&to_plural(&petname::petname(2, " ").unwrap()));
+        let random_number = rand::thread_rng().gen_range(0..1000);
+        let team_name = format!("{} {}", petname, random_number);
 
         if let Ok(team_id) = tx
             .query(

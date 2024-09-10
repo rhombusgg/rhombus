@@ -11,8 +11,8 @@ use crate::{
         database::{
             cache::Writeups,
             provider::{
-                Challenge, Challenges, Database, Email, FirstBloods, Leaderboard, Scoreboard, Team,
-                TeamMeta, TeamStandings, Ticket,
+                Challenge, Challenges, Database, Email, FirstBloods, Leaderboard, Scoreboard,
+                SiteStatistics, Team, TeamMeta, TeamStandings, Ticket,
             },
         },
         division::Division,
@@ -362,6 +362,10 @@ impl Database for Postgres {
     }
 
     async fn download_file(&self, _hash: &str) -> Result<(Bytes, String)> {
+        todo!()
+    }
+
+    async fn get_site_statistics(&self) -> Result<SiteStatistics> {
         todo!()
     }
 }

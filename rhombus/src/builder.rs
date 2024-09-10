@@ -1113,13 +1113,13 @@ pub fn hash(s: impl AsRef<str>) -> i64 {
     (hash_value >> 11) as i64
 }
 
-fn find_image_file(partial_path: &str) -> Option<std::path::PathBuf> {
+pub fn find_image_file(partial_path: &str) -> Option<std::path::PathBuf> {
     let exact_path = std::path::Path::new(partial_path);
     if exact_path.exists() {
         return Some(exact_path.to_path_buf());
     }
 
-    let extensions = ["svg", "png", "jpg", "jpeg", "gif", "ico"];
+    let extensions = ["svg", "png", "webp", "jpg", "jpeg", "gif", "ico"];
 
     let dir = exact_path.parent().unwrap_or(std::path::Path::new("."));
     let base_name = exact_path

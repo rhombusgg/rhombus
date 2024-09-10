@@ -613,6 +613,13 @@ pub async fn route_signin_ctftime_callback(
         return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
     };
 
+    let Some(ctftime_client_secret) = ctftime_settings.client_secret else {
+        let json_error = ErrorResponse {
+            message: "CTFtime client secret is not configured".to_string(),
+        };
+        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+    };
+
     let client = Client::new();
     let res = client
         .post("https://oauth.ctftime.org/token")
@@ -620,14 +627,11 @@ pub async fn route_signin_ctftime_callback(
             reqwest::header::CONTENT_TYPE,
             "application/x-www-form-urlencoded",
         )
-        .basic_auth(
-            ctftime_settings.client_id,
-            Some(&ctftime_settings.client_secret),
-        )
+        .basic_auth(ctftime_settings.client_id, Some(&ctftime_client_secret))
         .form(&[
             ("code", params.code.as_str()),
             ("client_id", ctftime_settings.client_id.to_string().as_str()),
-            ("client_secret", ctftime_settings.client_secret.as_str()),
+            ("client_secret", ctftime_client_secret.as_str()),
             ("grant_type", "authorization_code"),
         ])
         .send()
