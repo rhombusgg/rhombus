@@ -19,7 +19,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct S3UploadProvider {
-    pub bucket: Bucket,
+    pub bucket: Box<Bucket>,
     pub presigned_get_expiry: Option<u32>,
     pub prefix: String,
 }
