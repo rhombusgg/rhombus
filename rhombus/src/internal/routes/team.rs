@@ -114,6 +114,7 @@ pub async fn route_team(
                 global => state.global_page_meta,
                 page,
                 title => format!("Team | {}", state.global_page_meta.title),
+                og_image => format!("{}/team/{}/og-image.png", state.global_page_meta.location_url, team.id),
                 user,
                 team,
                 team_invite_url,

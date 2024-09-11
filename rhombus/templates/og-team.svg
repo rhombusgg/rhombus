@@ -1,0 +1,179 @@
+{% macro players(x, y) %}
+<svg x="{{ x }}" y="{{ y }}" xmlns="http://www.w3.org/2000/svg">
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#555"
+    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user">
+    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </svg>
+  <text x="34" y="20" font-family="Inter" font-size="22" fill="black">
+    {{ num_users }}
+  </text>
+  <text x="34" y="46" font-family="Inter" font-size="16" fill="#555">
+    Player{% if num_users != 1 %}s{% endif %}
+  </text>
+</svg>
+{% endmacro %}
+
+{% macro solves(x, y) %}
+<svg x="{{ x }}" y="{{ y }}" xmlns="http://www.w3.org/2000/svg">
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#555"
+    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-flag">
+    <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+    <line x1="4" x2="4" y1="22" y2="15" />
+  </svg>
+  <text x="34" y="20" font-family="Inter" font-size="22" fill="black">
+    {{ num_solves }}
+  </text>
+  <text x="34" y="46" font-family="Inter" font-size="16" fill="#555">
+    Solve{% if num_solves != 1 %}s{% endif %}
+  </text>
+</svg>
+{% endmacro %}
+
+{% macro writeups(x, y) %}
+<svg x="{{ x }}" y="{{ y }}" xmlns="http://www.w3.org/2000/svg">
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#555"
+    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-notebook-pen">
+    <path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4" />
+    <path d="M2 6h4" />
+    <path d="M2 10h4" />
+    <path d="M2 14h4" />
+    <path d="M2 18h4" />
+    <path
+      d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z" />
+  </svg>
+  <text x="34" y="20" font-family="Inter" font-size="22" fill="black">
+    {{ num_writeups }}
+  </text>
+  <text x="34" y="46" font-family="Inter" font-size="16" fill="#555">
+    Writeup{% if num_writeups != 1 %}s{% endif %}
+  </text>
+</svg>
+{% endmacro %}
+
+<svg viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <title>Team {{ team.name }} in {{ site.title }}</title>
+
+  <rect x="0" y="0" width="800" height="400" fill="white" />
+
+  <image x="600" y="20" width="180" xlink:href="logo" />
+
+  <text text-anchor="end" x="750" y="336" font-family="Inter" font-weight="bold" font-size="18" fill="#8af">
+    {{ location }}
+  </text>
+
+  {% set line_y=60 %}
+  <text x="50" y="{{ line_y }}" font-family="Inter" font-weight="bold" font-size="32" fill="black">
+    {{ team.name }}
+  </text>
+  {% set line_y = line_y + 24 %}
+
+  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="18" fill="#333">
+    {{ site.title }}{% if site.organizer %} hosted by {{ site.organizer }}{% endif %}
+  </text>
+
+  {% set line_y = line_y + 26 %}
+
+  {% if ctf_start_time %}
+  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="18" fill="#333">
+    {% if ctf_started %}
+    Started
+    {% else %}
+    Starts
+    {% endif %}
+    {{ ctf_start_time }}
+  </text>
+  {% set line_y = line_y + 22 %}
+  {% endif %}
+
+  {% if ctf_end_time %}
+  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="18" fill="#333">
+    {% if ctf_ended %}
+    Ended
+    {% else %}
+    Ends
+    {% endif %}
+    {{ ctf_end_time }}
+  </text>
+  {% set line_y = line_y + 22 %}
+  {% endif %}
+
+  {% if site.description %}
+  {% set line_y = line_y + 6 %}
+  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="18" fill="#333">
+    {{ site.description }}
+  </text>
+  {% endif %}
+
+  {% set user_y = 200 %}
+  <text x="50" y="{{ user_y }}" font-family="Inter" font-size="18" font-weight="bold" fill="#333">
+    Players
+  </text>
+  {% set user_y = user_y + 22 %}
+  {% for _, user in team.users | items %}
+  {% if user.is_team_owner %}
+  <svg x="28" y="{{ user_y - 16 }}" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+    fill="none" stroke="#d6af36" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+    class="lucide lucide-crown">
+    <path
+      d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z" />
+    <path d="M5 21h14" />
+  </svg>
+  {% endif %}
+  <text x="50" y="{{ user_y }}" font-family="Inter" font-size="18" fill="#333">
+    {{ user.name }}
+  </text>
+  {% set user_y = user_y + 20 %}
+  {% endfor %}
+
+  {% set division_x = 240 %}
+  {% for division in divisions %}
+  {% if standings[division.id] %}
+  <text x="{{ division_x }}" y="200" font-family="Inter" font-size="18" font-weight="bold" fill="#333">
+    {{- division.name -}}
+  </text>
+  <text x="{{ division_x }}" y="222" font-family="Inter" font-size="18" fill="#333">{{ standings[division.id].points }}
+    points</text>
+  <text x="{{ division_x }}" y="242" font-family="Inter" font-size="18" fill="#333">
+    {%- if standings[division.id].rank == 1 -%}
+    1st
+    {%- elif standings[division.id].rank == 2 -%}
+    2nd
+    {%- elif standings[division.id].rank == 3 -%}
+    3rd
+    {%- else -%}
+    {{ standings[division.id].rank }}th
+    {%- endif %} place
+  </text>
+  {% set division_x = division_x + 170 %}
+  {% endif %}
+  {% endfor %}
+
+  {% set info_offset = 50 %}
+  {% if team.users | length > 4 %}
+  {% set info_offset = 240 %}
+  {% endif %}
+
+  {{ players(x=info_offset, y="290") }}
+  {% if ctf_started %}
+  {{ solves(x=info_offset + 100, y="290") }}
+  {% endif %}
+  {% if ctf_ended and num_writeups > 0 %}
+  {{ writeups(x=info_offset + 200, y="290") }}
+  {% endif %}
+
+  {% if num_solves > 0 %}
+  {% set x = 0 %}
+  {% for category in categories %}
+  <text x="{{ x * 100 + 1 }}%" y="93%" font-family="Inter" font-size="18" font-weight="bold"
+    fill="{{ category.color }}">
+    {{ category.name }}
+  </text>
+  <rect x="{{ x * 100 }}%" width="{{ category.num / num_solves * 100 }}%" y="95%" height="5%"
+    fill="{{ category.color }}" />
+  {% set x = x + category.num / num_solves %}
+  {% endfor %}
+  {% else %}
+  <rect x="0" y="95%" width="100%" height="5%" fill="black" />
+  {% endif %}
+</svg>

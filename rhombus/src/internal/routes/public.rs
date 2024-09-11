@@ -48,6 +48,7 @@ pub async fn route_public_user(
                 global => state.global_page_meta,
                 page,
                 title => format!("{} | {}", public_user.name, state.global_page_meta.title),
+                og_image => format!("{}/user/{}/og-image.png", state.global_page_meta.location_url, public_user.id),
                 user,
                 public_user,
                 public_team => team,
@@ -68,7 +69,7 @@ pub async fn route_public_team(
 ) -> impl IntoResponse {
     let Ok(team) = state.db.get_team_from_id(team_id.0).await else {
         return Json(json!({
-            "error": "User not found",
+            "error": "Team not found",
         }))
         .into_response();
     };
@@ -96,6 +97,7 @@ pub async fn route_public_team(
             .unwrap()
             .render(context! {
                 global => state.global_page_meta,
+                og_image => format!("{}/team/{}/og-image.png", state.global_page_meta.location_url, team.id),
                 page,
                 title => format!("{} | {}", team.name, state.global_page_meta.title),
                 user,

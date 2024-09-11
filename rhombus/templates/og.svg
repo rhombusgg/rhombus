@@ -1,4 +1,4 @@
-{% macro users(x, y) %}
+{% macro players(x, y) %}
 <svg x="{{ x }}" y="{{ y }}" xmlns="http://www.w3.org/2000/svg">
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#555"
     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user">
@@ -9,7 +9,7 @@
     {{ stats.total_users }}
   </text>
   <text x="34" y="46" font-family="Inter" font-size="16" fill="#555">
-    Users
+    Player{% if stats.total_users != 1 %}s{% endif %}
   </text>
 </svg>
 {% endmacro %}
@@ -27,7 +27,7 @@
     {{ stats.total_teams }}
   </text>
   <text x="34" y="46" font-family="Inter" font-size="16" fill="#555">
-    Teams
+    Team{% if stats.total_teams != 1 %}s{% endif %}
   </text>
 </svg>
 {% endmacro %}
@@ -49,7 +49,7 @@
     {{ stats.total_challenges }}
   </text>
   <text x="34" y="46" font-family="Inter" font-size="16" fill="#555">
-    Challenges
+    Challenge{% if stats.total_challenges != 1 %}s{% endif %}
   </text>
 </svg>
 {% endmacro %}
@@ -65,7 +65,7 @@
     {{ stats.total_solves }}
   </text>
   <text x="34" y="46" font-family="Inter" font-size="16" fill="#555">
-    Solves
+    Solve{% if stats.total_solves != 1 %}s{% endif %}
   </text>
 </svg>
 {% endmacro %}
@@ -96,7 +96,7 @@
     {{ ctftime.teams_interested }}
   </text>
   <text x="34" y="46" font-family="Inter" font-size="16" fill="#555">
-    Teams Interested
+    Team{% if stats.teams_interested != 1 %}s{% endif %} Interested
   </text>
 </svg>
 {% endmacro %}
@@ -162,7 +162,7 @@
   {% set division_x = 50 %}
   {% for division in division_meta %}
   {% if division.places | length > 0 %}
-  <text x="{{ division_x }}" y="{{ scoreboard_y }}" font-family="Inter" font-size="18" fill="#333">
+  <text x="{{ division_x }}" y="{{ scoreboard_y }}" font-family="Inter" font-size="18" font-weight="bold" fill="#333">
     {{ division.name }}
   </text>
   {% set place_y = scoreboard_y + 20 %}
@@ -191,16 +191,16 @@
   {% endfor %}
   {% endif %}
 
-  {{ users(x="50", y="290") }}
+  {{ players(x="50", y="290") }}
   {{ teams(x="150", y="290") }}
   {{ challenges(x="250", y="290") }}
   {% if ctf_started %}
   {{ solves(x="380", y="290") }}
-  {{ ctftime_weight(x="480", y="290") }}
+  {% if ctftime.weight %}{{ ctftime_weight(x="480", y="290") }}{% endif %}
   {% else %}
   {% if ctftime %}
   {{ teams_interested(x="380", y="290") }}
-  {{ ctftime_weight(x="570", y="290") }}
+  {% if ctftime.weight %}{{ ctftime_weight(x="570", y="290") }}{% endif %}
   {% endif %}
   {% endif %}
 

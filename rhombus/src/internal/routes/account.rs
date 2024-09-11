@@ -162,6 +162,7 @@ pub async fn route_account(
                 global => state.global_page_meta,
                 page,
                 title => format!("Account | {}", state.global_page_meta.title),
+                og_image => format!("{}/user/{}/og-image.png", state.global_page_meta.location_url, user.id),
                 user,
                 discord,
                 now => chrono::Utc::now(),

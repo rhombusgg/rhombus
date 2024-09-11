@@ -1,14 +1,24 @@
+use std::collections::BTreeMap;
+use std::time::Duration;
+
+use axum::extract::Path;
+use axum::Json;
 use axum::{body::Body, extract::State, http::Response, response::IntoResponse};
 use chrono::{DateTime, Utc};
+use dashmap::DashMap;
 use lazy_static::lazy_static;
 use minijinja::context;
 use resvg::{tiny_skia, usvg};
 use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use tokio::sync::RwLock;
 
 use crate::builder::find_image_file;
-use crate::internal::router::RouterState;
+use crate::internal::{
+    database::{cache::TimedCache, provider::StatisticsCategory},
+    router::RouterState,
+};
 
 #[derive(RustEmbed)]
 #[folder = "fonts"]
@@ -205,7 +215,6 @@ pub async fn route_default_og_image(state: State<RouterState>) -> impl IntoRespo
         .get_template("og.svg")
         .unwrap()
         .render(context! {
-            title => "Rhombus",
             site,
             stats,
             ctftime,
@@ -225,11 +234,302 @@ pub async fn route_default_og_image(state: State<RouterState>) -> impl IntoRespo
         data: png.clone(),
     };
     {
-        _ = DEFAULT_IMAGE_CACHE.write().await.replace(new_image);
+        DEFAULT_IMAGE_CACHE.write().await.replace(new_image);
     }
 
     Response::builder()
         .header("Content-Type", "image/png")
         .body(Body::from(png))
         .unwrap()
+}
+
+lazy_static::lazy_static! {
+    pub static ref TEAM_OG_IMAGE_CACHE: DashMap<i64, TimedCache<Vec<u8>>> = DashMap::new();
+}
+
+pub async fn route_team_og_image(
+    state: State<RouterState>,
+    team_id: Path<i64>,
+) -> impl IntoResponse {
+    let Ok(team) = state.db.get_team_from_id(team_id.0).await else {
+        return Json(json!({
+            "error": "Team not found",
+        }))
+        .into_response();
+    };
+
+    if let Some(png) = TEAM_OG_IMAGE_CACHE.get(&team_id) {
+        return Response::builder()
+            .header("Content-Type", "image/png")
+            .body(Body::from(png.value.clone()))
+            .unwrap();
+    }
+
+    let challenge_data = state.db.get_challenges();
+    let standings = state.db.get_team_standings(team_id.0);
+    let (challenge_data, standings) = tokio::join!(challenge_data, standings);
+    let challenge_data = challenge_data.unwrap();
+    let standings = standings.unwrap();
+
+    let site = {
+        let settings = state.settings.read().await;
+        SiteOGImage {
+            title: settings.title.clone(),
+            description: settings.description.clone(),
+            start_time: settings.start_time,
+            end_time: settings.end_time,
+            location_url: settings.location_url.clone(),
+            organizer: settings.organizer.clone(),
+        }
+    };
+
+    let url = reqwest::Url::parse(&site.location_url).unwrap();
+    let location = url
+        .as_str()
+        .trim_start_matches(url.scheme())
+        .trim_start_matches("://")
+        .trim_end_matches("/");
+
+    let ctf_started = site
+        .start_time
+        .map(|start_time| chrono::Utc::now() > start_time)
+        .unwrap_or(true);
+
+    let ctf_ended = site
+        .end_time
+        .map(|end_time| chrono::Utc::now() > end_time)
+        .unwrap_or(false);
+
+    let ctf_start_time = site
+        .start_time
+        .map(|start_time| start_time.format("%A, %B %-d, %Y at %H:%MZ").to_string());
+
+    let ctf_end_time = site
+        .end_time
+        .map(|end_time| end_time.format("%A, %B %-d, %Y at %H:%MZ").to_string());
+
+    let num_writeups: usize = team.writeups.values().map(|w| w.len()).sum();
+
+    let num_solves = team.solves.len();
+    let num_users = team.users.len();
+
+    let mut categories = BTreeMap::<i64, StatisticsCategory>::new();
+    for challenge_id in team.solves.keys() {
+        let challenge = challenge_data
+            .challenges
+            .iter()
+            .find(|c| c.id == *challenge_id)
+            .unwrap();
+        let category = challenge_data
+            .categories
+            .iter()
+            .find(|c| c.id == challenge.category_id)
+            .unwrap();
+        categories
+            .entry(category.id)
+            .and_modify(|c| c.num += 1)
+            .or_insert_with(|| StatisticsCategory {
+                color: category.color.clone(),
+                name: category.name.clone(),
+                num: 1,
+            });
+    }
+    let mut categories = categories.values().collect::<Vec<_>>();
+    categories.sort();
+
+    let svg = state
+        .jinja
+        .get_template("og-team.svg")
+        .unwrap()
+        .render(context! {
+            site,
+            ctf_started,
+            ctf_ended,
+            location,
+            ctf_start_time,
+            ctf_end_time,
+            divisions => state.divisions,
+            standings => standings.standings,
+            num_solves,
+            num_users,
+            categories,
+            team,
+            num_writeups,
+        })
+        .unwrap();
+
+    let png = convert_svg_to_png(&svg);
+
+    let cache = TimedCache::new(png.clone());
+    {
+        TEAM_OG_IMAGE_CACHE.insert(team_id.0, cache);
+    }
+
+    Response::builder()
+        .header("Content-Type", "image/png")
+        .body(Body::from(png))
+        .unwrap()
+}
+
+lazy_static::lazy_static! {
+    pub static ref USER_OG_IMAGE_CACHE: DashMap<i64, TimedCache<Vec<u8>>> = DashMap::new();
+}
+
+pub async fn route_user_og_image(
+    state: State<RouterState>,
+    user_id: Path<i64>,
+) -> impl IntoResponse {
+    let Ok(user) = state.db.get_user_from_id(user_id.0).await else {
+        return Json(json!({
+            "error": "User not found",
+        }))
+        .into_response();
+    };
+
+    if let Some(png) = USER_OG_IMAGE_CACHE.get(&user_id) {
+        return Response::builder()
+            .header("Content-Type", "image/png")
+            .body(Body::from(png.value.clone()))
+            .unwrap();
+    }
+
+    let challenge_data = state.db.get_challenges();
+    let team = state.db.get_team_from_id(user.team_id);
+    let (challenge_data, team) = tokio::join!(challenge_data, team);
+    let challenge_data = challenge_data.unwrap();
+    let team = team.unwrap();
+
+    let site = {
+        let settings = state.settings.read().await;
+        SiteOGImage {
+            title: settings.title.clone(),
+            description: settings.description.clone(),
+            start_time: settings.start_time,
+            end_time: settings.end_time,
+            location_url: settings.location_url.clone(),
+            organizer: settings.organizer.clone(),
+        }
+    };
+
+    let url = reqwest::Url::parse(&site.location_url).unwrap();
+    let location = url
+        .as_str()
+        .trim_start_matches(url.scheme())
+        .trim_start_matches("://")
+        .trim_end_matches("/");
+
+    let ctf_started = site
+        .start_time
+        .map(|start_time| chrono::Utc::now() > start_time)
+        .unwrap_or(true);
+
+    let ctf_ended = site
+        .end_time
+        .map(|end_time| chrono::Utc::now() > end_time)
+        .unwrap_or(false);
+
+    let ctf_start_time = site
+        .start_time
+        .map(|start_time| start_time.format("%A, %B %-d, %Y at %H:%MZ").to_string());
+
+    let ctf_end_time = site
+        .end_time
+        .map(|end_time| end_time.format("%A, %B %-d, %Y at %H:%MZ").to_string());
+
+    let mut categories = BTreeMap::<i64, StatisticsCategory>::new();
+    for (challenge_id, solve) in team.solves.iter() {
+        if solve.user_id != user.id {
+            continue;
+        }
+
+        let challenge = challenge_data
+            .challenges
+            .iter()
+            .find(|c| c.id == *challenge_id)
+            .unwrap();
+        let category = challenge_data
+            .categories
+            .iter()
+            .find(|c| c.id == challenge.category_id)
+            .unwrap();
+        categories
+            .entry(category.id)
+            .and_modify(|c| c.num += 1)
+            .or_insert_with(|| StatisticsCategory {
+                color: category.color.clone(),
+                name: category.name.clone(),
+                num: 1,
+            });
+    }
+    let mut categories = categories.values().collect::<Vec<_>>();
+    categories.sort();
+
+    let num_solves = categories.len();
+
+    let svg = state
+        .jinja
+        .get_template("og-user.svg")
+        .unwrap()
+        .render(context! {
+            site,
+            ctf_started,
+            ctf_ended,
+            location,
+            ctf_start_time,
+            ctf_end_time,
+            divisions => state.divisions,
+            num_solves,
+            categories,
+            user,
+            team,
+        })
+        .unwrap();
+
+    let png = convert_svg_to_png(&svg);
+
+    let cache = TimedCache::new(png.clone());
+    {
+        USER_OG_IMAGE_CACHE.insert(user_id.0, cache);
+    }
+
+    Response::builder()
+        .header("Content-Type", "image/png")
+        .body(Body::from(png))
+        .unwrap()
+}
+
+pub fn open_graph_cache_evictor(seconds: u64) {
+    tokio::task::spawn(async move {
+        let duration = Duration::from_secs(seconds);
+        loop {
+            tokio::time::sleep(duration).await;
+            let evict_threshold = (chrono::Utc::now() - duration).timestamp();
+
+            let mut count: i64 = 0;
+            TEAM_OG_IMAGE_CACHE.retain(|_, v| {
+                if v.insert_timestamp > evict_threshold {
+                    true
+                } else {
+                    count += 1;
+                    false
+                }
+            });
+            if count > 0 {
+                tracing::trace!(count, "Evicted team og image cache");
+            }
+
+            let mut count: i64 = 0;
+            USER_OG_IMAGE_CACHE.retain(|_, v| {
+                if v.insert_timestamp > evict_threshold {
+                    true
+                } else {
+                    count += 1;
+                    false
+                }
+            });
+            if count > 0 {
+                tracing::trace!(count, "Evicted user og image cache");
+            }
+        }
+    });
 }

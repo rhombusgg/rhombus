@@ -196,7 +196,7 @@ pub struct Ticket {
     pub email_in_reply_to: Option<String>,
 }
 
-#[derive(Debug, Serialize, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Serialize, Clone, PartialEq, PartialOrd, Eq, Ord)]
 pub struct StatisticsCategory {
     pub num: u64,
     pub name: String,

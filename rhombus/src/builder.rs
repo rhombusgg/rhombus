@@ -51,7 +51,10 @@ use crate::{
             track_middleware, IpExtractorFn, KeyExtractorShim,
         },
         locales::{self, jinja_timediff, jinja_translate, locale_middleware},
-        open_graph::route_default_og_image,
+        open_graph::{
+            open_graph_cache_evictor, route_default_og_image, route_team_og_image,
+            route_user_og_image,
+        },
         router::{route_reload, RouterState, RouterStateInner},
         routes::{
             account::{
@@ -572,6 +575,8 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 }
             };
 
+            open_graph_cache_evictor(20);
+
             let mut localizer = locales::Localizations::new();
 
             let mut templates = Templates::new();
@@ -999,7 +1004,9 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 )
                 .route("/scoreboard/:id", get(route_scoreboard_division))
                 .route("/scoreboard", get(route_scoreboard))
+                .route("/user/:id/og-image.png", get(route_user_og_image))
                 .route("/user/:id", get(route_public_user))
+                .route("/team/:id/og-image.png", get(route_team_og_image))
                 .route("/team/:id", get(route_public_team))
                 .route("/og-image.png", get(route_default_og_image))
                 .route("/robots.txt", get(route_robots_txt))
