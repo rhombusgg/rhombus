@@ -51,10 +51,7 @@
                   {% if user.discord_id %}
                     {{ t("account-discord-integration-link-discord") }}
                   {% else %}
-                    <a
-                      class="flex items-center gap-2"
-                      href="{{ discord.signin_url }}"
-                    >
+                    <a class="flex items-center gap-2" href="/signin/discord">
                       <span
                         >{{ t("account-discord-integration-link-discord") }}</span
                       >
