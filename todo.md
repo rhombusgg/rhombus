@@ -50,6 +50,7 @@
 - [ ] API
   - [ ] Access tokens
 - [x] Documentation/marketing site
+- [ ] Telemetry (basic)
 - [ ] Admin challenges
   - [ ] Creation
   - [ ] List
