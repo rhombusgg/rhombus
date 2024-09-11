@@ -118,6 +118,22 @@
         "enum": ["discord", "email", "ctftime", "credentials"]
       }
     },
+    "ctftime": {
+      "client_id": {
+        "title": "Client ID",
+        "description": "Client ID for the CTFtime OAuth2 application, also is the ID of the CTF on CTFtime",
+        "type": "string",
+        "examples": ["1234"]
+      },
+      "client_secret": {
+        "title": "Client Secret",
+        "description": "Client Secret for the CTFtime OAuth2 application",
+        "type": "string",
+        "examples": [
+          "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        ]
+      }
+    },
     "turso": {
       "title": "Turso",
       "description": "Configuration for 3rd party database provider https://turso.tech\ndatabase_url must be a libsql:// scheme url for Turso to have an effect",
