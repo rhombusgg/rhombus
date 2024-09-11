@@ -501,6 +501,10 @@ impl Database for DbCache {
     async fn get_site_statistics(&self) -> Result<SiteStatistics> {
         self.inner.get_site_statistics().await
     }
+
+    async fn get_last_created_ticket_time(&self, user_id: i64) -> Result<Option<DateTime<Utc>>> {
+        self.inner.get_last_created_ticket_time(user_id).await
+    }
 }
 
 lazy_static::lazy_static! {

@@ -375,6 +375,10 @@ impl Database for Postgres {
     async fn get_site_statistics(&self) -> Result<SiteStatistics> {
         todo!()
     }
+
+    async fn get_last_created_ticket_time(&self, _user_id: i64) -> Result<Option<DateTime<Utc>>> {
+        todo!()
+    }
 }
 
 #[cfg(test)]

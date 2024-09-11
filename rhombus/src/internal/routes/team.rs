@@ -181,9 +181,7 @@ pub async fn route_team_set_name(
                 .localizer
                 .localize(&page.lang, "team-error-name-length", None),
         );
-    }
-
-    if let Err(e) = state
+    } else if let Err(e) = state
         .db
         .set_team_name(user.team_id, &form.name, 60 * 30)
         .await
@@ -201,7 +199,7 @@ pub async fn route_team_set_name(
                 let resets_in = resets_at - chrono::Utc::now();
                 errors.push(Some(format!(
                     "You can change name again in {} minutes",
-                    resets_in.num_minutes()
+                    resets_in.num_minutes() + 1
                 )));
             }
         }

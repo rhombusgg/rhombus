@@ -2231,6 +2231,28 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
             categories,
         })
     }
+
+    async fn get_last_created_ticket_time(&self, user_id: i64) -> Result<Option<DateTime<Utc>>> {
+        let last_opened_at_timestamp = self
+            .connect()?
+            .query(
+                "
+                SELECT opened_at
+                FROM rhombus_ticket
+                WHERE user_id = ?1
+            ",
+                [user_id],
+            )
+            .await?
+            .next()
+            .await?
+            .map(|row| row.get::<i64>(0).unwrap());
+
+        let last_opened_at =
+            last_opened_at_timestamp.and_then(|t| DateTime::<Utc>::from_timestamp(t, 0));
+
+        Ok(last_opened_at)
+    }
 }
 
 pub async fn create_team(tx: &Transaction) -> Result<i64> {

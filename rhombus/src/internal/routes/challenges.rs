@@ -7,6 +7,7 @@ use axum::{
     response::{Html, IntoResponse, Response},
     Extension, Form, Json,
 };
+use chrono::{DateTime, Utc};
 use minijinja::context;
 use serde::Deserialize;
 use serde_json::json;
@@ -220,6 +221,25 @@ pub async fn route_ticket_view(
         }
     }
 
+    let lasted_ticket_opened_at = state
+        .db
+        .get_last_created_ticket_time(user.id)
+        .await
+        .unwrap()
+        .unwrap_or(DateTime::<Utc>::from_timestamp(0, 0).unwrap());
+
+    let next_allowed_ticket_at = lasted_ticket_opened_at + Duration::from_secs(60 * 5);
+    if Utc::now() < next_allowed_ticket_at {
+        let minutes_until = (next_allowed_ticket_at - Utc::now()).num_minutes() + 1;
+        return Response::builder()
+            .body(format!(
+                r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">You must wait {} minute{} before submitting another ticket.</div>"#,
+                minutes_until, if minutes_until == 1 { "" } else { "s" }
+            ))
+            .unwrap()
+            .into_response();
+    }
+
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
     let (challenge_data, team) = tokio::join!(challenge_data, team);
@@ -294,7 +314,8 @@ pub async fn route_ticket_submit(
                 .header("content-type", "text/html")
                 .status(403)
                 .body("CTF not started yet".to_owned())
-                .unwrap();
+                .unwrap()
+                .into_response();
         }
     }
 
@@ -312,7 +333,23 @@ pub async fn route_ticket_submit(
             .header("Content-Type", "text/html")
             .header("HX-Trigger", "closeModal")
             .body("".to_owned())
-            .unwrap();
+            .unwrap()
+            .into_response();
+    }
+
+    let lasted_ticket_opened_at = state
+        .db
+        .get_last_created_ticket_time(user.id)
+        .await
+        .unwrap()
+        .unwrap_or(DateTime::<Utc>::from_timestamp(0, 0).unwrap());
+
+    let next_allowed_ticket_at = lasted_ticket_opened_at + Duration::from_secs(60 * 5);
+    if Utc::now() < next_allowed_ticket_at {
+        return Json(json!({
+            "error": "Too many tickets in a short period of time",
+        }))
+        .into_response();
     }
 
     let content = form.content;
@@ -332,7 +369,8 @@ pub async fn route_ticket_submit(
         return Response::builder()
             .header("content-type", "text/html")
             .body(html)
-            .unwrap();
+            .unwrap()
+            .into_response();
     }
 
     let challenge_data = state.db.get_challenges();
@@ -374,6 +412,7 @@ pub async fn route_ticket_submit(
                 .unwrap()
         ))
         .unwrap()
+        .into_response()
 }
 
 #[derive(Deserialize)]

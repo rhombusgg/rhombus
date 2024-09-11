@@ -161,6 +161,7 @@ CREATE TABLE IF NOT EXISTS rhombus_ticket (
     ticket_number INTEGER NOT NULL UNIQUE,
     user_id INTEGER NOT NULL,
     challenge_id INTEGER NOT NULL,
+    opened_at INTEGER NOT NULL DEFAULT(strftime('%s', 'now')),
     closed_at INTEGER,
     discord_channel_id INTEGER NOT NULL UNIQUE,
     discord_last_message_id INTEGER,
