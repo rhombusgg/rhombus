@@ -11,8 +11,8 @@ use crate::{
         auth::User,
         database::provider::{
             Challenge, ChallengeData, Challenges, Connection, Database, Email, FirstBloods,
-            Leaderboard, Scoreboard, SiteStatistics, Team, TeamMeta, TeamStandings, Ticket,
-            Writeup,
+            Leaderboard, Scoreboard, SetAccountNameError, SetTeamNameError, SiteStatistics, Team,
+            TeamMeta, TeamStandings, Ticket, Writeup,
         },
         division::Division,
         settings::Settings,
@@ -214,10 +214,20 @@ impl Database for DbCache {
         new_invite_token
     }
 
-    async fn set_team_name(&self, team_id: i64, new_team_name: &str) -> Result<()> {
-        let result = self.inner.set_team_name(team_id, new_team_name).await;
-        if result.is_ok() {
-            TEAM_CACHE.remove(&team_id);
+    async fn set_team_name(
+        &self,
+        team_id: i64,
+        new_team_name: &str,
+        timeout_seconds: u64,
+    ) -> Result<std::result::Result<(), SetTeamNameError>> {
+        let result = self
+            .inner
+            .set_team_name(team_id, new_team_name, timeout_seconds)
+            .await;
+        if let Ok(ref r) = result {
+            if r.is_ok() {
+                TEAM_CACHE.remove(&team_id);
+            }
         }
         result
     }
@@ -227,14 +237,17 @@ impl Database for DbCache {
         user_id: i64,
         team_id: i64,
         new_account_name: &str,
-    ) -> Result<()> {
+        timeout_seconds: u64,
+    ) -> Result<std::result::Result<(), SetAccountNameError>> {
         let result = self
             .inner
-            .set_account_name(user_id, team_id, new_account_name)
+            .set_account_name(user_id, team_id, new_account_name, timeout_seconds)
             .await;
-        if result.is_ok() {
-            USER_CACHE.remove(&user_id);
-            TEAM_CACHE.remove(&team_id);
+        if let Ok(ref r) = result {
+            if r.is_ok() {
+                USER_CACHE.remove(&user_id);
+                TEAM_CACHE.remove(&team_id);
+            }
         }
         result
     }

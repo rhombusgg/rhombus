@@ -29,8 +29,9 @@ use crate::{
                 Author, Category, Challenge, ChallengeAttachment, ChallengeData, ChallengeDivision,
                 ChallengeDivisionPoints, ChallengeSolve, Challenges, Database, Email, FirstBloods,
                 Leaderboard, LeaderboardEntry, Scoreboard, ScoreboardSeriesPoint, ScoreboardTeam,
-                SiteStatistics, StatisticsCategory, Team, TeamInner, TeamMeta, TeamMetaInner,
-                TeamStandingEntry, TeamStandings, TeamUser, Ticket, Writeup,
+                SetAccountNameError, SetTeamNameError, SiteStatistics, StatisticsCategory, Team,
+                TeamInner, TeamMeta, TeamMetaInner, TeamStandingEntry, TeamStandings, TeamUser,
+                Ticket, Writeup,
             },
         },
         division::Division,
@@ -1032,14 +1033,62 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
         Ok(new_invite_token)
     }
 
-    async fn set_team_name(&self, team_id: i64, new_team_name: &str) -> Result<()> {
-        self.connect()?
+    async fn set_team_name(
+        &self,
+        team_id: i64,
+        new_team_name: &str,
+        timeout_seconds: u64,
+    ) -> Result<std::result::Result<(), SetTeamNameError>> {
+        let tx = self.transaction().await?;
+
+        let last_change_timestamp = tx
+            .query(
+                "
+                SELECT at
+                FROM rhombus_team_historical_names
+                WHERE team_id = ?1
+                ORDER BY at DESC
+                LIMIT 1
+            ",
+                [team_id],
+            )
+            .await?
+            .next()
+            .await?
+            .map(|row| row.get::<i64>(0).unwrap());
+
+        let last_change_date =
+            DateTime::<Utc>::from_timestamp(last_change_timestamp.unwrap_or(0), 0).unwrap();
+
+        let next_allowed = last_change_date + Duration::from_secs(timeout_seconds);
+        if Utc::now() < next_allowed {
+            return Ok(Err(SetTeamNameError::Timeout(next_allowed)));
+        }
+
+        tx.execute(
+            "
+            INSERT INTO rhombus_team_historical_names (team_id, name)
+            SELECT ?1, name
+            FROM rhombus_team
+            WHERE id = ?1
+            ",
+            params!(team_id),
+        )
+        .await?;
+
+        if tx
             .execute(
                 "UPDATE rhombus_team SET name = ?2 WHERE id = ?1",
                 params!(team_id, new_team_name),
             )
-            .await?;
-        Ok(())
+            .await
+            .is_err()
+        {
+            return Ok(Err(SetTeamNameError::Taken));
+        }
+
+        tx.commit().await?;
+        Ok(Ok(()))
     }
 
     async fn set_account_name(
@@ -1047,14 +1096,58 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
         user_id: i64,
         _team_id: i64,
         new_account_name: &str,
-    ) -> Result<()> {
-        self.connect()?
+        timeout_seconds: u64,
+    ) -> Result<std::result::Result<(), SetAccountNameError>> {
+        let tx = self.transaction().await?;
+
+        let last_change_timestamp = tx
+            .query(
+                "
+                SELECT at
+                FROM rhombus_user_historical_names
+                WHERE user_id = ?1
+                ORDER BY at DESC
+                LIMIT 1
+            ",
+                [user_id],
+            )
+            .await?
+            .next()
+            .await?
+            .map(|row| row.get::<i64>(0).unwrap());
+
+        let last_change_date =
+            DateTime::<Utc>::from_timestamp(last_change_timestamp.unwrap_or(0), 0).unwrap();
+
+        let next_allowed = last_change_date + Duration::from_secs(timeout_seconds);
+        if Utc::now() < next_allowed {
+            return Ok(Err(SetAccountNameError::Timeout(next_allowed)));
+        }
+
+        tx.execute(
+            "
+            INSERT INTO rhombus_user_historical_names (user_id, name)
+            SELECT ?1, name
+            FROM rhombus_user
+            WHERE id = ?1
+            ",
+            params!(user_id),
+        )
+        .await?;
+
+        if tx
             .execute(
                 "UPDATE rhombus_user SET name = ?2 WHERE id = ?1",
                 params!(user_id, new_account_name),
             )
-            .await?;
-        Ok(())
+            .await
+            .is_err()
+        {
+            return Ok(Err(SetAccountNameError::Taken));
+        }
+
+        tx.commit().await?;
+        Ok(Ok(()))
     }
 
     async fn solve_challenge(

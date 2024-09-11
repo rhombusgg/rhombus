@@ -15,7 +15,7 @@ use std::{
 };
 use unic_langid::{langid, LanguageIdentifier};
 
-use super::router::RouterState;
+use crate::internal::router::RouterState;
 
 pub type BundleMap = HashMap<String, FluentBundle<FluentResource, IntlLangMemoizer>>;
 

@@ -2,9 +2,7 @@ use std::time::Duration;
 
 use chrono::{TimeZone, Utc};
 
-use crate::internal::database::provider::Connection;
-
-use super::database::provider::WeakConnection;
+use crate::internal::database::provider::{Connection, WeakConnection};
 
 pub async fn healthcheck_catch_up(db: Connection) {
     tracing::info!("Running healthcheck catch-up");

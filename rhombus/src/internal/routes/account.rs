@@ -16,7 +16,10 @@ use serde::{Deserialize, Serialize};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::internal::{
-    auth::User, database::cache::TimedCache, router::RouterState, routes::meta::PageMeta,
+    auth::User,
+    database::{cache::TimedCache, provider::SetAccountNameError},
+    router::RouterState,
+    routes::meta::PageMeta,
 };
 
 pub fn generate_email_callback_code() -> String {
@@ -383,17 +386,30 @@ pub async fn route_account_set_name(
                 .localizer
                 .localize(&page.lang, "account-error-name-length", None),
         );
-    } else if state
+    }
+
+    if let Err(e) = state
         .db
-        .set_account_name(user.id, user.team_id, &form.name)
+        .set_account_name(user.id, user.team_id, &form.name, 60 * 30)
         .await
-        .is_err()
+        .unwrap()
     {
-        errors.push(
-            state
-                .localizer
-                .localize(&page.lang, "account-error-name-taken", None),
-        );
+        match e {
+            SetAccountNameError::Taken => {
+                errors.push(
+                    state
+                        .localizer
+                        .localize(&page.lang, "account-error-name-taken", None),
+                );
+            }
+            SetAccountNameError::Timeout(resets_at) => {
+                let resets_in = resets_at - chrono::Utc::now();
+                errors.push(Some(format!(
+                    "You can change name again in {} minutes",
+                    resets_in.num_minutes()
+                )));
+            }
+        }
     }
 
     let account_name_template = state.jinja.get_template("account-set-name.html").unwrap();

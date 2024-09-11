@@ -212,6 +212,16 @@ pub struct SiteStatistics {
     pub categories: Vec<StatisticsCategory>,
 }
 
+pub enum SetAccountNameError {
+    Timeout(DateTime<Utc>),
+    Taken,
+}
+
+pub enum SetTeamNameError {
+    Timeout(DateTime<Utc>),
+    Taken,
+}
+
 #[async_trait]
 pub trait Database {
     async fn migrate(&self) -> Result<()>;
@@ -272,13 +282,19 @@ pub trait Database {
     async fn get_user_from_discord_id(&self, discord_id: NonZeroU64) -> Result<User>;
     async fn kick_user(&self, user_id: i64, team_id: i64) -> Result<()>;
     async fn roll_invite_token(&self, team_id: i64) -> Result<String>;
-    async fn set_team_name(&self, team_id: i64, new_team_name: &str) -> Result<()>;
+    async fn set_team_name(
+        &self,
+        team_id: i64,
+        new_team_name: &str,
+        timeout_seconds: u64,
+    ) -> Result<std::result::Result<(), SetTeamNameError>>;
     async fn set_account_name(
         &self,
         user_id: i64,
         team_id: i64,
         new_account_name: &str,
-    ) -> Result<()>;
+        timeout_seconds: u64,
+    ) -> Result<std::result::Result<(), SetAccountNameError>>;
     async fn add_writeup(
         &self,
         user_id: i64,

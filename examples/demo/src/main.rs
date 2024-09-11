@@ -285,7 +285,7 @@ async fn solve_challenge(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
 fn solver(libsql: Arc<LibSQL>, db: Connection) {
     tokio::task::spawn(async move {
         loop {
-            tokio::time::sleep(Duration::from_secs(3)).await;
+            tokio::time::sleep(Duration::from_secs(10)).await;
             _ = solve_challenge(libsql.clone(), db.clone()).await;
         }
     });
@@ -294,7 +294,7 @@ fn solver(libsql: Arc<LibSQL>, db: Connection) {
 fn team_creator(libsql: Arc<LibSQL>, db: Connection) {
     tokio::task::spawn(async move {
         loop {
-            tokio::time::sleep(Duration::from_secs(6)).await;
+            tokio::time::sleep(Duration::from_secs(30)).await;
             _ = create_team(libsql.clone(), db.clone()).await;
         }
     });

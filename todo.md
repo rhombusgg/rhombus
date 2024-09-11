@@ -27,6 +27,7 @@
 - [x] Single static binary
 - [x] User pages
   - [ ] Admin geoip view
+  - [ ] Admin historical name viewer
 - [x] Team pages
 - [x] Homepage/countdown
 - [x] Divisions
@@ -62,4 +63,3 @@
 - [ ] CLI hosting templating
 - [ ] CLI challenge templating
 - [ ] CLI api integration
-- [ ] Serverless mode

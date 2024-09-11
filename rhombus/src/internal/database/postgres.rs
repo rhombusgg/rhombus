@@ -12,7 +12,8 @@ use crate::{
             cache::Writeups,
             provider::{
                 Challenge, Challenges, Database, Email, FirstBloods, Leaderboard, Scoreboard,
-                SiteStatistics, Team, TeamMeta, TeamStandings, Ticket,
+                SetAccountNameError, SetTeamNameError, SiteStatistics, Team, TeamMeta,
+                TeamStandings, Ticket,
             },
         },
         division::Division,
@@ -189,7 +190,12 @@ impl Database for Postgres {
         todo!()
     }
 
-    async fn set_team_name(&self, _team_id: i64, _new_team_name: &str) -> Result<()> {
+    async fn set_team_name(
+        &self,
+        _team_id: i64,
+        _new_team_name: &str,
+        _timeout_seconds: u64,
+    ) -> Result<std::result::Result<(), SetTeamNameError>> {
         todo!()
     }
 
@@ -198,7 +204,8 @@ impl Database for Postgres {
         _user_id: i64,
         _team_id: i64,
         _new_account_name: &str,
-    ) -> Result<()> {
+        _timeout_seconds: u64,
+    ) -> Result<std::result::Result<(), SetAccountNameError>> {
         todo!()
     }
 

@@ -15,7 +15,8 @@ use serde::{Deserialize, Serialize};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::internal::{
-    auth::User, division::MaxDivisionPlayers, router::RouterState, routes::meta::PageMeta,
+    auth::User, database::provider::SetTeamNameError, division::MaxDivisionPlayers,
+    router::RouterState, routes::meta::PageMeta,
 };
 
 pub fn create_team_invite_token() -> String {
@@ -180,17 +181,30 @@ pub async fn route_team_set_name(
                 .localizer
                 .localize(&page.lang, "team-error-name-length", None),
         );
-    } else if state
+    }
+
+    if let Err(e) = state
         .db
-        .set_team_name(user.team_id, &form.name)
+        .set_team_name(user.team_id, &form.name, 60 * 30)
         .await
-        .is_err()
+        .unwrap()
     {
-        errors.push(
-            state
-                .localizer
-                .localize(&page.lang, "team-error-name-taken", None),
-        );
+        match e {
+            SetTeamNameError::Taken => {
+                errors.push(
+                    state
+                        .localizer
+                        .localize(&page.lang, "team-error-name-taken", None),
+                );
+            }
+            SetTeamNameError::Timeout(resets_at) => {
+                let resets_in = resets_at - chrono::Utc::now();
+                errors.push(Some(format!(
+                    "You can change name again in {} minutes",
+                    resets_in.num_minutes()
+                )));
+            }
+        }
     }
 
     let team_name_template = state.jinja.get_template("team-set-name.html").unwrap();
