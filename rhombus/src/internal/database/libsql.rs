@@ -2240,6 +2240,8 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
                 SELECT opened_at
                 FROM rhombus_ticket
                 WHERE user_id = ?1
+                ORDER BY opened_at DESC
+                LIMIT 1
             ",
                 [user_id],
             )
