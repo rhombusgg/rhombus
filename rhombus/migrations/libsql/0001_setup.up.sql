@@ -194,7 +194,7 @@ SELECT
     rhombus_division.id AS division_id,
     CASE
         WHEN rhombus_challenge.score_type = 0 THEN
-            MAX(ROUND((((100 - 500) / POWER(50, 2)) * POWER(COUNT(DISTINCT rhombus_team.id), 2)) + 500), 100)
+            MAX(ROUND((((100 - 500) / (50*50)) * (COUNT(DISTINCT rhombus_team.id) * COUNT(DISTINCT rhombus_team.id))) + 500), 100)
         ELSE rhombus_challenge.static_points
     END AS points,
     COUNT(DISTINCT rhombus_team.id) AS solves
