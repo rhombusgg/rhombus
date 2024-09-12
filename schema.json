@@ -439,18 +439,12 @@
           "title": "Guild ID",
           "description": "Snowflake developer discord ID of guild (server) for support",
           "type": ["string", "integer"],
-          "pattern": "^\\d{19}$",
-          "minimum": 1000000000000000000,
-          "maximum": 9999999999999999999,
           "examples": ["1160610137703186636"]
         },
         "client_id": {
           "title": "Client ID",
           "description": "OAuth2 Client ID (discord snowflake)",
           "type": ["string", "integer"],
-          "pattern": "^\\d{19}$",
-          "minimum": 1000000000000000000,
-          "maximum": 9999999999999999999,
           "examples": ["1160076447977848945"]
         },
         "client_secret": {
@@ -474,34 +468,22 @@
         "first_blood_channel_id": {
           "title": "First Blood Channel ID",
           "description": "Snowflake Discord ID for the channel which first bloods should be sent to",
-          "type": ["string", "integer"],
-          "pattern": "^\\d{19}$",
-          "minimum": 1000000000000000000,
-          "maximum": 9999999999999999999
+          "type": ["string", "integer"]
         },
         "support_channel_id": {
           "title": "Support Channel ID",
           "description": "Snowflake Discord ID for the channel which support threads should be branched off of",
-          "type": ["string", "integer"],
-          "pattern": "^\\d{19}$",
-          "minimum": 1000000000000000000,
-          "maximum": 9999999999999999999
+          "type": ["string", "integer"]
         },
         "author_role_id": {
           "title": "Author Role ID",
           "description": "Snowflake Discord ID for the author role to link authors",
-          "type": ["string", "integer"],
-          "pattern": "^\\d{19}$",
-          "minimum": 1000000000000000000,
-          "maximum": 9999999999999999999
+          "type": ["string", "integer"]
         },
         "verified_role_id": {
           "title": "Author Role ID",
           "description": "Snowflake Discord ID for the verified role to give to users who sign in to the CTF website",
-          "type": ["string", "integer"],
-          "pattern": "^\\d{19}$",
-          "minimum": 1000000000000000000,
-          "maximum": 9999999999999999999
+          "type": ["string", "integer"]
         },
         "invite_url": {
           "title": "Invite URL",
