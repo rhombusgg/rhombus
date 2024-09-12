@@ -1,6 +1,6 @@
 use axum::{
-    body::Body,
-    extract::{Path, Query, Request, State},
+    extract::{path::FailedToDeserializePathParams, rejection::PathRejection, Path, Query, State},
+    http::Uri,
     response::{Html, IntoResponse, Redirect},
     Extension, Json,
 };
@@ -15,17 +15,36 @@ pub async fn route_scoreboard(
     user: Extension<MaybeUser>,
     page: Extension<PageMeta>,
     params: Query<PageParams>,
-    req: Request<Body>,
+    uri: Uri,
 ) -> impl IntoResponse {
     let challenge_data = state.db.get_challenges().await.unwrap();
     let default_division = challenge_data.divisions.keys().next().unwrap();
     if challenge_data.divisions.len() == 1 {
-        return route_scoreboard_division(state, user, page, Path(*default_division), params, req)
-            .await
-            .into_response();
+        return route_scoreboard_division(
+            state,
+            user,
+            page,
+            Path(default_division.to_string()),
+            params,
+            uri,
+        )
+        .await
+        .into_response();
     }
 
-    Redirect::temporary(format!("/scoreboard/{}", default_division).as_str()).into_response()
+    Redirect::temporary(
+        format!(
+            "/scoreboard/{}{}",
+            default_division,
+            if uri.path().ends_with(".json") {
+                ".json"
+            } else {
+                ""
+            }
+        )
+        .as_str(),
+    )
+    .into_response()
 }
 
 #[derive(Deserialize)]
@@ -37,11 +56,19 @@ pub async fn route_scoreboard_division(
     state: State<RouterState>,
     Extension(user): Extension<MaybeUser>,
     Extension(page): Extension<PageMeta>,
-    Path(division_id): Path<i64>,
+    Path(division_id): Path<String>,
     params: Query<PageParams>,
-    req: Request<Body>,
+    uri: Uri,
 ) -> impl IntoResponse {
     let page_num = params.page.unwrap_or(1).saturating_sub(1);
+
+    let Ok(division_id) = division_id
+        .strip_suffix(".json")
+        .unwrap_or(&division_id)
+        .parse()
+    else {
+        return Err::<(), &str>("Failed to parse integer").into_response();
+    };
 
     let scoreboard = state.db.get_scoreboard(division_id);
     let challenge_data = state.db.get_challenges();
@@ -51,10 +78,8 @@ pub async fn route_scoreboard_division(
             .await
             .unwrap();
 
-    if let Some(accept) = req.headers().get("accept") {
-        if accept.to_str().unwrap() == "application/json" {
-            return Json(scoreboard.teams).into_response();
-        }
+    if uri.path().ends_with(".json") {
+        return Json(scoreboard.teams).into_response();
     }
 
     Html(

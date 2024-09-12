@@ -960,6 +960,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 .route("/team/name", post(route_team_set_name))
                 .route("/team", get(route_team))
                 .route("/challenges", get(route_challenges))
+                .route("/challenges.json", get(route_challenges))
                 .route(
                     "/challenges/:id/writeup",
                     post(route_writeup_submit).delete(route_writeup_delete),
@@ -1004,6 +1005,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 )
                 .route("/scoreboard/:id", get(route_scoreboard_division))
                 .route("/scoreboard", get(route_scoreboard))
+                .route("/scoreboard.json", get(route_scoreboard))
                 .route("/user/:id/og-image.png", get(route_user_og_image))
                 .route("/user/:id", get(route_public_user))
                 .route("/team/:id/og-image.png", get(route_team_og_image))

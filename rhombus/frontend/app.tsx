@@ -375,7 +375,7 @@ const ChallengesComponent = ({
     shouldFetch,
     async () =>
       (await (
-        await fetch("/challenges", {
+        await fetch("/challenges.json", {
           headers: { accept: "application/json" },
         })
       ).json()) as ChallengesData,
