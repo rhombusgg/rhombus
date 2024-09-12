@@ -266,7 +266,7 @@ pub async fn route_signin_discord(state: State<RouterState>) -> impl IntoRespons
     .unwrap();
 
     let signin_url = format!(
-        "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}/signin/discord/callback&response_type=code&scope=identify{}&state={}",
+        "https://discord.com/api/oauth2/authorize?client_id={}&redirect_uri={}/signin/discord/callback&response_type=code&scope=identify+email{}&state={}",
         client_id,
         location_url,
         if autojoin.unwrap_or(true) { "+guilds.join" } else { "" },

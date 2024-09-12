@@ -5,5 +5,5 @@ edition = "2021"
 
 [dependencies]
 rhombus = { path = "../../rhombus", features = ["libsql"] }
-tokio = { version = "1.37.0", features = ["full"] }
+tokio = { version = "1.40.0", features = ["full"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
