@@ -434,10 +434,12 @@ const ChallengesComponent = ({
                       >
                         <div class="mb-2 flex justify-between h-8">
                           <div class="font-bold flex items-center gap-2">
-                            <button hx-trigger="click"
+                            <button
+                              hx-trigger="click"
                               hx-get={`/challenges/${challenge.id}`}
                               hx-target="body"
-                              hx-swap="beforeend">
+                              hx-swap="beforeend"
+                            >
                               <span style={`color: ${category.color}`}>
                                 {category.name} /
                               </span>
