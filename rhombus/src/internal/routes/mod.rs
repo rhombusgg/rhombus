@@ -5,3 +5,4 @@ pub mod meta;
 pub mod public;
 pub mod scoreboard;
 pub mod team;
+pub mod terms;

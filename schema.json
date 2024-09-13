@@ -118,6 +118,18 @@
         "enum": ["discord", "email", "ctftime", "credentials"]
       }
     },
+    "home": {
+      "content": {
+        "title": "Home Content",
+        "description": "Markdown string to render on the home page (HTML supported)",
+        "type": "string"
+      }
+    },
+    "terms": {
+      "title": "Terms",
+      "description": "Terms of use (or the Rules) for the CTF",
+      "type": "string"
+    },
     "ctftime": {
       "client_id": {
         "title": "Client ID",

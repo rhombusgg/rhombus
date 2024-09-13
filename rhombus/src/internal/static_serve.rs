@@ -9,8 +9,6 @@ use rust_embed::RustEmbed;
 use tower::ServiceExt;
 use tower_http::services::ServeDir;
 
-use crate::internal::upload_provider::path_is_valid;
-
 #[derive(RustEmbed)]
 #[folder = "static"]
 struct StaticDir;
@@ -54,4 +52,12 @@ pub async fn route_static_serve(uri: Uri, req: Request<Body>) -> impl IntoRespon
     }
 
     (StatusCode::NOT_FOUND, "Not Found").into_response()
+}
+
+// to prevent directory traversal attacks we ensure the path consists only of normal components
+pub fn path_is_valid(path: &str) -> bool {
+    let path = std::path::Path::new(path);
+    let mut components = path.components();
+
+    components.all(|c| matches!(c, std::path::Component::Normal(_)))
 }

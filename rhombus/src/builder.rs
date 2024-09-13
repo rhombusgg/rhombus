@@ -76,6 +76,7 @@ use crate::{
                 route_team, route_team_roll_token, route_team_set_division, route_team_set_name,
                 route_user_kick,
             },
+            terms::route_terms,
         },
         settings::{DbConfig, IpPreset, Settings},
         static_serve::route_static_serve,
@@ -976,6 +977,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 .route_layer(middleware::from_fn(enforce_auth_middleware))
                 .nest_service("/static", get(route_static_serve))
                 .route("/command-palette", get(route_command_palette_items))
+                .route("/terms", get(route_terms))
                 .route("/", get(route_home))
                 .merge(mailgun_router)
                 .route("/signout", get(route_signout))

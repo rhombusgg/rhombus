@@ -20,7 +20,7 @@ use crate::{
         auth::MaybeUser,
         database::provider::Connection,
         local_upload_provider::slice_to_hex_string,
-        upload_provider::{path_is_valid, route_upload_file},
+        upload_provider::{route_upload_file, validate_simple_filename},
     },
     upload_provider::UploadProvider,
     Result,
@@ -79,7 +79,7 @@ pub async fn route_database_download(
     Extension(maybe_user): Extension<MaybeUser>,
     axum::extract::Path(path): axum::extract::Path<String>,
 ) -> impl IntoResponse {
-    if !path_is_valid(&path) {
+    if !validate_simple_filename(&path) {
         return (StatusCode::BAD_REQUEST, "Invalid path".to_owned()).into_response();
     }
 

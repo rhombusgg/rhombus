@@ -1,5 +1,5 @@
 use axum::{
-    extract::{path::FailedToDeserializePathParams, rejection::PathRejection, Path, Query, State},
+    extract::{Path, Query, State},
     http::Uri,
     response::{Html, IntoResponse, Redirect},
     Extension, Json,

@@ -149,6 +149,7 @@ pub struct Settings {
     pub logo: Option<String>,
     pub logo_dark: Option<String>,
     pub home: Option<HomeSettings>,
+    pub terms: Option<String>,
     pub start_time: Option<chrono::DateTime<chrono::Utc>>,
     pub end_time: Option<chrono::DateTime<chrono::Utc>>,
     pub location_url: String,

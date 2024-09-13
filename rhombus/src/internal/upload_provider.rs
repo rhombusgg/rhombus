@@ -39,7 +39,7 @@ pub async fn route_upload_file<U: UploadProvider>(
         return (StatusCode::FORBIDDEN, "Forbidden".to_owned()).into_response();
     }
 
-    if !path_is_valid(&file_name) {
+    if !validate_simple_filename(&file_name) {
         return (StatusCode::BAD_REQUEST, "Invalid path".to_owned()).into_response();
     }
 
@@ -50,9 +50,8 @@ pub async fn route_upload_file<U: UploadProvider>(
         .into_response()
 }
 
-// to prevent directory traversal attacks we ensure the path consists of exactly one normal
-// component
-pub fn path_is_valid(path: &str) -> bool {
+// we should only upload files that are made up of a single normal component
+pub fn validate_simple_filename(path: &str) -> bool {
     let path = std::path::Path::new(path);
     let mut components = path.components().peekable();
 

@@ -13,7 +13,7 @@ use tokio::io::AsyncRead;
 use tower_http::services::ServeFile;
 
 use crate::{
-    internal::{auth::MaybeUser, upload_provider::path_is_valid},
+    internal::{auth::MaybeUser, upload_provider::validate_simple_filename},
     LocalUploadProvider,
 };
 
@@ -25,7 +25,7 @@ pub async fn route_local_download(
     axum::extract::Path(path): axum::extract::Path<String>,
     req: Request<Body>,
 ) -> impl IntoResponse {
-    if !path_is_valid(&path) {
+    if !validate_simple_filename(&path) {
         return (StatusCode::BAD_REQUEST, "Invalid path".to_owned()).into_response();
     }
 

@@ -457,8 +457,8 @@ const ChallengesComponent = ({
                                               new Date(
                                                 challenge.health.last_checked,
                                               ).getTime()) /
-                                            1000 /
-                                            60,
+                                              1000 /
+                                              60,
                                           ),
                                         })}
                                       ></div>
@@ -470,8 +470,8 @@ const ChallengesComponent = ({
                                               new Date(
                                                 challenge.health.last_checked,
                                               ).getTime()) /
-                                            1000 /
-                                            60,
+                                              1000 /
+                                              60,
                                           ),
                                         })}
                                       ></div>

@@ -51,6 +51,7 @@
   - [ ] Access tokens
 - [x] Documentation/marketing site
 - [ ] Telemetry (basic)
+- [ ] Audit log
 - [ ] Admin challenges
   - [ ] Creation
   - [ ] List
