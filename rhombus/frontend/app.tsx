@@ -434,12 +434,17 @@ const ChallengesComponent = ({
                       >
                         <div class="mb-2 flex justify-between h-8">
                           <div class="font-bold flex items-center gap-2">
-                            <div>
+                            <button
+                              hx-trigger="click"
+                              hx-get={`/challenges/${challenge.id}`}
+                              hx-target="body"
+                              hx-swap="beforeend"
+                            >
                               <span style={`color: ${category.color}`}>
                                 {category.name} /
                               </span>
                               <span> {challenge.name}</span>
-                            </div>
+                            </button>
                             <Show when={challenge.health}>
                               <Tooltip placement="top">
                                 <Tooltip.Portal>
