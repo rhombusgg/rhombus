@@ -57,7 +57,6 @@
             alejandra
 
             nodejs_20
-            cmake
             sqlite
             mold
             go-task
