@@ -67,7 +67,7 @@ pub async fn route_scoreboard_division(
         .unwrap_or(&division_id)
         .parse()
     else {
-        return Err::<(), &str>("Failed to parse integer").into_response();
+        return Err::<(), &str>("Failed to parse division ID as integer").into_response();
     };
 
     let scoreboard = state.db.get_scoreboard(division_id);
