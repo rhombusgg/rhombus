@@ -188,7 +188,7 @@
 
       const refetchHandler = async () => {
         const scoreboard_data = await (
-          await fetch(window.location.pathname, {
+          await fetch(window.location.pathname + ".json", {
             headers: { accept: "application/json" },
           })
         ).json();

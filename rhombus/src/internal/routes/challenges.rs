@@ -1,9 +1,8 @@
 use std::time::Duration;
 
 use axum::{
-    body::Body,
     extract::{Path, State},
-    http::Request,
+    http::Uri,
     response::{Html, IntoResponse, Response},
     Extension, Form, Json,
 };
@@ -18,7 +17,7 @@ pub async fn route_challenges(
     state: State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
-    req: Request<Body>,
+    uri: Uri,
 ) -> impl IntoResponse {
     if let Some(start_time) = state.settings.read().await.start_time {
         if !user.is_admin && chrono::Utc::now() < start_time {
@@ -112,10 +111,8 @@ pub async fn route_challenges(
         })
     });
 
-    if let Some(accept) = req.headers().get("accept") {
-        if accept.to_str().unwrap() == "application/json" {
-            return Json(challenge_json).into_response();
-        }
+    if uri.path().ends_with(".json") {
+        return Json(challenge_json).into_response();
     }
 
     let html = state
