@@ -248,7 +248,7 @@ async fn create_team(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
         };
         join_to_divisons(db.clone(), &division_ids, user_id, team_id).await?;
         set_user_to_bot(libsql.clone(), user_id).await?;
-        db.add_user_to_team(user_id, team_id).await?;
+        db.add_user_to_team(user_id, team_id, None).await?;
     }
 
     Ok(())

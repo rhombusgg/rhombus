@@ -1,0 +1,68 @@
+{% import "icons.html" as icons %}
+{% import "card.html" as card %}
+{% extends "layout.html" %}
+
+{% block content %}
+  <div class="container my-4 flex justify-center items-center">
+    <div class="max-w-prose">
+      {% call card.root() %}
+        {% call card.header() %}
+          {% call card.title() %}
+            Failed to join {{ team.name }}
+            {{ icons.delete_x(class="text-destructive inline-block h-full align-text-top ml-1") }}
+          {% endcall %}
+          {% call card.description() %}
+            You are unable to join the team because it is already full.
+          {% endcall %}
+        {% endcall %}
+        {% call card.content() %}
+          <div class="flex justify-between">
+            <div>
+              <h4 class="text-sm">Members</h4>
+              <p class="mb-2 text-sm text-muted-foreground">
+                {{ team.name }}'s team members
+              </p>
+            </div>
+            {% with num_members=team.users | length %}
+              <h4
+                class="text-sm"
+                title="{{ t('team-members-limited-hint', count=num_members, limit=max_players) }}"
+              >
+                {{ t('team-members-limited', count=num_members, limit=max_players) }}
+              </h4>
+            {% endwith %}
+          </div>
+          <ul class="flex flex-col gap-2">
+            {% for player_id, player in team.users | items %}
+              <li class="flex items-center justify-between group">
+                <div class="flex items-center gap-2">
+                  <a
+                    hx-boost="true"
+                    href="/user/{{ player_id }}"
+                    class="flex gap-2 items-center"
+                    title="Go to public user profile"
+                  >
+                    <img
+                      class="size-8 rounded-full"
+                      src="{{ player.avatar_url }}"
+                    />
+                    <span>{{ player.name }}</span>
+                  </a>
+                  <div class="flex gap-2">
+                    {% if player.is_team_owner %}
+                      <div class="text-yellow-300" title="Team owner">
+                        {{ icons.crown() }}
+                      </div>
+                    {% endif %}
+                  </div>
+                </div>
+              </li>
+            {% endfor %}
+          </ul>
+          <hr class="my-4" />
+          <p>A member of the team must leave before you can join.</p>
+        {% endcall %}
+      {% endcall %}
+    </div>
+  </div>
+{% endblock %}

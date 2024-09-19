@@ -912,7 +912,12 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
         }))
     }
 
-    async fn add_user_to_team(&self, user_id: i64, team_id: i64) -> Result<()> {
+    async fn add_user_to_team(
+        &self,
+        user_id: i64,
+        team_id: i64,
+        _old_team_id: Option<i64>,
+    ) -> Result<()> {
         let tx = self.transaction().await?;
 
         tx.execute(

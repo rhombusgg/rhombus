@@ -271,7 +271,12 @@ pub trait Database {
     async fn get_team_meta_from_invite_token(&self, invite_token: &str)
         -> Result<Option<TeamMeta>>;
     async fn get_team_from_id(&self, team_id: i64) -> Result<Team>;
-    async fn add_user_to_team(&self, user_id: i64, team_id: i64) -> Result<()>;
+    async fn add_user_to_team(
+        &self,
+        user_id: i64,
+        team_id: i64,
+        old_team_id: Option<i64>,
+    ) -> Result<()>;
     async fn solve_challenge(
         &self,
         user_id: i64,

@@ -138,68 +138,138 @@ pub async fn route_signin(
     Extension(page): Extension<PageMeta>,
     params: Query<SignInParams>,
 ) -> Response<Body> {
-    let (invite_token_cookie, team_name) = if let Some(url_invite_token) = &params.token {
-        let team = state
+    let mut invite_token_cookie = Cookie::build(("rhombus-invite-token", ""))
+        .path("/")
+        .max_age(time::Duration::hours(-1))
+        .same_site(SameSite::Lax)
+        .http_only(true);
+
+    let mut team_name = None;
+
+    if let Some(url_invite_token) = &params.token {
+        if let Some(team_meta) = state
             .db
             .get_team_meta_from_invite_token(url_invite_token)
             .await
-            .unwrap_or(None);
+            .unwrap_or(None)
+        {
+            let new_team = state.db.get_team_from_id(team_meta.id).await.unwrap();
 
-        if let (Some(team), Some(user)) = (&team, &user) {
-            // you cannot join a team if your current team has more than just you on it
-            let old_team = state.db.get_team_from_id(user.team_id).await.unwrap();
-            if old_team.users.len() > 1 {
-                return Redirect::temporary("/team").into_response();
-            }
+            // You cannot join a team in which the owner has left (and is on a different team themselves). This doesn't
+            // need an error page, it should just count as an invalid invite token and not register.
+            if !new_team.users.is_empty() {
+                if let Some(user) = &user {
+                    // you cannot join a team if your current team has more than just you on it
+                    let old_team = state.db.get_team_from_id(user.team_id).await.unwrap();
+                    if old_team.users.len() > 1 {
+                        // return Json(json!({
+                        //     "message": "You cannot join a team while your old team has other members in it."
+                        // }))
+                        // .into_response();
 
-            // you cannot join a team if the new team if, as a result of you joining it would
-            // lead to the team having more players than the minimum required by any division
-            let team_divisions = state.db.get_team_divisions(team.id).await.unwrap();
-            let user_divisions = state.db.get_user_divisions(user.id).await.unwrap();
-            let new_team = state.db.get_team_from_id(team.id).await.unwrap();
-            let min_players = state
-                .divisions
-                .iter()
-                .filter(|division| {
-                    team_divisions.contains(&division.id) && user_divisions.contains(&division.id)
-                })
-                .filter_map(|division| match division.max_players {
-                    MaxDivisionPlayers::Unlimited => None,
-                    MaxDivisionPlayers::Limited(max) => Some(max),
-                })
-                .min()
-                .map(MaxDivisionPlayers::Limited)
-                .unwrap_or(MaxDivisionPlayers::Unlimited);
-            match min_players {
-                MaxDivisionPlayers::Unlimited => {}
-                MaxDivisionPlayers::Limited(min_players) => {
-                    if new_team.users.len() >= min_players.get() as usize {
-                        return Redirect::temporary("/team").into_response();
+                        let html = state
+                        .jinja
+                        .get_template("join-error-existing-team.html")
+                        .unwrap()
+                        .render(context! {
+                            global => state.global_page_meta,
+                            page,
+                            title => format!("Team Join Error | {}", state.global_page_meta.title),
+                            user,
+                            team => old_team,
+                        })
+                        .unwrap();
+                        return Html(html).into_response();
                     }
+
+                    // you cannot join a team if the new team if, as a result of you joining it would
+                    // lead to the team having more players than the minimum required by any division
+                    let team_divisions = state.db.get_team_divisions(team_meta.id).await.unwrap();
+                    let user_divisions = state.db.get_user_divisions(user.id).await.unwrap();
+
+                    let max_players = state
+                        .divisions
+                        .iter()
+                        .filter(|division| team_divisions.contains(&division.id))
+                        .filter_map(|division| match division.max_players {
+                            MaxDivisionPlayers::Unlimited => None,
+                            MaxDivisionPlayers::Limited(max) => Some(max),
+                        })
+                        .min()
+                        .map(MaxDivisionPlayers::Limited)
+                        .unwrap_or(MaxDivisionPlayers::Unlimited);
+                    match max_players {
+                        MaxDivisionPlayers::Unlimited => {}
+                        MaxDivisionPlayers::Limited(max_players) => {
+                            if new_team.users.len() >= max_players.get() as usize {
+                                // return Json(json!({
+                                //     "message": "The team you are trying to join already has the maximum number of players allowed by their division."
+                                // }))
+                                // .into_response();
+
+                                let html = state
+                            .jinja
+                            .get_template("join-error-max.html")
+                            .unwrap()
+                            .render(context! {
+                                global => state.global_page_meta,
+                                page,
+                                title => format!("Team Join Error | {}", state.global_page_meta.title),
+                                user,
+                                team => new_team,
+                                max_players,
+                            })
+                            .unwrap();
+                                return Html(html).into_response();
+                            }
+                        }
+                    }
+
+                    let needs_divisions = team_divisions
+                        .iter()
+                        .filter(|division_id| !user_divisions.contains(division_id))
+                        .collect::<Vec<_>>();
+
+                    if !needs_divisions.is_empty() {
+                        // return Json(json!({
+                        //     "message": format!("To join this division you also need to join the following divisions: {}", needs_divisions.iter().map(|division_id| state.divisions.iter().find(|division| division.id == **division_id).unwrap().name.clone()).collect::<Vec<_>>().join(", "))
+                        // }))
+                        // .into_response();
+
+                        let html = state
+                        .jinja
+                        .get_template("join-error-division.html")
+                        .unwrap()
+                        .render(context! {
+                            global => state.global_page_meta,
+                            page,
+                            title => format!("Team Join Error | {}", state.global_page_meta.title),
+                            user,
+                            divisions => state.divisions,
+                            user_divisions => user_divisions,
+                            team_divisions => team_divisions,
+                            team => new_team,
+                        })
+                        .unwrap();
+                        return Html(html).into_response();
+                    }
+
+                    state
+                        .db
+                        .add_user_to_team(user.id, team_meta.id, Some(old_team.id))
+                        .await
+                        .unwrap();
+                    return Redirect::to("/team").into_response();
                 }
+
+                invite_token_cookie = Cookie::build(("rhombus-invite-token", url_invite_token))
+                    .path("/")
+                    .max_age(time::Duration::hours(1))
+                    .same_site(SameSite::Lax)
+                    .http_only(true);
+                team_name = Some(team_meta.name.clone());
             }
-
-            state.db.add_user_to_team(user.id, team.id).await.unwrap();
-            return Redirect::to("/team").into_response();
         }
-
-        (
-            Cookie::build(("rhombus-invite-token", url_invite_token))
-                .path("/")
-                .max_age(time::Duration::hours(1))
-                .same_site(SameSite::Lax)
-                .http_only(true),
-            team.map(|t| t.name.clone()),
-        )
-    } else {
-        (
-            Cookie::build(("rhombus-invite-token", ""))
-                .path("/")
-                .max_age(time::Duration::hours(-1))
-                .same_site(SameSite::Lax)
-                .http_only(true),
-            None,
-        )
     };
 
     let auth_options = state.settings.read().await.auth.clone();
@@ -1028,7 +1098,11 @@ async fn sign_in_cookie(
             .await
             .unwrap_or(None)
         {
-            state.db.add_user_to_team(user_id, team.id).await.unwrap();
+            state
+                .db
+                .add_user_to_team(user_id, team.id, None)
+                .await
+                .unwrap();
         }
     }
 

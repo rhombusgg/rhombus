@@ -180,11 +180,22 @@ impl Database for DbCache {
         get_team_from_id(&self.inner, team_id).await
     }
 
-    async fn add_user_to_team(&self, user_id: i64, team_id: i64) -> Result<()> {
-        let result = self.inner.add_user_to_team(user_id, team_id).await;
+    async fn add_user_to_team(
+        &self,
+        user_id: i64,
+        team_id: i64,
+        old_team_id: Option<i64>,
+    ) -> Result<()> {
+        let result = self
+            .inner
+            .add_user_to_team(user_id, team_id, old_team_id)
+            .await;
         if result.is_ok() {
             TEAM_CACHE.remove(&team_id);
             USER_CACHE.remove(&user_id);
+            if let Some(old_team_id) = old_team_id {
+                TEAM_CACHE.remove(&old_team_id);
+            }
         }
         result
     }

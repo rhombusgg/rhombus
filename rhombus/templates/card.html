@@ -8,8 +8,8 @@
   <div class="flex flex-col space-y-1.5 p-6">{{ caller() }}</div>
 {% endmacro %}
 
-{% macro title() %}
-  <div class="text-lg font-semibold leading-none tracking-tight">
+{% macro title(class="") %}
+  <div class="text-lg font-semibold leading-none tracking-tight {{ class }}">
     {{ caller() }}
   </div>
 {% endmacro %}
