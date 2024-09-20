@@ -72,10 +72,10 @@
     {{ site.title }}{% if site.organizer %} hosted by {{ site.organizer }}{% endif %}
   </text>
 
-  {% set line_y = line_y + 26 %}
+  {% set line_y = line_y + 20 %}
 
   {% if ctf_start_time %}
-  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="18" fill="#333">
+  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="14" fill="#333">
     {% if ctf_started %}
     Started
     {% else %}
@@ -83,11 +83,11 @@
     {% endif %}
     {{ ctf_start_time }}
   </text>
-  {% set line_y = line_y + 22 %}
+  {% set line_y = line_y + 18 %}
   {% endif %}
 
   {% if ctf_end_time %}
-  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="18" fill="#333">
+  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="14" fill="#333">
     {% if ctf_ended %}
     Ended
     {% else %}
@@ -95,24 +95,27 @@
     {% endif %}
     {{ ctf_end_time }}
   </text>
-  {% set line_y = line_y + 22 %}
+  {% set line_y = line_y + 18 %}
   {% endif %}
 
-  {% if site.description %}
+  {% if description %}
   {% set line_y = line_y + 6 %}
-  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="18" fill="#333">
-    {{ site.description }}
+  {% for line in description %}
+  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="14" fill="#333">
+    {{ line }}
   </text>
+  {% set line_y = line_y + 18 %}
+  {% endfor %}
   {% endif %}
 
-  {% set user_y = 200 %}
+  {% set user_y = 210 %}
   <text x="50" y="{{ user_y }}" font-family="Inter" font-size="18" font-weight="bold" fill="#333">
     Players
   </text>
-  {% set user_y = user_y + 22 %}
+  {% set user_y = user_y + 20 %}
   {% for _, user in team.users | items %}
   {% if user.is_team_owner %}
-  <svg x="28" y="{{ user_y - 16 }}" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+  <svg x="28" y="{{ user_y - 14 }}" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
     fill="none" stroke="#d6af36" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
     class="lucide lucide-crown">
     <path
@@ -120,21 +123,21 @@
     <path d="M5 21h14" />
   </svg>
   {% endif %}
-  <text x="50" y="{{ user_y }}" font-family="Inter" font-size="18" fill="#333">
+  <text x="50" y="{{ user_y }}" font-family="Inter" font-size="14" fill="#555">
     {{ user.name }}
   </text>
-  {% set user_y = user_y + 20 %}
+  {% set user_y = user_y + 18 %}
   {% endfor %}
 
   {% set division_x = 240 %}
   {% for division in divisions %}
   {% if standings[division.id] %}
-  <text x="{{ division_x }}" y="200" font-family="Inter" font-size="18" font-weight="bold" fill="#333">
+  <text x="{{ division_x }}" y="210" font-family="Inter" font-size="18" font-weight="bold" fill="#333">
     {{- division.name -}}
   </text>
-  <text x="{{ division_x }}" y="222" font-family="Inter" font-size="18" fill="#333">{{ standings[division.id].points }}
+  <text x="{{ division_x }}" y="230" font-family="Inter" font-size="14" fill="#555">{{ standings[division.id].points }}
     points</text>
-  <text x="{{ division_x }}" y="242" font-family="Inter" font-size="18" fill="#333">
+  <text x="{{ division_x }}" y="250" font-family="Inter" font-size="14" fill="#555">
     {%- if standings[division.id].rank == 1 -%}
     1st
     {%- elif standings[division.id].rank == 2 -%}
@@ -154,12 +157,13 @@
   {% set info_offset = 240 %}
   {% endif %}
 
-  {{ players(x=info_offset, y="290") }}
+  {% set cards_y = 300 %}
+  {{ players(x=info_offset, y=cards_y) }}
   {% if ctf_started %}
-  {{ solves(x=info_offset + 100, y="290") }}
+  {{ solves(x=info_offset + 100, y=cards_y) }}
   {% endif %}
   {% if ctf_ended and num_writeups > 0 %}
-  {{ writeups(x=info_offset + 200, y="290") }}
+  {{ writeups(x=info_offset + 200, y=cards_y) }}
   {% endif %}
 
   {% if num_solves > 0 %}

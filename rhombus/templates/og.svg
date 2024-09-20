@@ -124,10 +124,8 @@
   {% set line_y = line_y + 20 %}
   {% endif %}
 
-  {% set line_y = line_y + 6 %}
-
   {% if ctf_start_time %}
-  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="18" fill="#333">
+  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="14" fill="#333">
     {% if ctf_started %}
     Started
     {% else %}
@@ -135,11 +133,11 @@
     {% endif %}
     {{ ctf_start_time }}
   </text>
-  {% set line_y = line_y + 22 %}
+  {% set line_y = line_y + 18 %}
   {% endif %}
 
   {% if ctf_end_time %}
-  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="18" fill="#333">
+  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="14" fill="#333">
     {% if ctf_ended %}
     Ended
     {% else %}
@@ -147,18 +145,21 @@
     {% endif %}
     {{ ctf_end_time }}
   </text>
-  {% set line_y = line_y + 22 %}
+  {% set line_y = line_y + 18 %}
   {% endif %}
 
-  {% if site.description %}
+  {% if description %}
   {% set line_y = line_y + 6 %}
-  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="18" fill="#333">
-    {{ site.description }}
+  {% for line in description %}
+  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="14" fill="#333">
+    {{ line }}
   </text>
+  {% set line_y = line_y + 18 %}
+  {% endfor %}
   {% endif %}
 
   {% if ctf_ended %}
-  {% set scoreboard_y = 200 %}
+  {% set scoreboard_y = 210 %}
   {% set division_x = 50 %}
   {% for division in division_meta %}
   {% if division.places | length > 0 %}
@@ -167,7 +168,7 @@
   </text>
   {% set place_y = scoreboard_y + 20 %}
   {% for place in division.places %}
-  <svg x="{{ division_x - 20 }}" y="{{ place_y - 12 }}" xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+  <svg x="{{ division_x - 20 }}" y="{{ place_y - 14 }}" xmlns="http://www.w3.org/2000/svg" width="16" height="16"
     viewBox="0 0 24 24" fill="none"
     stroke="{% if loop.index == 1 %}#d6af36{% elif loop.index == 2 %}#a7a7ad{% elif loop.index == 3 %}#a77044{% else %}#000{% endif %}"
     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trophy">
@@ -178,10 +179,10 @@
     <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
     <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
   </svg>
-  <text x="{{ division_x }}" y="{{ place_y }}" font-family="Inter" font-size="13" fill="#555">
+  <text x="{{ division_x }}" y="{{ place_y }}" font-family="Inter" font-size="14" fill="#555">
     {{ place.name }}
   </text>
-  <text x="{{ division_x + 220 }}" y="{{ place_y }}" text-anchor="end" font-family="Inter" font-size="13" fill="#555">
+  <text x="{{ division_x + 220 }}" y="{{ place_y }}" text-anchor="end" font-family="Inter" font-size="14" fill="#555">
     {{ place.score }}
   </text>
   {% set place_y = place_y + 20 %}
@@ -191,16 +192,17 @@
   {% endfor %}
   {% endif %}
 
-  {{ players(x="50", y="290") }}
-  {{ teams(x="150", y="290") }}
-  {{ challenges(x="250", y="290") }}
+  {% set cards_y = 300 %}
+  {{ players(x="50", y=cards_y) }}
+  {{ teams(x="150", y=cards_y) }}
+  {{ challenges(x="250", y=cards_y) }}
   {% if ctf_started %}
-  {{ solves(x="380", y="290") }}
-  {% if ctftime.weight %}{{ ctftime_weight(x="480", y="290") }}{% endif %}
+  {{ solves(x="380", y=cards_y) }}
+  {% if ctftime.weight %}{{ ctftime_weight(x="480", y=cards_y) }}{% endif %}
   {% else %}
   {% if ctftime %}
-  {{ teams_interested(x="380", y="290") }}
-  {% if ctftime.weight %}{{ ctftime_weight(x="570", y="290") }}{% endif %}
+  {{ teams_interested(x="380", y=cards_y) }}
+  {% if ctftime.weight %}{{ ctftime_weight(x="570", y=cards_y) }}{% endif %}
   {% endif %}
   {% endif %}
 

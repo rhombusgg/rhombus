@@ -13,6 +13,7 @@ use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::RwLock;
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::builder::find_image_file;
 use crate::internal::{
@@ -210,6 +211,8 @@ pub async fn route_default_og_image(state: State<RouterState>) -> impl IntoRespo
         });
     }
 
+    let description = site.description.as_ref().map(|desc| wrap_text(desc, 74));
+
     let svg = state
         .jinja
         .get_template("og.svg")
@@ -224,6 +227,7 @@ pub async fn route_default_og_image(state: State<RouterState>) -> impl IntoRespo
             ctf_start_time,
             ctf_end_time,
             division_meta,
+            description,
         })
         .unwrap();
 
@@ -337,6 +341,8 @@ pub async fn route_team_og_image(
     let mut categories = categories.values().collect::<Vec<_>>();
     categories.sort();
 
+    let description = site.description.as_ref().map(|desc| wrap_text(desc, 74));
+
     let svg = state
         .jinja
         .get_template("og-team.svg")
@@ -355,6 +361,7 @@ pub async fn route_team_og_image(
             categories,
             team,
             num_writeups,
+            description,
         })
         .unwrap();
 
@@ -466,6 +473,8 @@ pub async fn route_user_og_image(
 
     let num_solves = categories.len();
 
+    let description = site.description.as_ref().map(|desc| wrap_text(desc, 74));
+
     let svg = state
         .jinja
         .get_template("og-user.svg")
@@ -482,6 +491,7 @@ pub async fn route_user_og_image(
             categories,
             user,
             team,
+            description,
         })
         .unwrap();
 
@@ -532,4 +542,34 @@ pub fn open_graph_cache_evictor(seconds: u64) {
             }
         }
     });
+}
+
+fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut current_line = String::new();
+    let mut line_len = 0;
+
+    for word in text.split_whitespace() {
+        let word_len = word.graphemes(true).count();
+
+        if line_len + word_len > max_width {
+            lines.push(current_line);
+            current_line = String::new();
+            line_len = 0;
+        }
+
+        if line_len > 0 {
+            current_line.push(' ');
+            line_len += 1;
+        }
+
+        current_line.push_str(word);
+        line_len += word_len;
+    }
+
+    if !current_line.is_empty() {
+        lines.push(current_line);
+    }
+
+    lines
 }

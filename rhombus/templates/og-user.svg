@@ -1,9 +1,11 @@
 {% macro showteam(x, y) %}
 <svg x="{{ x }}" y="{{ y }}" xmlns="http://www.w3.org/2000/svg">
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#555"
-    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user">
-    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
+    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </svg>
   <text x="34" y="20" font-family="Inter" font-size="22" fill="black">
     {{ team.name }}
@@ -51,10 +53,10 @@
     {{ site.title }}{% if site.organizer %} hosted by {{ site.organizer }}{% endif %}
   </text>
 
-  {% set line_y = line_y + 26 %}
+  {% set line_y = line_y + 20 %}
 
   {% if ctf_start_time %}
-  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="18" fill="#333">
+  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="14" fill="#333">
     {% if ctf_started %}
     Started
     {% else %}
@@ -62,11 +64,11 @@
     {% endif %}
     {{ ctf_start_time }}
   </text>
-  {% set line_y = line_y + 22 %}
+  {% set line_y = line_y + 18 %}
   {% endif %}
 
   {% if ctf_end_time %}
-  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="18" fill="#333">
+  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="14" fill="#333">
     {% if ctf_ended %}
     Ended
     {% else %}
@@ -74,21 +76,25 @@
     {% endif %}
     {{ ctf_end_time }}
   </text>
-  {% set line_y = line_y + 22 %}
+  {% set line_y = line_y + 18 %}
   {% endif %}
 
-  {% if site.description %}
+  {% if description %}
   {% set line_y = line_y + 6 %}
-  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="18" fill="#333">
-    {{ site.description }}
+  {% for line in description %}
+  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="14" fill="#333">
+    {{ line }}
   </text>
+  {% set line_y = line_y + 18 %}
+  {% endfor %}
   {% endif %}
 
+  {% set cards_y = 300 %}
   {% if ctf_started %}
-  {{ solves(x="50", y="290") }}
-  {{ showteam(x="150", y="290") }}
+  {{ solves(x="50", y=cards_y) }}
+  {{ showteam(x="150", y=cards_y) }}
   {% else %}
-  {{ showteam(x="50", y="290") }}
+  {{ showteam(x="50", y=cards_y) }}
   {% endif %}
 
   {% if num_solves > 0 %}
