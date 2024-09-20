@@ -482,6 +482,22 @@ impl Database for DbCache {
         get_team_divisions(&self.inner, team_id).await
     }
 
+    async fn get_team_division_last_edit_time(
+        &self,
+        team_id: i64,
+        division_id: i64,
+    ) -> Result<Option<DateTime<Utc>>> {
+        self.inner
+            .get_team_division_last_edit_time(team_id, division_id)
+            .await
+    }
+
+    async fn set_team_division_last_edit_time(&self, team_id: i64, division_id: i64) -> Result<()> {
+        self.inner
+            .set_team_division_last_edit_time(team_id, division_id)
+            .await
+    }
+
     async fn set_team_division(&self, team_id: i64, division_id: i64, join: bool) -> Result<()> {
         let result = self
             .inner

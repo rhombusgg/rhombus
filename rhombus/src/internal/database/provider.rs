@@ -357,6 +357,12 @@ pub trait Database {
     ) -> Result<()>;
     async fn insert_divisions(&self, divisions: &[Division]) -> Result<()>;
     async fn get_team_divisions(&self, team_id: i64) -> Result<Vec<i64>>;
+    async fn get_team_division_last_edit_time(
+        &self,
+        team_id: i64,
+        division_id: i64,
+    ) -> Result<Option<DateTime<Utc>>>;
+    async fn set_team_division_last_edit_time(&self, team_id: i64, division_id: i64) -> Result<()>;
     async fn set_team_division(&self, team_id: i64, division_id: i64, join: bool) -> Result<()>;
     async fn get_team_standings(&self, team_id: i64) -> Result<TeamStandings>;
     async fn upload_file(&self, hash: &str, filename: &str, bytes: &[u8]) -> Result<()>;

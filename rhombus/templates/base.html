@@ -42,7 +42,7 @@
       {% endif %}
     {% endwith %}
 
-    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.2"></script>
     <script
       src="https://unpkg.com/monaco-editor@0.48.0/min/vs/loader.js"
       defer
@@ -59,6 +59,6 @@
   <body>
     {% block body %}{% endblock %}
     <div id="toaster"></div>
-    <div id="htmx-toaster"></div>
+    <div hx-preserve="true" id="htmx-toaster"></div>
   </body>
 </html>

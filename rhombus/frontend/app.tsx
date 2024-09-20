@@ -22,7 +22,7 @@ import {
   LogInIcon,
   LogOutIcon,
 } from "lucide-solid";
-import { Toaster } from "solid-toast";
+import toast, { Toaster } from "solid-toast";
 
 export { toast } from "solid-toast";
 
@@ -750,4 +750,19 @@ document.addEventListener("DOMContentLoaded", () => {
   document.body.addEventListener("pageRefresh", () => {
     location.reload();
   });
+
+  document.body.addEventListener(
+    "toast",
+    (
+      evt: Event & { detail: { kind: "success" | "error"; message: string } },
+    ) => {
+      if (evt.detail.kind === "success") {
+        toast.success(evt.detail.message);
+      } else if (evt.detail.kind === "error") {
+        toast.error(evt.detail.message);
+      } else {
+        console.log("Unknown toast kind", evt.detail.kind);
+      }
+    },
+  );
 });

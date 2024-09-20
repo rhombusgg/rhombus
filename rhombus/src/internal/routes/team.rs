@@ -292,6 +292,36 @@ pub async fn route_team_set_division(
             .unwrap();
     }
 
+    let team_division_last_edit_time = state
+        .db
+        .get_team_division_last_edit_time(user.team_id, division_id)
+        .await
+        .unwrap()
+        .unwrap_or_default();
+
+    let next_allowed = team_division_last_edit_time + chrono::Duration::minutes(30);
+    if next_allowed > chrono::Utc::now() {
+        let resets_in = next_allowed - chrono::Utc::now();
+
+        return Response::builder()
+            .header(
+                "HX-Trigger",
+                format!(r##"{{"toast":{{"kind":"error","message":"You can change this division status again in {} minutes"}}}}"##, resets_in.num_minutes() + 1)
+            )
+            .header(
+                "HX-Location",
+                r##"{"path":"/team","select":"#screen","target":"#screen","swap":"outerHTML"}"##,
+            )
+            .body("".to_owned())
+            .unwrap();
+    }
+
+    state
+        .db
+        .set_team_division_last_edit_time(user.team_id, division_id)
+        .await
+        .unwrap();
+
     let team = state.db.get_team_from_id(user.team_id).await.unwrap();
     let division = state.divisions.iter().find(|d| d.id == division_id);
     if let Some(division) = division {

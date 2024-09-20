@@ -2054,6 +2054,46 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
         Ok(divisions)
     }
 
+    async fn get_team_division_last_edit_time(
+        &self,
+        team_id: i64,
+        division_id: i64,
+    ) -> Result<Option<DateTime<Utc>>> {
+        let last_edit_at_timestamp = self
+            .connect()?
+            .query(
+                "
+                SELECT last_edit_at
+                FROM rhombus_team_division_last_edit
+                WHERE team_id = ?1 AND division_id = ?2
+                ",
+                [team_id, division_id],
+            )
+            .await?
+            .next()
+            .await?
+            .map(|row| row.get::<i64>(0).unwrap());
+
+        let last_edit_at =
+            last_edit_at_timestamp.and_then(|t| DateTime::<Utc>::from_timestamp(t, 0));
+
+        Ok(last_edit_at)
+    }
+
+    async fn set_team_division_last_edit_time(&self, team_id: i64, division_id: i64) -> Result<()> {
+        self.connect()?
+            .execute(
+                "
+                INSERT OR REPLACE INTO rhombus_team_division_last_edit (team_id, division_id, last_edit_at)
+                VALUES (?1, ?2, ?3)
+            ",
+                [team_id, division_id, chrono::Utc::now().timestamp()],
+            )
+            .await?;
+
+        Ok(())
+    }
+
     async fn set_team_division(&self, team_id: i64, division_id: i64, join: bool) -> Result<()> {
         if join {
             self.connect()?

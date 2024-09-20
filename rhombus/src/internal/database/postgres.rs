@@ -361,6 +361,22 @@ impl Database for Postgres {
         todo!()
     }
 
+    async fn get_team_division_last_edit_time(
+        &self,
+        _team_id: i64,
+        _division_id: i64,
+    ) -> Result<Option<DateTime<Utc>>> {
+        todo!()
+    }
+
+    async fn set_team_division_last_edit_time(
+        &self,
+        _team_id: i64,
+        _division_id: i64,
+    ) -> Result<()> {
+        todo!()
+    }
+
     async fn set_team_division(&self, _team_id: i64, _division_id: i64, _join: bool) -> Result<()> {
         todo!()
     }

@@ -157,6 +157,15 @@ CREATE TABLE IF NOT EXISTS rhombus_team_division (
     FOREIGN KEY (division_id) REFERENCES rhombus_division(id)
 );
 
+CREATE TABLE IF NOT EXISTS rhombus_team_division_last_edit (
+    team_id INTEGER NOT NULL,
+    division_id INTEGER NOT NULL,
+    last_edit_at INTEGER NOT NULL DEFAULT(strftime('%s', 'now')),
+    PRIMARY KEY (team_id, division_id),
+    FOREIGN KEY (team_id) REFERENCES rhombus_team(id),
+    FOREIGN KEY (division_id) REFERENCES rhombus_division(id)
+);
+
 CREATE TABLE IF NOT EXISTS rhombus_ticket (
     ticket_number INTEGER NOT NULL UNIQUE,
     user_id INTEGER NOT NULL,
