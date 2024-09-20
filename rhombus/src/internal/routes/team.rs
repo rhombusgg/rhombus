@@ -299,7 +299,7 @@ pub async fn route_team_set_division(
         .unwrap()
         .unwrap_or_default();
 
-    let next_allowed = team_division_last_edit_time + chrono::Duration::minutes(30);
+    let next_allowed = team_division_last_edit_time + chrono::Duration::minutes(120);
     if next_allowed > chrono::Utc::now() {
         let resets_in = next_allowed - chrono::Utc::now();
 
