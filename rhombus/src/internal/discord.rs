@@ -51,16 +51,38 @@ pub async fn whois(
     ctx: Context<'_>,
     #[description = "User to look up"] user: serenity::all::User,
 ) -> std::result::Result<(), DiscordError> {
-    if let Ok(user) = ctx.data().db.get_user_from_discord_id(user.id.into()).await {
+    if let Ok(rhombus_user) = ctx.data().db.get_user_from_discord_id(user.id.into()).await {
+        let rhombus_team = ctx.data().db.get_team_from_id(rhombus_user.team_id).await?;
+        let location_url = &ctx.data().settings.read().await.location_url;
+        let team_members_string = rhombus_team
+            .users
+            .iter()
+            .map(|(user_id, user)| {
+                if let Some(discord_id) = user.discord_id {
+                    format!(
+                        ":identification_card: <@{}> is [{}]({}/user/{})",
+                        discord_id, user.name, location_url, user_id
+                    )
+                } else {
+                    format!(
+                        ":identification_card: [{}]({}/user/{})",
+                        user.name, location_url, user_id
+                    )
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
         ctx.reply(format!(
-            "Found! [Go to {}'s user profile]({}/user/{})",
-            user.name,
-            ctx.data().settings.read().await.location_url,
-            user.id,
+            "Looked up <@{}>\n\n:red_square: Team [{}]({}/team/{})\n{}",
+            user.id, rhombus_team.name, location_url, rhombus_team.id, team_members_string,
         ))
         .await?;
     } else {
-        ctx.reply("Could not find user").await?;
+        ctx.reply(format!(
+            "Could not find associated CTF account for <@{}>",
+            user.id
+        ))
+        .await?;
     }
 
     Ok(())
