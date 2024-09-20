@@ -910,7 +910,7 @@ pub async fn route_signin_credentials(
     Form(form): Form<CredentialsSubmit>,
 ) -> impl IntoResponse {
     let username_graphemes = form.username.graphemes(true).count();
-    if !(3..=30).contains(&username_graphemes) {
+    if !(3..=30).contains(&username_graphemes) || !(0..=256).contains(&form.username.len()) {
         return Response::builder()
             .body(format!(
                 r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
@@ -924,7 +924,7 @@ pub async fn route_signin_credentials(
     }
 
     let password_graphemes = form.password.graphemes(true).count();
-    if !(8..=256).contains(&password_graphemes) {
+    if !(8..=256).contains(&password_graphemes) || !(0..=256).contains(&form.password.len()) {
         return Response::builder()
             .body(format!(
                 r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,

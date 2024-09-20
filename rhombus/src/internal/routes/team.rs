@@ -175,7 +175,7 @@ pub async fn route_team_set_name(
 
     let mut errors = vec![];
     let graphemes = form.name.graphemes(true).count();
-    if !(3..=30).contains(&graphemes) {
+    if !(3..=30).contains(&graphemes) || !(0..=256).contains(&form.name.len()) {
         errors.push(
             state
                 .localizer
