@@ -675,7 +675,9 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
             .collect::<Vec<Challenge>>()
             .await;
 
-        let category_rows = tx.query("SELECT * FROM rhombus_category", ()).await?;
+        let category_rows = tx
+            .query("SELECT * FROM rhombus_category ORDER BY sequence", ())
+            .await?;
         #[derive(Debug, Deserialize)]
         struct DbCategory {
             id: i64,

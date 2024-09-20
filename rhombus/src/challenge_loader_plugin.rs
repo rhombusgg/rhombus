@@ -189,7 +189,7 @@ impl Plugin for ChallengeLoaderPlugin {
                         .await?;
                 }
 
-                for category in &config.categories {
+                for (sequence, category) in config.categories.iter().enumerate() {
                     let color = category
                         .color
                         .as_deref()
@@ -197,8 +197,8 @@ impl Plugin for ChallengeLoaderPlugin {
                     let id = hash(category.stable_id.as_ref().unwrap_or(&category.name));
                     let _ = tx
                         .execute(
-                            "INSERT OR REPLACE INTO rhombus_category (id, name, color) VALUES (?1, ?2, ?3)",
-                            params!(id, category.name.as_str(), color),
+                            "INSERT OR REPLACE INTO rhombus_category (id, name, color, sequence) VALUES (?1, ?2, ?3, ?4)",
+                            params!(id, category.name.as_str(), color, sequence as i64),
                         )
                         .await?;
                 }
