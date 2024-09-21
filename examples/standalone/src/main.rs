@@ -1,3 +1,6 @@
+use std::net::SocketAddr;
+
+use rhombus::axum::ServiceExt;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -25,6 +28,12 @@ async fn main() {
         .await
         .unwrap();
 
+    let service = app.service();
     let listener = tokio::net::TcpListener::bind(":::3000").await.unwrap();
-    app.serve(listener).await;
+    rhombus::axum::serve(
+        listener,
+        service.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await
+    .unwrap();
 }

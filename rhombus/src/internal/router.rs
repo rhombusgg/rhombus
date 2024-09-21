@@ -1,8 +1,18 @@
-use axum::{extract::State, response::IntoResponse, Extension};
-use std::sync::{atomic::AtomicPtr, Arc};
-use tower::{make::Shared, ServiceExt};
-
+use axum::{
+    body::Body,
+    extract::State,
+    http::Request,
+    response::{IntoResponse, Response},
+    Extension,
+};
+use std::{
+    convert::Infallible,
+    future::Future,
+    pin::Pin,
+    sync::{atomic::AtomicPtr, Arc},
+};
 use tokio::sync::{Mutex, RwLock};
+use tower::{make::Shared, Service, ServiceExt};
 
 use crate::{
     internal::{
@@ -69,6 +79,37 @@ impl Router {
         });
 
         axum::serve(listener, Shared::new(service)).await.unwrap();
+    }
+
+    pub fn service(
+        &self,
+    ) -> impl Service<
+        Request<Body>,
+        Response = Response,
+        Error = Infallible,
+        Future = Pin<Box<dyn Future<Output = Result<Response, Infallible>> + Send>>,
+    > + Clone
+           + Send
+           + 'static {
+        let router_ptr = self.service.clone();
+        tower::service_fn(move |req: Request<Body>| {
+            let router_ptr = router_ptr.clone();
+            Box::pin(async move {
+                let router = unsafe {
+                    router_ptr
+                        .load(std::sync::atomic::Ordering::Relaxed)
+                        .as_ref()
+                }
+                .unwrap()
+                .clone();
+                Ok(router.oneshot(req).await.unwrap_or_else(|_| {
+                    Response::builder()
+                        .status(500)
+                        .body(Body::from("Internal server error"))
+                        .unwrap()
+                }))
+            }) as Pin<Box<dyn Future<Output = Result<Response, Infallible>> + Send>>
+        })
     }
 }
 

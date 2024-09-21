@@ -142,8 +142,8 @@ pub fn maybe_cf_connecting_ip(headers: &HeaderMap, _: &Extensions) -> Option<IpA
         .and_then(|s| s.parse::<IpAddr>().ok())
 }
 
-/// Get client IP from axum's `ConnectInfo`. The axum router must be served with
-/// `router.into_make_service_with_connect_info::<SocketAddr>()`
+/// Get client IP from `ConnectInfo`. The router must be served with
+/// `rhombus::axum::serve(listener, app.service().into_make_service_with_connect_info::<SocketAddr>())`
 pub fn maybe_peer_ip(_: &HeaderMap, extensions: &Extensions) -> Option<IpAddr> {
     extensions
         .get::<ConnectInfo<SocketAddr>>()
