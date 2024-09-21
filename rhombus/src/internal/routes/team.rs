@@ -173,6 +173,10 @@ pub async fn route_team_set_name(
         return Err(StatusCode::UNAUTHORIZED);
     }
 
+    if user.disabled {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
     let mut errors = vec![];
     let graphemes = form.name.graphemes(true).count();
     if !(3..=30).contains(&graphemes) || !(0..=256).contains(&form.name.len()) {

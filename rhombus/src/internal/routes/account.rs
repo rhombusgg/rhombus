@@ -378,6 +378,10 @@ pub async fn route_account_set_name(
     Extension(page): Extension<PageMeta>,
     Form(form): Form<SetAccountName>,
 ) -> Result<impl IntoResponse, StatusCode> {
+    if user.disabled {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
     let mut errors = vec![];
     let graphemes = form.name.graphemes(true).count();
     if !(3..=30).contains(&graphemes) || !(0..=256).contains(&form.name.len()) {
