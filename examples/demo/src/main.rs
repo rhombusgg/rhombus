@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{path::PathBuf, sync::Arc, time::Duration};
 
 use chrono::prelude::*;
 use fake::{
@@ -17,6 +17,7 @@ use tracing_subscriber::EnvFilter;
 
 use rhombus::{
     axum::{http::Response, response::IntoResponse, routing, Extension, Router},
+    challenge_loader_plugin::ChallengeLoaderPlugin,
     internal::{
         auth::User,
         database::{
@@ -43,13 +44,8 @@ async fn main() {
     let app = rhombus::Builder::default()
         .load_env()
         .config_source(rhombus::config::File::with_name("config"))
-        .extractor(rhombus::ip::maybe_peer_ip)
         .plugin(DemoPlugin)
-        .plugin(
-            rhombus::challenge_loader_plugin::ChallengeLoaderPlugin::new(std::path::PathBuf::from(
-                "challenges",
-            )),
-        )
+        .plugin(ChallengeLoaderPlugin::new(PathBuf::from("challenges")))
         .build()
         .await
         .unwrap();

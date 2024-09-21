@@ -1,6 +1,6 @@
-use std::net::SocketAddr;
+use std::path::PathBuf;
 
-use rhombus::axum::ServiceExt;
+use rhombus::challenge_loader_plugin::ChallengeLoaderPlugin;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -15,25 +15,12 @@ async fn main() {
 
     let app = rhombus::Builder::default()
         .load_env()
-        .config_override("location_url", "http://localhost:3000")
         .config_source(rhombus::config::File::with_name("config"))
-        .extractor(rhombus::ip::maybe_peer_ip)
-        // .upload_provider(rhombus::LocalUploadProvider::new("uploads".into()))
-        .plugin(
-            rhombus::challenge_loader_plugin::ChallengeLoaderPlugin::new(std::path::PathBuf::from(
-                "challenges",
-            )),
-        )
+        .plugin(ChallengeLoaderPlugin::new(PathBuf::from("challenges")))
         .build()
         .await
         .unwrap();
 
-    let service = app.service();
     let listener = tokio::net::TcpListener::bind(":::3000").await.unwrap();
-    rhombus::axum::serve(
-        listener,
-        service.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .await
-    .unwrap();
+    app.serve(listener).await;
 }

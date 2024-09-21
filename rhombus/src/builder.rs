@@ -804,9 +804,11 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 }
             };
 
-            let ip_extractor = self_arc.ip_extractor.or_else(|| {
-                settings
-                    .blocking_read()
+            let ip_extractor = match self_arc.ip_extractor {
+                Some(ip_extractor) => Some(ip_extractor),
+                None => settings
+                    .read()
+                    .await
                     .ip_preset
                     .as_ref()
                     .map(|preset| match preset {
@@ -834,8 +836,8 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                             info!("Selecting preset peer ip");
                             maybe_peer_ip
                         }
-                    })
-            });
+                    }),
+            };
 
             let mut jinja = templates.build();
 
@@ -911,7 +913,12 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 }
             }
 
-            healthcheck_catch_up(cached_db.clone()).await;
+            {
+                let healthcheck_db = cached_db.clone();
+                tokio::task::spawn(async move {
+                    healthcheck_catch_up(healthcheck_db).await;
+                });
+            }
             healthcheck_runner(Arc::downgrade(&cached_db));
 
             cached_db.insert_divisions(&divisions).await?;

@@ -9,7 +9,6 @@ pub async fn healthcheck_catch_up(db: Connection) {
     let challenges = db.get_challenges().await.unwrap();
 
     for challenge in &challenges.challenges {
-        tracing::trace!(hs=?challenge.healthscript, healthy=?challenge.healthy, "Healthcheck");
         if challenge.healthscript.is_none() {
             continue;
         }
@@ -30,7 +29,7 @@ pub async fn healthcheck_catch_up(db: Connection) {
             .set_challenge_health(challenge.id, healthy, chrono::Utc::now())
             .await;
 
-        tracing::trace!(challenge_id = challenge.id, challenge_name = challenge.name, healthy = ?healthy, "Healthcheck");
+        tracing::trace!(challenge_id = challenge.id, challenge_name = challenge.name, healthy = ?healthy, "Healthcheck catch-up");
     }
 }
 
@@ -39,7 +38,6 @@ pub fn healthcheck_runner(db: WeakConnection) {
         loop {
             tokio::time::sleep(Duration::from_secs(60)).await;
 
-            tracing::trace!("Running healthcheck");
             let Some(db) = db.upgrade() else {
                 break;
             };
