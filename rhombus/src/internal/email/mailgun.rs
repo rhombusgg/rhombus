@@ -165,7 +165,8 @@ pub async fn route_mailgun_receive_email(
         return mailgun_error("Invalid signature");
     }
 
-    let Ok(ticket_number) = state.db.get_ticket_number_by_message_id(&in_reply_to).await else {
+    let Ok(Some(ticket_number)) = state.db.get_ticket_number_by_message_id(&in_reply_to).await
+    else {
         tracing::error!(in_reply_to, "Failed to find ticket number");
         return mailgun_error("Internal error");
     };

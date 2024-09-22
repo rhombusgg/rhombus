@@ -149,30 +149,46 @@ async fn receive_emails(
                 continue;
             };
 
-            let Some(&in_reply_to) = message
-                .references() // should probably be in_reply_to
-                .as_text_list()
-                .as_ref()
-                .and_then(|l| l.first())
-            else {
-                tracing::error!("No in-reply-to header found");
-                continue;
-            };
-
             let Some(text) = message.body_text(0) else {
                 tracing::error!("No body text found");
                 continue;
             };
 
-            let main_message = reply_parser::visible_text(&text);
+            let mut ticket_number = None;
+            if let Some(in_reply_tos) = message.in_reply_to().as_text_list() {
+                for message_id in in_reply_tos {
+                    tracing::trace!(message_id, "Checking in-reply-tos");
+                    if let Ok(Some(tn)) = db
+                        .get_ticket_number_by_message_id(&format!("<{}>", message_id))
+                        .await
+                    {
+                        ticket_number = Some(tn);
+                        break;
+                    }
+                }
+            }
 
-            let Ok(ticket_number) = db
-                .get_ticket_number_by_message_id(&format!("<{}>", in_reply_to))
-                .await
-            else {
-                tracing::error!(in_reply_to, "Failed to find ticket number");
+            if ticket_number.is_none() {
+                if let Some(references) = message.references().as_text_list() {
+                    for message_id in references {
+                        tracing::trace!(message_id, "Checking references");
+                        if let Ok(Some(tn)) = db
+                            .get_ticket_number_by_message_id(&format!("<{}>", message_id))
+                            .await
+                        {
+                            ticket_number = Some(tn);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            let Some(ticket_number) = ticket_number else {
+                tracing::error!("Failed to find ticket number");
                 continue;
             };
+
+            let main_message = reply_parser::visible_text(&text);
 
             let Ok(ticket) = db.get_ticket_by_ticket_number(ticket_number).await else {
                 tracing::error!(ticket_number, "Failed to find ticket");

@@ -358,7 +358,7 @@ pub async fn digest_channel(
     {
         _ = DIGEST_DEBOUNCER.lock().await.insert(channel, now);
     }
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(60)).await; // debouncing time
     if let Some(timestamp) = DIGEST_DEBOUNCER.lock().await.remove(&channel) {
         if timestamp != now {
             return Ok(());

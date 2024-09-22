@@ -1503,7 +1503,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
         Ok(())
     }
 
-    async fn get_ticket_number_by_message_id(&self, message_id: &str) -> Result<u64> {
+    async fn get_ticket_number_by_message_id(&self, message_id: &str) -> Result<Option<u64>> {
         let ticket_number = self
             .connect()?
             .query(
@@ -1517,9 +1517,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
             .await?
             .next()
             .await?
-            .unwrap()
-            .get::<u64>(0)
-            .unwrap();
+            .map(|row| row.get::<u64>(0).unwrap());
 
         Ok(ticket_number)
     }

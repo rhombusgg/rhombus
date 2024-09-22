@@ -366,7 +366,7 @@ impl Database for DbCache {
             .await
     }
 
-    async fn get_ticket_number_by_message_id(&self, message_id: &str) -> Result<u64> {
+    async fn get_ticket_number_by_message_id(&self, message_id: &str) -> Result<Option<u64>> {
         self.inner.get_ticket_number_by_message_id(message_id).await
     }
 
