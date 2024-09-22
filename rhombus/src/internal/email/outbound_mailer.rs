@@ -17,6 +17,7 @@ pub struct OutboundMailer {
     pub jinja: Arc<Environment<'static>>,
     pub settings: Arc<RwLock<Settings>>,
     pub db: Connection,
+    pub logo_path: Arc<String>,
 }
 
 impl OutboundMailer {
@@ -25,12 +26,14 @@ impl OutboundMailer {
         jinja: Arc<Environment<'static>>,
         settings: Arc<RwLock<Settings>>,
         db: Connection,
+        logo_path: &str,
     ) -> Self {
         OutboundMailer {
             inner: provider,
             jinja,
             settings,
             db,
+            logo_path: Arc::new(logo_path.to_string()),
         }
     }
 
@@ -57,7 +60,7 @@ impl OutboundMailer {
             ip,
             email => to,
             verify_url => format!("{}/account/verify?code={}", location_url, code),
-            logo => "https://avatars.githubusercontent.com/u/152339298",
+            logo => format!("{}/{}", location_url, self.logo_path),
         };
 
         let plaintext = self
@@ -104,7 +107,7 @@ impl OutboundMailer {
             ip,
             email => to,
             signin_url => format!("{}/signin/email?code={}", location_url, code),
-            logo => "https://avatars.githubusercontent.com/u/152339298",
+            logo => format!("{}/{}", location_url, self.logo_path),
         };
 
         let plaintext = self

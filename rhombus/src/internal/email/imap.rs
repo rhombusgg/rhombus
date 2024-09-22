@@ -150,7 +150,7 @@ async fn receive_emails(
             };
 
             let Some(&in_reply_to) = message
-                .in_reply_to()
+                .references() // should probably be in_reply_to
                 .as_text_list()
                 .as_ref()
                 .and_then(|l| l.first())

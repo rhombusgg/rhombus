@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS rhombus_file_attachment (
     challenge_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     url TEXT NOT NULL,
+    hash TEXT,
     PRIMARY KEY (challenge_id, url),
     FOREIGN KEY (challenge_id) REFERENCES rhombus_challenge(id)
 );

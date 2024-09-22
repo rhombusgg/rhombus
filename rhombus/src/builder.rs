@@ -857,6 +857,9 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
             let (outbound_mailer, mailgun_router): (Option<Arc<_>>, axum::Router<RouterState>) =
                 if let Some(email) = settings.clone().read().await.email.as_ref() {
+                    let logo_path = find_image_file("static/logo")
+                        .map(|p| p.to_str().unwrap().to_owned())
+                        .unwrap_or("static/logo.svg".to_owned());
                     if email.mailgun.is_some() {
                         let (mailgun_provider, router) =
                             MailgunProvider::new(settings.clone()).await.unwrap();
@@ -866,6 +869,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                             jinja.clone(),
                             settings.clone(),
                             cached_db.clone(),
+                            &logo_path,
                         ));
                         (Some(mailer), router)
                     } else if email.smtp_connection_url.is_some() {
@@ -876,6 +880,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                             jinja.clone(),
                             settings.clone(),
                             cached_db.clone(),
+                            &logo_path,
                         ));
                         (Some(mailer), axum::Router::new())
                     } else {

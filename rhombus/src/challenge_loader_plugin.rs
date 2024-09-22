@@ -6,10 +6,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use async_hash::{Digest, Sha256};
 use axum::Router;
 use config::Config;
-use futures::StreamExt;
-use futures::{TryFutureExt, TryStreamExt};
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use libsql::params;
 use serde::{Deserialize, Serialize};
 use tokio_util::{
@@ -18,7 +18,10 @@ use tokio_util::{
 };
 
 use crate::{
-    internal::{database::libsql::LibSQLConnection, router::RouterState},
+    internal::{
+        database::libsql::LibSQLConnection, local_upload_provider::slice_to_hex_string,
+        router::RouterState,
+    },
     plugin::RunContext,
     Plugin, Result, UploadProvider,
 };
@@ -51,7 +54,7 @@ impl Plugin for ChallengeLoaderPlugin {
             .try_deserialize::<ChallengeLoaderConfiguration>()
             .unwrap();
 
-        let walker = ChallengeYamlWalker::new(Path::new("."));
+        let walker = ChallengeYamlWalker::new(self.path.as_path());
 
         let challenges = walker
             .map(|path| {
@@ -232,7 +235,7 @@ impl Plugin for ChallengeLoaderPlugin {
                         (1, Some(challenge.points.parse::<i64>().unwrap()))
                     };
 
-                    tracing::info!(name = challenge.name, description = challenge.description);
+                    tracing::info!(name = challenge.name);
 
                     _ = tx
                         .execute(
@@ -267,10 +270,40 @@ impl Plugin for ChallengeLoaderPlugin {
                         .await;
 
                     for file in challenge.files.iter() {
-                        let url = if let Some(url) = &file.url {
-                            url.to_owned()
+                        #[derive(Debug, Deserialize)]
+                        struct QueryPrevious {
+                            hash: String,
+                            url: String,
+                        }
+
+                        let previous = tx
+                            .query(
+                                "SELECT hash, url FROM rhombus_file_attachment WHERE challenge_id = ?1 AND name = ?2",
+                                params!(id, file.dst.clone()),
+                            )
+                            .await?
+                            .next()
+                            .await?
+                            .and_then(|row| {
+                                libsql::de::from_row::<QueryPrevious>(&row).ok()
+                            });
+
+                        let (url, hash) = if let Some(url) = &file.url {
+                            (url.to_owned(), None)
                         } else if let Some(src) = &file.src {
                             let src = challenge.root.join(src);
+
+                            let data = tokio::fs::read(&src).await?;
+                            let mut hasher = Sha256::new();
+                            hasher.update(data);
+                            let hash = slice_to_hex_string(hasher.finalize().as_slice());
+
+                            if let Some(previous) = previous {
+                                if previous.hash == hash {
+                                    attachment_urls.remove(&previous.url);
+                                    continue;
+                                }
+                            }
 
                             let stream = tokio::fs::File::open(&src)
                                 .map_ok(|file| {
@@ -279,11 +312,13 @@ impl Plugin for ChallengeLoaderPlugin {
                                 })
                                 .try_flatten_stream();
 
-                            context
+                            let url = context
                                 .upload_provider
                                 .upload(src.file_name().unwrap().to_str().unwrap(), stream)
                                 .await
-                                .unwrap()
+                                .unwrap();
+
+                            (url, Some(hash))
                         } else {
                             panic!("No URL or source provided for file {}", file.dst);
                         };
@@ -291,10 +326,10 @@ impl Plugin for ChallengeLoaderPlugin {
                         _ = tx
                             .execute(
                                 "
-                                INSERT OR REPLACE INTO rhombus_file_attachment (challenge_id, name, url)
-                                VALUES (?1, ?2, ?3)
+                                INSERT OR REPLACE INTO rhombus_file_attachment (challenge_id, name, url, hash)
+                                VALUES (?1, ?2, ?3, ?4)
                             ",
-                                params!(id, dst, url.as_str()),
+                                params!(id, dst, url.as_str(), hash),
                             )
                             .await?;
                         attachment_urls.remove(&url);
