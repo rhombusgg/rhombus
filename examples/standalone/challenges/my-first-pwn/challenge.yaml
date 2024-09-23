@@ -1,6 +1,9 @@
 stable_id: my-first-pwn
 name: my-first-pwn
-description: asjdlfhljasdfhjls
+description: |
+  asjdlfhljasdfhjls
+  
+  `nc abc 123`
 flag: flag{this_is_a_fake_flag}
 category: pwn
 author: mbund

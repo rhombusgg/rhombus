@@ -1517,7 +1517,7 @@ impl<T: LibSQLConnection + Send + Sync> Database for T {
             .await?
             .next()
             .await?
-            .map(|row| row.get::<u64>(0).unwrap());
+            .and_then(|row| row.get::<u64>(0).ok());
 
         Ok(ticket_number)
     }

@@ -296,6 +296,13 @@ pub async fn route_team_set_division(
             .unwrap();
     }
 
+    if user.disabled {
+        return Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .body("".to_owned())
+            .unwrap();
+    }
+
     let team_division_last_edit_time = state
         .db
         .get_team_division_last_edit_time(user.team_id, division_id)

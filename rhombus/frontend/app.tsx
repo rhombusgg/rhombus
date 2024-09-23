@@ -397,9 +397,14 @@ const ChallengesComponent = ({
     <Show when={data()}>
       <For each={data().categories}>
         {(category) => {
-          const challenges = data().challenges.filter(
-            (challenge) => challenge.category_id === category.id,
-          );
+          const challenges = data()
+            .challenges.filter(
+              (challenge) => challenge.category_id === category.id,
+            )
+            .sort(
+              (a, b) =>
+                a.division_points[0].points - b.division_points[0].points,
+            );
 
           return (
             <div>
