@@ -841,29 +841,41 @@ impl Bot {
             .collect::<Vec<&str>>()
             .join(" ");
 
-        ChannelId::from(
-            self.settings
-                .read()
-                .await
-                .discord
-                .as_ref()
-                .unwrap()
-                .first_blood_channel_id
-                .ok_or(RhombusError::MissingConfiguration(
-                    "first blood channel id".to_owned(),
-                ))?,
-        )
-        .send_message(
+        let (channel_id, location_url) = {
+            let settings = self.settings.read().await;
+            (
+                ChannelId::from(
+                    settings
+                        .discord
+                        .as_ref()
+                        .unwrap()
+                        .first_blood_channel_id
+                        .ok_or(RhombusError::MissingConfiguration(
+                            "first blood channel id".to_owned(),
+                        ))?,
+                ),
+                settings.location_url.clone(),
+            )
+        };
+
+        channel_id.send_message(
             &self.http,
-            CreateMessage::new().content(if let Some(discord_id) = user.discord_id {
+            CreateMessage::new().content({
+                let user_link = match user.discord_id {
+                    Some(discord_id) => format!("<@{}>", discord_id),
+                    None => format!("**[{}]({}/user/{})**", user.name, location_url, user.id),
+                };
                 format!(
-                    "Congrats to <@{}> on team **{}** for first blood on **{} / {}** in {}! {}",
-                    discord_id, team.name, category.name, challenge.name, division_string, emoji,
-                )
-            } else {
-                format!(
-                    "Congrats to {} on team **{}** for first blood on **{} / {}** in {}! {}",
-                    user.name, team.name, category.name, challenge.name, division_string, emoji,
+                    "Congrats to {} on team **[{}]({location_url}/team/{})** for first blood on **[{} / {}]({location_url}/challenges#{})** in {}! {}",
+                    user_link,
+                    team.name,
+                    team.id,
+                    category.name,
+                    challenge.name,
+                    urlencoding::encode(&challenge.name),
+                    division_string,
+                    emoji,
+                    location_url = location_url,
                 )
             }),
         )

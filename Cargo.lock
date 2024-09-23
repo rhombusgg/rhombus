@@ -4592,6 +4592,7 @@ dependencies = [
  "tracing",
  "unic-langid",
  "unicode-segmentation",
+ "urlencoding",
  "webpki-roots 0.26.5",
 ]
 
