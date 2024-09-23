@@ -15,7 +15,15 @@ pub async fn route_command_palette_items(
         .map(|division| (division.id.to_string(), division.name.clone()))
         .collect::<Value>();
 
-    if user.is_some() {
+    if let Some(user) = user {
+        if let Some(start_time) = state.settings.read().await.start_time {
+            if !user.is_admin && chrono::Utc::now() < start_time {
+                return Json(json!({
+                    "divisions": divisions,
+                }));
+            }
+        }
+
         let challenges = challenge_data
             .categories
             .iter()
