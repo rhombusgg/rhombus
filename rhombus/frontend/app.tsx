@@ -432,7 +432,9 @@ const ChallengesComponent = ({
                     return (
                       <li
                         classList={{
-                          ring: decodeURIComponent(location.hash.substring(1)) === challenge.name,
+                          ring:
+                            decodeURIComponent(location.hash.substring(1)) ===
+                            challenge.name,
                         }}
                         class="border-l-4 bg-card p-4 ring-offset-4 ring-offset-background"
                         style={`border-color: ${category.color}; --tw-ring-color: ${category.color}`}
