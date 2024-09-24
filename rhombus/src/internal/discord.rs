@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     collections::{btree_map, BTreeMap},
     num::NonZeroU64,
     sync::Arc,
@@ -998,9 +999,17 @@ fn format_list_en(items: &[&str]) -> String {
     }
 }
 
-fn escape_discord_link(input: &str) -> String {
-    // Remove special characters to prevent messing up formatting or injecting links
-    // Sadly escaping with \ does not work (discord parser is weird)
-    let chars_to_remove = &['[', ']', '@', '|', '*', '_', '#', '<', '>', '\\', '`', ':'];
-    input.replace(chars_to_remove, "").trim().to_owned()
+fn escape_discord_link(input: &str) -> Cow<str> {
+    // Discord markdown parsing is frustration.
+    let special_characters = &['[', ']', '@', '#', '\\', '*', '`', '_'];
+    if input
+        .bytes()
+        .any(|c| special_characters.contains(&(c as char)))
+    {
+        format!("`{}`", input.replace(&['`', '[', ']', '@'], ""))
+            .replace("://", "")
+            .into()
+    } else {
+        input.into()
+    }
 }
