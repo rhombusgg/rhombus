@@ -863,12 +863,12 @@ impl Bot {
             CreateMessage::new().content({
                 let user_link = match user.discord_id {
                     Some(discord_id) => format!("<@{}>", discord_id),
-                    None => format!("**[{}]({}/user/{})**", user.name, location_url, user.id),
+                    None => format!("**[{}]({}/user/{})**", escape_discord_link(&user.name), location_url, user.id),
                 };
                 format!(
                     "Congrats to {} on team **[{}]({location_url}/team/{})** for first blood on **[{} / {}]({location_url}/challenges#{})** in {}! {}",
                     user_link,
-                    team.name,
+                    escape_discord_link(&team.name),
                     team.id,
                     category.name,
                     challenge.name,
@@ -996,4 +996,8 @@ fn format_list_en(items: &[&str]) -> String {
             formatted
         }
     }
+}
+
+fn escape_discord_link(input: &str) -> String {
+    input.replace(&['[', ']', '(', ')'], "").trim().to_owned()
 }
