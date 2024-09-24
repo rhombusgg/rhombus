@@ -999,5 +999,8 @@ fn format_list_en(items: &[&str]) -> String {
 }
 
 fn escape_discord_link(input: &str) -> String {
-    input.replace(&['[', ']', '(', ')'], "").trim().to_owned()
+    // Remove special characters to prevent messing up formatting or injecting links
+    // Sadly escaping with \ does not work (discord parser is weird)
+    let chars_to_remove = &['[', ']', '@', '|', '*', '_', '#', '<', '>', '\\', '`', ':'];
+    input.replace(chars_to_remove, "").trim().to_owned()
 }
