@@ -514,7 +514,11 @@ pub async fn route_signin_discord_callback(
         return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
     }
 
-    let profile = res.json::<DiscordProfile>().await.unwrap();
+    let res_text = res.text().await.unwrap();
+    let Ok(profile) = serde_json::from_str::<DiscordProfile>(&res_text) else {
+        tracing::warn!(json = res_text, "failed to get discord profile");
+        panic!();
+    };
 
     // join the user to the guild
     let client = Client::new();
