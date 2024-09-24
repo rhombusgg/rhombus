@@ -1006,7 +1006,7 @@ fn escape_discord_link(input: &str) -> Cow<str> {
         .bytes()
         .any(|c| special_characters.contains(&(c as char)))
     {
-        format!("`{}`", input.replace(&['`', '[', ']', '@'], ""))
+        format!("`{}`", input.replace(['`', '[', ']', '@'], ""))
             .replace("://", "")
             .into()
     } else {
