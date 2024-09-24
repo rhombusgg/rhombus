@@ -336,7 +336,7 @@ pub struct EmailRemove {
 pub async fn route_account_delete_email(
     state: State<RouterState>,
     Extension(user): Extension<User>,
-    Form(form): Form<EmailRemove>,
+    Query(query): Query<EmailRemove>,
 ) -> impl IntoResponse {
     let emails = state.db.get_emails_for_user_id(user.id).await.unwrap();
 
@@ -347,7 +347,7 @@ pub async fn route_account_delete_email(
             .unwrap();
     }
 
-    state.db.delete_email(user.id, &form.email).await.unwrap();
+    state.db.delete_email(user.id, &query.email).await.unwrap();
 
     Response::builder()
         .header("HX-Trigger", "pageRefresh")
