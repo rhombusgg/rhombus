@@ -1,6 +1,6 @@
 [package]
 name = "rhombus"
-version = "0.2.6"
+version = "0.2.7"
 edition = "2021"
 description = "Next generation extendable CTF framework with batteries included"
 authors = ["Mark Bundschuh <mark@mbund.dev>"]

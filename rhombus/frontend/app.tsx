@@ -631,38 +631,49 @@ const ChallengesComponent = ({
                                 stroke-width="2"
                                 stroke-linecap="round"
                                 stroke-linejoin="round"
-                                class="lucide lucide-layout-grid"
+                                class="lucide lucide-expand"
                               >
-                                <rect width="7" height="7" x="3" y="3" rx="1" />
-                                <rect
-                                  width="7"
-                                  height="7"
-                                  x="14"
-                                  y="3"
-                                  rx="1"
-                                />
-                                <rect
-                                  width="7"
-                                  height="7"
-                                  x="14"
-                                  y="14"
-                                  rx="1"
-                                />
-                                <rect
-                                  width="7"
-                                  height="7"
-                                  x="3"
-                                  y="14"
-                                  rx="1"
-                                />
+                                <path d="m21 21-6-6m6 6v-4.8m0 4.8h-4.8" />
+                                <path d="M3 16.2V21m0 0h4.8M3 21l6-6" />
+                                <path d="M21 7.8V3m0 0h-4.8M21 3l-6 6" />
+                                <path d="M3 7.8V3m0 0h4.8M3 3l6 6" />
                               </svg>
                             </button>
                           </div>
                         </div>
-                        <SolidMarkdown
+                        <div
                           class="prose dark:prose-invert"
-                          children={challenge.description}
-                        />
+                          innerHTML={challenge.description}
+                        ></div>
+                        <div class="flex gap-2 mt-4">
+                          <For each={challenge.attachments}>
+                            {(attachment) => (
+                              <a
+                                class="pr-2 py-1 pl-1 max-w-fit rounded-lg flex"
+                                style={`background-color: ${category.color}77`}
+                                href={attachment.url}
+                              >
+                                <div class="scale-75">
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    class="lucide lucide-paperclip"
+                                  >
+                                    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                                  </svg>
+                                </div>
+                                {attachment.name}
+                              </a>
+                            )}
+                          </For>
+                        </div>
                       </li>
                     );
                   }}
@@ -697,6 +708,10 @@ type ChallengesData = {
       division_id: number;
       points: number;
       solves: number;
+    }[];
+    attachments: {
+      name: string;
+      url: string;
     }[];
   }[];
   categories: {

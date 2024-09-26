@@ -237,6 +237,19 @@ impl Plugin for ChallengeLoaderPlugin {
 
                     tracing::info!(name = challenge.name);
 
+                    let description = markdown::to_html_with_options(
+                        &challenge.description,
+                        &markdown::Options {
+                            compile: markdown::CompileOptions {
+                                allow_dangerous_html: true,
+                                allow_dangerous_protocol: true,
+                                ..markdown::CompileOptions::default()
+                            },
+                            ..markdown::Options::default()
+                        },
+                    )
+                    .unwrap();
+
                     _ = tx
                         .execute(
                             "
@@ -246,7 +259,7 @@ impl Plugin for ChallengeLoaderPlugin {
                             params!(
                                 id,
                                 challenge.name.as_str(),
-                                challenge.description.as_str(),
+                                description.as_str(),
                                 challenge.flag.as_str(),
                                 category_id,
                                 author_id,
@@ -314,7 +327,7 @@ impl Plugin for ChallengeLoaderPlugin {
 
                             let url = context
                                 .upload_provider
-                                .upload(src.file_name().unwrap().to_str().unwrap(), stream)
+                                .upload(&file.dst, stream)
                                 .await
                                 .unwrap();
 

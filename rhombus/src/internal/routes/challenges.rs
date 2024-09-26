@@ -78,6 +78,10 @@ pub async fn route_challenges(
                 "points": division_points.points,
                 "solves": division_points.solves,
             })).collect::<serde_json::Value>(),
+            "attachments": challenge.attachments.iter().map(|attachment| json!({
+                "name": attachment.name,
+                "url": attachment.url,
+            })).collect::<serde_json::Value>(),
         })).collect::<serde_json::Value>(),
         "categories": challenge_data.categories.iter().map(|category| json!({
             "id": category.id,
@@ -167,19 +171,6 @@ pub async fn route_challenge_view(
         .find(|c| challenge.category_id.eq(&c.id))
         .unwrap();
 
-    let description = markdown::to_html_with_options(
-        &challenge.description,
-        &markdown::Options {
-            compile: markdown::CompileOptions {
-                allow_dangerous_html: true,
-                allow_dangerous_protocol: true,
-                ..markdown::CompileOptions::default()
-            },
-            ..markdown::Options::default()
-        },
-    )
-    .unwrap();
-
     Html(
         state
             .jinja
@@ -190,7 +181,6 @@ pub async fn route_challenge_view(
                 page,
                 user,
                 challenge,
-                description,
                 category,
                 team,
                 divisions => challenge_data.divisions,
@@ -260,19 +250,6 @@ pub async fn route_ticket_view(
         state.settings.read().await.default_ticket_template.clone()
     };
 
-    let description = markdown::to_html_with_options(
-        &challenge.description,
-        &markdown::Options {
-            compile: markdown::CompileOptions {
-                allow_dangerous_html: true,
-                allow_dangerous_protocol: true,
-                ..markdown::CompileOptions::default()
-            },
-            ..markdown::Options::default()
-        },
-    )
-    .unwrap();
-
     Html(
         state
             .jinja
@@ -283,7 +260,6 @@ pub async fn route_ticket_view(
                 page,
                 user,
                 challenge,
-                description,
                 category,
                 team,
                 ticket_template,
