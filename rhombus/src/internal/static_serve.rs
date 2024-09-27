@@ -45,7 +45,7 @@ pub async fn route_static_serve(uri: Uri, req: Request<Body>) -> impl IntoRespon
         #[cfg(not(debug_assertions))]
         response.headers_mut().insert(
             "Cache-Control",
-            HeaderValue::from_static("public, max-age=604800"),
+            HeaderValue::from_static("public, max-age=90"),
         );
 
         return response.into_response();
