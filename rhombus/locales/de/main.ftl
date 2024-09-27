@@ -26,7 +26,7 @@ account-error-email-length = E-Mail-Adresse muss zwischen 1 und 255 Zeichen lang
 account-error-email-already-added = E-Mail-Adresse bereits hinzugefügt
 account-error-verification-email = Fehler beim Senden der Bestätigungs-E-Mail
 
-challenges-ticket-submitted = Ticket eingereicht
+challenges-ticket-submitted = Ticket eingereicht. Die Autor wird sich in Kürze bei Ihnen anworten.
 challenges-challenge-solved = Challenge gelöst
 challenges-error-ticket-too-long = Ticket ist zu lang
 challenges-error-incorrect-flag = Falsche Flag

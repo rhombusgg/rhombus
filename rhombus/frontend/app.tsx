@@ -645,35 +645,37 @@ const ChallengesComponent = ({
                           class="prose dark:prose-invert"
                           innerHTML={challenge.description}
                         ></div>
-                        <div class="flex gap-2 mt-4">
-                          <For each={challenge.attachments}>
-                            {(attachment) => (
-                              <a
-                                class="pr-2 py-1 pl-1 max-w-fit rounded-lg flex"
-                                style={`background-color: ${category.color}77`}
-                                href={attachment.url}
-                              >
-                                <div class="scale-75">
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="24"
-                                    height="24"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    stroke-width="2"
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    class="lucide lucide-paperclip"
-                                  >
-                                    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-                                  </svg>
-                                </div>
-                                {attachment.name}
-                              </a>
-                            )}
-                          </For>
-                        </div>
+                        <Show when={challenge.attachments.length > 0}>
+                          <div class="flex gap-2 mt-4">
+                            <For each={challenge.attachments}>
+                              {(attachment) => (
+                                <a
+                                  class="pr-2 py-1 pl-1 max-w-fit rounded-lg flex"
+                                  style={`background-color: ${category.color}77`}
+                                  href={attachment.url}
+                                >
+                                  <div class="scale-75">
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      width="24"
+                                      height="24"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      stroke-width="2"
+                                      stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                      class="lucide lucide-paperclip"
+                                    >
+                                      <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                                    </svg>
+                                  </div>
+                                  {attachment.name}
+                                </a>
+                              )}
+                            </For>
+                          </div>
+                        </Show>
                       </li>
                     );
                   }}

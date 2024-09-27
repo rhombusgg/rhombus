@@ -86,8 +86,12 @@ impl UploadProvider for S3UploadProvider {
 
         futures::pin_mut!(body_reader);
 
-        let mut buffer = BytesMut::with_capacity(1024);
-        _ = body_reader.read_buf(&mut buffer).await?;
+        let mut buffer = BytesMut::new();
+        while let Ok(bytes_read) = body_reader.read_buf(&mut buffer).await {
+            if bytes_read == 0 {
+                break;
+            }
+        }
 
         let mut hasher = Sha256::new();
         hasher.update(&buffer);

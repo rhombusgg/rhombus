@@ -48,7 +48,7 @@ account-error-name-length = Account name must be between 3 and 30 characters
 account-error-password-length = Password must be at least 8 characters
 account-error-name-taken = Account name already taken
 
-challenges-ticket-submitted = Ticket submitted
+challenges-ticket-submitted = Ticket submitted. The author will get back to you shortly.
 challenges-challenge-solved = Challenge solved
 challenges-error-ticket-too-long = Ticket is too long
 challenges-error-incorrect-flag = Incorrect flag
