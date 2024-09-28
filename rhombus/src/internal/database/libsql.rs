@@ -130,10 +130,10 @@ pub trait LibSQLConnection {
                     }
                     Err(e) => {
                         count += 1;
-                        if count > 5 {
+                        if count > 10 {
                             return Err(crate::errors::RhombusError::LibSQL(e));
                         }
-                        tokio::time::sleep(Duration::from_millis(10)).await;
+                        tokio::time::sleep(Duration::from_millis(100)).await;
                     }
                 }
             }

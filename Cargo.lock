@@ -4536,7 +4536,7 @@ dependencies = [
 
 [[package]]
 name = "rhombus"
-version = "0.2.10"
+version = "0.2.11"
 dependencies = [
  "Inflector",
  "argon2",
