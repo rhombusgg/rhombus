@@ -107,11 +107,10 @@ pub async fn route_account(
         None
     };
 
-    let db = state.db.lock().await;
-    let challenge_data = db.get_challenges();
-    let team = db.get_team_from_id(user.team_id);
-    let emails = db.get_emails_for_user_id(user.id);
-    let user_divisions = db.get_user_divisions(user.id);
+    let challenge_data = state.db.get_challenges();
+    let team = state.db.get_team_from_id(user.team_id);
+    let emails = state.db.get_emails_for_user_id(user.id);
+    let user_divisions = state.db.get_user_divisions(user.id);
     let (challenge_data, team, emails, user_divisions) =
         tokio::join!(challenge_data, team, emails, user_divisions);
     let (challenge_data, team, emails, user_divisions) = (
@@ -125,13 +124,15 @@ pub async fn route_account(
     for division in state.divisions.iter() {
         let eligible = division
             .division_eligibility
-            .is_user_eligible(user.id, &db)
+            .is_user_eligible(user.id, &state.db)
             .await;
 
         let joined = user_divisions.contains(&division.id);
 
         if eligible.is_ok() != joined {
-            db.set_user_division(user.id, team.id, division.id, eligible.is_ok())
+            state
+                .db
+                .set_user_division(user.id, team.id, division.id, eligible.is_ok())
                 .await
                 .unwrap();
         }
@@ -202,9 +203,7 @@ pub async fn route_account_add_email(
             .unwrap();
     }
 
-    let db = state.db.lock().await;
-
-    let emails = db.get_emails_for_user_id(user.id).await.unwrap();
+    let emails = state.db.get_emails_for_user_id(user.id).await.unwrap();
     if emails.iter().any(|email| email.address == form.email) {
         return Response::builder()
             .body(format!(
@@ -218,7 +217,8 @@ pub async fn route_account_add_email(
     }
 
     if let Some(ref mailer) = state.outbound_mailer {
-        let Ok(code) = db
+        let Ok(code) = state
+            .db
             .create_email_verification_callback_code(user.id, &form.email)
             .await
         else {
@@ -243,7 +243,7 @@ pub async fn route_account_add_email(
             .await
             .is_err()
         {
-            db.delete_email(user.id, &form.email).await.unwrap();
+            state.db.delete_email(user.id, &form.email).await.unwrap();
 
             return Response::builder()
                 .body(format!(
@@ -285,8 +285,8 @@ pub async fn route_account_email_verify_callback(
     Extension(page): Extension<PageMeta>,
     params: Query<EmailVerifyParams>,
 ) -> impl IntoResponse {
-    let db = state.db.lock().await;
-    let Ok(email) = db
+    let Ok(email) = state
+        .db
         .get_email_verification_by_callback_code(&params.code)
         .await
     else {
@@ -319,8 +319,9 @@ pub async fn route_account_email_verify_confirm(
     state: State<RouterState>,
     params: Query<EmailVerifyParams>,
 ) -> impl IntoResponse {
-    let db = state.db.lock().await;
-    db.verify_email_verification_callback_code(&params.code)
+    state
+        .db
+        .verify_email_verification_callback_code(&params.code)
         .await
         .unwrap();
 
@@ -337,8 +338,7 @@ pub async fn route_account_delete_email(
     Extension(user): Extension<User>,
     Query(query): Query<EmailRemove>,
 ) -> impl IntoResponse {
-    let db = state.db.lock().await;
-    let emails = db.get_emails_for_user_id(user.id).await.unwrap();
+    let emails = state.db.get_emails_for_user_id(user.id).await.unwrap();
 
     if emails.len() == 1 {
         return Response::builder()
@@ -347,7 +347,7 @@ pub async fn route_account_delete_email(
             .unwrap();
     }
 
-    db.delete_email(user.id, &query.email).await.unwrap();
+    state.db.delete_email(user.id, &query.email).await.unwrap();
 
     Response::builder()
         .header("HX-Trigger", "pageRefresh")
@@ -382,8 +382,6 @@ pub async fn route_account_set_name(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    let db = state.db.lock().await;
-
     let mut errors = vec![];
     let graphemes = form.name.graphemes(true).count();
     if !(3..=30).contains(&graphemes) || !(0..=256).contains(&form.name.len()) {
@@ -392,7 +390,8 @@ pub async fn route_account_set_name(
                 .localizer
                 .localize(&page.lang, "account-error-name-length", None),
         );
-    } else if let Err(e) = db
+    } else if let Err(e) = state
+        .db
         .set_account_name(user.id, user.team_id, &form.name, 60 * 30)
         .await
         .unwrap()

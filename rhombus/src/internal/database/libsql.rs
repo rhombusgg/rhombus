@@ -14,6 +14,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
 use futures::stream::StreamExt;
 use inflector::{cases::titlecase::to_title_case, string::pluralize::to_plural};
+use lazy_static::lazy_static;
 use libsql::{de, params, Builder, Transaction};
 use rand::{rngs::OsRng, Rng};
 use rust_embed::RustEmbed;
@@ -145,6 +146,10 @@ impl LibSQLConnection for RemoteLibSQL {
 //     }
 // }
 
+lazy_static! {
+    static ref TX_MUTEX: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
+}
+
 pub trait LibSQLConnection {
     fn connect(&self) -> Result<libsql::Connection>;
     fn transaction(&self) -> Pin<Box<dyn Future<Output = Result<libsql::Transaction>> + Send>> {
@@ -217,6 +222,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         discord_id: NonZeroU64,
         user_id: Option<i64>,
     ) -> Result<(i64, i64)> {
+        let _tx_mutex = TX_MUTEX.lock().await;
         let tx = self.transaction().await?;
 
         let existing_user = if let Some(user_id) = user_id {
@@ -294,6 +300,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         email: &str,
         avatar: &str,
     ) -> Result<(i64, i64)> {
+        let _tx_mutex = TX_MUTEX.lock().await;
         let tx = self.transaction().await?;
 
         let existing_user = tx
@@ -347,6 +354,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         avatar: &str,
         password: &str,
     ) -> Result<Option<(i64, i64)>> {
+        let _tx_mutex = TX_MUTEX.lock().await;
         let tx = self.transaction().await?;
 
         #[derive(Debug, Deserialize)]
@@ -418,6 +426,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         ctftime_team_id: i64,
         team_name: &str,
     ) -> Result<(i64, i64, Option<String>)> {
+        let _tx_mutex = TX_MUTEX.lock().await;
         let tx = self.transaction().await?;
 
         #[derive(Debug, Deserialize)]
@@ -590,6 +599,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     }
 
     async fn get_challenges(&self) -> Result<Challenges> {
+        let _tx_mutex = TX_MUTEX.lock().await;
         let tx = self.transaction().await?;
 
         let rhombus_challenge_division_points = tx
@@ -816,6 +826,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     }
 
     async fn get_team_from_id(&self, team_id: i64) -> Result<Team> {
+        let _tx_mutex = TX_MUTEX.lock().await;
         let tx = self.transaction().await?;
 
         #[derive(Debug, Deserialize)]
@@ -946,6 +957,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         team_id: i64,
         _old_team_id: Option<i64>,
     ) -> Result<()> {
+        let _tx_mutex = TX_MUTEX.lock().await;
         let tx = self.transaction().await?;
 
         tx.execute(
@@ -1072,6 +1084,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         new_team_name: &str,
         timeout_seconds: u64,
     ) -> Result<std::result::Result<(), SetTeamNameError>> {
+        let _tx_mutex = TX_MUTEX.lock().await;
         let tx = self.transaction().await?;
 
         let last_change_timestamp = tx
@@ -1131,6 +1144,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         new_account_name: &str,
         timeout_seconds: u64,
     ) -> Result<std::result::Result<(), SetAccountNameError>> {
+        let _tx_mutex = TX_MUTEX.lock().await;
         let tx = self.transaction().await?;
 
         let last_change_timestamp = tx
@@ -1189,6 +1203,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         team_id: i64,
         challenge: &Challenge,
     ) -> Result<FirstBloods> {
+        let _tx_mutex = TX_MUTEX.lock().await;
         let tx = self.transaction().await?;
 
         let now = chrono::Utc::now().timestamp();
@@ -1355,6 +1370,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             pub discord_channel_id: NonZeroU64,
         }
 
+        let _tx_mutex = TX_MUTEX.lock().await;
         let tx = self.transaction().await?;
 
         let ticket_row = tx
@@ -1424,6 +1440,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             pub discord_channel_id: NonZeroU64,
         }
 
+        let _tx_mutex = TX_MUTEX.lock().await;
         let tx = self.transaction().await?;
 
         let ticket_row = self
@@ -1599,6 +1616,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     }
 
     async fn get_scoreboard(&self, division_id: i64) -> Result<Scoreboard> {
+        let _tx_mutex = TX_MUTEX.lock().await;
         let tx = self.transaction().await?;
 
         #[derive(Debug, Deserialize)]
@@ -1716,6 +1734,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         }
 
         if let Some(page) = page {
+            let _tx_mutex = TX_MUTEX.lock().await;
             let tx = self.transaction().await?;
 
             let num_teams = tx
@@ -1982,6 +2001,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         division_id: i64,
         join: bool,
     ) -> Result<()> {
+        let _tx_mutex = TX_MUTEX.lock().await;
         let tx = self.transaction().await?;
 
         if join {
@@ -2033,6 +2053,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     }
 
     async fn insert_divisions(&self, divisions: &[Division]) -> Result<()> {
+        let _tx_mutex = TX_MUTEX.lock().await;
         let tx = self.transaction().await?;
 
         let current_division_ids = tx
@@ -2224,6 +2245,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     }
 
     async fn get_site_statistics(&self) -> Result<SiteStatistics> {
+        let _tx_mutex = TX_MUTEX.lock().await;
         let tx = self.transaction().await?;
 
         let total_users = tx

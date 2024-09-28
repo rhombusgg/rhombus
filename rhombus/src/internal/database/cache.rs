@@ -22,7 +22,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct DbCache {
-    inner: Arc<Mutex<dyn Database + Send + Sync>>,
+    inner: Arc<dyn Database + Send + Sync>,
 }
 
 impl DbCache {
@@ -40,11 +40,11 @@ impl From<Connection> for DbCache {
 #[async_trait]
 impl Database for DbCache {
     async fn get_raw_libsql(&self) -> Option<libsql::Connection> {
-        self.inner.lock().await.get_raw_libsql().await
+        self.inner.get_raw_libsql().await
     }
 
     async fn migrate(&self) -> Result<()> {
-        self.inner.lock().await.migrate().await
+        self.inner.migrate().await
     }
 
     async fn upsert_user_by_discord_id(
@@ -57,8 +57,6 @@ impl Database for DbCache {
     ) -> Result<(i64, i64)> {
         let result = self
             .inner
-            .lock()
-            .await
             .upsert_user_by_discord_id(name, email, avatar, discord_id, user_id)
             .await;
         if let Ok(result) = result {
@@ -74,12 +72,7 @@ impl Database for DbCache {
         email: &str,
         avatar: &str,
     ) -> Result<(i64, i64)> {
-        let result = self
-            .inner
-            .lock()
-            .await
-            .upsert_user_by_email(name, email, avatar)
-            .await;
+        let result = self.inner.upsert_user_by_email(name, email, avatar).await;
         if let Ok(result) = result {
             USER_CACHE.remove(&result.0);
             TEAM_CACHE.remove(&result.1);
@@ -95,8 +88,6 @@ impl Database for DbCache {
     ) -> Result<Option<(i64, i64)>> {
         let result = self
             .inner
-            .lock()
-            .await
             .upsert_user_by_credentials(username, avatar, password)
             .await;
 
@@ -118,8 +109,6 @@ impl Database for DbCache {
     ) -> Result<(i64, i64, Option<String>)> {
         let result = self
             .inner
-            .lock()
-            .await
             .upsert_user_by_ctftime(
                 name,
                 email,
@@ -144,8 +133,6 @@ impl Database for DbCache {
         requests: u64,
     ) -> Result<()> {
         self.inner
-            .lock()
-            .await
             .insert_track(ip, user_agent, user_id, requests)
             .await
     }
@@ -161,8 +148,6 @@ impl Database for DbCache {
         checked_at: DateTime<Utc>,
     ) -> Result<()> {
         self.inner
-            .lock()
-            .await
             .set_challenge_health(challenge_id, healthy, checked_at)
             .await?;
 
@@ -191,8 +176,6 @@ impl Database for DbCache {
         invite_token: &str,
     ) -> Result<Option<TeamMeta>> {
         self.inner
-            .lock()
-            .await
             .get_team_meta_from_invite_token(invite_token)
             .await
     }
@@ -209,8 +192,6 @@ impl Database for DbCache {
     ) -> Result<()> {
         let result = self
             .inner
-            .lock()
-            .await
             .add_user_to_team(user_id, team_id, old_team_id)
             .await;
         if result.is_ok() {
@@ -228,15 +209,11 @@ impl Database for DbCache {
     }
 
     async fn get_user_from_discord_id(&self, discord_id: NonZeroU64) -> Result<User> {
-        self.inner
-            .lock()
-            .await
-            .get_user_from_discord_id(discord_id)
-            .await
+        self.inner.get_user_from_discord_id(discord_id).await
     }
 
     async fn kick_user(&self, user_id: i64, team_id: i64) -> Result<()> {
-        let result = self.inner.lock().await.kick_user(user_id, team_id).await;
+        let result = self.inner.kick_user(user_id, team_id).await;
         if result.is_ok() {
             USER_CACHE.remove(&user_id);
             TEAM_CACHE.remove(&team_id);
@@ -245,7 +222,7 @@ impl Database for DbCache {
     }
 
     async fn roll_invite_token(&self, team_id: i64) -> Result<String> {
-        let new_invite_token = self.inner.lock().await.roll_invite_token(team_id).await;
+        let new_invite_token = self.inner.roll_invite_token(team_id).await;
         if new_invite_token.is_ok() {
             TEAM_CACHE.remove(&team_id);
         }
@@ -260,8 +237,6 @@ impl Database for DbCache {
     ) -> Result<std::result::Result<(), SetTeamNameError>> {
         let result = self
             .inner
-            .lock()
-            .await
             .set_team_name(team_id, new_team_name, timeout_seconds)
             .await;
         if let Ok(ref r) = result {
@@ -281,8 +256,6 @@ impl Database for DbCache {
     ) -> Result<std::result::Result<(), SetAccountNameError>> {
         let result = self
             .inner
-            .lock()
-            .await
             .set_account_name(user_id, team_id, new_account_name, timeout_seconds)
             .await;
         if let Ok(ref r) = result {
@@ -302,8 +275,6 @@ impl Database for DbCache {
     ) -> Result<FirstBloods> {
         let result = self
             .inner
-            .lock()
-            .await
             .solve_challenge(user_id, team_id, challenge)
             .await;
         if result.is_ok() {
@@ -326,8 +297,6 @@ impl Database for DbCache {
     ) -> Result<()> {
         let result = self
             .inner
-            .lock()
-            .await
             .add_writeup(user_id, team_id, challenge_id, writeup_url)
             .await;
         if result.is_ok() {
@@ -344,8 +313,6 @@ impl Database for DbCache {
     async fn delete_writeup(&self, challenge_id: i64, user_id: i64, team_id: i64) -> Result<()> {
         let result = self
             .inner
-            .lock()
-            .await
             .delete_writeup(challenge_id, user_id, team_id)
             .await;
         if result.is_ok() {
@@ -356,7 +323,7 @@ impl Database for DbCache {
     }
 
     async fn get_next_ticket_number(&self) -> Result<u64> {
-        self.inner.lock().await.get_next_ticket_number().await
+        self.inner.get_next_ticket_number().await
     }
 
     async fn create_ticket(
@@ -367,18 +334,12 @@ impl Database for DbCache {
         discord_channel_id: NonZeroU64,
     ) -> Result<()> {
         self.inner
-            .lock()
-            .await
             .create_ticket(ticket_number, user_id, challenge_id, discord_channel_id)
             .await
     }
 
     async fn get_ticket_by_ticket_number(&self, ticket_number: u64) -> Result<Ticket> {
-        self.inner
-            .lock()
-            .await
-            .get_ticket_by_ticket_number(ticket_number)
-            .await
+        self.inner.get_ticket_by_ticket_number(ticket_number).await
     }
 
     async fn get_ticket_by_discord_channel_id(
@@ -386,22 +347,16 @@ impl Database for DbCache {
         discord_channel_id: NonZeroU64,
     ) -> Result<Ticket> {
         self.inner
-            .lock()
-            .await
             .get_ticket_by_discord_channel_id(discord_channel_id)
             .await
     }
 
     async fn close_ticket(&self, ticket_number: u64, time: DateTime<Utc>) -> Result<()> {
-        self.inner
-            .lock()
-            .await
-            .close_ticket(ticket_number, time)
-            .await
+        self.inner.close_ticket(ticket_number, time).await
     }
 
     async fn reopen_ticket(&self, ticket_number: u64) -> Result<()> {
-        self.inner.lock().await.reopen_ticket(ticket_number).await
+        self.inner.reopen_ticket(ticket_number).await
     }
 
     async fn add_email_message_id_to_ticket(
@@ -411,26 +366,20 @@ impl Database for DbCache {
         user_sent: bool,
     ) -> Result<()> {
         self.inner
-            .lock()
-            .await
             .add_email_message_id_to_ticket(ticket_number, message_id, user_sent)
             .await
     }
 
     async fn get_ticket_number_by_message_id(&self, message_id: &str) -> Result<Option<u64>> {
-        self.inner
-            .lock()
-            .await
-            .get_ticket_number_by_message_id(message_id)
-            .await
+        self.inner.get_ticket_number_by_message_id(message_id).await
     }
 
     async fn save_settings(&self, settings: &Settings) -> Result<()> {
-        self.inner.lock().await.save_settings(settings).await
+        self.inner.save_settings(settings).await
     }
 
     async fn load_settings(&self, settings: &mut Settings) -> Result<()> {
-        self.inner.lock().await.load_settings(settings).await
+        self.inner.load_settings(settings).await
     }
 
     async fn get_scoreboard(&self, division_id: i64) -> Result<Scoreboard> {
@@ -452,8 +401,6 @@ impl Database for DbCache {
     ) -> Result<String> {
         let result = self
             .inner
-            .lock()
-            .await
             .create_email_verification_callback_code(user_id, email)
             .await;
         if result.is_ok() {
@@ -465,8 +412,6 @@ impl Database for DbCache {
     async fn verify_email_verification_callback_code(&self, code: &str) -> Result<()> {
         let result = self
             .inner
-            .lock()
-            .await
             .verify_email_verification_callback_code(code)
             .await;
         if result.is_ok() {
@@ -477,38 +422,24 @@ impl Database for DbCache {
 
     async fn get_email_verification_by_callback_code(&self, code: &str) -> Result<String> {
         self.inner
-            .lock()
-            .await
             .get_email_verification_by_callback_code(code)
             .await
     }
 
     async fn create_email_signin_callback_code(&self, email: &str) -> Result<String> {
-        self.inner
-            .lock()
-            .await
-            .create_email_signin_callback_code(email)
-            .await
+        self.inner.create_email_signin_callback_code(email).await
     }
 
     async fn verify_email_signin_callback_code(&self, code: &str) -> Result<String> {
-        self.inner
-            .lock()
-            .await
-            .verify_email_signin_callback_code(code)
-            .await
+        self.inner.verify_email_signin_callback_code(code).await
     }
 
     async fn get_email_signin_by_callback_code(&self, code: &str) -> Result<String> {
-        self.inner
-            .lock()
-            .await
-            .get_email_signin_by_callback_code(code)
-            .await
+        self.inner.get_email_signin_by_callback_code(code).await
     }
 
     async fn delete_email(&self, user_id: i64, email: &str) -> Result<()> {
-        let result = self.inner.lock().await.delete_email(user_id, email).await;
+        let result = self.inner.delete_email(user_id, email).await;
         if result.is_ok() {
             USER_EMAILS_CACHE.remove(&user_id);
         }
@@ -528,8 +459,6 @@ impl Database for DbCache {
     ) -> Result<()> {
         let result = self
             .inner
-            .lock()
-            .await
             .set_user_division(user_id, team_id, division_id, join)
             .await;
         if result.is_ok() {
@@ -544,7 +473,7 @@ impl Database for DbCache {
     }
 
     async fn insert_divisions(&self, divisions: &[Division]) -> Result<()> {
-        let result = self.inner.lock().await.insert_divisions(divisions).await;
+        let result = self.inner.insert_divisions(divisions).await;
         if result.is_ok() {
             USER_DIVISIONS.clear();
             TEAM_DIVISIONS.clear();
@@ -563,16 +492,12 @@ impl Database for DbCache {
         division_id: i64,
     ) -> Result<Option<DateTime<Utc>>> {
         self.inner
-            .lock()
-            .await
             .get_team_division_last_edit_time(team_id, division_id)
             .await
     }
 
     async fn set_team_division_last_edit_time(&self, team_id: i64, division_id: i64) -> Result<()> {
         self.inner
-            .lock()
-            .await
             .set_team_division_last_edit_time(team_id, division_id)
             .await
     }
@@ -580,8 +505,6 @@ impl Database for DbCache {
     async fn set_team_division(&self, team_id: i64, division_id: i64, join: bool) -> Result<()> {
         let result = self
             .inner
-            .lock()
-            .await
             .set_team_division(team_id, division_id, join)
             .await;
         if result.is_ok() {
@@ -599,27 +522,19 @@ impl Database for DbCache {
     }
 
     async fn upload_file(&self, hash: &str, filename: &str, bytes: &[u8]) -> Result<()> {
-        self.inner
-            .lock()
-            .await
-            .upload_file(hash, filename, bytes)
-            .await
+        self.inner.upload_file(hash, filename, bytes).await
     }
 
     async fn download_file(&self, hash: &str) -> Result<(Bytes, String)> {
-        self.inner.lock().await.download_file(hash).await
+        self.inner.download_file(hash).await
     }
 
     async fn get_site_statistics(&self) -> Result<SiteStatistics> {
-        self.inner.lock().await.get_site_statistics().await
+        self.inner.get_site_statistics().await
     }
 
     async fn get_last_created_ticket_time(&self, user_id: i64) -> Result<Option<DateTime<Utc>>> {
-        self.inner
-            .lock()
-            .await
-            .get_last_created_ticket_time(user_id)
-            .await
+        self.inner.get_last_created_ticket_time(user_id).await
     }
 }
 
@@ -633,7 +548,7 @@ pub async fn get_challenges(db: &Connection) -> Result<Challenges> {
     }
     tracing::trace!("cache miss: challenges");
 
-    let challenges = db.lock().await.get_challenges().await;
+    let challenges = db.get_challenges().await;
 
     if let Ok(challenges) = &challenges {
         let mut cache = CHALLENGES_CACHE.write().await;
@@ -653,7 +568,7 @@ pub async fn get_team_from_id(db: &Connection, team_id: i64) -> Result<Team> {
     }
     tracing::trace!(team_id, "cache miss: get_team_from_id");
 
-    let team = db.lock().await.get_team_from_id(team_id).await;
+    let team = db.get_team_from_id(team_id).await;
 
     if let Ok(team) = &team {
         TEAM_CACHE.insert(team_id, TimedCache::new(team.clone()));
@@ -686,7 +601,7 @@ pub async fn get_user_from_id(db: &Connection, user_id: i64) -> Result<User> {
     }
     tracing::trace!(user_id, "cache miss: get_user_from_id");
 
-    let user = db.lock().await.get_user_from_id(user_id).await;
+    let user = db.get_user_from_id(user_id).await;
 
     if let Ok(user) = &user {
         USER_CACHE.insert(user_id, TimedCache::new(user.clone()));
@@ -706,7 +621,7 @@ pub async fn get_writeups_from_user_id(db: &Connection, user_id: i64) -> Result<
     }
     tracing::trace!(user_id, "cache miss: get_writeups_from_user_id");
 
-    let writeups = db.lock().await.get_writeups_from_user_id(user_id).await;
+    let writeups = db.get_writeups_from_user_id(user_id).await;
 
     if let Ok(writeups) = &writeups {
         USER_WRITEUP_CACHE.insert(user_id, TimedCache::new(writeups.clone()));
@@ -724,7 +639,7 @@ pub async fn get_scoreboard(db: &Connection, division_id: i64) -> Result<Scorebo
     }
     tracing::trace!(division_id, "cache miss: get_scoreboard");
 
-    let scoreboard = db.lock().await.get_scoreboard(division_id).await;
+    let scoreboard = db.get_scoreboard(division_id).await;
 
     if let Ok(scoreboard) = &scoreboard {
         SCOREBOARD_CACHE.insert(division_id, scoreboard.clone());
@@ -746,7 +661,7 @@ pub async fn get_leaderboard(
     }
     tracing::trace!(division_id, page, "cache miss: get_leaderboard");
 
-    let leaderboard = db.lock().await.get_leaderboard(division_id, page).await;
+    let leaderboard = db.get_leaderboard(division_id, page).await;
 
     if let Ok(leaderboard) = &leaderboard {
         LEADERBOARD_CACHE.insert((division_id, page), leaderboard.clone());
@@ -764,7 +679,7 @@ pub async fn get_emails_for_user_id(db: &Connection, user_id: i64) -> Result<Vec
     }
     tracing::trace!(user_id, "cache miss: get_emails_for_user_id");
 
-    let emails = db.lock().await.get_emails_for_user_id(user_id).await;
+    let emails = db.get_emails_for_user_id(user_id).await;
 
     if let Ok(emails) = &emails {
         USER_EMAILS_CACHE.insert(user_id, TimedCache::new(emails.clone()));
@@ -782,7 +697,7 @@ pub async fn get_user_divisions(db: &Connection, user_id: i64) -> Result<Vec<i64
     }
     tracing::trace!(user_id, "cache miss: get_user_divisions");
 
-    let divisions = db.lock().await.get_user_divisions(user_id).await;
+    let divisions = db.get_user_divisions(user_id).await;
 
     if let Ok(divisions) = &divisions {
         USER_DIVISIONS.insert(user_id, TimedCache::new(divisions.clone()));
@@ -800,7 +715,7 @@ pub async fn get_team_divisions(db: &Connection, team_id: i64) -> Result<Vec<i64
     }
     tracing::trace!(team_id, "cache miss: get_team_divisions");
 
-    let divisions = db.lock().await.get_team_divisions(team_id).await;
+    let divisions = db.get_team_divisions(team_id).await;
 
     if let Ok(divisions) = &divisions {
         TEAM_DIVISIONS.insert(team_id, TimedCache::new(divisions.clone()));
@@ -818,7 +733,7 @@ pub async fn get_team_standing(db: &Connection, team_id: i64) -> Result<TeamStan
     }
     tracing::trace!(team_id, "cache miss: get_team_standing");
 
-    let standings = db.lock().await.get_team_standings(team_id).await;
+    let standings = db.get_team_standings(team_id).await;
 
     if let Ok(standings) = &standings {
         TEAM_STANDINGS.insert(team_id, TimedCache::new(standings.clone()));

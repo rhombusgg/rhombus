@@ -52,9 +52,8 @@ pub async fn whois(
     ctx: Context<'_>,
     #[description = "User to look up"] user: serenity::all::User,
 ) -> std::result::Result<(), DiscordError> {
-    let db = ctx.data().db.lock().await;
-    if let Ok(rhombus_user) = db.get_user_from_discord_id(user.id.into()).await {
-        let rhombus_team = db.get_team_from_id(rhombus_user.team_id).await?;
+    if let Ok(rhombus_user) = ctx.data().db.get_user_from_discord_id(user.id.into()).await {
+        let rhombus_team = ctx.data().db.get_team_from_id(rhombus_user.team_id).await?;
         let location_url = &ctx.data().settings.read().await.location_url;
         let team_members_string = rhombus_team
             .users
@@ -350,10 +349,8 @@ pub async fn digest_channel(
         return Ok(());
     };
 
-    let db = data.db.lock().await;
-
     // dont send a digest if the user who made the ticket has linked their discord
-    let ticket_creator_user = db.get_user_from_id(ticket.user_id).await?;
+    let ticket_creator_user = data.db.get_user_from_id(ticket.user_id).await?;
     if ticket_creator_user.discord_id.is_some() {
         return Ok(());
     }
@@ -396,7 +393,10 @@ pub async fn digest_channel(
                         discord_id: ticket_creator_user.discord_id.map(|id| id.into()),
                         rhombus_id: Some(ticket_creator_user.id),
                     });
-                } else if let Ok(user) = db.get_user_from_discord_id(message.author.id.into()).await
+                } else if let Ok(user) = data
+                    .db
+                    .get_user_from_discord_id(message.author.id.into())
+                    .await
                 {
                     entry.insert(DigestAuthor {
                         name: user.name.clone(),
@@ -452,8 +452,6 @@ async fn event_handler(
         )
     };
 
-    let db = data.db.lock().await;
-
     if let Some(support_channel_id) = support_channel_id {
         let support_channel: ChannelId = support_channel_id.into();
         match event {
@@ -465,7 +463,8 @@ async fn event_handler(
                 if let Some(channel) = new_message.channel(ctx).await?.guild() {
                     if let Some(parent_id) = channel.parent_id {
                         if parent_id == support_channel {
-                            let ticket = db
+                            let ticket = data
+                                .db
                                 .get_ticket_by_discord_channel_id(channel.id.into())
                                 .await?;
                             digest_channel(ctx, data, channel.id, &ticket).await?;
@@ -481,7 +480,8 @@ async fn event_handler(
                 if let Some(channel) = event.channel_id.to_channel(ctx).await?.guild() {
                     if let Some(parent_id) = channel.parent_id {
                         if parent_id == support_channel {
-                            let ticket = db
+                            let ticket = data
+                                .db
                                 .get_ticket_by_discord_channel_id(channel.id.into())
                                 .await?;
                             digest_channel(ctx, data, channel.id, &ticket).await?;
@@ -497,7 +497,7 @@ async fn event_handler(
                             .unwrap();
 
                         let now = chrono::Utc::now();
-                        db.close_ticket(ticket_number, now).await?;
+                        data.db.close_ticket(ticket_number, now).await?;
 
                         interaction
                             .message
@@ -529,7 +529,7 @@ async fn event_handler(
                             .parse::<u64>()
                             .unwrap();
 
-                        db.reopen_ticket(ticket_number).await?;
+                        data.db.reopen_ticket(ticket_number).await?;
 
                         interaction
                             .message
@@ -698,9 +698,7 @@ impl Bot {
             return Ok(());
         }
 
-        let db = self.db.lock().await;
-
-        let ticket_number = db.get_next_ticket_number().await?;
+        let ticket_number = self.db.get_next_ticket_number().await?;
 
         let thread = ChannelId::from(support_channel_id.unwrap())
             .create_thread(
@@ -713,7 +711,8 @@ impl Bot {
             )
             .await?;
 
-        db.create_ticket(ticket_number, user.id, challenge.id, thread.id.into())
+        self.db
+            .create_ticket(ticket_number, user.id, challenge.id, thread.id.into())
             .await?;
 
         thread

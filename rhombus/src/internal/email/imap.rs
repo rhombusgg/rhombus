@@ -159,8 +159,6 @@ async fn receive_emails(
                 for message_id in in_reply_tos {
                     tracing::trace!(message_id, "Checking in-reply-tos");
                     if let Ok(Some(tn)) = db
-                        .lock()
-                        .await
                         .get_ticket_number_by_message_id(&format!("<{}>", message_id))
                         .await
                     {
@@ -175,8 +173,6 @@ async fn receive_emails(
                     for message_id in references {
                         tracing::trace!(message_id, "Checking references");
                         if let Ok(Some(tn)) = db
-                            .lock()
-                            .await
                             .get_ticket_number_by_message_id(&format!("<{}>", message_id))
                             .await
                         {
@@ -193,8 +189,6 @@ async fn receive_emails(
             };
 
             let main_message = reply_parser::visible_text(&text);
-
-            let db = db.lock().await;
 
             let Ok(ticket) = db.get_ticket_by_ticket_number(ticket_number).await else {
                 tracing::error!(ticket_number, "Failed to find ticket");

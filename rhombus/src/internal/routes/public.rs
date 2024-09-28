@@ -16,17 +16,15 @@ pub async fn route_public_user(
     Extension(page): Extension<PageMeta>,
     user_id: Path<i64>,
 ) -> impl IntoResponse {
-    let db = state.db.lock().await;
-
-    let Ok(public_user) = db.get_user_from_id(user_id.0).await else {
+    let Ok(public_user) = state.db.get_user_from_id(user_id.0).await else {
         return Json(json!({
             "error": "User not found",
         }))
         .into_response();
     };
 
-    let challenge_data = db.get_challenges();
-    let team = db.get_team_from_id(public_user.team_id);
+    let challenge_data = state.db.get_challenges();
+    let team = state.db.get_team_from_id(public_user.team_id);
     let (challenge_data, team) = tokio::join!(challenge_data, team);
     let challenge_data = challenge_data.unwrap();
     let team = team.unwrap();
@@ -69,17 +67,15 @@ pub async fn route_public_team(
     Extension(page): Extension<PageMeta>,
     team_id: Path<i64>,
 ) -> impl IntoResponse {
-    let db = state.db.lock().await;
-
-    let Ok(team) = db.get_team_from_id(team_id.0).await else {
+    let Ok(team) = state.db.get_team_from_id(team_id.0).await else {
         return Json(json!({
             "error": "Team not found",
         }))
         .into_response();
     };
 
-    let challenge_data = db.get_challenges();
-    let standings = db.get_team_standings(team_id.0);
+    let challenge_data = state.db.get_challenges();
+    let standings = state.db.get_team_standings(team_id.0);
     let (challenge_data, standings) = tokio::join!(challenge_data, standings);
     let challenge_data = challenge_data.unwrap();
     let standings = standings.unwrap();

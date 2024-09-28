@@ -8,7 +8,6 @@ use std::{
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use tokio::sync::Mutex;
 use tokio_util::bytes::Bytes;
 
 use crate::{
@@ -16,8 +15,8 @@ use crate::{
     Result,
 };
 
-pub type Connection = Arc<Mutex<dyn Database + Send + Sync>>;
-pub type WeakConnection = Weak<Mutex<dyn Database + Send + Sync>>;
+pub type Connection = Arc<dyn Database + Send + Sync>;
+pub type WeakConnection = Weak<dyn Database + Send + Sync>;
 
 #[derive(Debug, Serialize, Clone)]
 pub enum ScoringType {

@@ -16,7 +16,7 @@ pub trait DivisionEligible {
     async fn is_user_eligible(
         &self,
         user_id: i64,
-        db: &MutexGuard<dyn Database + Send + Sync>,
+        db: &Arc<dyn Database + Send + Sync>,
     ) -> std::result::Result<bool, String>;
 }
 
@@ -40,7 +40,7 @@ impl DivisionEligible for EmailDivisionEligibilityProvider {
     async fn is_user_eligible(
         &self,
         user_id: i64,
-        db: &MutexGuard<dyn Database + Send + Sync>,
+        db: &Arc<dyn Database + Send + Sync>,
     ) -> std::result::Result<bool, String> {
         let emails = db.get_emails_for_user_id(user_id).await.unwrap();
         let eligible = emails
@@ -63,7 +63,7 @@ impl DivisionEligible for OpenDivisionEligibilityProvider {
     async fn is_user_eligible(
         &self,
         _user_id: i64,
-        _db: &MutexGuard<dyn Database + Send + Sync>,
+        _db: &Arc<dyn Database + Send + Sync>,
     ) -> std::result::Result<bool, String> {
         Ok(true)
     }
