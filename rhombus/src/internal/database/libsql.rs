@@ -44,25 +44,55 @@ use crate::{
 #[derive(Clone)]
 pub struct LocalLibSQL {
     pub conn: libsql::Connection,
+    pub lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl LocalLibSQL {
     pub async fn new_local(path: impl AsRef<Path>) -> Result<LocalLibSQL> {
         let db = Builder::new_local(path).build().await?;
         let conn = db.connect()?;
-        Ok(LocalLibSQL { conn })
+        Ok(LocalLibSQL {
+            conn,
+            lock: Arc::new(tokio::sync::Mutex::new(())),
+        })
     }
 
     pub async fn new_memory() -> Result<LocalLibSQL> {
         let db = Builder::new_local(":memory:").build().await?;
         let conn = db.connect()?;
-        Ok(LocalLibSQL { conn })
+        Ok(LocalLibSQL {
+            conn,
+            lock: Arc::new(tokio::sync::Mutex::new(())),
+        })
     }
 }
 
 impl LibSQLConnection for LocalLibSQL {
     fn connect(&self) -> Result<libsql::Connection> {
         Ok(self.conn.to_owned())
+    }
+    fn transaction(&self) -> Pin<Box<dyn Future<Output = Result<libsql::Transaction>> + Send>> {
+        let conn = self.connect();
+        let lock = self.lock.clone();
+        Box::pin(async move {
+            _ = lock.lock().await;
+            let conn = conn?;
+            let mut count = 0;
+            loop {
+                match conn.transaction().await {
+                    Ok(tx) => {
+                        return Ok(tx);
+                    }
+                    Err(e) => {
+                        count += 1;
+                        if count > 10 {
+                            return Err(crate::errors::RhombusError::LibSQL(e));
+                        }
+                        tokio::time::sleep(Duration::from_millis(100)).await;
+                    }
+                }
+            }
+        })
     }
 }
 
@@ -71,13 +101,19 @@ impl TryFrom<libsql::Database> for LocalLibSQL {
 
     fn try_from(db: libsql::Database) -> Result<Self> {
         let conn = db.connect()?;
-        Ok(LocalLibSQL { conn })
+        Ok(LocalLibSQL {
+            conn,
+            lock: Arc::new(tokio::sync::Mutex::new(())),
+        })
     }
 }
 
 impl From<libsql::Connection> for LocalLibSQL {
     fn from(conn: libsql::Connection) -> Self {
-        LocalLibSQL { conn }
+        LocalLibSQL {
+            conn,
+            lock: Arc::new(tokio::sync::Mutex::new(())),
+        }
     }
 }
 
@@ -114,10 +150,6 @@ impl LibSQLConnection for RemoteLibSQL {
     fn connect(&self) -> Result<libsql::Connection> {
         Ok(self.db.connect()?)
     }
-}
-
-pub trait LibSQLConnection {
-    fn connect(&self) -> Result<libsql::Connection>;
     fn transaction(&self) -> Pin<Box<dyn Future<Output = Result<libsql::Transaction>> + Send>> {
         let conn = self.connect();
         Box::pin(async move {
@@ -141,6 +173,11 @@ pub trait LibSQLConnection {
     }
 }
 
+pub trait LibSQLConnection {
+    fn connect(&self) -> Result<libsql::Connection>;
+    fn transaction(&self) -> Pin<Box<dyn Future<Output = Result<libsql::Transaction>> + Send>>;
+}
+
 pub enum LibSQL {
     Local(LocalLibSQL),
     Remote(RemoteLibSQL),
@@ -152,6 +189,27 @@ impl LibSQLConnection for LibSQL {
             LibSQL::Local(local) => local.connect(),
             LibSQL::Remote(remote) => remote.connect(),
         }
+    }
+    fn transaction(&self) -> Pin<Box<dyn Future<Output = Result<libsql::Transaction>> + Send>> {
+        let conn = self.connect();
+        Box::pin(async move {
+            let conn = conn?;
+            let mut count = 0;
+            loop {
+                match conn.transaction().await {
+                    Ok(tx) => {
+                        return Ok(tx);
+                    }
+                    Err(e) => {
+                        count += 1;
+                        if count > 10 {
+                            return Err(crate::errors::RhombusError::LibSQL(e));
+                        }
+                        tokio::time::sleep(Duration::from_millis(100)).await;
+                    }
+                }
+            }
+        })
     }
 }
 
