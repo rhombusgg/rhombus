@@ -631,12 +631,10 @@ const ChallengesComponent = ({
                                 stroke-width="2"
                                 stroke-linecap="round"
                                 stroke-linejoin="round"
-                                class="lucide lucide-expand"
+                                class="lucide lucide-flag"
                               >
-                                <path d="m21 21-6-6m6 6v-4.8m0 4.8h-4.8" />
-                                <path d="M3 16.2V21m0 0h4.8M3 21l6-6" />
-                                <path d="M21 7.8V3m0 0h-4.8M21 3l-6 6" />
-                                <path d="M3 7.8V3m0 0h4.8M3 3l6 6" />
+                                <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+                                <line x1="4" x2="4" y1="22" y2="15" />
                               </svg>
                             </button>
                           </div>
