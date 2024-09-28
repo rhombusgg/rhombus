@@ -8,6 +8,7 @@ use std::{
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
+use tokio::sync::Mutex;
 use tokio_util::bytes::Bytes;
 
 use crate::{
@@ -15,8 +16,8 @@ use crate::{
     Result,
 };
 
-pub type Connection = Arc<dyn Database + Send + Sync>;
-pub type WeakConnection = Weak<dyn Database + Send + Sync>;
+pub type Connection = Arc<Mutex<dyn Database + Send + Sync>>;
+pub type WeakConnection = Weak<Mutex<dyn Database + Send + Sync>>;
 
 #[derive(Debug, Serialize, Clone)]
 pub enum ScoringType {
@@ -224,6 +225,9 @@ pub enum SetTeamNameError {
 
 #[async_trait]
 pub trait Database {
+    async fn get_raw_libsql(&self) -> Option<libsql::Connection> {
+        None
+    }
     async fn migrate(&self) -> Result<()>;
     async fn get_challenges(&self) -> Result<Challenges>;
     async fn set_challenge_health(

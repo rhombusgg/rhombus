@@ -42,8 +42,9 @@ pub async fn route_challenges(
         }
     }
 
-    let challenge_data = state.db.get_challenges();
-    let team = state.db.get_team_from_id(user.team_id);
+    let db = state.db.lock().await;
+    let challenge_data = db.get_challenges();
+    let team = db.get_team_from_id(user.team_id);
     let (challenge_data, team) = tokio::join!(challenge_data, team);
     let challenge_data = challenge_data.unwrap();
     let team = team.unwrap();
@@ -152,9 +153,10 @@ pub async fn route_challenge_view(
         }
     }
 
-    let challenge_data = state.db.get_challenges();
-    let team = state.db.get_team_from_id(user.team_id);
-    let user_writeups = state.db.get_writeups_from_user_id(user.id);
+    let db = state.db.lock().await;
+    let challenge_data = db.get_challenges();
+    let team = db.get_team_from_id(user.team_id);
+    let user_writeups = db.get_writeups_from_user_id(user.id);
     let (challenge_data, team, user_writeups) = tokio::join!(challenge_data, team, user_writeups);
     let challenge_data = challenge_data.unwrap();
     let team = team.unwrap();
@@ -208,8 +210,8 @@ pub async fn route_ticket_view(
         }
     }
 
-    let lasted_ticket_opened_at = state
-        .db
+    let db = state.db.lock().await;
+    let lasted_ticket_opened_at = db
         .get_last_created_ticket_time(user.id)
         .await
         .unwrap()
@@ -227,8 +229,8 @@ pub async fn route_ticket_view(
             .into_response();
     }
 
-    let challenge_data = state.db.get_challenges();
-    let team = state.db.get_team_from_id(user.team_id);
+    let challenge_data = db.get_challenges();
+    let team = db.get_team_from_id(user.team_id);
     let (challenge_data, team) = tokio::join!(challenge_data, team);
     let challenge_data = challenge_data.unwrap();
     let team = team.unwrap();
@@ -310,8 +312,8 @@ pub async fn route_ticket_submit(
             .into_response();
     }
 
-    let lasted_ticket_opened_at = state
-        .db
+    let db = state.db.lock().await;
+    let lasted_ticket_opened_at = db
         .get_last_created_ticket_time(user.id)
         .await
         .unwrap()
@@ -346,8 +348,8 @@ pub async fn route_ticket_submit(
             .into_response();
     }
 
-    let challenge_data = state.db.get_challenges();
-    let team = state.db.get_team_from_id(user.team_id);
+    let challenge_data = db.get_challenges();
+    let team = db.get_team_from_id(user.team_id);
     let (challenge_data, team) = tokio::join!(challenge_data, team);
     let challenge_data = challenge_data.unwrap();
     let team = team.unwrap();
@@ -410,7 +412,8 @@ pub async fn route_challenge_submit(
         }
     }
 
-    let challenge_data = state.db.get_challenges().await.unwrap();
+    let db = state.db.lock().await;
+    let challenge_data = db.get_challenges().await.unwrap();
     let challenge = challenge_data
         .challenges
         .iter()
@@ -452,10 +455,7 @@ pub async fn route_challenge_submit(
         }
     }
 
-    let first_bloods = state
-        .db
-        .solve_challenge(user.id, user.team_id, challenge)
-        .await;
+    let first_bloods = db.solve_challenge(user.id, user.team_id, challenge).await;
 
     if let Err(error) = first_bloods {
         tracing::error!("{:#?}", error);
@@ -488,7 +488,7 @@ pub async fn route_challenge_submit(
             let first_bloods = first_bloods.unwrap();
 
             if !first_bloods.division_ids.is_empty() {
-                let team = state.db.get_team_from_id(user.team_id).await.unwrap();
+                let team = db.get_team_from_id(user.team_id).await.unwrap();
                 _ = bot
                     .send_first_blood(
                         &user,
@@ -642,6 +642,8 @@ pub async fn route_writeup_submit(
 
     state
         .db
+        .lock()
+        .await
         .add_writeup(user.id, user.team_id, challenge_id.0, &form.url)
         .await
         .unwrap();
@@ -670,6 +672,8 @@ pub async fn route_writeup_delete(
 
     state
         .db
+        .lock()
+        .await
         .delete_writeup(challenge_id.0, user.id, user.team_id)
         .await
         .unwrap();

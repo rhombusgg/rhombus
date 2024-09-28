@@ -25,6 +25,8 @@ pub fn track_flusher(db: Connection) {
                 let key = track.key();
                 let count = *track;
                 if db
+                    .lock()
+                    .await
                     .insert_track(key.0, key.1.as_deref(), key.2, count)
                     .await
                     .is_ok()

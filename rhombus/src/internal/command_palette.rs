@@ -7,7 +7,7 @@ pub async fn route_command_palette_items(
     state: State<RouterState>,
     Extension(user): Extension<MaybeUser>,
 ) -> impl IntoResponse {
-    let challenge_data = state.db.get_challenges().await.unwrap();
+    let challenge_data = state.db.lock().await.get_challenges().await.unwrap();
 
     let divisions = state
         .divisions

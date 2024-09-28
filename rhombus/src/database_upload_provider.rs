@@ -64,7 +64,11 @@ impl UploadProvider for DatabaseUploadProvider {
         hasher.update(&buffer);
         let hash = slice_to_hex_string(hasher.finalize().as_slice());
 
-        self.db.upload_file(&hash, filename, &buffer).await?;
+        self.db
+            .lock()
+            .await
+            .upload_file(&hash, filename, &buffer)
+            .await?;
 
         let url = format!("/uploads/{}-{}", hash, filename);
 
@@ -89,7 +93,7 @@ pub async fn route_database_download(
         return (StatusCode::BAD_REQUEST, "Invalid path".to_owned()).into_response();
     };
 
-    let (contents, db_filename) = state.db.download_file(hash).await.unwrap();
+    let (contents, db_filename) = state.db.lock().await.download_file(hash).await.unwrap();
 
     if filename != db_filename {
         return (StatusCode::NOT_FOUND, "Not Found").into_response();

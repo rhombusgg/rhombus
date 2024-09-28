@@ -134,7 +134,8 @@ pub async fn route_default_og_image(state: State<RouterState>) -> impl IntoRespo
         }
     };
 
-    let stats = state.db.get_site_statistics().await.unwrap();
+    let db = state.db.lock().await;
+    let stats = db.get_site_statistics().await.unwrap();
 
     let ctftime = match &state.settings.read().await.ctftime {
         Some(ctftime) => 'arm: {
@@ -193,11 +194,7 @@ pub async fn route_default_og_image(state: State<RouterState>) -> impl IntoRespo
     let mut division_meta = Vec::with_capacity(state.divisions.len());
     for division in state.divisions.iter() {
         let mut places = Vec::with_capacity(3);
-        let leaderboard = state
-            .db
-            .get_leaderboard(division.id, Some(0))
-            .await
-            .unwrap();
+        let leaderboard = db.get_leaderboard(division.id, Some(0)).await.unwrap();
         leaderboard.entries.iter().take(3).for_each(|entry| {
             places.push(TeamMeta {
                 name: entry.team_name.clone(),
@@ -255,7 +252,8 @@ pub async fn route_team_og_image(
     state: State<RouterState>,
     team_id: Path<i64>,
 ) -> impl IntoResponse {
-    let Ok(team) = state.db.get_team_from_id(team_id.0).await else {
+    let db = state.db.lock().await;
+    let Ok(team) = db.get_team_from_id(team_id.0).await else {
         return Json(json!({
             "error": "Team not found",
         }))
@@ -269,8 +267,8 @@ pub async fn route_team_og_image(
             .unwrap();
     }
 
-    let challenge_data = state.db.get_challenges();
-    let standings = state.db.get_team_standings(team_id.0);
+    let challenge_data = db.get_challenges();
+    let standings = db.get_team_standings(team_id.0);
     let (challenge_data, standings) = tokio::join!(challenge_data, standings);
     let challenge_data = challenge_data.unwrap();
     let standings = standings.unwrap();
@@ -386,7 +384,8 @@ pub async fn route_user_og_image(
     state: State<RouterState>,
     user_id: Path<i64>,
 ) -> impl IntoResponse {
-    let Ok(user) = state.db.get_user_from_id(user_id.0).await else {
+    let db = state.db.lock().await;
+    let Ok(user) = db.get_user_from_id(user_id.0).await else {
         return Json(json!({
             "error": "User not found",
         }))
@@ -400,8 +399,8 @@ pub async fn route_user_og_image(
             .unwrap();
     }
 
-    let challenge_data = state.db.get_challenges();
-    let team = state.db.get_team_from_id(user.team_id);
+    let challenge_data = db.get_challenges();
+    let team = db.get_team_from_id(user.team_id);
     let (challenge_data, team) = tokio::join!(challenge_data, team);
     let challenge_data = challenge_data.unwrap();
     let team = team.unwrap();

@@ -90,10 +90,10 @@ use crate::{
 
 pub enum RawDb {
     #[cfg(feature = "postgres")]
-    Postgres(Arc<crate::internal::database::postgres::Postgres>),
+    Postgres(Arc<Mutex<crate::internal::database::postgres::Postgres>>),
 
     #[cfg(feature = "libsql")]
-    LibSQL(Arc<crate::internal::database::libsql::LibSQL>),
+    LibSQL(Arc<Mutex<crate::internal::database::libsql::LibSQL>>),
 
     Plugin(Box<dyn Any + Send + Sync>),
 }
@@ -258,7 +258,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     let database = crate::internal::database::postgres::Postgres::new(pool.clone());
                     database.migrate().await?;
 
-                    let db = Arc::new(database);
+                    let db = Arc::new(Mutex::new(database));
                     return Ok((db.clone(), RawDb::Postgres(db)));
                 }
 
@@ -270,7 +270,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
                     let libsql_database: crate::internal::database::libsql::LibSQL =
                         database.into();
-                    let db = Arc::new(libsql_database);
+                    let db = Arc::new(Mutex::new(libsql_database));
                     return Ok((db.clone(), RawDb::LibSQL(db)));
                 }
 
@@ -282,7 +282,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
                     let libsql_database: crate::internal::database::libsql::LibSQL =
                         database.into();
-                    let db = Arc::new(libsql_database);
+                    let db = Arc::new(Mutex::new(libsql_database));
                     return Ok((db.clone(), RawDb::LibSQL(db)));
                 }
             }
@@ -306,7 +306,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     let database = crate::internal::database::postgres::Postgres::new(pool.clone());
                     database.migrate().await?;
 
-                    let db = Arc::new(database);
+                    let db = Arc::new(Mutex::new(database));
                     return Ok((db.clone(), RawDb::Postgres(db)));
                 }
             }
@@ -331,7 +331,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
                     let libsql_database: crate::internal::database::libsql::LibSQL =
                         database.into();
-                    let db = Arc::new(libsql_database);
+                    let db = Arc::new(Mutex::new(libsql_database));
                     return Ok((db.clone(), RawDb::LibSQL(db)));
                 }
             }
@@ -373,7 +373,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
                         let libsql_database: crate::internal::database::libsql::LibSQL =
                             database.into();
-                        let db = Arc::new(libsql_database);
+                        let db = Arc::new(Mutex::new(libsql_database));
                         return Ok((db.clone(), RawDb::LibSQL(db)));
                     }
                 } else {
@@ -404,7 +404,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
                     let libsql_database: crate::internal::database::libsql::LibSQL =
                         database.into();
-                    let db = Arc::new(libsql_database);
+                    let db = Arc::new(Mutex::new(libsql_database));
                     return Ok((db.clone(), RawDb::LibSQL(db)));
                 }
             }
@@ -425,7 +425,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
             database.migrate().await?;
 
             let libsql_database: crate::internal::database::libsql::LibSQL = database.into();
-            let db = Arc::new(libsql_database);
+            let db = Arc::new(Mutex::new(libsql_database));
             Ok((db.clone(), RawDb::LibSQL(db)))
         }
 
@@ -478,9 +478,6 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 self_arc.build_database(&settings).await?
             };
 
-            db.load_settings(&mut settings).await?;
-            db.save_settings(&settings).await?;
-
             let mut divisions = if let Some(divisions) = &settings.divisions {
                 divisions
                     .iter()
@@ -488,7 +485,6 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                         let division_eligibility: DivisionEligibilityProvider =
                             if let Some(email_regex) = &division.email_regex {
                                 Arc::new(EmailDivisionEligibilityProvider::new(
-                                    db.clone(),
                                     email_regex,
                                     division.requirement.clone(),
                                 ))
@@ -551,14 +547,14 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     let duration = 360;
                     info!(duration, "Enabling default in memory cache");
                     database_cache_evictor(duration);
-                    Arc::new(DbCache::new(db.clone()))
+                    Arc::new(Mutex::new(DbCache::new(db.clone())))
                 }
                 duration => {
                     if let Ok(duration) = duration.parse::<u64>() {
                         if duration >= 5 {
                             info!(duration, "Enabling default in memory cache");
                             database_cache_evictor(duration);
-                            Arc::new(DbCache::new(db.clone()))
+                            Arc::new(Mutex::new(DbCache::new(db.clone())))
                         } else {
                             info!(
                                 duration,
@@ -926,7 +922,9 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
             }
             healthcheck_runner(Arc::downgrade(&cached_db));
 
-            cached_db.insert_divisions(&divisions).await?;
+            {
+                cached_db.lock().await.insert_divisions(&divisions).await?;
+            }
 
             let global_page_meta = Arc::new(GlobalPageMeta {
                 title: settings.read().await.title.clone(),

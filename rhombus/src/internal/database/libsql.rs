@@ -18,6 +18,7 @@ use libsql::{de, params, Builder, Transaction};
 use rand::{rngs::OsRng, Rng};
 use rust_embed::RustEmbed;
 use serde::Deserialize;
+use tokio::sync::Mutex;
 use tokio_util::bytes::Bytes;
 
 use crate::{
@@ -43,6 +44,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct LocalLibSQL {
+    pub lock: Arc<Mutex<()>>,
     pub conn: libsql::Connection,
 }
 
@@ -50,13 +52,19 @@ impl LocalLibSQL {
     pub async fn new_local(path: impl AsRef<Path>) -> Result<LocalLibSQL> {
         let db = Builder::new_local(path).build().await?;
         let conn = db.connect()?;
-        Ok(LocalLibSQL { conn })
+        Ok(LocalLibSQL {
+            conn,
+            lock: Arc::new(Mutex::new(())),
+        })
     }
 
     pub async fn new_memory() -> Result<LocalLibSQL> {
         let db = Builder::new_local(":memory:").build().await?;
         let conn = db.connect()?;
-        Ok(LocalLibSQL { conn })
+        Ok(LocalLibSQL {
+            conn,
+            lock: Arc::new(Mutex::new(())),
+        })
     }
 }
 
@@ -71,13 +79,19 @@ impl TryFrom<libsql::Database> for LocalLibSQL {
 
     fn try_from(db: libsql::Database) -> Result<Self> {
         let conn = db.connect()?;
-        Ok(LocalLibSQL { conn })
+        Ok(LocalLibSQL {
+            conn,
+            lock: Arc::new(Mutex::new(())),
+        })
     }
 }
 
 impl From<libsql::Connection> for LocalLibSQL {
     fn from(conn: libsql::Connection) -> Self {
-        LocalLibSQL { conn }
+        LocalLibSQL {
+            conn,
+            lock: Arc::new(Mutex::new(())),
+        }
     }
 }
 
@@ -116,16 +130,36 @@ impl LibSQLConnection for RemoteLibSQL {
     }
 }
 
+// pub struct RhombusTransaction {
+//     pub tx: Arc<Mutex<libsql::Transaction>>,
+// }
+
+// impl RhombusTransaction {
+//     pub async fn get(&self) -> Result<libsql::Transaction> {
+//         self.tx
+//             .lock()
+//             .await
+//             .transaction()
+//             .await
+//             .map_err(|e| crate::errors::RhombusError::LibSQL(e))
+//     }
+// }
+
 pub trait LibSQLConnection {
     fn connect(&self) -> Result<libsql::Connection>;
     fn transaction(&self) -> Pin<Box<dyn Future<Output = Result<libsql::Transaction>> + Send>> {
         let conn = self.connect();
         Box::pin(async move {
             let conn = conn?;
-
             conn.transaction()
                 .await
                 .map_err(|e| crate::errors::RhombusError::LibSQL(e))
+
+            // let tx = Arc::new(Mutex::new(
+            //     conn.transaction()
+            //         .await
+            //         .map_err(|e| crate::errors::RhombusError::LibSQL(e)),
+            // ));
         })
     }
 }
@@ -161,7 +195,10 @@ impl From<RemoteLibSQL> for LibSQL {
 struct Migrations;
 
 #[async_trait]
-impl<T: LibSQLConnection + Send + Sync> Database for T {
+impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
+    async fn get_raw_libsql(&self) -> Option<libsql::Connection> {
+        self.connect().ok()
+    }
     async fn migrate(&self) -> Result<()> {
         self.connect()?
             .execute_batch(

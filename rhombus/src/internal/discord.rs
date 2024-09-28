@@ -52,8 +52,9 @@ pub async fn whois(
     ctx: Context<'_>,
     #[description = "User to look up"] user: serenity::all::User,
 ) -> std::result::Result<(), DiscordError> {
-    if let Ok(rhombus_user) = ctx.data().db.get_user_from_discord_id(user.id.into()).await {
-        let rhombus_team = ctx.data().db.get_team_from_id(rhombus_user.team_id).await?;
+    let db = ctx.data().db.lock().await;
+    if let Ok(rhombus_user) = db.get_user_from_discord_id(user.id.into()).await {
+        let rhombus_team = db.get_team_from_id(rhombus_user.team_id).await?;
         let location_url = &ctx.data().settings.read().await.location_url;
         let team_members_string = rhombus_team
             .users
@@ -111,11 +112,11 @@ pub async fn firstbloods(
         return Ok(());
     }
 
-    {
-        let mut settings = ctx.data().settings.write().await;
-        settings.discord.as_mut().unwrap().first_blood_channel_id = Some(channel.id.into());
-        ctx.data().db.save_settings(&settings).await?;
-    }
+    // {
+    //     let mut settings = ctx.data().settings.write().await;
+    //     settings.discord.as_mut().unwrap().first_blood_channel_id = Some(channel.id.into());
+    //     ctx.data().db.save_settings(&settings).await?;
+    // }
 
     ctx.reply(format!(
         "Successfully bound <#{}> as the first blood channel",
@@ -147,11 +148,11 @@ pub async fn support_link(
         return Ok(());
     }
 
-    {
-        let mut settings = ctx.data().settings.write().await;
-        settings.discord.as_mut().unwrap().support_channel_id = Some(channel.id.into());
-        ctx.data().db.save_settings(&settings).await?;
-    }
+    // {
+    //     let mut settings = ctx.data().settings.write().await;
+    //     settings.discord.as_mut().unwrap().support_channel_id = Some(channel.id.into());
+    //     ctx.data().db.save_settings(&settings).await?;
+    // }
 
     ctx.reply(format!(
         "Successfully bound <#{}> as the support channel",
@@ -214,11 +215,11 @@ pub async fn author(
         return Ok(());
     }
 
-    {
-        let mut settings = ctx.data().settings.write().await;
-        settings.discord.as_mut().unwrap().author_role_id = Some(role.id.into());
-        ctx.data().db.save_settings(&settings).await?;
-    }
+    // {
+    //     let mut settings = ctx.data().settings.write().await;
+    //     settings.discord.as_mut().unwrap().author_role_id = Some(role.id.into());
+    //     ctx.data().db.save_settings(&settings).await?;
+    // }
 
     ctx.reply(format!(
         "Successfully bound <@&{}> as the author role",
@@ -241,11 +242,11 @@ pub async fn verified(
         return Ok(());
     }
 
-    {
-        let mut settings = ctx.data().settings.write().await;
-        settings.discord.as_mut().unwrap().verified_role_id = Some(role.id.into());
-        ctx.data().db.save_settings(&settings).await?;
-    }
+    // {
+    //     let mut settings = ctx.data().settings.write().await;
+    //     settings.discord.as_mut().unwrap().verified_role_id = Some(role.id.into());
+    //     ctx.data().db.save_settings(&settings).await?;
+    // }
 
     ctx.reply(format!(
         "Successfully bound <@&{}> as the verified role",
@@ -349,8 +350,10 @@ pub async fn digest_channel(
         return Ok(());
     };
 
+    let db = data.db.lock().await;
+
     // dont send a digest if the user who made the ticket has linked their discord
-    let ticket_creator_user = data.db.get_user_from_id(ticket.user_id).await?;
+    let ticket_creator_user = db.get_user_from_id(ticket.user_id).await?;
     if ticket_creator_user.discord_id.is_some() {
         return Ok(());
     }
@@ -393,10 +396,7 @@ pub async fn digest_channel(
                         discord_id: ticket_creator_user.discord_id.map(|id| id.into()),
                         rhombus_id: Some(ticket_creator_user.id),
                     });
-                } else if let Ok(user) = data
-                    .db
-                    .get_user_from_discord_id(message.author.id.into())
-                    .await
+                } else if let Ok(user) = db.get_user_from_discord_id(message.author.id.into()).await
                 {
                     entry.insert(DigestAuthor {
                         name: user.name.clone(),
@@ -452,6 +452,8 @@ async fn event_handler(
         )
     };
 
+    let db = data.db.lock().await;
+
     if let Some(support_channel_id) = support_channel_id {
         let support_channel: ChannelId = support_channel_id.into();
         match event {
@@ -463,8 +465,7 @@ async fn event_handler(
                 if let Some(channel) = new_message.channel(ctx).await?.guild() {
                     if let Some(parent_id) = channel.parent_id {
                         if parent_id == support_channel {
-                            let ticket = data
-                                .db
+                            let ticket = db
                                 .get_ticket_by_discord_channel_id(channel.id.into())
                                 .await?;
                             digest_channel(ctx, data, channel.id, &ticket).await?;
@@ -480,8 +481,7 @@ async fn event_handler(
                 if let Some(channel) = event.channel_id.to_channel(ctx).await?.guild() {
                     if let Some(parent_id) = channel.parent_id {
                         if parent_id == support_channel {
-                            let ticket = data
-                                .db
+                            let ticket = db
                                 .get_ticket_by_discord_channel_id(channel.id.into())
                                 .await?;
                             digest_channel(ctx, data, channel.id, &ticket).await?;
@@ -497,7 +497,7 @@ async fn event_handler(
                             .unwrap();
 
                         let now = chrono::Utc::now();
-                        data.db.close_ticket(ticket_number, now).await?;
+                        db.close_ticket(ticket_number, now).await?;
 
                         interaction
                             .message
@@ -529,7 +529,7 @@ async fn event_handler(
                             .parse::<u64>()
                             .unwrap();
 
-                        data.db.reopen_ticket(ticket_number).await?;
+                        db.reopen_ticket(ticket_number).await?;
 
                         interaction
                             .message
@@ -698,7 +698,9 @@ impl Bot {
             return Ok(());
         }
 
-        let ticket_number = self.db.get_next_ticket_number().await?;
+        let db = self.db.lock().await;
+
+        let ticket_number = db.get_next_ticket_number().await?;
 
         let thread = ChannelId::from(support_channel_id.unwrap())
             .create_thread(
@@ -711,8 +713,7 @@ impl Bot {
             )
             .await?;
 
-        self.db
-            .create_ticket(ticket_number, user.id, challenge.id, thread.id.into())
+        db.create_ticket(ticket_number, user.id, challenge.id, thread.id.into())
             .await?;
 
         thread

@@ -6,6 +6,7 @@ use crate::internal::database::provider::{Connection, WeakConnection};
 
 pub async fn healthcheck_catch_up(db: Connection) {
     tracing::info!("Running healthcheck catch-up");
+    let db = db.lock().await;
     let challenges = db.get_challenges().await.unwrap();
 
     for challenge in &challenges.challenges {
@@ -41,6 +42,7 @@ pub fn healthcheck_runner(db: WeakConnection) {
             let Some(db) = db.upgrade() else {
                 break;
             };
+            let db = db.lock().await;
             let Ok(challenges) = db.get_challenges().await else {
                 break;
             };

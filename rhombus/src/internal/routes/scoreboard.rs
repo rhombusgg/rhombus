@@ -11,17 +11,17 @@ use serde_json::json;
 use crate::internal::{auth::MaybeUser, router::RouterState, routes::meta::PageMeta};
 
 pub async fn route_scoreboard(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     user: Extension<MaybeUser>,
     page: Extension<PageMeta>,
     params: Query<PageParams>,
     uri: Uri,
 ) -> impl IntoResponse {
-    let challenge_data = state.db.get_challenges().await.unwrap();
+    let challenge_data = state.db.lock().await.get_challenges().await.unwrap();
     let default_division = challenge_data.divisions.keys().next().unwrap();
     if challenge_data.divisions.len() == 1 {
         return route_scoreboard_division(
-            state,
+            State(state),
             user,
             page,
             Path(default_division.to_string()),
@@ -70,9 +70,11 @@ pub async fn route_scoreboard_division(
         return Err::<(), &str>("Failed to parse division ID as integer").into_response();
     };
 
-    let scoreboard = state.db.get_scoreboard(division_id);
-    let challenge_data = state.db.get_challenges();
-    let leaderboard = state.db.get_leaderboard(division_id, Some(page_num));
+    let db = state.db.lock().await;
+
+    let scoreboard = db.get_scoreboard(division_id);
+    let challenge_data = db.get_challenges();
+    let leaderboard = db.get_leaderboard(division_id, Some(page_num));
     let (scoreboard, challenge_data, leaderboard) =
         futures::future::try_join3(scoreboard, challenge_data, leaderboard)
             .await
@@ -109,8 +111,10 @@ pub async fn route_scoreboard_division_ctftime(
     state: State<RouterState>,
     Path(division_id): Path<i64>,
 ) -> impl IntoResponse {
-    let challenge_data = state.db.get_challenges().await.unwrap();
-    let leaderboard = state.db.get_leaderboard(division_id, None).await.unwrap();
+    let db = state.db.lock().await;
+
+    let challenge_data = db.get_challenges().await.unwrap();
+    let leaderboard = db.get_leaderboard(division_id, None).await.unwrap();
 
     let tasks = challenge_data
         .challenges

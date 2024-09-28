@@ -21,6 +21,7 @@ use minijinja::context;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tokio::sync::MutexGuard;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::internal::{
@@ -29,6 +30,8 @@ use crate::internal::{
     router::RouterState,
     routes::{meta::PageMeta, team::create_team_invite_token},
 };
+
+use super::database::provider::Database;
 
 #[derive(Debug, Serialize, Clone)]
 pub struct UserInner {
@@ -117,7 +120,13 @@ pub async fn auth_injector_middleware(
         ) {
             req.extensions_mut().insert(Some(token_data.claims.clone()));
             req.extensions_mut().insert(token_data.claims.clone());
-            if let Ok(user) = state.db.get_user_from_id(token_data.claims.sub).await {
+            if let Ok(user) = state
+                .db
+                .lock()
+                .await
+                .get_user_from_id(token_data.claims.sub)
+                .await
+            {
                 req.extensions_mut().insert(Some(user.clone()));
                 req.extensions_mut().insert(user);
             }
@@ -146,21 +155,22 @@ pub async fn route_signin(
 
     let mut team_name = None;
 
+    let db = state.db.lock().await;
+
     if let Some(url_invite_token) = &params.token {
-        if let Some(team_meta) = state
-            .db
+        if let Some(team_meta) = db
             .get_team_meta_from_invite_token(url_invite_token)
             .await
             .unwrap_or(None)
         {
-            let new_team = state.db.get_team_from_id(team_meta.id).await.unwrap();
+            let new_team = db.get_team_from_id(team_meta.id).await.unwrap();
 
             // You cannot join a team in which the owner has left (and is on a different team themselves). This doesn't
             // need an error page, it should just count as an invalid invite token and not register.
             if !new_team.users.is_empty() {
                 if let Some(user) = &user {
                     // you cannot join a team if your current team has more than just you on it
-                    let old_team = state.db.get_team_from_id(user.team_id).await.unwrap();
+                    let old_team = db.get_team_from_id(user.team_id).await.unwrap();
                     if old_team.users.len() > 1 {
                         // return Json(json!({
                         //     "message": "You cannot join a team while your old team has other members in it."
@@ -184,8 +194,8 @@ pub async fn route_signin(
 
                     // you cannot join a team if the new team if, as a result of you joining it would
                     // lead to the team having more players than the minimum required by any division
-                    let team_divisions = state.db.get_team_divisions(team_meta.id).await.unwrap();
-                    let user_divisions = state.db.get_user_divisions(user.id).await.unwrap();
+                    let team_divisions = db.get_team_divisions(team_meta.id).await.unwrap();
+                    let user_divisions = db.get_user_divisions(user.id).await.unwrap();
 
                     let max_players = state
                         .divisions
@@ -254,9 +264,7 @@ pub async fn route_signin(
                         return Html(html).into_response();
                     }
 
-                    state
-                        .db
-                        .add_user_to_team(user.id, team_meta.id, Some(old_team.id))
+                    db.add_user_to_team(user.id, team_meta.id, Some(old_team.id))
                         .await
                         .unwrap();
                     return Redirect::to("/team").into_response();
@@ -568,8 +576,9 @@ pub async fn route_signin_discord_callback(
         )
     };
 
-    let Ok((user_id, team_id)) = state
-        .db
+    let db = state.db.lock().await;
+
+    let Ok((user_id, team_id)) = db
         .upsert_user_by_discord_id(
             &profile.global_name,
             &profile.email,
@@ -588,7 +597,7 @@ pub async fn route_signin_discord_callback(
         .same_site(SameSite::Lax)
         .http_only(true);
 
-    let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar).await;
+    let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar, &db).await;
     let mut response = Redirect::temporary("/team").into_response();
     let headers = response.headers_mut();
     headers.insert(header::SET_COOKIE, cookie.to_string().parse().unwrap());
@@ -741,8 +750,9 @@ pub async fn route_signin_ctftime_callback(
 
     let user_data = res.json::<CTFtimeUserData>().await.unwrap();
 
-    let Ok((user_id, team_id, invite_token)) = state
-        .db
+    let db = state.db.lock().await;
+
+    let Ok((user_id, team_id, invite_token)) = db
         .upsert_user_by_ctftime(
             &user_data.name,
             &user_data.email,
@@ -765,7 +775,7 @@ pub async fn route_signin_ctftime_callback(
         return Redirect::temporary("/signin").into_response();
     };
 
-    let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar).await;
+    let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar, &db).await;
     let mut response = if let Some(invite_token) = invite_token {
         Redirect::temporary(format!("/signin?token={}", invite_token).as_str()).into_response()
     } else {
@@ -868,6 +878,8 @@ pub async fn route_signin_email(
 
     let code = state
         .db
+        .lock()
+        .await
         .create_email_signin_callback_code(&form.email)
         .await
         .unwrap();
@@ -943,8 +955,9 @@ pub async fn route_signin_credentials(
 
     let avatar = avatar_from_email(&form.username.trim().to_lowercase());
 
-    let Some((user_id, team_id)) = state
-        .db
+    let db = state.db.lock().await;
+
+    let Some((user_id, team_id)) = db
         .upsert_user_by_credentials(&form.username, &avatar, &form.password)
         .await
         .unwrap()
@@ -961,7 +974,7 @@ pub async fn route_signin_credentials(
             .into_response();
     };
 
-    let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar).await;
+    let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar, &db).await;
 
     Response::builder()
         .header("HX-Redirect", "/team")
@@ -998,6 +1011,8 @@ pub async fn route_signin_email_callback(
 ) -> impl IntoResponse {
     let Ok(email) = state
         .db
+        .lock()
+        .await
         .get_email_signin_by_callback_code(&params.code)
         .await
     else {
@@ -1037,11 +1052,8 @@ pub async fn route_signin_email_confirm_callback(
     params: Query<EmailSignInParams>,
     cookie_jar: CookieJar,
 ) -> impl IntoResponse {
-    let Ok(email) = state
-        .db
-        .verify_email_signin_callback_code(&params.code)
-        .await
-    else {
+    let db = state.db.lock().await;
+    let Ok(email) = db.verify_email_signin_callback_code(&params.code).await else {
         tracing::info!(code = params.code, "invalid email signin callback code");
         return Redirect::temporary("/signin").into_response();
     };
@@ -1050,23 +1062,24 @@ pub async fn route_signin_email_confirm_callback(
 
     let avatar = avatar_from_email(&email);
 
-    let Ok((user_id, team_id)) = state.db.upsert_user_by_email(name, &email, &avatar).await else {
+    let Ok((user_id, team_id)) = db.upsert_user_by_email(name, &email, &avatar).await else {
         tracing::info!(email, "failed to upsert user by email");
         return Redirect::temporary("/signin").into_response();
     };
 
-    let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar).await;
+    let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar, &db).await;
     let mut response = Redirect::temporary("/team").into_response();
     let headers = response.headers_mut();
     headers.insert(header::SET_COOKIE, cookie.to_string().parse().unwrap());
     response
 }
 
-async fn sign_in_cookie(
+async fn sign_in_cookie<'a>(
     state: &State<RouterState>,
     user_id: i64,
     team_id: i64,
     cookie_jar: &CookieJar,
+    db: &MutexGuard<'a, dyn Database + Send + Sync>,
 ) -> Cookie<'static> {
     let jwt_secret = {
         let settings = state.settings.read().await;
@@ -1076,12 +1089,10 @@ async fn sign_in_cookie(
     for division in state.divisions.iter() {
         let eligible = division
             .division_eligibility
-            .is_user_eligible(user_id)
+            .is_user_eligible(user_id, db)
             .await;
 
-        state
-            .db
-            .set_user_division(user_id, team_id, division.id, eligible.is_ok())
+        db.set_user_division(user_id, team_id, division.id, eligible.is_ok())
             .await
             .unwrap();
     }
@@ -1096,17 +1107,12 @@ async fn sign_in_cookie(
     };
 
     if let Some(cookie_invite_token) = cookie_jar.get("rhombus-invite-token").map(|c| c.value()) {
-        if let Some(team) = state
-            .db
+        if let Some(team) = db
             .get_team_meta_from_invite_token(cookie_invite_token)
             .await
             .unwrap_or(None)
         {
-            state
-                .db
-                .add_user_to_team(user_id, team.id, None)
-                .await
-                .unwrap();
+            db.add_user_to_team(user_id, team.id, None).await.unwrap();
         }
     }
 

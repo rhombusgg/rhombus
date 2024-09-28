@@ -139,7 +139,8 @@ impl OutboundMailer {
     }
 
     pub async fn send_digest(&self, ticket: &Ticket, messages: &[DigestMessage<'_>]) -> Result<()> {
-        let user_emails = self.db.get_emails_for_user_id(ticket.user_id).await?;
+        let db = self.db.lock().await;
+        let user_emails = db.get_emails_for_user_id(ticket.user_id).await?;
         let to = if let Some(email) = user_emails.iter().find(|e| e.verified) {
             &email.address
         } else {
@@ -228,8 +229,7 @@ impl OutboundMailer {
             )
             .await?;
 
-        self.db
-            .add_email_message_id_to_ticket(ticket.ticket_number, &message_id, false)
+        db.add_email_message_id_to_ticket(ticket.ticket_number, &message_id, false)
             .await?;
 
         tracing::trace!(user_id = ticket.user_id, to, "Sent digest");
