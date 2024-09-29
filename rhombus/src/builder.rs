@@ -546,14 +546,14 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 "true" => {
                     let duration = 360;
                     info!(duration, "Enabling default in memory cache");
-                    database_cache_evictor(duration);
+                    database_cache_evictor(duration, db.clone());
                     Arc::new(DbCache::new(db.clone()))
                 }
                 duration => {
                     if let Ok(duration) = duration.parse::<u64>() {
                         if duration >= 5 {
                             info!(duration, "Enabling default in memory cache");
-                            database_cache_evictor(duration);
+                            database_cache_evictor(duration, db.clone());
                             Arc::new(DbCache::new(db.clone()))
                         } else {
                             info!(

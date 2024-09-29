@@ -280,10 +280,6 @@ impl Database for DbCache {
         if result.is_ok() {
             USER_CACHE.remove(&user_id);
             TEAM_CACHE.clear();
-            SCOREBOARD_CACHE.clear();
-            LEADERBOARD_CACHE.clear();
-            TEAM_STANDINGS.clear();
-            *CHALLENGES_CACHE.write().await = None;
         }
         result
     }
@@ -464,10 +460,10 @@ impl Database for DbCache {
         if result.is_ok() {
             USER_DIVISIONS.remove(&user_id);
             TEAM_DIVISIONS.remove(&team_id);
-            TEAM_STANDINGS.clear();
-            SCOREBOARD_CACHE.clear();
-            LEADERBOARD_CACHE.clear();
-            *CHALLENGES_CACHE.write().await = None;
+            // TEAM_STANDINGS.clear();
+            // SCOREBOARD_CACHE.clear();
+            // LEADERBOARD_CACHE.clear();
+            // *CHALLENGES_CACHE.write().await = None;
         }
         result
     }
@@ -477,7 +473,7 @@ impl Database for DbCache {
         if result.is_ok() {
             USER_DIVISIONS.clear();
             TEAM_DIVISIONS.clear();
-            *CHALLENGES_CACHE.write().await = None;
+            // *CHALLENGES_CACHE.write().await = None;
         }
         result
     }
@@ -509,10 +505,10 @@ impl Database for DbCache {
             .await;
         if result.is_ok() {
             TEAM_DIVISIONS.remove(&team_id);
-            TEAM_STANDINGS.clear();
-            SCOREBOARD_CACHE.clear();
-            LEADERBOARD_CACHE.clear();
-            *CHALLENGES_CACHE.write().await = None;
+            // TEAM_STANDINGS.clear();
+            // SCOREBOARD_CACHE.clear();
+            // LEADERBOARD_CACHE.clear();
+            // *CHALLENGES_CACHE.write().await = None;
         }
         result
     }
@@ -741,7 +737,7 @@ pub async fn get_team_standing(db: &Connection, team_id: i64) -> Result<TeamStan
     standings
 }
 
-pub fn database_cache_evictor(seconds: u64) {
+pub fn database_cache_evictor(seconds: u64, db: Connection) {
     tokio::task::spawn(async move {
         let duration = Duration::from_secs(seconds);
         loop {
@@ -856,7 +852,9 @@ pub fn database_cache_evictor(seconds: u64) {
                 let mut challenges = CHALLENGES_CACHE.write().await;
                 if challenges.is_some() {
                     tracing::trace!("Evicted challenges cache");
-                    *challenges = None
+                    if let Ok(db_challenges) = db.get_challenges().await {
+                        *challenges = Some(db_challenges);
+                    }
                 }
             }
         }
