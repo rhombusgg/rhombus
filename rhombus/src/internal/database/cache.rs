@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, net::IpAddr, num::NonZeroU64, sync::Arc, time::
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 use tokio_util::bytes::Bytes;
 
 use crate::{

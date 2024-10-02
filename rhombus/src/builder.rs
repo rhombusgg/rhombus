@@ -4,6 +4,7 @@ use std::{
     hash::{BuildHasher, BuildHasherDefault, Hasher},
     num::NonZeroU32,
     sync::Arc,
+    time::Duration,
 };
 
 use axum::{
@@ -65,6 +66,7 @@ use crate::{
             challenges::{
                 route_challenge_submit, route_challenge_view, route_challenges,
                 route_ticket_submit, route_ticket_view, route_writeup_delete, route_writeup_submit,
+                TEAM_BURSTED_POINTS,
             },
             home::route_home,
             meta::{page_meta_middleware, route_robots_txt, GlobalPageMeta},
@@ -537,6 +539,15 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     division_eligibility: Arc::new(OpenDivisionEligibilityProvider {}),
                 }]
             };
+
+            tokio::task::spawn(async move {
+                let duration = Duration::from_secs(3 * 60);
+                loop {
+                    tokio::time::sleep(duration).await;
+
+                    TEAM_BURSTED_POINTS.alter_all(|_, v| if v > 0 { v - 1 } else { 0 });
+                }
+            });
 
             let cached_db = match settings.in_memory_cache.as_str() {
                 "false" => {

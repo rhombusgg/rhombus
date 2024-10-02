@@ -7,6 +7,7 @@ use axum::{
     Extension, Form, Json,
 };
 use chrono::{DateTime, Utc};
+use dashmap::DashMap;
 use minijinja::context;
 use serde::Deserialize;
 use serde_json::json;
@@ -393,6 +394,10 @@ pub struct SubmitChallenge {
     flag: String,
 }
 
+lazy_static::lazy_static! {
+    pub static ref TEAM_BURSTED_POINTS: DashMap<i64, i64> = DashMap::new();
+}
+
 pub async fn route_challenge_submit(
     state: State<RouterState>,
     Extension(user): Extension<User>,
@@ -452,6 +457,28 @@ pub async fn route_challenge_submit(
         }
     }
 
+    let num_solves = TEAM_BURSTED_POINTS
+        .get(&user.team_id)
+        .map(|v| *v.value())
+        .unwrap_or(0);
+
+    if num_solves >= 3 {
+        let html = state
+            .jinja
+            .get_template("challenge-submit.html")
+            .unwrap()
+            .render(context! {
+                page,
+                error => "Too many solves in a short period of time. Please try again in a few minutes",
+            })
+            .unwrap();
+
+        return Response::builder()
+            .header("content-type", "text/html")
+            .body(html)
+            .unwrap();
+    }
+
     let first_bloods = state
         .db
         .solve_challenge(user.id, user.team_id, challenge)
@@ -473,6 +500,11 @@ pub async fn route_challenge_submit(
             .body(html)
             .unwrap();
     }
+
+    TEAM_BURSTED_POINTS
+        .entry(user.team_id)
+        .and_modify(|v| *v += 1)
+        .or_insert(1);
 
     if let Some(ref bot) = state.bot {
         let first_blood_enabled = {
