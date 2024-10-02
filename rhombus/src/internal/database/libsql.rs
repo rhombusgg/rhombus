@@ -14,7 +14,6 @@ use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
 use futures::stream::StreamExt;
 use inflector::{cases::titlecase::to_title_case, string::pluralize::to_plural};
-use lazy_static::lazy_static;
 use libsql::{de, params, Builder, Transaction};
 use rand::{rngs::OsRng, Rng};
 use rust_embed::RustEmbed;
@@ -131,21 +130,6 @@ impl LibSQLConnection for RemoteLibSQL {
     }
 }
 
-// pub struct RhombusTransaction {
-//     pub tx: Arc<Mutex<libsql::Transaction>>,
-// }
-
-// impl RhombusTransaction {
-//     pub async fn get(&self) -> Result<libsql::Transaction> {
-//         self.tx
-//             .lock()
-//             .await
-//             .transaction()
-//             .await
-//             .map_err(|e| crate::errors::RhombusError::LibSQL(e))
-//     }
-// }
-
 pub trait LibSQLConnection {
     fn connect(&self) -> Result<libsql::Connection>;
     fn transaction(&self) -> Pin<Box<dyn Future<Output = Result<libsql::Transaction>> + Send>> {
@@ -154,13 +138,7 @@ pub trait LibSQLConnection {
             let conn = conn?;
             conn.transaction()
                 .await
-                .map_err(|e| crate::errors::RhombusError::LibSQL(e))
-
-            // let tx = Arc::new(Mutex::new(
-            //     conn.transaction()
-            //         .await
-            //         .map_err(|e| crate::errors::RhombusError::LibSQL(e)),
-            // ));
+                .map_err(crate::errors::RhombusError::LibSQL)
         })
     }
 }
@@ -197,9 +175,6 @@ struct Migrations;
 
 #[async_trait]
 impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
-    async fn get_raw_libsql(&self) -> Option<libsql::Connection> {
-        self.connect().ok()
-    }
     async fn migrate(&self) -> Result<()> {
         self.connect()?
             .execute_batch(

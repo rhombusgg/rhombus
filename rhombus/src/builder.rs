@@ -487,6 +487,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                         let division_eligibility: DivisionEligibilityProvider =
                             if let Some(email_regex) = &division.email_regex {
                                 Arc::new(EmailDivisionEligibilityProvider::new(
+                                    db.clone(),
                                     email_regex,
                                     division.requirement.clone(),
                                 ))

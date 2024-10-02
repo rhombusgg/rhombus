@@ -21,7 +21,6 @@ use minijinja::context;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tokio::sync::MutexGuard;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::internal::{
@@ -1080,7 +1079,7 @@ async fn sign_in_cookie<'a>(
     for division in state.divisions.iter() {
         let eligible = division
             .division_eligibility
-            .is_user_eligible(user_id, db)
+            .is_user_eligible(user_id)
             .await;
 
         db.set_user_division(user_id, team_id, division.id, eligible.is_ok())

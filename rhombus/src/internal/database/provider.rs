@@ -224,9 +224,6 @@ pub enum SetTeamNameError {
 
 #[async_trait]
 pub trait Database {
-    async fn get_raw_libsql(&self) -> Option<libsql::Connection> {
-        None
-    }
     async fn migrate(&self) -> Result<()>;
     async fn get_challenges(&self) -> Result<Challenges>;
     async fn set_challenge_health(

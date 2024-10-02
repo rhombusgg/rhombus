@@ -124,7 +124,7 @@ pub async fn route_account(
     for division in state.divisions.iter() {
         let eligible = division
             .division_eligibility
-            .is_user_eligible(user.id, &state.db)
+            .is_user_eligible(user.id)
             .await;
 
         let joined = user_divisions.contains(&division.id);

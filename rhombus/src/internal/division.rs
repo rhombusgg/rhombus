@@ -3,32 +3,27 @@ use std::{num::NonZeroU32, sync::Arc};
 use async_trait::async_trait;
 use fancy_regex::Regex;
 use serde::Serialize;
-use tokio::sync::MutexGuard;
 
 use crate::internal::database::provider::Connection;
-
-use super::database::provider::Database;
 
 pub type DivisionEligibilityProvider = Arc<dyn DivisionEligible + Send + Sync>;
 
 #[async_trait]
 pub trait DivisionEligible {
-    async fn is_user_eligible(
-        &self,
-        user_id: i64,
-        db: &Arc<dyn Database + Send + Sync>,
-    ) -> std::result::Result<bool, String>;
+    async fn is_user_eligible(&self, user_id: i64) -> std::result::Result<bool, String>;
 }
 
 pub struct EmailDivisionEligibilityProvider {
+    pub db: Connection,
     pub regex: Regex,
     pub requirement: String,
 }
 
 impl EmailDivisionEligibilityProvider {
-    pub fn new(regex: &str, requirement: Option<String>) -> Self {
+    pub fn new(db: Connection, regex: &str, requirement: Option<String>) -> Self {
         let r = Regex::new(regex).unwrap();
         Self {
+            db,
             regex: r,
             requirement: requirement.unwrap_or(format!("Email must match regex {regex}")),
         }
@@ -37,12 +32,8 @@ impl EmailDivisionEligibilityProvider {
 
 #[async_trait]
 impl DivisionEligible for EmailDivisionEligibilityProvider {
-    async fn is_user_eligible(
-        &self,
-        user_id: i64,
-        db: &Arc<dyn Database + Send + Sync>,
-    ) -> std::result::Result<bool, String> {
-        let emails = db.get_emails_for_user_id(user_id).await.unwrap();
+    async fn is_user_eligible(&self, user_id: i64) -> std::result::Result<bool, String> {
+        let emails = self.db.get_emails_for_user_id(user_id).await.unwrap();
         let eligible = emails
             .iter()
             .filter(|email| email.verified)
@@ -60,11 +51,7 @@ pub struct OpenDivisionEligibilityProvider;
 
 #[async_trait]
 impl DivisionEligible for OpenDivisionEligibilityProvider {
-    async fn is_user_eligible(
-        &self,
-        _user_id: i64,
-        _db: &Arc<dyn Database + Send + Sync>,
-    ) -> std::result::Result<bool, String> {
+    async fn is_user_eligible(&self, _user_id: i64) -> std::result::Result<bool, String> {
         Ok(true)
     }
 }

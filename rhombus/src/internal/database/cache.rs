@@ -39,10 +39,6 @@ impl From<Connection> for DbCache {
 
 #[async_trait]
 impl Database for DbCache {
-    async fn get_raw_libsql(&self) -> Option<libsql::Connection> {
-        self.inner.get_raw_libsql().await
-    }
-
     async fn migrate(&self) -> Result<()> {
         self.inner.migrate().await
     }
