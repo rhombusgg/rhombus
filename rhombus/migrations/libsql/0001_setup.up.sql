@@ -1,3 +1,5 @@
+PRAGMA journal_mode=WAL;
+
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS rhombus_challenge (
@@ -43,7 +45,7 @@ CREATE TABLE IF NOT EXISTS rhombus_author (
     id INTEGER PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
     avatar TEXT NOT NULL,
-    discord_id INTEGER NOT NULL UNIQUE
+    discord_id INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS rhombus_points_snapshot (

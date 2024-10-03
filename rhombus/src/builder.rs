@@ -275,18 +275,6 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     let db = Arc::new(libsql_database);
                     return Ok((db.clone(), RawDb::LibSQL(db)));
                 }
-
-                #[cfg(feature = "libsql")]
-                DbConfig::RawLibSQLConnection(connection) => {
-                    let database =
-                        crate::internal::database::libsql::LocalLibSQL::from(connection.clone());
-                    database.migrate().await?;
-
-                    let libsql_database: crate::internal::database::libsql::LibSQL =
-                        database.into();
-                    let db = Arc::new(libsql_database);
-                    return Ok((db.clone(), RawDb::LibSQL(db)));
-                }
             }
         }
 

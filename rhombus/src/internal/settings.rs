@@ -187,9 +187,6 @@ pub enum DbConfig {
 
     #[cfg(feature = "libsql")]
     RawLibSQL(Arc<libsql::Database>),
-
-    #[cfg(feature = "libsql")]
-    RawLibSQLConnection(libsql::Connection),
 }
 
 #[cfg(feature = "postgres")]
@@ -203,12 +200,5 @@ impl From<sqlx::PgPool> for DbConfig {
 impl From<Arc<libsql::Database>> for DbConfig {
     fn from(value: Arc<libsql::Database>) -> Self {
         Self::RawLibSQL(value)
-    }
-}
-
-#[cfg(feature = "libsql")]
-impl From<libsql::Connection> for DbConfig {
-    fn from(value: libsql::Connection) -> Self {
-        Self::RawLibSQLConnection(value)
     }
 }

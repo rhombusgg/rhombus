@@ -18,7 +18,6 @@ use libsql::{de, params, Builder, Transaction};
 use rand::{rngs::OsRng, Rng};
 use rust_embed::RustEmbed;
 use serde::Deserialize;
-use tokio::sync::Mutex;
 use tokio_util::bytes::Bytes;
 
 use crate::{
@@ -44,33 +43,24 @@ use crate::{
 
 #[derive(Clone)]
 pub struct LocalLibSQL {
-    pub lock: Arc<Mutex<()>>,
-    pub conn: libsql::Connection,
+    pub db: Arc<libsql::Database>,
 }
 
 impl LocalLibSQL {
     pub async fn new_local(path: impl AsRef<Path>) -> Result<LocalLibSQL> {
         let db = Builder::new_local(path).build().await?;
-        let conn = db.connect()?;
-        Ok(LocalLibSQL {
-            conn,
-            lock: Arc::new(Mutex::new(())),
-        })
+        Ok(LocalLibSQL { db: Arc::new(db) })
     }
 
     pub async fn new_memory() -> Result<LocalLibSQL> {
         let db = Builder::new_local(":memory:").build().await?;
-        let conn = db.connect()?;
-        Ok(LocalLibSQL {
-            conn,
-            lock: Arc::new(Mutex::new(())),
-        })
+        Ok(LocalLibSQL { db: Arc::new(db) })
     }
 }
 
 impl LibSQLConnection for LocalLibSQL {
     fn connect(&self) -> Result<libsql::Connection> {
-        Ok(self.conn.to_owned())
+        Ok(self.db.connect()?)
     }
 }
 
@@ -78,20 +68,7 @@ impl TryFrom<libsql::Database> for LocalLibSQL {
     type Error = crate::errors::RhombusError;
 
     fn try_from(db: libsql::Database) -> Result<Self> {
-        let conn = db.connect()?;
-        Ok(LocalLibSQL {
-            conn,
-            lock: Arc::new(Mutex::new(())),
-        })
-    }
-}
-
-impl From<libsql::Connection> for LocalLibSQL {
-    fn from(conn: libsql::Connection) -> Self {
-        LocalLibSQL {
-            conn,
-            lock: Arc::new(Mutex::new(())),
-        }
+        Ok(LocalLibSQL { db: Arc::new(db) })
     }
 }
 
@@ -2353,7 +2330,9 @@ mod test {
         }
 
         let num_tracks = database
-            .conn
+            .db
+            .connect()
+            .unwrap()
             .query("SELECT COUNT(*) FROM rhombus_track", ())
             .await
             .unwrap()
