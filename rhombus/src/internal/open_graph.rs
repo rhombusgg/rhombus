@@ -444,10 +444,13 @@ pub async fn route_user_og_image(
         .map(|end_time| end_time.format("%A, %B %-d, %Y at %H:%MZ").to_string());
 
     let mut categories = BTreeMap::<i64, StatisticsCategory>::new();
+    let mut num_solves = 0;
     for (challenge_id, solve) in team.solves.iter() {
         if solve.user_id != user.id {
             continue;
         }
+
+        num_solves += 1;
 
         let challenge = challenge_data
             .challenges
@@ -470,8 +473,6 @@ pub async fn route_user_og_image(
     }
     let mut categories = categories.values().collect::<Vec<_>>();
     categories.sort();
-
-    let num_solves = categories.len();
 
     let description = site.description.as_ref().map(|desc| wrap_text(desc, 74));
 
