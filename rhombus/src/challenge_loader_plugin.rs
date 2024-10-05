@@ -124,7 +124,7 @@ impl Plugin for ChallengeLoaderPlugin {
 
             #[cfg(feature = "libsql")]
             crate::builder::RawDb::LibSQL(db) => {
-                let tx = db.connect()?.transaction().await?;
+                let tx = db.transaction().await?;
 
                 let new_challenge_ids = challenges
                     .iter()

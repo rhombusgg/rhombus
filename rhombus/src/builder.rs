@@ -316,7 +316,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 {
                     info!(database_url, "Connecting to local file libsql database");
                     let database =
-                        crate::internal::database::libsql::LocalLibSQL::new_local(path).await?;
+                        crate::internal::database::libsql::LocalLibSQL::new(path).await?;
                     database.migrate().await?;
 
                     let libsql_database: crate::internal::database::libsql::LibSQL =
@@ -374,31 +374,6 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 }
             }
 
-            if database_url == ":memory:" {
-                #[cfg(not(feature = "libsql"))]
-                {
-                    _ = path;
-                    return Err(DatabaseConfigurationError::MissingFeature(
-                        "libsql".to_owned(),
-                        database_url.to_owned(),
-                    )
-                    .into());
-                }
-
-                #[cfg(feature = "libsql")]
-                {
-                    info!(database_url, "Connecting to in memory libsql database");
-                    let database =
-                        crate::internal::database::libsql::LocalLibSQL::new_memory().await?;
-                    database.migrate().await?;
-
-                    let libsql_database: crate::internal::database::libsql::LibSQL =
-                        database.into();
-                    let db = Arc::new(libsql_database);
-                    return Ok((db.clone(), RawDb::LibSQL(db)));
-                }
-            }
-
             return Err(
                 DatabaseConfigurationError::UnknownUrlScheme(database_url.to_owned()).into(),
             );
@@ -411,7 +386,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 "Falling back to local database"
             );
             let database =
-                crate::internal::database::libsql::LocalLibSQL::new_local("rhombus.db").await?;
+                crate::internal::database::libsql::LocalLibSQL::new("rhombus.db").await?;
             database.migrate().await?;
 
             let libsql_database: crate::internal::database::libsql::LibSQL = database.into();

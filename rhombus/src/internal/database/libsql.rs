@@ -47,20 +47,29 @@ pub struct LocalLibSQL {
 }
 
 impl LocalLibSQL {
-    pub async fn new_local(path: impl AsRef<Path>) -> Result<LocalLibSQL> {
+    pub async fn new(path: impl AsRef<Path>) -> Result<LocalLibSQL> {
         let db = Builder::new_local(path).build().await?;
-        Ok(LocalLibSQL { db: Arc::new(db) })
-    }
-
-    pub async fn new_memory() -> Result<LocalLibSQL> {
-        let db = Builder::new_local(":memory:").build().await?;
         Ok(LocalLibSQL { db: Arc::new(db) })
     }
 }
 
 impl LibSQLConnection for LocalLibSQL {
-    fn connect(&self) -> Result<libsql::Connection> {
-        Ok(self.db.connect()?)
+    fn connect(&self) -> Pin<Box<dyn Future<Output = Result<libsql::Connection>> + Send>> {
+        let conn = self.db.connect();
+        Box::pin(async move {
+            let conn = conn?;
+            conn.execute_batch(
+                "
+            PRAGMA busy_timeout = 5000;
+            PRAGMA synchronous = NORMAL;
+            PRAGMA cache_size = 2000;
+            PRAGMA temp_store = MEMORY;
+            PRAGMA foreign_keys = TRUE;
+        ",
+            )
+            .await?;
+            Ok(conn)
+        })
     }
 }
 
@@ -69,6 +78,37 @@ impl TryFrom<libsql::Database> for LocalLibSQL {
 
     fn try_from(db: libsql::Database) -> Result<Self> {
         Ok(LocalLibSQL { db: Arc::new(db) })
+    }
+}
+
+#[derive(Clone)]
+pub struct InMemoryLibSQL {
+    pub conn: libsql::Connection,
+}
+
+impl InMemoryLibSQL {
+    pub async fn new() -> Result<InMemoryLibSQL> {
+        let conn = Builder::new_local(":memory:").build().await?.connect()?;
+
+        conn.execute_batch(
+            "
+        PRAGMA busy_timeout = 5000;
+        PRAGMA synchronous = NORMAL;
+        PRAGMA cache_size = 2000;
+        PRAGMA temp_store = MEMORY;
+        PRAGMA foreign_keys = TRUE;
+    ",
+        )
+        .await?;
+
+        Ok(InMemoryLibSQL { conn })
+    }
+}
+
+impl LibSQLConnection for InMemoryLibSQL {
+    fn connect(&self) -> Pin<Box<dyn Future<Output = Result<libsql::Connection>> + Send>> {
+        let conn = self.conn.clone();
+        Box::pin(async move { Ok(conn) })
     }
 }
 
@@ -102,18 +142,32 @@ impl From<Arc<libsql::Database>> for RemoteLibSQL {
 }
 
 impl LibSQLConnection for RemoteLibSQL {
-    fn connect(&self) -> Result<libsql::Connection> {
-        Ok(self.db.connect()?)
+    fn connect(&self) -> Pin<Box<dyn Future<Output = Result<libsql::Connection>> + Send>> {
+        let conn = self.db.connect();
+        Box::pin(async move {
+            let conn = conn?;
+            conn.execute_batch(
+                "
+            PRAGMA busy_timeout = 5000;
+            PRAGMA synchronous = NORMAL;
+            PRAGMA cache_size = 2000;
+            PRAGMA temp_store = MEMORY;
+            PRAGMA foreign_keys = TRUE;
+        ",
+            )
+            .await?;
+            Ok(conn)
+        })
     }
 }
 
 pub trait LibSQLConnection {
-    fn connect(&self) -> Result<libsql::Connection>;
+    fn connect(&self) -> Pin<Box<dyn Future<Output = Result<libsql::Connection>> + Send>>;
     fn transaction(&self) -> Pin<Box<dyn Future<Output = Result<libsql::Transaction>> + Send>> {
         let conn = self.connect();
         Box::pin(async move {
-            let conn = conn?;
-            conn.transaction()
+            let conn = conn.await?;
+            conn.transaction_with_behavior(libsql::TransactionBehavior::Immediate)
                 .await
                 .map_err(crate::errors::RhombusError::LibSQL)
         })
@@ -126,7 +180,7 @@ pub enum LibSQL {
 }
 
 impl LibSQLConnection for LibSQL {
-    fn connect(&self) -> Result<libsql::Connection> {
+    fn connect(&self) -> Pin<Box<dyn Future<Output = Result<libsql::Connection>> + Send>> {
         match self {
             LibSQL::Local(local) => local.connect(),
             LibSQL::Remote(remote) => remote.connect(),
@@ -153,7 +207,8 @@ struct Migrations;
 #[async_trait]
 impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     async fn migrate(&self) -> Result<()> {
-        self.connect()?
+        self.connect()
+            .await?
             .execute_batch(
                 std::str::from_utf8(Migrations::get("0001_setup.up.sql").unwrap().data.as_ref())
                     .unwrap(),
@@ -507,7 +562,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         .octets();
 
         let track_id = self
-            .connect()?
+            .connect()
+            .await?
             .query(
                 "
             INSERT INTO rhombus_track (ip, user_agent, requests) VALUES (?1, ?2, ?3)
@@ -527,7 +583,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .unwrap();
 
         if let Some(user_id) = user_id {
-            self.connect()?
+            self.connect()
+                .await?
                 .execute(
                     "
                     INSERT INTO rhombus_track_ip (user_id, track_id) VALUES (?1, ?2)
@@ -728,7 +785,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         healthy: Option<bool>,
         checked_at: DateTime<Utc>,
     ) -> Result<()> {
-        self.connect()?
+        self.connect()
+            .await?
             .execute(
                 "UPDATE rhombus_challenge SET healthy = ?2, last_healthcheck = ?3 WHERE id = ?1",
                 params!(challenge_id, healthy, checked_at.timestamp()),
@@ -748,7 +806,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             name: String,
         }
         let team = self
-            .connect()?
+            .connect()
+            .await?
             .query(
                 "SELECT id, name FROM rhombus_team WHERE invite_token = ?",
                 [invite_token],
@@ -939,7 +998,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         }
 
         let row = self
-            .connect()?
+            .connect()
+            .await?
             .query("SELECT * FROM rhombus_user WHERE id = ?1", [user_id])
             .await?
             .next()
@@ -973,7 +1033,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         }
 
         let row = self
-            .connect()?
+            .connect()
+            .await?
             .query(
                 "SELECT * FROM rhombus_user WHERE discord_id = ?1",
                 [discord_id.get()],
@@ -997,7 +1058,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     }
 
     async fn kick_user(&self, user_id: i64, _team_id: i64) -> Result<()> {
-        self.connect()?
+        self.connect()
+            .await?
             .execute(
                 "UPDATE rhombus_user SET team_id = owner_team_id WHERE id = ?1",
                 [user_id],
@@ -1009,7 +1071,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     async fn roll_invite_token(&self, team_id: i64) -> Result<String> {
         let new_invite_token = create_team_invite_token();
 
-        self.connect()?
+        self.connect()
+            .await?
             .execute(
                 "UPDATE rhombus_team SET invite_token = ?2 WHERE id = ?1",
                 params!(team_id, new_invite_token.clone()),
@@ -1199,7 +1262,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         challenge_id: i64,
         writeup_url: &str,
     ) -> Result<()> {
-        self.connect()?
+        self.connect()
+            .await?
             .execute(
                 "
                 INSERT INTO rhombus_writeup (user_id, challenge_id, url) VALUES (?1, ?2, ?3)
@@ -1219,7 +1283,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             pub url: String,
         }
         let mut db_writeups = self
-            .connect()?
+            .connect()
+            .await?
             .query(
                 "
                 SELECT user_id, challenge_id, url
@@ -1244,7 +1309,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     }
 
     async fn delete_writeup(&self, challenge_id: i64, user_id: i64, _team_id: i64) -> Result<()> {
-        self.connect()?
+        self.connect()
+            .await?
             .execute(
                 "
                 DELETE FROM rhombus_writeup
@@ -1259,7 +1325,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
     async fn get_next_ticket_number(&self) -> Result<u64> {
         let ticket_number = self
-            .connect()?
+            .connect()
+            .await?
             .query(
                 "
                 UPDATE rhombus_ticket_number_counter
@@ -1287,7 +1354,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         discord_channel_id: NonZeroU64,
     ) -> Result<()> {
         self
-            .connect()?
+            .connect().await?
             .execute(
                 "
                 INSERT INTO rhombus_ticket (ticket_number, user_id, challenge_id, discord_channel_id) VALUES (?1, ?2, ?3, ?4)
@@ -1380,7 +1447,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         let tx = self.transaction().await?;
 
         let ticket_row = self
-            .connect()?
+            .connect()
+            .await?
             .query(
                 "
                 SELECT ticket_number, user_id, challenge_id, closed_at, discord_channel_id
@@ -1435,7 +1503,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     }
 
     async fn close_ticket(&self, ticket_number: u64, time: DateTime<Utc>) -> Result<()> {
-        self.connect()?
+        self.connect()
+            .await?
             .execute(
                 "
                 UPDATE rhombus_ticket
@@ -1450,7 +1519,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     }
 
     async fn reopen_ticket(&self, ticket_number: u64) -> Result<()> {
-        self.connect()?
+        self.connect()
+            .await?
             .execute(
                 "
                 UPDATE rhombus_ticket
@@ -1470,7 +1540,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         message_id: &str,
         user_sent: bool,
     ) -> Result<()> {
-        self.connect()?
+        self.connect().await?
             .execute(
                 "
                 INSERT INTO rhombus_ticket_email_message_id_reference (ticket_number, message_id, user_sent) VALUES (?1, ?2, ?3)
@@ -1484,7 +1554,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
     async fn get_ticket_number_by_message_id(&self, message_id: &str) -> Result<Option<u64>> {
         let ticket_number = self
-            .connect()?
+            .connect()
+            .await?
             .query(
                 "
                 SELECT ticket_number
@@ -1508,7 +1579,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
         let json = serde_json::to_string(settings).unwrap();
 
-        self.connect()?
+        self.connect()
+            .await?
             .execute(
                 "
                 INSERT OR REPLACE INTO rhombus_config (id, config) VALUES (1, ?1)
@@ -1732,7 +1804,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             let mut rank = 0;
 
             let leaderboard_entries = self
-                .connect()?
+                .connect()
+                .await?
                 .query(
                     "
                 SELECT team_id, name, points
@@ -1773,7 +1846,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         }
 
         let emails = self
-            .connect()?
+            .connect()
+            .await?
             .query(
                 "SELECT email, code FROM rhombus_email WHERE user_id = ?1",
                 [user_id],
@@ -1800,7 +1874,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     ) -> Result<String> {
         let code = generate_email_callback_code();
 
-        self.connect()?
+        self.connect()
+            .await?
             .execute(
                 "INSERT INTO rhombus_email (email, user_id, code) VALUES (?1, ?2, ?3)",
                 params!(email, user_id, code.as_str()),
@@ -1811,7 +1886,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     }
 
     async fn verify_email_verification_callback_code(&self, code: &str) -> Result<()> {
-        self.connect()?
+        self.connect()
+            .await?
             .execute(
                 "
                 UPDATE rhombus_email
@@ -1827,7 +1903,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
     async fn get_email_verification_by_callback_code(&self, code: &str) -> Result<String> {
         let email = self
-            .connect()?
+            .connect()
+            .await?
             .query(
                 "
                 SELECT email
@@ -1849,7 +1926,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     async fn create_email_signin_callback_code(&self, email: &str) -> Result<String> {
         let code = generate_email_callback_code();
 
-        self.connect()?
+        self.connect()
+            .await?
             .execute(
                 "INSERT OR REPLACE INTO rhombus_email_signin (email, code) VALUES (?1, ?2)",
                 params!(email, code.as_str()),
@@ -1861,7 +1939,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
     async fn verify_email_signin_callback_code(&self, code: &str) -> Result<String> {
         let email = self
-            .connect()?
+            .connect()
+            .await?
             .query(
                 "
                 DELETE FROM rhombus_email_signin
@@ -1882,7 +1961,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
     async fn get_email_signin_by_callback_code(&self, code: &str) -> Result<String> {
         let email = self
-            .connect()?
+            .connect()
+            .await?
             .query(
                 "
                 SELECT email
@@ -1902,7 +1982,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     }
 
     async fn delete_email(&self, user_id: i64, email: &str) -> Result<()> {
-        self.connect()?
+        self.connect()
+            .await?
             .execute(
                 "DELETE FROM rhombus_email WHERE user_id = ?1 AND email = ?2",
                 params!(user_id, email),
@@ -1914,7 +1995,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
     async fn get_user_divisions(&self, user_id: i64) -> Result<Vec<i64>> {
         let divisions = self
-            .connect()?
+            .connect()
+            .await?
             .query(
                 "SELECT division_id FROM rhombus_user_division WHERE user_id = ?1",
                 [user_id],
@@ -2019,7 +2101,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
     async fn get_team_divisions(&self, team_id: i64) -> Result<Vec<i64>> {
         let divisions = self
-            .connect()?
+            .connect()
+            .await?
             .query(
                 "SELECT division_id FROM rhombus_team_division WHERE team_id = ?1",
                 [team_id],
@@ -2039,7 +2122,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         division_id: i64,
     ) -> Result<Option<DateTime<Utc>>> {
         let last_edit_at_timestamp = self
-            .connect()?
+            .connect()
+            .await?
             .query(
                 "
                 SELECT last_edit_at
@@ -2060,7 +2144,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     }
 
     async fn set_team_division_last_edit_time(&self, team_id: i64, division_id: i64) -> Result<()> {
-        self.connect()?
+        self.connect().await?
             .execute(
                 "
                 INSERT OR REPLACE INTO rhombus_team_division_last_edit (team_id, division_id, last_edit_at)
@@ -2075,7 +2159,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
     async fn set_team_division(&self, team_id: i64, division_id: i64, join: bool) -> Result<()> {
         if join {
-            self.connect()?
+            self.connect().await?
                 .execute(
                     "INSERT OR IGNORE INTO rhombus_team_division (team_id, division_id) VALUES (?1, ?2)",
                     [team_id, division_id],
@@ -2083,7 +2167,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                 .await?;
         } else {
             _ = self
-                .connect()?
+                .connect()
+                .await?
                 .execute(
                     "DELETE FROM rhombus_team_division WHERE team_id = ?1 AND division_id = ?2",
                     [team_id, division_id],
@@ -2104,7 +2189,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
         let mut standings = BTreeMap::new();
         let mut standing_rows = self
-            .connect()?
+            .connect()
+            .await?
             .query(
                 "
                 WITH ranked_teams AS (
@@ -2143,7 +2229,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     }
 
     async fn upload_file(&self, hash: &str, filename: &str, bytes: &[u8]) -> Result<()> {
-        self.connect()?
+        self.connect()
+            .await?
             .query(
                 "INSERT INTO rhombus_file (hash, filename, contents) VALUES (?1, ?2, ?3)",
                 params!(hash, filename, bytes),
@@ -2161,7 +2248,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         }
 
         let row = self
-            .connect()?
+            .connect()
+            .await?
             .query(
                 "SELECT filename, contents FROM rhombus_file WHERE hash = ?1",
                 [hash],
@@ -2258,7 +2346,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
     async fn get_last_created_ticket_time(&self, user_id: i64) -> Result<Option<DateTime<Utc>>> {
         let last_opened_at_timestamp = self
-            .connect()?
+            .connect()
+            .await?
             .query(
                 "
                 SELECT opened_at
@@ -2307,17 +2396,17 @@ pub async fn create_team(tx: &Transaction) -> Result<i64> {
 mod test {
     use std::net::IpAddr;
 
-    use crate::internal::database::{libsql::LocalLibSQL, provider::Database};
+    use crate::internal::database::{libsql::InMemoryLibSQL, provider::Database};
 
     #[tokio::test]
     async fn migrate_libsql() {
-        let database = LocalLibSQL::new_memory().await.unwrap();
+        let database = InMemoryLibSQL::new().await.unwrap();
         database.migrate().await.unwrap();
     }
 
     #[tokio::test]
     async fn track_load() {
-        let database = LocalLibSQL::new_memory().await.unwrap();
+        let database = InMemoryLibSQL::new().await.unwrap();
         database.migrate().await.unwrap();
 
         let ip: IpAddr = "1.2.3.4".parse().unwrap();
@@ -2330,9 +2419,7 @@ mod test {
         }
 
         let num_tracks = database
-            .db
-            .connect()
-            .unwrap()
+            .conn
             .query("SELECT COUNT(*) FROM rhombus_track", ())
             .await
             .unwrap()

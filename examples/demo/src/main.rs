@@ -77,7 +77,7 @@ impl Plugin for DemoPlugin {
         let libsql = match context.rawdb {
             rhombus::builder::RawDb::LibSQL(db) => {
                 {
-                    let conn = db.connect()?;
+                    let conn = db.connect().await?;
 
                     conn.execute("PRAGMA foreign_keys = 0", params!()).await?;
 
@@ -107,7 +107,7 @@ impl Plugin for DemoPlugin {
                 db.migrate().await?;
 
                 {
-                    let conn = db.connect()?;
+                    let conn = db.connect().await?;
 
                     _ = conn
                         .execute(
@@ -170,7 +170,7 @@ fn create_dummy_user() -> DummyUser {
 }
 
 async fn set_user_to_bot(libsql: Arc<LibSQL>, user_id: i64) -> Result<()> {
-    let conn = libsql.connect()?;
+    let conn = libsql.connect().await?;
 
     conn.execute(
         "UPDATE rhombus_user SET is_bot = 1 WHERE id = ?",
@@ -251,7 +251,7 @@ async fn create_team(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
 }
 
 async fn solve_challenge(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
-    let conn = libsql.connect()?;
+    let conn = libsql.connect().await?;
 
     if let Some((user_id, team_id)) = conn
         .query(
@@ -307,7 +307,7 @@ impl DemoState {
     }
 
     async fn grant_admin(&self, user_id: i64) -> Result<()> {
-        let conn = self.libsql.connect()?;
+        let conn = self.libsql.connect().await?;
 
         conn.execute(
             "UPDATE rhombus_user SET is_admin = 1 WHERE id = ?",
@@ -321,7 +321,7 @@ impl DemoState {
     }
 
     async fn revoke_admin(&self, user_id: i64) -> Result<()> {
-        let conn = self.libsql.connect()?;
+        let conn = self.libsql.connect().await?;
 
         conn.execute(
             "UPDATE rhombus_user SET is_admin = 0 WHERE id = ?",
@@ -368,7 +368,7 @@ fn delayed_backup_tables(libsql: Arc<LibSQL>) {
 }
 
 async fn backup_tables(libsql: Arc<LibSQL>) -> Result<()> {
-    let conn = libsql.connect()?;
+    let conn = libsql.connect().await?;
 
     let tx = conn.transaction().await?;
 
@@ -407,7 +407,7 @@ async fn backup_tables(libsql: Arc<LibSQL>) -> Result<()> {
 }
 
 async fn reset_database(libsql: Arc<LibSQL>) -> Result<()> {
-    let conn = libsql.connect()?;
+    let conn = libsql.connect().await?;
 
     conn.execute("PRAGMA foreign_keys = 0", params!()).await?;
 

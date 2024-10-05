@@ -61,7 +61,7 @@ impl Plugin for MyPlugin {
             .await
             .unwrap();
 
-        let core_db = rhombus::internal::database::libsql::LocalLibSQL::new_memory()
+        let core_db = rhombus::internal::database::libsql::InMemoryLibSQL::new()
             .await
             .unwrap();
         core_db.migrate().await.unwrap();
