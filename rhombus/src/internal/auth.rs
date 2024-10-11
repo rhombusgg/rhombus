@@ -164,11 +164,6 @@ pub async fn route_signin(
                     // you cannot join a team if your current team has more than just you on it
                     let old_team = state.db.get_team_from_id(user.team_id).await.unwrap();
                     if old_team.users.len() > 1 {
-                        // return Json(json!({
-                        //     "message": "You cannot join a team while your old team has other members in it."
-                        // }))
-                        // .into_response();
-
                         let html = state
                             .jinja
                             .get_template("join-error-existing-team.html")
@@ -186,74 +181,33 @@ pub async fn route_signin(
 
                     // you cannot join a team if the new team if, as a result of you joining it would
                     // lead to the team having more players than the minimum required by any division
-                    let team_divisions = state.db.get_team_divisions(team_meta.id).await.unwrap();
-                    let user_divisions = state.db.get_user_divisions(user.id).await.unwrap();
-
-                    let max_players = state
+                    let max_players = &state
                         .divisions
                         .iter()
-                        .filter(|division| team_divisions.contains(&division.id))
-                        .filter_map(|division| match division.max_players {
-                            MaxDivisionPlayers::Unlimited => None,
-                            MaxDivisionPlayers::Limited(max) => Some(max),
-                        })
-                        .min()
-                        .map(MaxDivisionPlayers::Limited)
-                        .unwrap_or(MaxDivisionPlayers::Unlimited);
+                        .find(|division| division.id == new_team.division_id)
+                        .unwrap()
+                        .max_players;
+
                     match max_players {
                         MaxDivisionPlayers::Unlimited => {}
                         MaxDivisionPlayers::Limited(max_players) => {
                             if new_team.users.len() >= max_players.get() as usize {
-                                // return Json(json!({
-                                //     "message": "The team you are trying to join already has the maximum number of players allowed by their division."
-                                // }))
-                                // .into_response();
-
                                 let html = state
-                            .jinja
-                            .get_template("join-error-max.html")
-                            .unwrap()
-                            .render(context! {
-                                global => state.global_page_meta,
-                                page,
-                                title => format!("Team Join Error | {}", state.global_page_meta.title),
-                                user,
-                                team => new_team,
-                                max_players,
-                            })
-                            .unwrap();
+                                    .jinja
+                                    .get_template("join-error-max.html")
+                                    .unwrap()
+                                    .render(context! {
+                                        global => state.global_page_meta,
+                                        page,
+                                        title => format!("Team Join Error | {}", state.global_page_meta.title),
+                                        user,
+                                        team => new_team,
+                                        max_players,
+                                    })
+                                    .unwrap();
                                 return Html(html).into_response();
                             }
                         }
-                    }
-
-                    let needs_divisions = team_divisions
-                        .iter()
-                        .filter(|division_id| !user_divisions.contains(division_id))
-                        .collect::<Vec<_>>();
-
-                    if !needs_divisions.is_empty() {
-                        // return Json(json!({
-                        //     "message": format!("To join this division you also need to join the following divisions: {}", needs_divisions.iter().map(|division_id| state.divisions.iter().find(|division| division.id == **division_id).unwrap().name.clone()).collect::<Vec<_>>().join(", "))
-                        // }))
-                        // .into_response();
-
-                        let html = state
-                        .jinja
-                        .get_template("join-error-division.html")
-                        .unwrap()
-                        .render(context! {
-                            global => state.global_page_meta,
-                            page,
-                            title => format!("Team Join Error | {}", state.global_page_meta.title),
-                            user,
-                            divisions => state.divisions,
-                            user_divisions => user_divisions,
-                            team_divisions => team_divisions,
-                            team => new_team,
-                        })
-                        .unwrap();
-                        return Html(html).into_response();
                     }
 
                     state
@@ -1067,7 +1021,7 @@ pub async fn route_signin_email_confirm_callback(
 async fn sign_in_cookie<'a>(
     state: &State<RouterState>,
     user_id: i64,
-    team_id: i64,
+    _team_id: i64,
     cookie_jar: &CookieJar,
     db: &Arc<dyn Database + Send + Sync>,
 ) -> Cookie<'static> {
@@ -1075,17 +1029,6 @@ async fn sign_in_cookie<'a>(
         let settings = state.settings.read().await;
         settings.jwt_secret.clone()
     };
-
-    for division in state.divisions.iter() {
-        let eligible = division
-            .division_eligibility
-            .is_user_eligible(user_id)
-            .await;
-
-        db.set_user_division(user_id, team_id, division.id, eligible.is_ok())
-            .await
-            .unwrap();
-    }
 
     let now = chrono::Utc::now();
     let iat = now.timestamp();

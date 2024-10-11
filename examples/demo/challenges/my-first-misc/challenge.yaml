@@ -5,12 +5,11 @@ description: |
 flag: flag{this_is_a_fake_flag}
 category: misc
 author: mbund
-points: dynamic
 files:
   - src: hello.py
     dst: main.py
   - url: https://upload.wikimedia.org/wikipedia/commons/1/14/Symmetries_of_square.svg
-    dst: statue.svg
+    dst: quadrilaterals.svg
 ticket_template: |
   # Misc template
 healthscript: https://example.com

@@ -1312,11 +1312,6 @@ body {
   z-index: 50;
 }
 
-.mx-1 {
-  margin-left: 0.25rem;
-  margin-right: 0.25rem;
-}
-
 .mx-4 {
   margin-left: 1rem;
   margin-right: 1rem;
@@ -1523,16 +1518,6 @@ body {
   width: 100%;
 }
 
-.w-max {
-  width: -moz-max-content;
-  width: max-content;
-}
-
-.w-min {
-  width: -moz-min-content;
-  width: min-content;
-}
-
 .max-w-fit {
   max-width: -moz-fit-content;
   max-width: fit-content;
@@ -1568,10 +1553,6 @@ body {
 
 .grow {
   flex-grow: 1;
-}
-
-.table-auto {
-  table-layout: auto;
 }
 
 .table-fixed {
@@ -1825,10 +1806,6 @@ body {
 .bg-primary {
   --tw-bg-opacity: 1;
   background-color: hsl(var(--primary) / var(--tw-bg-opacity));
-}
-
-.bg-primary\/20 {
-  background-color: hsl(var(--primary) / 0.2);
 }
 
 .bg-red-500 {
@@ -2345,11 +2322,6 @@ dialog[open] {
   content: var(--tw-content);
   --tw-bg-opacity: 1;
   background-color: hsl(var(--primary) / var(--tw-bg-opacity));
-}
-
-.odd\:bg-secondary:nth-child(odd) {
-  --tw-bg-opacity: 1;
-  background-color: hsl(var(--secondary) / var(--tw-bg-opacity));
 }
 
 .even\:bg-secondary:nth-child(even) {

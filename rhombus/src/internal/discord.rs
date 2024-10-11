@@ -13,7 +13,7 @@ use serenity::{
     all::{
         ButtonStyle, ChannelId, ChannelType, CreateActionRow, CreateAttachment, CreateButton,
         CreateEmbed, CreateEmbedAuthor, CreateMessage, CreateThread, EditMessage, EditThread,
-        GatewayIntents, GetMessages, Http, UserId,
+        GatewayIntents, GetMessages, Http, MessageFlags, UserId,
     },
     Client,
 };
@@ -24,7 +24,7 @@ use crate::{
     internal::{
         auth::User,
         database::provider::{
-            Author, Category, Challenge, ChallengeDivision, Connection, FirstBloods, Team, Ticket,
+            Author, Category, Challenge, ChallengeDivision, Connection, Team, Ticket,
         },
         email::outbound_mailer::OutboundMailer,
         settings::Settings,
@@ -752,7 +752,9 @@ impl Bot {
                                 ":crossed_swords: Challenge",
                                 format!(
                                     "[{}]({}/challenges#{})",
-                                    challenge.name, location_url, challenge.name
+                                    challenge.name,
+                                    location_url,
+                                    urlencoding::encode(&challenge.name)
                                 ),
                                 true,
                             )
@@ -796,19 +798,14 @@ impl Bot {
         challenge: &Challenge,
         divisions: &BTreeMap<i64, ChallengeDivision>,
         categories: &[Category],
-        first_bloods: &FirstBloods,
+        division_id: i64,
     ) -> Result<()> {
         let category = categories
             .iter()
             .find(|category| category.id == challenge.category_id)
             .unwrap();
 
-        let divisions = first_bloods
-            .division_ids
-            .iter()
-            .map(|division_id| divisions[division_id].name.as_str())
-            .collect::<Vec<&str>>();
-        let division_string = format_list_en(&divisions);
+        let division_name = divisions[&division_id].name.as_str();
 
         let emoji = [
             "🩸",
@@ -861,22 +858,21 @@ impl Bot {
 
         channel_id.send_message(
             &self.http,
-            CreateMessage::new().content({
+            CreateMessage::new().flags(MessageFlags::SUPPRESS_EMBEDS).content({
                 let user_link = match user.discord_id {
                     Some(discord_id) => format!("<@{}>", discord_id),
                     None => format!("**[{}]({}/user/{})**", escape_discord_link(&user.name), location_url, user.id),
                 };
                 format!(
-                    "Congrats to {} on team **[{}]({location_url}/team/{})** for first blood on **[{} / {}]({location_url}/challenges#{})** in {}! {}",
+                    "Congrats to {} on team **[{}]({location_url}/team/{})** for first blood on **[{} / {}]({location_url}/challenges#{})** in **{}** division! {}",
                     user_link,
                     escape_discord_link(&team.name),
                     team.id,
                     category.name,
                     challenge.name,
                     urlencoding::encode(&challenge.name),
-                    division_string,
+                    division_name,
                     emoji,
-                    location_url = location_url,
                 )
             }),
         )
@@ -971,32 +967,6 @@ lazy_static::lazy_static! {
         url: String::new(),
         timestamp: 0,
     });
-}
-
-fn format_list_en(items: &[&str]) -> String {
-    match items.len() {
-        0 => String::new(),
-        1 => format!("**{}** division", items[0]),
-        2 => format!("**{}** and **{}** divisions", items[0], items[1]),
-        _ => {
-            let mut formatted = String::new();
-            for (i, item) in items.iter().take(items.len() - 1).enumerate() {
-                formatted.push_str("**");
-                formatted.push_str(item);
-                formatted.push_str("**");
-                if i < items.len() - 2 {
-                    formatted.push_str(", ");
-                } else {
-                    formatted.push_str(", and ");
-                }
-            }
-            formatted.push_str("**");
-            formatted.push_str(items[items.len() - 1]);
-            formatted.push_str("**");
-            formatted.push_str(" divisions");
-            formatted
-        }
-    }
 }
 
 fn escape_discord_link(input: &str) -> Cow<str> {

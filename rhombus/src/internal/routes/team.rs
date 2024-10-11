@@ -29,7 +29,7 @@ pub struct TeamDivision<'a> {
     pub name: &'a str,
     pub description: &'a str,
     pub eligible: bool,
-    pub ineligible_user_ids: Vec<i64>,
+    pub requirement: Option<String>,
     pub joined: bool,
     pub max_players: MaxDivisionPlayers,
 }
@@ -41,14 +41,15 @@ pub async fn route_team(
 ) -> impl IntoResponse {
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
-    let team_divisions = state.db.get_team_divisions(user.team_id);
-    let standings = state.db.get_team_standings(user.team_id);
-    let (challenge_data, team, team_divisions, standings) =
-        tokio::join!(challenge_data, team, team_divisions, standings);
+    let (challenge_data, team) = tokio::join!(challenge_data, team);
     let challenge_data = challenge_data.unwrap();
     let team = team.unwrap();
-    let team_divisions = team_divisions.unwrap();
-    let standings = standings.unwrap();
+
+    let standing = state
+        .db
+        .get_team_standing(user.team_id, team.division_id)
+        .await
+        .unwrap();
 
     let location_url = state.settings.read().await.location_url.clone();
 
@@ -66,14 +67,10 @@ pub async fn route_team(
 
     let mut divisions = vec![];
     for division in state.divisions.iter() {
-        let mut ineligible_user_ids = vec![];
-        for user_id in team.users.keys() {
-            let user_divisions = state.db.get_user_divisions(*user_id).await.unwrap();
-
-            if !user_divisions.contains(&division.id) {
-                ineligible_user_ids.push(*user_id);
-            }
-        }
+        let eligible = division
+            .division_eligibility
+            .is_user_eligible(team.owner_user_id)
+            .await;
 
         let oversized = match division.max_players {
             MaxDivisionPlayers::Unlimited => true,
@@ -82,13 +79,15 @@ pub async fn route_team(
             }
         };
 
+        let joined = team.division_id == division.id;
+
         divisions.push(TeamDivision {
             id: division.id,
             name: &division.name,
             description: &division.description,
-            eligible: ineligible_user_ids.is_empty() && oversized,
-            ineligible_user_ids,
-            joined: team_divisions.contains(&division.id),
+            eligible: eligible.is_ok() && oversized,
+            requirement: eligible.err(),
+            joined,
             max_players: division.max_players.clone(),
         })
     }
@@ -103,8 +102,6 @@ pub async fn route_team(
         .min()
         .map(MaxDivisionPlayers::Limited)
         .unwrap_or(MaxDivisionPlayers::Unlimited);
-
-    let num_joined_divisions = divisions.iter().filter(|d| d.joined).count();
 
     Html(
         state
@@ -123,9 +120,9 @@ pub async fn route_team(
                 now => chrono::Utc::now(),
                 challenges,
                 categories,
-                num_joined_divisions,
                 divisions,
-                standings => standings.standings,
+                standing,
+                division_id => team.division_id,
             })
             .unwrap(),
     )
@@ -277,17 +274,11 @@ pub async fn route_user_kick(
         .unwrap()
 }
 
-#[derive(Deserialize)]
-pub struct DivisionSet {
-    join: Option<String>,
-}
-
 pub async fn route_team_set_division(
     state: State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
     Path(division_id): Path<i64>,
-    Form(form): Form<DivisionSet>,
 ) -> impl IntoResponse {
     if !user.is_team_owner {
         return Response::builder()
@@ -303,116 +294,60 @@ pub async fn route_team_set_division(
             .unwrap();
     }
 
-    let team_division_last_edit_time = state
-        .db
-        .get_team_division_last_edit_time(user.team_id, division_id)
-        .await
-        .unwrap()
-        .unwrap_or_default();
-
-    let next_allowed = team_division_last_edit_time + chrono::Duration::minutes(120);
-    if next_allowed > chrono::Utc::now() {
-        let resets_in = next_allowed - chrono::Utc::now();
-
-        return Response::builder()
-            .header(
-                "HX-Trigger",
-                format!(r##"{{"toast":{{"kind":"error","message":"You can change this division status again in {} minutes"}}}}"##, resets_in.num_minutes() + 1)
-            )
-            .header(
-                "HX-Location",
-                r##"{"path":"/team","select":"#screen","target":"#screen","swap":"outerHTML"}"##,
-            )
-            .body("".to_owned())
-            .unwrap();
-    }
-
-    state
-        .db
-        .set_team_division_last_edit_time(user.team_id, division_id)
-        .await
-        .unwrap();
-
     let team = state.db.get_team_from_id(user.team_id).await.unwrap();
     let division = state.divisions.iter().find(|d| d.id == division_id);
-    if let Some(division) = division {
-        match division.max_players {
-            MaxDivisionPlayers::Limited(max_players) => {
-                if team.users.len() > max_players.get() as usize {
-                    return Response::builder()
-                        .status(StatusCode::FORBIDDEN)
-                        .body("".to_owned())
-                        .unwrap();
-                }
-            }
-            MaxDivisionPlayers::Unlimited => {}
-        }
-    } else {
+    let Some(division) = division else {
         return Response::builder()
             .status(StatusCode::NOT_FOUND)
             .body("".to_owned())
             .unwrap();
+    };
+
+    match division.max_players {
+        MaxDivisionPlayers::Limited(max_players) => {
+            if team.users.len() > max_players.get() as usize {
+                return Response::builder()
+                    .status(StatusCode::FORBIDDEN)
+                    .body("".to_owned())
+                    .unwrap();
+            }
+        }
+        MaxDivisionPlayers::Unlimited => {}
     }
 
-    let team_divisions = state.db.get_team_divisions(team.id).await.unwrap();
+    let eligible = division
+        .division_eligibility
+        .is_user_eligible(user.id)
+        .await
+        .is_ok();
 
-    if team_divisions.len() == 1 && team_divisions.contains(&division_id) {
-        tracing::info!("Cannot remove last division");
+    if !eligible {
         return Response::builder()
             .status(StatusCode::FORBIDDEN)
             .body("".to_owned())
             .unwrap();
     }
 
-    let mut eligible = true;
-    for user_id in team.users.keys() {
-        let user_divisions = state.db.get_user_divisions(*user_id).await.unwrap();
-
-        if !user_divisions.contains(&division_id) {
-            eligible = false;
-            break;
-        }
-    }
-
     state
         .db
-        .set_team_division(user.team_id, division_id, eligible && form.join.is_some())
+        .set_team_division(team.id, team.division_id, division_id)
         .await
         .unwrap();
 
-    let standings = state.db.get_team_standings(user.team_id).await.unwrap();
+    tracing::trace!(team_id = team.id, division_id, "Set division");
 
-    tracing::trace!(
-        user_id = user.id,
-        division_id,
-        joined = form.join.is_some(),
-        "Set division"
-    );
+    let standing = state
+        .db
+        .get_team_standing(user.team_id, division_id)
+        .await
+        .unwrap();
 
-    let team_divisions = state.db.get_team_divisions(team.id).await.unwrap();
-    let max_players = state
-        .divisions
-        .iter()
-        .filter(|division| team_divisions.contains(&division.id))
-        .filter_map(|division| match division.max_players {
-            MaxDivisionPlayers::Unlimited => None,
-            MaxDivisionPlayers::Limited(max) => Some(max),
-        })
-        .min()
-        .map(MaxDivisionPlayers::Limited)
-        .unwrap_or(MaxDivisionPlayers::Unlimited);
-
-    let team = state.db.get_team_from_id(user.team_id).await.unwrap();
     let mut divisions = vec![];
     for division in state.divisions.iter() {
-        let mut ineligible_user_ids = vec![];
-        for user_id in team.users.keys() {
-            let user_divisions = state.db.get_user_divisions(*user_id).await.unwrap();
-
-            if !user_divisions.contains(&division.id) {
-                ineligible_user_ids.push(*user_id);
-            }
-        }
+        let eligible = division
+            .division_eligibility
+            .is_user_eligible(team.owner_user_id)
+            .await;
 
         let oversized = match division.max_players {
             MaxDivisionPlayers::Unlimited => true,
@@ -421,18 +356,29 @@ pub async fn route_team_set_division(
             }
         };
 
+        let joined = division_id == division.id;
+
         divisions.push(TeamDivision {
             id: division.id,
             name: &division.name,
             description: &division.description,
-            eligible: ineligible_user_ids.is_empty() && oversized,
-            ineligible_user_ids,
-            joined: team_divisions.contains(&division.id),
+            eligible: eligible.is_ok() && oversized,
+            requirement: eligible.err(),
+            joined,
             max_players: division.max_players.clone(),
         })
     }
 
-    let num_joined_divisions = divisions.iter().filter(|d| d.joined).count();
+    let max_players = divisions
+        .iter()
+        .filter(|division| division.joined)
+        .filter_map(|division| match division.max_players {
+            MaxDivisionPlayers::Unlimited => None,
+            MaxDivisionPlayers::Limited(max) => Some(max),
+        })
+        .min()
+        .map(MaxDivisionPlayers::Limited)
+        .unwrap_or(MaxDivisionPlayers::Unlimited);
 
     let html = state
         .jinja
@@ -444,8 +390,8 @@ pub async fn route_team_set_division(
             max_players,
             user,
             divisions,
-            standings => standings.standings,
-            num_joined_divisions,
+            division_id,
+            standing,
             oob => true,
         })
         .unwrap();

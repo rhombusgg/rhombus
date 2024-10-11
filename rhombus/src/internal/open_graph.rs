@@ -270,10 +270,10 @@ pub async fn route_team_og_image(
     }
 
     let challenge_data = state.db.get_challenges();
-    let standings = state.db.get_team_standings(team_id.0);
-    let (challenge_data, standings) = tokio::join!(challenge_data, standings);
+    let standing = state.db.get_team_standing(team_id.0, team.division_id);
+    let (challenge_data, standings) = tokio::join!(challenge_data, standing);
     let challenge_data = challenge_data.unwrap();
-    let standings = standings.unwrap();
+    let standing = standings.unwrap();
 
     let site = {
         let settings = state.settings.read().await;
@@ -355,7 +355,7 @@ pub async fn route_team_og_image(
             ctf_start_time,
             ctf_end_time,
             divisions => state.divisions,
-            standings => standings.standings,
+            standing,
             num_solves,
             num_users,
             categories,

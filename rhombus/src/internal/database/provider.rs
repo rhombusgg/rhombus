@@ -8,6 +8,7 @@ use std::{
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
+use serde_json::Value;
 use tokio_util::bytes::Bytes;
 
 use crate::{
@@ -17,28 +18,6 @@ use crate::{
 
 pub type Connection = Arc<dyn Database + Send + Sync>;
 pub type WeakConnection = Weak<dyn Database + Send + Sync>;
-
-#[derive(Debug, Serialize, Clone)]
-pub enum ScoringType {
-    Dynamic,
-    Static,
-}
-
-impl From<i64> for ScoringType {
-    fn from(value: i64) -> Self {
-        match value {
-            0 => ScoringType::Dynamic,
-            _ => ScoringType::Static,
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Clone)]
-pub struct ChallengeDivisionPoints {
-    pub division_id: i64,
-    pub points: u64,
-    pub solves: u64,
-}
 
 #[derive(Debug, Serialize, Clone)]
 pub struct ChallengeAttachment {
@@ -51,16 +30,18 @@ pub struct Challenge {
     pub id: i64,
     pub name: String,
     pub description: String,
+    pub flag: String,
     pub category_id: i64,
     pub author_id: i64,
+    pub ticket_template: Option<String>,
     pub healthscript: Option<String>,
     pub healthy: Option<bool>,
     pub last_healthcheck: Option<DateTime<Utc>>,
-    pub division_points: Vec<ChallengeDivisionPoints>,
-    pub scoring_type: ScoringType,
-    pub flag: String,
-    pub ticket_template: Option<String>,
+    pub score_type: String,
+    pub metadata: Value,
+    pub points: i64,
     pub attachments: Vec<ChallengeAttachment>,
+    pub division_solves: BTreeMap<i64, u64>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -96,6 +77,7 @@ pub type Challenges = Arc<ChallengeData>;
 pub struct ChallengeSolve {
     pub solved_at: DateTime<Utc>,
     pub user_id: i64,
+    pub points: Option<i64>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -120,6 +102,8 @@ pub struct TeamInner {
     pub users: BTreeMap<i64, TeamUser>,
     pub solves: BTreeMap<i64, ChallengeSolve>,
     pub writeups: BTreeMap<i64, Vec<Writeup>>,
+    pub division_id: i64,
+    pub owner_user_id: i64,
 }
 
 pub type Team = Arc<TeamInner>;
@@ -131,11 +115,6 @@ pub struct TeamMetaInner {
 }
 
 pub type TeamMeta = Arc<TeamMetaInner>;
-
-#[derive(Debug, Serialize, Clone)]
-pub struct FirstBloods {
-    pub division_ids: Vec<i64>,
-}
 
 #[derive(Debug, Serialize, Clone)]
 pub struct ScoreboardSeriesPoint {
@@ -175,14 +154,9 @@ pub struct Email {
 }
 
 #[derive(Debug, Serialize, Clone)]
-pub struct TeamStandingEntry {
-    pub points: u64,
+pub struct TeamStanding {
+    pub points: i64,
     pub rank: u64,
-}
-
-#[derive(Debug, Serialize, Clone)]
-pub struct TeamStandings {
-    pub standings: BTreeMap<i64, TeamStandingEntry>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -281,8 +255,10 @@ pub trait Database {
         &self,
         user_id: i64,
         team_id: i64,
+        division_id: i64,
         challenge: &Challenge,
-    ) -> Result<FirstBloods>;
+        next_points: i64,
+    ) -> Result<()>;
     async fn get_user_from_id(&self, user_id: i64) -> Result<User>;
     async fn get_user_from_discord_id(&self, discord_id: NonZeroU64) -> Result<User>;
     async fn kick_user(&self, user_id: i64, team_id: i64) -> Result<()>;
@@ -347,24 +323,18 @@ pub trait Database {
     async fn verify_email_signin_callback_code(&self, code: &str) -> Result<String>;
     async fn get_email_signin_by_callback_code(&self, code: &str) -> Result<String>;
     async fn delete_email(&self, user_id: i64, email: &str) -> Result<()>;
-    async fn get_user_divisions(&self, user_id: i64) -> Result<Vec<i64>>;
-    async fn set_user_division(
+    async fn set_team_division(
         &self,
-        user_id: i64,
         team_id: i64,
-        division_id: i64,
-        join: bool,
+        old_division_id: i64,
+        new_division_id: i64,
     ) -> Result<()>;
     async fn insert_divisions(&self, divisions: &[Division]) -> Result<()>;
-    async fn get_team_divisions(&self, team_id: i64) -> Result<Vec<i64>>;
-    async fn get_team_division_last_edit_time(
+    async fn get_team_standing(
         &self,
         team_id: i64,
         division_id: i64,
-    ) -> Result<Option<DateTime<Utc>>>;
-    async fn set_team_division_last_edit_time(&self, team_id: i64, division_id: i64) -> Result<()>;
-    async fn set_team_division(&self, team_id: i64, division_id: i64, join: bool) -> Result<()>;
-    async fn get_team_standings(&self, team_id: i64) -> Result<TeamStandings>;
+    ) -> Result<Option<TeamStanding>>;
     async fn upload_file(&self, hash: &str, filename: &str, bytes: &[u8]) -> Result<()>;
     async fn download_file(&self, hash: &str) -> Result<(Bytes, String)>;
     async fn get_site_statistics(&self) -> Result<SiteStatistics>;

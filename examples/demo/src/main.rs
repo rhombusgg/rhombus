@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, path::PathBuf, sync::Arc, time::Duration};
 
 use chrono::prelude::*;
 use fake::{
@@ -12,7 +12,7 @@ use rand::{
     Rng,
 };
 use sha2::{Digest, Sha256};
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 use tracing_subscriber::EnvFilter;
 
 use rhombus::{
@@ -25,6 +25,7 @@ use rhombus::{
             libsql::{LibSQL, LibSQLConnection},
             provider::{Connection, Database},
         },
+        routes::challenges::ChallengePoints,
         settings::Settings,
     },
     libsql::params,
@@ -128,8 +129,11 @@ impl Plugin for DemoPlugin {
         };
 
         randomize_jwt(context.settings.clone()).await;
-
-        solver(libsql.clone(), context.db.clone());
+        solver(
+            libsql.clone(),
+            context.db.clone(),
+            context.score_type_map.clone(),
+        );
         team_creator(libsql.clone(), context.db.clone());
 
         let plugin_state = DemoState::new(libsql.clone());
@@ -181,21 +185,6 @@ async fn set_user_to_bot(libsql: Arc<LibSQL>, user_id: i64) -> Result<()> {
     Ok(())
 }
 
-async fn join_to_divisons(
-    db: Connection,
-    division_ids: &[i64],
-    user_id: i64,
-    team_id: i64,
-) -> Result<()> {
-    for division_id in division_ids {
-        db.set_user_division(user_id, team_id, *division_id, true)
-            .await?;
-        db.set_team_division(team_id, *division_id, true).await?;
-    }
-
-    Ok(())
-}
-
 async fn create_team(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
     let dummy_user = create_dummy_user();
 
@@ -208,11 +197,9 @@ async fn create_team(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
         .collect::<Vec<_>>();
 
     let mut rng = rand::rngs::OsRng;
-    let num_divisions = rng.gen_range(1..=division_ids.len().max(1));
-    let division_ids = division_ids
-        .choose_multiple(&mut rng, num_divisions)
-        .copied()
-        .collect::<Vec<_>>();
+    let Some(division_id) = division_ids.choose(&mut rng) else {
+        return Ok(());
+    };
 
     let Some((user_id, team_id)) = db
         .upsert_user_by_credentials(
@@ -225,7 +212,9 @@ async fn create_team(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
         panic!()
     };
 
-    join_to_divisons(db.clone(), &division_ids, user_id, team_id).await?;
+    let team = db.get_team_from_id(team_id).await?;
+    db.set_team_division(team_id, team.division_id, *division_id)
+        .await?;
     set_user_to_bot(libsql.clone(), user_id).await?;
 
     let num_members = rng.gen_range(0..3);
@@ -242,7 +231,8 @@ async fn create_team(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
         else {
             continue;
         };
-        join_to_divisons(db.clone(), &division_ids, user_id, team_id).await?;
+        db.set_team_division(team_id, team.division_id, *division_id)
+            .await?;
         set_user_to_bot(libsql.clone(), user_id).await?;
         db.add_user_to_team(user_id, team_id, None).await?;
     }
@@ -250,13 +240,19 @@ async fn create_team(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
     Ok(())
 }
 
-async fn solve_challenge(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
+async fn solve_challenge(
+    libsql: Arc<LibSQL>,
+    db: Connection,
+    score_type_map: Arc<Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>>,
+) -> Result<()> {
     let conn = libsql.connect().await?;
 
-    if let Some((user_id, team_id)) = conn
+    if let Some((user_id, team_id, division_id)) = conn
         .query(
             "
-            SELECT id, team_id FROM rhombus_user
+            SELECT rhombus_user.id, rhombus_user.team_id, rhombus_team.division_id
+            FROM rhombus_user
+            JOIN rhombus_team ON rhombus_user.team_id = rhombus_team.id
             WHERE is_bot = 1
             ORDER BY RANDOM()
             LIMIT 1
@@ -266,11 +262,29 @@ async fn solve_challenge(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
         .await?
         .next()
         .await?
-        .map(|row| (row.get::<i64>(0).unwrap(), row.get::<i64>(1).unwrap()))
+        .map(|row| {
+            (
+                row.get::<i64>(0).unwrap(),
+                row.get::<i64>(1).unwrap(),
+                row.get::<i64>(2).unwrap(),
+            )
+        })
     {
         let mut rng = rand::rngs::OsRng;
         if let Some(challenge) = db.get_challenges().await?.challenges.choose(&mut rng) {
-            db.solve_challenge(user_id, team_id, challenge).await?;
+            let user = db.get_user_from_id(user_id).await?;
+            let team = db.get_team_from_id(team_id).await?;
+            let next_points = score_type_map
+                .lock()
+                .await
+                .get(challenge.score_type.as_str())
+                .unwrap()
+                .next(&user, &team, challenge)
+                .await
+                .unwrap();
+
+            db.solve_challenge(user_id, team_id, division_id, challenge, next_points)
+                .await?;
             tracing::info!(user_id, challenge_id = challenge.id, "Solved challenge");
         }
     }
@@ -278,11 +292,15 @@ async fn solve_challenge(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
     Ok(())
 }
 
-fn solver(libsql: Arc<LibSQL>, db: Connection) {
+fn solver(
+    libsql: Arc<LibSQL>,
+    db: Connection,
+    score_type_map: Arc<Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>>,
+) {
     tokio::task::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(10)).await;
-            _ = solve_challenge(libsql.clone(), db.clone()).await;
+            _ = solve_challenge(libsql.clone(), db.clone(), score_type_map.clone()).await;
         }
     });
 }

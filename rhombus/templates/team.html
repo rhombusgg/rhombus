@@ -87,31 +87,15 @@
         {% call card.root() %}
           {% call card.header() %}
             {% call card.title() %}
-              Standing
-            {% endcall %}
-            {% call card.description() %}
-              Your team's standing in the competition
-            {% endcall %}
-          {% endcall %}
-          {% call card.content() %}
-            {% with x=divisions, y=standings %}
-            {% endwith %}
-            {% include "standing-table.html" %}
-          {% endcall %}
-        {% endcall %}
-
-        {% call card.root() %}
-          {% call card.header() %}
-            {% call card.title() %}
               Divisions
             {% endcall %}
             {% call card.description() %}
-              Join your team to eligible divisions
+              Your team can qualify for different scoring brackets. The team
+              captain must fulfill division specific requirements to join your
+              team to a division.
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
-            {% with a=divisions, b=user, c=num_joined_divisions, d=team %}
-            {% endwith %}
             {% include "team-divisions.html" %}
           {% endcall %}
         {% endcall %}
@@ -179,7 +163,7 @@
                           {{ challenge.name }}
                         </a>
                         <span class="text-muted-foreground">
-                          / {{ challenge.division_points[0].points }} points /
+                          / {{ challenge.points }} points /
                           <span title="{{ solve.solved_at }}">
                             {% with diff=timediff(solve.solved_at, now) %}
                               {{ t("time-difference", years=diff.years, days=diff.days, hours=diff.hours, minutes=diff.minutes, seconds=diff.seconds) }}

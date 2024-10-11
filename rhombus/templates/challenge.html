@@ -14,22 +14,19 @@
       <rhombus-tooltip class="cursor-pointer">
         <div slot="content">
           <table>
-            {%- for division_points in challenge.division_points -%}
+            {%- for (division_id, solves) in challenge.division_solves | items -%}
               <tr>
                 <td class="pr-2 text-right">
-                  {{ divisions[division_points.division_id].name }}
+                  {{ divisions[division_id].name }}
                 </td>
-                <td class="pr-2">
-                  {{ t("solves", solves=division_points.solves) }}
-                </td>
-                <td>{{ t("points", points=division_points.points) }}</td>
+                <td class="pr-2">{{ t("solves", solves=solves) }}</td>
               </tr>
             {%- endfor -%}
           </table>
         </div>
 
         <span
-          >{{ t("solves-points", solves=challenge.division_points[0].solves, points=challenge.division_points[0].points) }}</span
+          >{{ t("solves-points", solves=challenge.division_solves[challenge.division_solves | first], points=challenge.points) }}</span
         >
       </rhombus-tooltip>
     </div>

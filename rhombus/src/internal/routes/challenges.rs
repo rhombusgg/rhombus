@@ -10,9 +10,14 @@ use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use minijinja::context;
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{json, Value};
 
-use crate::internal::{auth::User, router::RouterState, routes::meta::PageMeta};
+use crate::internal::{
+    auth::User,
+    database::provider::{Challenge, Team},
+    router::RouterState,
+    routes::meta::PageMeta,
+};
 
 pub async fn route_challenges(
     state: State<RouterState>,
@@ -59,6 +64,7 @@ pub async fn route_challenges(
     };
 
     let challenge_json = json!({
+        "division_id": team.division_id,
         "ticket_enabled": ticket_enabled,
         "challenges": challenge_data.challenges.iter().map(|challenge| json!({
             "id": challenge.id,
@@ -72,12 +78,12 @@ pub async fn route_challenges(
             } else {
                 None
             },
+            "points": challenge.points,
             "category_id": challenge.category_id,
             "author_id": challenge.author_id,
-            "division_points": challenge.division_points.iter().map(|division_points| json!({
-                "division_id": division_points.division_id,
-                "points": division_points.points,
-                "solves": division_points.solves,
+            "division_solves": challenge.division_solves.iter().map(|(division_id, solves)| json!({
+                "division_id": division_id,
+                "solves": solves,
             })).collect::<serde_json::Value>(),
             "attachments": challenge.attachments.iter().map(|attachment| json!({
                 "name": attachment.name,
@@ -111,6 +117,7 @@ pub async fn route_challenges(
                 (solve.0.to_string(), json!({
                     "solved_at": solve.1.solved_at,
                     "user_id": solve.1.user_id,
+                    "points": solve.1.points,
                 }))
             ).collect::<serde_json::Value>(),
         })
@@ -134,6 +141,88 @@ pub async fn route_challenges(
         .unwrap();
 
     Html(html).into_response()
+}
+
+#[async_trait::async_trait]
+pub trait ChallengeFlag {
+    async fn correct_flag(
+        &self,
+        challenge: &Challenge,
+        flag: &str,
+    ) -> std::result::Result<bool, String>;
+}
+
+pub struct ExactFlag;
+
+#[async_trait::async_trait]
+impl ChallengeFlag for ExactFlag {
+    async fn correct_flag(
+        &self,
+        challenge: &Challenge,
+        flag: &str,
+    ) -> std::result::Result<bool, String> {
+        Ok(challenge.flag.trim() == flag.trim())
+    }
+}
+
+#[async_trait::async_trait]
+pub trait ChallengePoints {
+    async fn initial(&self, metadata: &Value) -> crate::Result<i64>;
+    async fn next(&self, user: &User, team: &Team, challenge: &Challenge) -> crate::Result<i64>;
+}
+
+pub struct DynamicPoints;
+
+#[async_trait::async_trait]
+impl ChallengePoints for DynamicPoints {
+    async fn initial(&self, metadata: &Value) -> crate::Result<i64> {
+        let initial = metadata["dynamic"]["initial"].as_i64().unwrap_or(500);
+
+        Ok(initial)
+    }
+
+    async fn next(&self, _user: &User, _team: &Team, challenge: &Challenge) -> crate::Result<i64> {
+        let initial = challenge.metadata["dynamic"]["initial"]
+            .as_f64()
+            .unwrap_or(500.);
+        let minimum = challenge.metadata["dynamic"]["minimum"]
+            .as_f64()
+            .unwrap_or(100.);
+        let decay = challenge.metadata["dynamic"]["decay"]
+            .as_f64()
+            .unwrap_or(100.);
+
+        let total_solves = challenge.division_solves.values().sum::<u64>() as f64;
+
+        let solves = total_solves + 1.;
+        let points =
+            (((minimum - initial) / (decay * decay) * (solves * solves)) + initial).ceil() as i64;
+
+        Ok(points)
+    }
+}
+
+pub struct StaticPoints;
+
+#[async_trait::async_trait]
+impl ChallengePoints for StaticPoints {
+    async fn initial(&self, metadata: &Value) -> crate::Result<i64> {
+        let points = metadata["points"].as_i64().unwrap_or(100);
+
+        Ok(points)
+    }
+
+    async fn next(&self, _user: &User, _team: &Team, challenge: &Challenge) -> crate::Result<i64> {
+        let Some(points) = challenge.metadata["points"].as_i64() else {
+            tracing::error!(
+                challenge_id = challenge.id,
+                "Static scoring used but no points specified. Defaulting to 100 points",
+            );
+            return Ok(100);
+        };
+
+        Ok(points)
+    }
 }
 
 pub async fn route_challenge_view(
@@ -422,20 +511,44 @@ pub async fn route_challenge_submit(
         .find(|c| challenge_id.eq(&c.id))
         .unwrap();
 
-    if challenge.flag != form.flag {
-        let html = state
-            .jinja
-            .get_template("challenge-submit.html")
-            .unwrap()
-            .render(context! {
-                page,
-                error => state.localizer.localize(&page.lang, "challenges-error-incorrect-flag", None),
-            })
-            .unwrap();
-        return Response::builder()
-            .header("content-type", "text/html")
-            .body(html)
-            .unwrap();
+    let correct_flag = if let Some(custom) = state.flag_fn_map.lock().await.get(&challenge_id) {
+        custom.correct_flag(challenge, &form.flag).await
+    } else {
+        ExactFlag.correct_flag(challenge, &form.flag).await
+    };
+
+    match correct_flag {
+        Ok(true) => (),
+        Ok(false) => {
+            let html = state
+                .jinja
+                .get_template("challenge-submit.html")
+                .unwrap()
+                .render(context! {
+                    page,
+                    error => state.localizer.localize(&page.lang, "challenges-error-incorrect-flag", None),
+                })
+                .unwrap();
+            return Response::builder()
+                .header("content-type", "text/html")
+                .body(html)
+                .unwrap();
+        }
+        Err(error) => {
+            let html = state
+                .jinja
+                .get_template("challenge-submit.html")
+                .unwrap()
+                .render(context! {
+                    page,
+                    error,
+                })
+                .unwrap();
+            return Response::builder()
+                .header("content-type", "text/html")
+                .body(html)
+                .unwrap();
+        }
     }
 
     if let Some(end_time) = state.settings.read().await.end_time {
@@ -479,12 +592,40 @@ pub async fn route_challenge_submit(
             .unwrap();
     }
 
-    let first_bloods = state
-        .db
-        .solve_challenge(user.id, user.team_id, challenge)
-        .await;
+    let team = state.db.get_team_from_id(user.team_id).await.unwrap();
 
-    if let Err(error) = first_bloods {
+    let next_points = state
+        .score_type_map
+        .lock()
+        .await
+        .get(challenge.score_type.as_str())
+        .unwrap()
+        .next(&user, &team, challenge)
+        .await
+        .unwrap_or_else(|error| {
+            let total_solves = challenge.division_solves.values().sum::<u64>();
+
+            tracing::error!(
+                challenge_id = challenge.id,
+                user_id = user.id,
+                team_id = user.team_id,
+                score_type = challenge.score_type,
+                division_solves = ?challenge.division_solves,
+                total_solves,
+                previous_points=challenge.points,
+                ?error,
+                "Failed to calculate points for challenge after solve. Defaulting to previous value"
+            );
+            challenge.points
+        });
+
+    let first_blooded = challenge.division_solves[&team.division_id] == 0;
+
+    if let Err(error) = state
+        .db
+        .solve_challenge(user.id, team.id, team.division_id, challenge, next_points)
+        .await
+    {
         tracing::error!("{:#?}", error);
         let html = state
             .jinja
@@ -516,30 +657,32 @@ pub async fn route_challenge_submit(
                 .is_some()
         };
 
-        if first_blood_enabled {
-            let first_bloods = first_bloods.unwrap();
-
-            if !first_bloods.division_ids.is_empty() {
-                let team = state.db.get_team_from_id(user.team_id).await.unwrap();
-                _ = bot
-                    .send_first_blood(
-                        &user,
-                        &team,
-                        challenge,
-                        &challenge_data.divisions,
-                        &challenge_data.categories,
-                        &first_bloods,
-                    )
-                    .await;
+        if first_blood_enabled && first_blooded {
+            if let Err(error) = bot
+                .send_first_blood(
+                    &user,
+                    &team,
+                    challenge,
+                    &challenge_data.divisions,
+                    &challenge_data.categories,
+                    team.division_id,
+                )
+                .await
+            {
+                tracing::error!(
+                    user_id = user.id,
+                    team_id = user.team_id,
+                    challenge_id = challenge.id,
+                    division_id = team.division_id,
+                    error = ?error,
+                    "First blood failed to send",
+                );
+            } else {
                 tracing::info!(
                     user_id = user.id,
+                    team_id = user.team_id,
                     challenge_id = challenge.id,
-                    divisions = first_bloods
-                        .division_ids
-                        .iter()
-                        .map(|n| n.to_string())
-                        .collect::<Vec<String>>()
-                        .join(","),
+                    division_id = team.division_id,
                     "First blooded"
                 );
             }

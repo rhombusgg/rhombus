@@ -11,9 +11,9 @@ use crate::{
         database::{
             cache::Writeups,
             provider::{
-                Challenge, Challenges, Database, Email, FirstBloods, Leaderboard, Scoreboard,
+                Challenge, Challenges, Database, Email, Leaderboard, Scoreboard,
                 SetAccountNameError, SetTeamNameError, SiteStatistics, Team, TeamMeta,
-                TeamStandings, Ticket,
+                TeamStanding, Ticket,
             },
         },
         division::Division,
@@ -218,8 +218,10 @@ impl Database for Postgres {
         &self,
         _user_id: i64,
         _team_id: i64,
+        _division_id: i64,
         _challenge: &Challenge,
-    ) -> Result<FirstBloods> {
+        _next_points: i64,
+    ) -> Result<()> {
         todo!()
     }
 
@@ -339,16 +341,11 @@ impl Database for Postgres {
         todo!()
     }
 
-    async fn get_user_divisions(&self, _user_id: i64) -> Result<Vec<i64>> {
-        todo!()
-    }
-
-    async fn set_user_division(
+    async fn set_team_division(
         &self,
-        _user_id: i64,
         _team_id: i64,
-        _division_id: i64,
-        _join: bool,
+        _old_division_id: i64,
+        _new_division_id: i64,
     ) -> Result<()> {
         todo!()
     }
@@ -357,32 +354,12 @@ impl Database for Postgres {
         todo!()
     }
 
-    async fn get_team_divisions(&self, _team_id: i64) -> Result<Vec<i64>> {
-        todo!()
-    }
-
-    async fn get_team_division_last_edit_time(
+    async fn get_team_standing(
         &self,
         _team_id: i64,
         _division_id: i64,
-    ) -> Result<Option<DateTime<Utc>>> {
+    ) -> Result<Option<TeamStanding>> {
         todo!()
-    }
-
-    async fn set_team_division_last_edit_time(
-        &self,
-        _team_id: i64,
-        _division_id: i64,
-    ) -> Result<()> {
-        todo!()
-    }
-
-    async fn set_team_division(&self, _team_id: i64, _division_id: i64, _join: bool) -> Result<()> {
-        todo!()
-    }
-
-    async fn get_team_standings(&self, _team_id: i64) -> Result<TeamStandings> {
-        todo!();
     }
 
     async fn upload_file(&self, _hash: &str, _filename: &str, _bytes: &[u8]) -> Result<()> {

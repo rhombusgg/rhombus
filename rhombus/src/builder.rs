@@ -1,5 +1,6 @@
 use std::{
     any::Any,
+    collections::BTreeMap,
     fmt::Debug,
     hash::{BuildHasher, BuildHasherDefault, Hasher},
     num::NonZeroU32,
@@ -66,7 +67,7 @@ use crate::{
             challenges::{
                 route_challenge_submit, route_challenge_view, route_challenges,
                 route_ticket_submit, route_ticket_view, route_writeup_delete, route_writeup_submit,
-                TEAM_BURSTED_POINTS,
+                ChallengePoints, DynamicPoints, StaticPoints, TEAM_BURSTED_POINTS,
             },
             home::route_home,
             meta::{page_meta_middleware, route_robots_txt, GlobalPageMeta},
@@ -446,7 +447,8 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
             let mut divisions = if let Some(divisions) = &settings.divisions {
                 divisions
                     .iter()
-                    .map(|division| {
+                    .enumerate()
+                    .map(|(i, division)| {
                         let division_eligibility: DivisionEligibilityProvider =
                             if let Some(email_regex) = &division.email_regex {
                                 Arc::new(EmailDivisionEligibilityProvider::new(
@@ -489,6 +491,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                             description: division.description.clone(),
                             max_players,
                             division_eligibility,
+                            is_default: i == 0,
                         }
                     })
                     .collect()
@@ -501,6 +504,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     description: "Open division for everyone".to_owned(),
                     max_players: MaxDivisionPlayers::Unlimited,
                     division_eligibility: Arc::new(OpenDivisionEligibilityProvider {}),
+                    is_default: true,
                 }]
             };
 
@@ -519,7 +523,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     db.clone()
                 }
                 "true" => {
-                    let duration = 360;
+                    let duration = 180;
                     info!(duration, "Enabling default in memory cache");
                     database_cache_evictor(duration, db.clone());
                     Arc::new(DbCache::new(db.clone()))
@@ -657,6 +661,14 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
             let old_settings = settings.clone();
             let settings = Arc::new(RwLock::new(settings));
 
+            let mut score_type_map: BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>> =
+                BTreeMap::new();
+            score_type_map.insert("static".to_owned(), Box::new(StaticPoints));
+            score_type_map.insert("dynamic".to_owned(), Box::new(DynamicPoints));
+            let score_type_map = Arc::new(Mutex::new(score_type_map));
+
+            let flag_fn_map = Arc::default();
+
             let (plugin_router, upload_router) = {
                 let plugin_upload_provider_builder = UploadProviderContext {
                     settings: &old_settings,
@@ -678,6 +690,8 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                         divisions: &mut divisions,
                         rawdb: &rawdb,
                         db: cached_db.clone(),
+                        score_type_map: &score_type_map,
+                        flag_fn_map: &flag_fn_map,
                     };
 
                     let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
@@ -694,6 +708,8 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                         divisions: &mut divisions,
                         rawdb: &rawdb,
                         db: cached_db.clone(),
+                        score_type_map: &score_type_map,
+                        flag_fn_map: &flag_fn_map,
                     };
 
                     let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
@@ -711,6 +727,8 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                         divisions: &mut divisions,
                         rawdb: &rawdb,
                         db: cached_db.clone(),
+                        score_type_map: &score_type_map,
+                        flag_fn_map: &flag_fn_map,
                     };
 
                     let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
@@ -732,6 +750,8 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                         divisions: &mut divisions,
                         rawdb: &rawdb,
                         db: cached_db.clone(),
+                        score_type_map: &score_type_map,
+                        flag_fn_map: &flag_fn_map,
                     };
 
                     let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
@@ -767,6 +787,8 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                         divisions: &mut divisions,
                         rawdb: &rawdb,
                         db: cached_db.clone(),
+                        score_type_map: &score_type_map,
+                        flag_fn_map: &flag_fn_map,
                     };
 
                     let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
@@ -920,6 +942,8 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 divisions: Arc::new(divisions),
                 router: rr.clone(),
                 global_page_meta,
+                score_type_map,
+                flag_fn_map,
             });
 
             let rhombus_router = axum::Router::new()

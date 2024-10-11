@@ -39,7 +39,7 @@ mail-parser = "0.9.4"
 markdown = "1.0.0-alpha.20"
 mime_guess = "2.0.5"
 minify-html-onepass = "0.15.0"
-minijinja = { version = "2.2.0", features = ["json", "loader"] }
+minijinja = { version = "2.3.1", features = ["json", "loader", "speedups"] }
 petname = "2.0.2"
 pin-project-lite = "0.2.14"
 poise = "0.6.1"

@@ -10,9 +10,9 @@ use crate::{
     internal::{
         auth::User,
         database::provider::{
-            Challenge, ChallengeData, Challenges, Connection, Database, Email, FirstBloods,
-            Leaderboard, Scoreboard, SetAccountNameError, SetTeamNameError, SiteStatistics, Team,
-            TeamMeta, TeamStandings, Ticket, Writeup,
+            Challenge, ChallengeData, Challenges, Connection, Database, Email, Leaderboard,
+            Scoreboard, SetAccountNameError, SetTeamNameError, SiteStatistics, Team, TeamInner,
+            TeamMeta, TeamStanding, Ticket, Writeup,
         },
         division::Division,
         settings::Settings,
@@ -267,15 +267,37 @@ impl Database for DbCache {
         &self,
         user_id: i64,
         team_id: i64,
-        challenge: &Challenge,
-    ) -> Result<FirstBloods> {
+        division_id: i64,
+        solved_challenge: &Challenge,
+        next_points: i64,
+    ) -> Result<()> {
         let result = self
             .inner
-            .solve_challenge(user_id, team_id, challenge)
+            .solve_challenge(user_id, team_id, division_id, solved_challenge, next_points)
             .await;
         if result.is_ok() {
             USER_CACHE.remove(&user_id);
             TEAM_CACHE.clear();
+            SCOREBOARD_CACHE.clear();
+            LEADERBOARD_CACHE.clear();
+            TEAM_STANDINGS.clear();
+
+            if let Some(ref mut cached) = &mut *CHALLENGES_CACHE.write().await {
+                let mut challenges = cached.challenges.clone();
+                if let Some(challenge) = challenges
+                    .iter_mut()
+                    .find(|challenge| challenge.id == solved_challenge.id)
+                {
+                    *challenge.division_solves.get_mut(&division_id).unwrap() += 1;
+                    challenge.points = next_points;
+                }
+                *cached = Arc::new(ChallengeData {
+                    challenges,
+                    authors: cached.authors.clone(),
+                    categories: cached.categories.clone(),
+                    divisions: cached.divisions.clone(),
+                });
+            }
         }
         result
     }
@@ -438,28 +460,55 @@ impl Database for DbCache {
         result
     }
 
-    async fn get_user_divisions(&self, user_id: i64) -> Result<Vec<i64>> {
-        get_user_divisions(&self.inner, user_id).await
-    }
-
-    async fn set_user_division(
+    async fn set_team_division(
         &self,
-        user_id: i64,
         team_id: i64,
-        division_id: i64,
-        join: bool,
+        old_division_id: i64,
+        new_division_id: i64,
     ) -> Result<()> {
         let result = self
             .inner
-            .set_user_division(user_id, team_id, division_id, join)
+            .set_team_division(team_id, old_division_id, new_division_id)
             .await;
         if result.is_ok() {
-            USER_DIVISIONS.remove(&user_id);
-            TEAM_DIVISIONS.remove(&team_id);
-            // TEAM_STANDINGS.clear();
-            // SCOREBOARD_CACHE.clear();
-            // LEADERBOARD_CACHE.clear();
-            // *CHALLENGES_CACHE.write().await = None;
+            TEAM_CACHE.alter(&team_id, |_, v| TimedCache {
+                value: Arc::new(TeamInner {
+                    division_id: new_division_id,
+                    id: v.value.id,
+                    name: v.value.name.clone(),
+                    invite_token: v.value.invite_token.clone(),
+                    users: v.value.users.clone(),
+                    solves: v.value.solves.clone(),
+                    writeups: v.value.writeups.clone(),
+                    owner_user_id: v.value.owner_user_id,
+                }),
+                insert_timestamp: v.insert_timestamp,
+            });
+            TEAM_STANDINGS.clear();
+            SCOREBOARD_CACHE.clear();
+            LEADERBOARD_CACHE.clear();
+
+            if let Some(ref mut cached) = &mut *CHALLENGES_CACHE.write().await {
+                let mut challenges = cached.challenges.clone();
+
+                let team = self.get_team_from_id(team_id).await?;
+                for (challenge_id, _) in team.solves.iter() {
+                    if let Some(challenge) = challenges
+                        .iter_mut()
+                        .find(|challenge| challenge.id == *challenge_id)
+                    {
+                        *challenge.division_solves.get_mut(&new_division_id).unwrap() += 1;
+                        *challenge.division_solves.get_mut(&old_division_id).unwrap() -= 1;
+                    }
+                }
+
+                *cached = Arc::new(ChallengeData {
+                    challenges,
+                    authors: cached.authors.clone(),
+                    categories: cached.categories.clone(),
+                    divisions: cached.divisions.clone(),
+                });
+            }
         }
         result
     }
@@ -467,50 +516,17 @@ impl Database for DbCache {
     async fn insert_divisions(&self, divisions: &[Division]) -> Result<()> {
         let result = self.inner.insert_divisions(divisions).await;
         if result.is_ok() {
-            USER_DIVISIONS.clear();
-            TEAM_DIVISIONS.clear();
             // *CHALLENGES_CACHE.write().await = None;
         }
         result
     }
 
-    async fn get_team_divisions(&self, team_id: i64) -> Result<Vec<i64>> {
-        get_team_divisions(&self.inner, team_id).await
-    }
-
-    async fn get_team_division_last_edit_time(
+    async fn get_team_standing(
         &self,
         team_id: i64,
         division_id: i64,
-    ) -> Result<Option<DateTime<Utc>>> {
-        self.inner
-            .get_team_division_last_edit_time(team_id, division_id)
-            .await
-    }
-
-    async fn set_team_division_last_edit_time(&self, team_id: i64, division_id: i64) -> Result<()> {
-        self.inner
-            .set_team_division_last_edit_time(team_id, division_id)
-            .await
-    }
-
-    async fn set_team_division(&self, team_id: i64, division_id: i64, join: bool) -> Result<()> {
-        let result = self
-            .inner
-            .set_team_division(team_id, division_id, join)
-            .await;
-        if result.is_ok() {
-            TEAM_DIVISIONS.remove(&team_id);
-            // TEAM_STANDINGS.clear();
-            // SCOREBOARD_CACHE.clear();
-            // LEADERBOARD_CACHE.clear();
-            // *CHALLENGES_CACHE.write().await = None;
-        }
-        result
-    }
-
-    async fn get_team_standings(&self, team_id: i64) -> Result<TeamStandings> {
-        get_team_standing(&self.inner, team_id).await
+    ) -> Result<Option<TeamStanding>> {
+        get_team_standing(&self.inner, team_id, division_id).await
     }
 
     async fn upload_file(&self, hash: &str, filename: &str, bytes: &[u8]) -> Result<()> {
@@ -680,57 +696,25 @@ pub async fn get_emails_for_user_id(db: &Connection, user_id: i64) -> Result<Vec
 }
 
 lazy_static::lazy_static! {
-    pub static ref USER_DIVISIONS: DashMap<i64, TimedCache<Vec<i64>>> = DashMap::new();
+    pub static ref TEAM_STANDINGS: DashMap<i64, TimedCache<Option<TeamStanding>>> = DashMap::new();
 }
 
-pub async fn get_user_divisions(db: &Connection, user_id: i64) -> Result<Vec<i64>> {
-    if let Some(divisions) = USER_DIVISIONS.get(&user_id) {
-        return Ok(divisions.value.clone());
+pub async fn get_team_standing(
+    db: &Connection,
+    team_id: i64,
+    division_id: i64,
+) -> Result<Option<TeamStanding>> {
+    if let Some(standing) = TEAM_STANDINGS.get(&team_id) {
+        return Ok(standing.value.clone());
     }
-    tracing::trace!(user_id, "cache miss: get_user_divisions");
+    tracing::trace!(team_id, division_id, "cache miss: get_team_standing");
 
-    let divisions = db.get_user_divisions(user_id).await;
+    let standing = db.get_team_standing(team_id, division_id).await;
 
-    if let Ok(divisions) = &divisions {
-        USER_DIVISIONS.insert(user_id, TimedCache::new(divisions.clone()));
+    if let Ok(standing) = &standing {
+        TEAM_STANDINGS.insert(team_id, TimedCache::new(standing.clone()));
     }
-    divisions
-}
-
-lazy_static::lazy_static! {
-    pub static ref TEAM_DIVISIONS: DashMap<i64, TimedCache<Vec<i64>>> = DashMap::new();
-}
-
-pub async fn get_team_divisions(db: &Connection, team_id: i64) -> Result<Vec<i64>> {
-    if let Some(divisions) = TEAM_DIVISIONS.get(&team_id) {
-        return Ok(divisions.value.clone());
-    }
-    tracing::trace!(team_id, "cache miss: get_team_divisions");
-
-    let divisions = db.get_team_divisions(team_id).await;
-
-    if let Ok(divisions) = &divisions {
-        TEAM_DIVISIONS.insert(team_id, TimedCache::new(divisions.clone()));
-    }
-    divisions
-}
-
-lazy_static::lazy_static! {
-    pub static ref TEAM_STANDINGS: DashMap<i64, TimedCache<TeamStandings>> = DashMap::new();
-}
-
-pub async fn get_team_standing(db: &Connection, team_id: i64) -> Result<TeamStandings> {
-    if let Some(standings) = TEAM_STANDINGS.get(&team_id) {
-        return Ok(standings.value.clone());
-    }
-    tracing::trace!(team_id, "cache miss: get_team_standing");
-
-    let standings = db.get_team_standings(team_id).await;
-
-    if let Ok(standings) = &standings {
-        TEAM_STANDINGS.insert(team_id, TimedCache::new(standings.clone()));
-    }
-    standings
+    standing
 }
 
 pub fn database_cache_evictor(seconds: u64, db: Connection) {
@@ -816,34 +800,6 @@ pub fn database_cache_evictor(seconds: u64, db: Connection) {
                 tracing::trace!(count, "Evicted user emails cache");
             }
 
-            // User divisions cache
-            let mut count: i64 = 0;
-            USER_DIVISIONS.retain(|_, v| {
-                if v.insert_timestamp > evict_threshold {
-                    true
-                } else {
-                    count += 1;
-                    false
-                }
-            });
-            if count > 0 {
-                tracing::trace!(count, "Evicted user divisions cache");
-            }
-
-            // Team divisions cache
-            let mut count: i64 = 0;
-            TEAM_DIVISIONS.retain(|_, v| {
-                if v.insert_timestamp > evict_threshold {
-                    true
-                } else {
-                    count += 1;
-                    false
-                }
-            });
-            if count > 0 {
-                tracing::trace!(count, "Evicted team divisions cache");
-            }
-
             {
                 let mut challenges = CHALLENGES_CACHE.write().await;
                 if challenges.is_some() {
@@ -865,8 +821,6 @@ pub async fn clear_all_caches() {
     SCOREBOARD_CACHE.clear();
     LEADERBOARD_CACHE.clear();
     USER_EMAILS_CACHE.clear();
-    USER_DIVISIONS.clear();
-    TEAM_DIVISIONS.clear();
     TEAM_STANDINGS.clear();
     *CHALLENGES_CACHE.write().await = None;
 }
