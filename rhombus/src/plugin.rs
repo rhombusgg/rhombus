@@ -1,13 +1,18 @@
-use std::{any::Any, sync::Arc};
+use std::{any::Any, collections::BTreeMap, sync::Arc};
 
 use axum::Router;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
 use crate::{
     builder::RawDb,
     internal::{
-        database::provider::Connection, division::Division, locales::Localizations,
-        router::RouterState, settings::Settings, templates::Templates,
+        database::provider::Connection,
+        division::Division,
+        locales::Localizations,
+        router::RouterState,
+        routes::challenges::{ChallengeFlag, ChallengePoints},
+        settings::Settings,
+        templates::Templates,
     },
     upload_provider::EitherUploadProvider,
     Result, UploadProvider,
@@ -38,6 +43,10 @@ pub struct RunContext<'a, U: UploadProvider> {
 
     /// Divisions and their eligibility functions.
     pub divisions: &'a mut Vec<Division>,
+
+    pub score_type_map: &'a Arc<Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>>,
+
+    pub flag_fn_map: &'a Arc<Mutex<BTreeMap<i64, Box<dyn ChallengeFlag + Send + Sync>>>>,
 }
 
 pub struct UploadProviderContext<'a> {

@@ -1,5 +1,6 @@
 name: Deploy Demo to Fly.io
 on:
+  workflow_dispatch:
   push:
     branches:
       - main

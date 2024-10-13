@@ -75,10 +75,10 @@ pub async fn route_public_team(
     };
 
     let challenge_data = state.db.get_challenges();
-    let standings = state.db.get_team_standings(team_id.0);
-    let (challenge_data, standings) = tokio::join!(challenge_data, standings);
+    let standing = state.db.get_team_standing(team_id.0, team.division_id);
+    let (challenge_data, standing) = tokio::join!(challenge_data, standing);
     let challenge_data = challenge_data.unwrap();
-    let standings = standings.unwrap();
+    let standing = standing.unwrap();
 
     let mut challenges = BTreeMap::new();
     for challenge in &challenge_data.challenges {
@@ -106,7 +106,7 @@ pub async fn route_public_team(
                 challenges,
                 categories,
                 divisions => state.divisions,
-                standings => standings.standings,
+                standing,
             })
             .unwrap(),
     )

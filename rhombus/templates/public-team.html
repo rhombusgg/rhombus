@@ -79,9 +79,35 @@
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
-            {% with x=divisions, y=standings %}
-            {% endwith %}
-            {% include "standing-table.html" %}
+            <table id="division-table" class="w-full text-left table-fixed">
+              <tr>
+                <th class="w-2/3">Division Name</th>
+                <th>Points</th>
+                <th>Rank</th>
+              </tr>
+              {% for division in divisions %}
+                <tr class="*:p-2">
+                  <td class="flex items-center">
+                    {{ division.name }}
+                    <div title="{{ division.description }}">
+                      {{ icons.info(class="h-4 ml-2") }}
+                    </div>
+                  </td>
+                  {% if division.id == public_team.division_id %}
+                    {% if standing %}
+                      <td>{{ standing.points }}</td>
+                      <td>{{ standing.rank }}</td>
+                    {% else %}
+                      <td>0</td>
+                      <td>N/A</td>
+                    {% endif %}
+                  {% else %}
+                    <td></td>
+                    <td></td>
+                  {% endif %}
+                </tr>
+              {% endfor %}
+            </table>
           {% endcall %}
         {% endcall %}
       </div>
@@ -119,7 +145,7 @@
                           {{ challenge.name }}
                         </a>
                         <span class="text-muted-foreground">
-                          / {{ challenge.division_points[0].points }} points /
+                          / {{ challenge.points }} points /
                           <span title="{{ solve.solved_at }}">
                             {% with diff=timediff(solve.solved_at, now) %}
                               {{ t("time-difference", years=diff.years, days=diff.days, hours=diff.hours, minutes=diff.minutes, seconds=diff.seconds) }}

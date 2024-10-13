@@ -131,24 +131,23 @@
 
   {% set division_x = 240 %}
   {% for division in divisions %}
-  {% if standings[division.id] %}
+  {% if team.division_id == division.id and standing %}
   <text x="{{ division_x }}" y="210" font-family="Inter" font-size="18" font-weight="bold" fill="#333">
     {{- division.name -}}
   </text>
-  <text x="{{ division_x }}" y="230" font-family="Inter" font-size="14" fill="#555">{{ standings[division.id].points }}
+  <text x="{{ division_x }}" y="230" font-family="Inter" font-size="14" fill="#555">{{ standing.points }}
     points</text>
   <text x="{{ division_x }}" y="250" font-family="Inter" font-size="14" fill="#555">
-    {%- if standings[division.id].rank == 1 -%}
+    {%- if standing.rank == 1 -%}
     1st
-    {%- elif standings[division.id].rank == 2 -%}
+    {%- elif standing.rank == 2 -%}
     2nd
-    {%- elif standings[division.id].rank == 3 -%}
+    {%- elif standing.rank == 3 -%}
     3rd
     {%- else -%}
-    {{ standings[division.id].rank }}th
+    {{ standing.rank }}th
     {%- endif %} place
   </text>
-  {% set division_x = division_x + 170 %}
   {% endif %}
   {% endfor %}
 

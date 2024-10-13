@@ -62,6 +62,7 @@ pub struct Division {
     pub name: String,
     pub description: String,
     pub max_players: MaxDivisionPlayers,
+    pub is_default: bool,
 
     #[serde(skip)]
     pub division_eligibility: DivisionEligibilityProvider,

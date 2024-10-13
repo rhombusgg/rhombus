@@ -10,7 +10,6 @@ import {
   onCleanup,
 } from "solid-js";
 import { customElement } from "solid-element";
-import { SolidMarkdown } from "solid-markdown";
 import {
   SunIcon,
   MoonIcon,
@@ -401,10 +400,7 @@ const ChallengesComponent = ({
             .challenges.filter(
               (challenge) => challenge.category_id === category.id,
             )
-            .sort(
-              (a, b) =>
-                a.division_points[0].points - b.division_points[0].points,
-            );
+            .sort((a, b) => a.points - b.points);
 
           return (
             <div>
@@ -533,24 +529,19 @@ const ChallengesComponent = ({
                               <Tooltip.Portal>
                                 <Tooltip.Content class="tooltip">
                                   <table>
-                                    {challenge.division_points.map(
-                                      (division_points) => (
+                                    {challenge.division_solves.map(
+                                      (division_solves) => (
                                         <tr>
                                           <td class="pr-2 text-right">
                                             {
                                               data().divisions[
-                                                division_points.division_id
+                                                division_solves.division_id
                                               ].name
                                             }
                                           </td>
                                           <td class="pr-2">
                                             {translate("solves", {
-                                              solves: division_points.solves,
-                                            })}
-                                          </td>
-                                          <td>
-                                            {translate("points", {
-                                              points: division_points.points,
+                                              solves: division_solves.solves,
                                             })}
                                           </td>
                                         </tr>
@@ -562,8 +553,12 @@ const ChallengesComponent = ({
                               </Tooltip.Portal>
                               <Tooltip.Trigger as="span" class="cursor-pointer">
                                 {translate("solves-points", {
-                                  solves: challenge.division_points[0].solves,
-                                  points: challenge.division_points[0].points,
+                                  solves: challenge.division_solves.find(
+                                    (division_solves) =>
+                                      division_solves.division_id ===
+                                      data().division_id,
+                                  ).solves,
+                                  points: solve?.points || challenge.points,
                                 })}
                               </Tooltip.Trigger>
                             </Tooltip>
@@ -693,6 +688,7 @@ type CommandPaletteData = {
 };
 
 type ChallengesData = {
+  division_id: number;
   ticket_enabled: boolean;
   challenges: {
     id: number;
@@ -704,9 +700,9 @@ type ChallengesData = {
     } | null;
     category_id: number;
     author_id: number;
-    division_points: {
+    points: number;
+    division_solves: {
       division_id: number;
-      points: number;
       solves: number;
     }[];
     attachments: {
@@ -745,6 +741,7 @@ type ChallengesData = {
       {
         solved_at: Date;
         user_id: number;
+        points: number | null;
       }
     >;
   };

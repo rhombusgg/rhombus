@@ -1,3 +1,11 @@
+use std::{
+    collections::BTreeMap,
+    convert::Infallible,
+    future::Future,
+    pin::Pin,
+    sync::{atomic::AtomicPtr, Arc},
+};
+
 use axum::{
     body::Body,
     extract::State,
@@ -5,20 +13,22 @@ use axum::{
     response::{IntoResponse, Response},
     Extension,
 };
-use std::{
-    convert::Infallible,
-    future::Future,
-    pin::Pin,
-    sync::{atomic::AtomicPtr, Arc},
-};
 use tokio::sync::{Mutex, RwLock};
 use tower::{make::Shared, Service, ServiceExt};
 
 use crate::{
     internal::{
-        database::provider::Connection, discord::Bot, division::Division,
-        email::outbound_mailer::OutboundMailer, ip::IpExtractorFn, locales::Localizations,
-        routes::meta::GlobalPageMeta, settings::Settings,
+        database::provider::Connection,
+        discord::Bot,
+        division::Division,
+        email::outbound_mailer::OutboundMailer,
+        ip::IpExtractorFn,
+        locales::Localizations,
+        routes::{
+            challenges::{ChallengeFlag, ChallengePoints},
+            meta::GlobalPageMeta,
+        },
+        settings::Settings,
     },
     Plugin, UploadProvider,
 };
@@ -36,6 +46,8 @@ pub struct RouterStateInner {
     pub divisions: Arc<Vec<Division>>,
     pub router: Arc<Router>,
     pub global_page_meta: Arc<GlobalPageMeta>,
+    pub score_type_map: Arc<Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>>,
+    pub flag_fn_map: Arc<Mutex<BTreeMap<i64, Box<dyn ChallengeFlag + Send + Sync>>>>,
 }
 
 pub struct Router {

@@ -64,6 +64,12 @@ impl Plugin for ChallengeLoaderPlugin {
                     .unwrap()
                     .try_deserialize::<Challenge>()
                     .unwrap();
+                let metadata = Config::builder()
+                    .add_source(config::File::from(path.as_path()))
+                    .build()
+                    .unwrap()
+                    .try_deserialize::<serde_json::Value>()
+                    .unwrap();
                 let root = path.parent().unwrap().to_path_buf();
                 ChallengeIntermediate {
                     stable_id: challenge.stable_id,
@@ -73,10 +79,11 @@ impl Plugin for ChallengeLoaderPlugin {
                     category: challenge.category,
                     author: challenge.author,
                     ticket_template: challenge.ticket_template,
-                    points: challenge.points,
+                    score_type: challenge.score_type.unwrap_or("dynamic".to_owned()),
                     files: challenge.files,
                     healthscript: challenge.healthscript,
                     root,
+                    metadata: serde_json::to_string(&metadata).unwrap(),
                 }
             })
             .collect::<Vec<_>>();
@@ -229,12 +236,6 @@ impl Plugin for ChallengeLoaderPlugin {
                     );
                     let id = hash(challenge.stable_id.as_ref().unwrap_or(&challenge.name));
 
-                    let (score_type, static_points) = if challenge.points == "dynamic" {
-                        (0, None)
-                    } else {
-                        (1, Some(challenge.points.parse::<i64>().unwrap()))
-                    };
-
                     tracing::info!(name = challenge.name);
 
                     let description = markdown::to_html_with_options(
@@ -250,11 +251,31 @@ impl Plugin for ChallengeLoaderPlugin {
                     )
                     .unwrap();
 
+                    let points = context
+                        .score_type_map
+                        .lock()
+                        .await
+                        .get(challenge.score_type.as_str())
+                        .unwrap()
+                        .initial(&serde_json::from_str(&challenge.metadata).unwrap())
+                        .await
+                        .unwrap();
+
                     _ = tx
                         .execute(
                             "
-                            INSERT OR REPLACE INTO rhombus_challenge (id, name, description, flag, category_id, author_id, ticket_template, score_type, static_points, healthscript)
-                            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                            INSERT INTO rhombus_challenge (id, name, description, flag, category_id, author_id, ticket_template, healthscript, score_type, points, metadata)
+                            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+                            ON CONFLICT(id) DO UPDATE SET
+                                name = excluded.name,
+                                description = excluded.description,
+                                flag = excluded.flag,
+                                category_id = excluded.category_id,
+                                author_id = excluded.author_id,
+                                ticket_template = excluded.ticket_template,
+                                healthscript = excluded.healthscript,
+                                score_type = excluded.score_type,
+                                metadata = excluded.metadata
                         ",
                             params!(
                                 id,
@@ -264,9 +285,10 @@ impl Plugin for ChallengeLoaderPlugin {
                                 category_id,
                                 author_id,
                                 challenge.ticket_template.as_str(),
-                                score_type,
-                                static_points,
-                                challenge.healthscript.as_deref()
+                                challenge.healthscript.as_deref(),
+                                challenge.score_type.as_str(),
+                                points,
+                                challenge.metadata.as_str(),
                             ),
                         )
                         .await?;
@@ -390,7 +412,7 @@ pub struct Challenge {
     pub category: String,
     pub author: String,
     pub ticket_template: String,
-    pub points: String,
+    pub score_type: Option<String>,
     pub files: Vec<Attachment>,
     pub healthscript: Option<String>,
 }
@@ -404,10 +426,11 @@ pub struct ChallengeIntermediate {
     pub category: String,
     pub author: String,
     pub ticket_template: String,
-    pub points: String,
+    pub score_type: String,
     pub files: Vec<Attachment>,
     pub healthscript: Option<String>,
     pub root: PathBuf,
+    pub metadata: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

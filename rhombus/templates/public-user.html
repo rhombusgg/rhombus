@@ -81,8 +81,7 @@
                           {{ challenge.name }}
                         </a>
                         <span class="text-muted-foreground">
-                          &nbsp;/ {{ challenge.division_points[0].points }}
-                          points /
+                          &nbsp;/ {{ challenge.points }} points /
                           <span title="{{ solve.solved_at }}">
                             {% with diff=timediff(solve.solved_at, now) %}
                               {{ t("time-difference", years=diff.years, days=diff.days, hours=diff.hours, minutes=diff.minutes, seconds=diff.seconds) }}

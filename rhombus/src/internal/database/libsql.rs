@@ -27,11 +27,10 @@ use crate::{
             cache::Writeups,
             provider::{
                 Author, Category, Challenge, ChallengeAttachment, ChallengeData, ChallengeDivision,
-                ChallengeDivisionPoints, ChallengeSolve, Challenges, Database, Email, FirstBloods,
-                Leaderboard, LeaderboardEntry, Scoreboard, ScoreboardSeriesPoint, ScoreboardTeam,
-                SetAccountNameError, SetTeamNameError, SiteStatistics, StatisticsCategory, Team,
-                TeamInner, TeamMeta, TeamMetaInner, TeamStandingEntry, TeamStandings, TeamUser,
-                Ticket, Writeup,
+                ChallengeSolve, Challenges, Database, Email, Leaderboard, LeaderboardEntry,
+                Scoreboard, ScoreboardSeriesPoint, ScoreboardTeam, SetAccountNameError,
+                SetTeamNameError, SiteStatistics, StatisticsCategory, Team, TeamInner, TeamMeta,
+                TeamMetaInner, TeamStanding, TeamUser, Ticket, Writeup,
             },
         },
         division::Division,
@@ -87,6 +86,7 @@ pub struct InMemoryLibSQL {
 }
 
 impl InMemoryLibSQL {
+    #[allow(unused)]
     pub async fn new() -> Result<InMemoryLibSQL> {
         let conn = Builder::new_local(":memory:").build().await?.connect()?;
 
@@ -602,36 +602,55 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     async fn get_challenges(&self) -> Result<Challenges> {
         let tx = self.transaction().await?;
 
-        let rhombus_challenge_division_points = tx
+        let mut division_rows = tx
+            .query("SELECT id, name FROM rhombus_division", ())
+            .await?;
+        #[derive(Debug, Deserialize)]
+        struct DbDivision {
+            id: i64,
+            name: String,
+        }
+        let mut divisions: BTreeMap<i64, ChallengeDivision> = Default::default();
+        while let Some(row) = division_rows.next().await? {
+            let query_division = de::from_row::<DbDivision>(&row).unwrap();
+            divisions.insert(
+                query_division.id,
+                ChallengeDivision {
+                    name: query_division.name,
+                },
+            );
+        }
+
+        let challenge_division_solves_rows = tx
             .query(
                 "
                 SELECT *
-                FROM rhombus_challenge_division_points
+                FROM rhombus_challenge_division_solves
             ",
                 (),
             )
             .await?
             .into_stream()
-            .map(|row| de::from_row::<DbChallengeDivisionPoints>(&row.unwrap()).unwrap())
+            .map(|row| de::from_row::<DbChallengeDivisionSolves>(&row.unwrap()).unwrap())
             .collect::<Vec<_>>()
             .await;
         #[derive(Debug, Deserialize)]
-        struct DbChallengeDivisionPoints {
+        struct DbChallengeDivisionSolves {
             challenge_id: i64,
             division_id: i64,
-            points: f64,
-            solves: f64,
+            solves: i64,
         }
-        let mut dbps = BTreeMap::new();
-        for d in rhombus_challenge_division_points.into_iter() {
-            let elem = ChallengeDivisionPoints {
-                division_id: d.division_id,
-                points: d.points as u64,
-                solves: d.solves as u64,
-            };
-            match dbps.get_mut(&d.challenge_id) {
-                None => _ = dbps.insert(d.challenge_id, vec![elem]),
-                Some(ps) => ps.push(elem),
+        let mut challenge_division_solves = BTreeMap::new();
+        for row in challenge_division_solves_rows.into_iter() {
+            match challenge_division_solves.get_mut(&row.challenge_id) {
+                None => {
+                    let mut map = BTreeMap::new();
+                    map.insert(row.division_id, row.solves as u64);
+                    _ = challenge_division_solves.insert(row.challenge_id, map);
+                }
+                Some(division_solves) => {
+                    _ = division_solves.insert(row.division_id, row.solves as u64)
+                }
             }
         }
 
@@ -650,23 +669,26 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             name: String,
             url: String,
         }
-        let mut attachments = BTreeMap::new();
+        let mut challenge_attachments = BTreeMap::new();
         while let Some(row) = query_challenges.next().await? {
             let query_attachment = de::from_row::<QueryChallengeFileAttachment>(&row).unwrap();
             let attachment = ChallengeAttachment {
                 name: query_attachment.name,
                 url: query_attachment.url,
             };
-            match attachments.get_mut(&query_attachment.challenge_id) {
-                None => _ = attachments.insert(query_attachment.challenge_id, vec![attachment]),
-                Some(ws) => ws.push(attachment),
+            match challenge_attachments.get_mut(&query_attachment.challenge_id) {
+                None => {
+                    _ = challenge_attachments
+                        .insert(query_attachment.challenge_id, vec![attachment])
+                }
+                Some(attachments) => attachments.push(attachment),
             };
         }
 
         let challenge_rows = tx
             .query(
                 "
-                SELECT rhombus_challenge.*, COUNT(rhombus_solve.challenge_id) AS solves_count
+                SELECT rhombus_challenge.*
                 FROM rhombus_challenge
                 LEFT JOIN rhombus_solve ON rhombus_challenge.id = rhombus_solve.challenge_id
                 GROUP BY rhombus_challenge.id
@@ -679,14 +701,16 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             id: i64,
             name: String,
             description: String,
+            flag: String,
             category_id: i64,
             author_id: i64,
-            healthy: Option<bool>,
-            healthscript: Option<String>,
-            last_healthcheck: Option<i64>,
-            flag: String,
-            score_type: i64,
             ticket_template: Option<String>,
+            healthscript: Option<String>,
+            healthy: Option<bool>,
+            last_healthcheck: Option<i64>,
+            metadata: String,
+            points: i64,
+            score_type: String,
         }
         let challenges = challenge_rows
             .into_stream()
@@ -695,18 +719,34 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                 id: challenge.id,
                 name: challenge.name,
                 description: challenge.description,
+                flag: challenge.flag,
                 category_id: challenge.category_id,
                 author_id: challenge.author_id,
-                healthy: challenge.healthy,
+                ticket_template: challenge.ticket_template,
                 healthscript: challenge.healthscript,
+                healthy: challenge.healthy,
                 last_healthcheck: challenge
                     .last_healthcheck
                     .map(|t| Utc.timestamp_opt(t, 0).unwrap()),
-                flag: challenge.flag,
-                scoring_type: challenge.score_type.into(),
-                division_points: dbps.get(&challenge.id).unwrap_or(&vec![]).to_vec(),
-                ticket_template: challenge.ticket_template,
-                attachments: attachments.get(&challenge.id).unwrap_or(&vec![]).to_vec(),
+                score_type: challenge.score_type,
+                metadata: serde_json::from_str(&challenge.metadata).unwrap(),
+                points: challenge.points,
+                attachments: challenge_attachments
+                    .get(&challenge.id)
+                    .unwrap_or(&vec![])
+                    .to_vec(),
+                division_solves: {
+                    let mut division_solves = challenge_division_solves
+                        .get(&challenge.id)
+                        .unwrap_or(&BTreeMap::new())
+                        .clone();
+                    for (division_id, _) in divisions.iter() {
+                        if !division_solves.contains_key(division_id) {
+                            division_solves.insert(*division_id, 0);
+                        }
+                    }
+                    division_solves
+                },
             })
             .collect::<Vec<Challenge>>()
             .await;
@@ -748,23 +788,6 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                     name: query_author.name,
                     avatar_url: query_author.avatar,
                     discord_id: query_author.discord_id,
-                },
-            );
-        }
-
-        let mut division_rows = tx.query("SELECT * FROM rhombus_division", ()).await?;
-        #[derive(Debug, Deserialize)]
-        struct DbDivision {
-            id: i64,
-            name: String,
-        }
-        let mut divisions: BTreeMap<i64, ChallengeDivision> = Default::default();
-        while let Some(row) = division_rows.next().await? {
-            let query_division = de::from_row::<DbDivision>(&row).unwrap();
-            divisions.insert(
-                query_division.id,
-                ChallengeDivision {
-                    name: query_division.name,
                 },
             );
         }
@@ -834,10 +857,12 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         struct QueryTeam {
             name: String,
             invite_token: String,
+            division_id: i64,
+            last_division_change: Option<i64>,
         }
         let query_team_row = tx
             .query(
-                "SELECT name, invite_token FROM rhombus_team WHERE id = ?1",
+                "SELECT name, invite_token, division_id, last_division_change FROM rhombus_team WHERE id = ?1",
                 [team_id],
             )
             .await?
@@ -860,9 +885,13 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                 [team_id],
             )
             .await?;
+        let mut owner_user_id = 0;
         let mut users: BTreeMap<i64, TeamUser> = Default::default();
         while let Some(row) = query_user_rows.next().await? {
             let query_user = de::from_row::<QueryTeamUser>(&row).unwrap();
+            if query_user.owner_team_id == team_id {
+                owner_user_id = query_user.id;
+            }
             users.insert(
                 query_user.id,
                 TeamUser {
@@ -879,11 +908,12 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             pub challenge_id: i64,
             pub user_id: i64,
             pub solved_at: i64,
+            pub points: Option<i64>,
         }
         let mut query_solves = tx
             .query(
                 "
-                SELECT challenge_id, user_id, solved_at
+                SELECT challenge_id, user_id, solved_at, points
                 FROM rhombus_solve
                 WHERE team_id = ?1
             ",
@@ -896,6 +926,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             let solve = ChallengeSolve {
                 user_id: query_solve.user_id,
                 solved_at: DateTime::<Utc>::from_timestamp(query_solve.solved_at, 0).unwrap(),
+                points: query_solve.points,
             };
 
             // favor the earliest solve
@@ -946,6 +977,11 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             id: team_id,
             name: query_team.name,
             invite_token: query_team.invite_token,
+            division_id: query_team.division_id,
+            last_division_change: query_team
+                .last_division_change
+                .map(|t| DateTime::<Utc>::from_timestamp(t, 0).unwrap()),
+            owner_user_id,
             users,
             solves,
             writeups,
@@ -1203,8 +1239,10 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         &self,
         user_id: i64,
         team_id: i64,
+        division_id: i64,
         challenge: &Challenge,
-    ) -> Result<FirstBloods> {
+        next_points: i64,
+    ) -> Result<()> {
         let tx = self.transaction().await?;
 
         let now = chrono::Utc::now().timestamp();
@@ -1217,42 +1255,32 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
         tx.execute(
             "
-            INSERT INTO rhombus_points_snapshot
-            SELECT team_id, division_id, ?1, points
-            FROM rhombus_team_division_points
-            WHERE division_id IN (
-                SELECT division_id
-                FROM rhombus_team_division
-                WHERE team_id = ?2
-            )
-            ",
-            [now, team_id],
+            UPDATE rhombus_challenge
+            SET points = ?2
+            WHERE id = ?1
+        ",
+            [challenge.id, next_points],
         )
         .await?;
 
-        let first_blood_division_ids = tx
-            .query(
-                "
-                SELECT rhombus_team_division.division_id
-                FROM rhombus_challenge_division_points
-                JOIN rhombus_team_division ON
-                    rhombus_team_division.division_id = rhombus_challenge_division_points.division_id AND
-                    rhombus_team_division.team_id = ?2
-                WHERE challenge_id = ?1 AND solves = 1
-            ",
-                [challenge.id, team_id],
-            )
-            .await?
-            .into_stream()
-            .map(|row| row.unwrap().get::<i64>(0).unwrap())
-            .collect::<Vec<_>>()
-            .await;
+        tx.execute(
+            "
+            INSERT INTO rhombus_points_snapshot
+            SELECT team_id, ?1, ?2, points
+            FROM rhombus_team_points
+            JOIN rhombus_team ON
+                rhombus_team.id = rhombus_team_points.team_id AND
+                rhombus_team.division_id = ?1
+            ORDER BY points DESC
+            LIMIT 20
+        ",
+            [division_id, now],
+        )
+        .await?;
 
         tx.commit().await?;
 
-        Ok(FirstBloods {
-            division_ids: first_blood_division_ids,
-        })
+        Ok(())
     }
 
     async fn add_writeup(
@@ -1642,9 +1670,11 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         let top_team_ids = tx
             .query(
                 "
-                SELECT team_id
-                FROM rhombus_team_division_points
-                WHERE division_id = ?1
+                SELECT rhombus_team_points.team_id
+                FROM rhombus_team_points
+                JOIN rhombus_team ON
+                    rhombus_team_points.team_id = rhombus_team.id AND
+                    rhombus_team.division_id = ?1
                 ORDER BY points DESC, last_solved_at ASC
                 LIMIT 10
             ",
@@ -1746,10 +1776,12 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             let num_teams = tx
                 .query(
                     "
-            SELECT COUNT(*)
-            FROM rhombus_team_division_points
-            WHERE division_id = ?1
-        ",
+                    SELECT COUNT(*)
+                    FROM rhombus_team_points
+                    JOIN rhombus_team ON
+                        rhombus_team_points.team_id = rhombus_team.id AND
+                        rhombus_team.division_id = ?1
+                ",
                     [division_id],
                 )
                 .await?
@@ -1770,13 +1802,14 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             let leaderboard_entries = tx
                 .query(
                     "
-                SELECT team_id, name, points
-                FROM rhombus_team_division_points
-                JOIN rhombus_team ON rhombus_team_division_points.team_id = rhombus_team.id
-                WHERE division_id = ?1
-                ORDER BY points DESC, last_solved_at ASC
-                LIMIT ?3 OFFSET ?2
-            ",
+                    SELECT rhombus_team_points.team_id, name, points
+                    FROM rhombus_team_points
+                    JOIN rhombus_team ON
+                        rhombus_team_points.team_id = rhombus_team.id AND
+                        rhombus_team.division_id = ?1
+                    ORDER BY points DESC, last_solved_at ASC
+                    LIMIT ?3 OFFSET ?2
+                ",
                     params!(division_id, page * PAGE_SIZE, PAGE_SIZE),
                 )
                 .await?
@@ -1808,12 +1841,13 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                 .await?
                 .query(
                     "
-                SELECT team_id, name, points
-                FROM rhombus_team_division_points
-                JOIN rhombus_team ON rhombus_team_division_points.team_id = rhombus_team.id
-                WHERE division_id = ?1
-                ORDER BY points DESC
-            ",
+                    SELECT rhombus_team_points.team_id, name, points
+                    FROM rhombus_team_points
+                    JOIN rhombus_team ON
+                        rhombus_team_points.team_id = rhombus_team.id AND
+                        division_id = ?1
+                    ORDER BY points DESC
+                ",
                     params!(division_id),
                 )
                 .await?
@@ -1993,76 +2027,20 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         Ok(())
     }
 
-    async fn get_user_divisions(&self, user_id: i64) -> Result<Vec<i64>> {
-        let divisions = self
-            .connect()
-            .await?
-            .query(
-                "SELECT division_id FROM rhombus_user_division WHERE user_id = ?1",
-                [user_id],
-            )
-            .await?
-            .into_stream()
-            .map(|row| row.unwrap().get::<i64>(0).unwrap())
-            .collect::<Vec<_>>()
-            .await;
-
-        Ok(divisions)
-    }
-
-    async fn set_user_division(
+    async fn set_team_division(
         &self,
-        user_id: i64,
         team_id: i64,
-        division_id: i64,
-        join: bool,
+        _old_division_id: i64,
+        new_division_id: i64,
+        now: DateTime<Utc>,
     ) -> Result<()> {
-        let tx = self.transaction().await?;
+        let conn = self.connect().await?;
 
-        if join {
-            let num_users_in_team = tx
-                .query(
-                    "SELECT COUNT(*) FROM rhombus_user WHERE team_id = ?1",
-                    [team_id],
-                )
-                .await?
-                .next()
-                .await?
-                .unwrap()
-                .get::<i64>(0)
-                .unwrap();
-
-            tx
-                .execute(
-                    "INSERT OR IGNORE INTO rhombus_user_division (user_id, division_id) VALUES (?1, ?2)",
-                    [user_id, division_id],
-                )
-                .await?;
-
-            if num_users_in_team == 1 {
-                tx
-                    .execute(
-                        "INSERT OR IGNORE INTO rhombus_team_division (team_id, division_id) VALUES (?1, ?2)",
-                        [team_id, division_id],
-                    )
-                    .await?;
-            }
-        } else {
-            _ = tx
-                .execute(
-                    "DELETE FROM rhombus_user_division WHERE user_id = ?1 AND division_id = ?2",
-                    [user_id, division_id],
-                )
-                .await;
-            _ = tx
-                .execute(
-                    "DELETE FROM rhombus_team_division WHERE team_id = ?1 AND division_id = ?2",
-                    [team_id, division_id],
-                )
-                .await;
-        }
-
-        tx.commit().await?;
+        conn.execute(
+            "UPDATE rhombus_team SET division_id = ?1, last_division_change = ?2 WHERE id = ?3",
+            params!(new_division_id, now.timestamp(), team_id),
+        )
+        .await?;
 
         Ok(())
     }
@@ -2088,8 +2066,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
         for division in divisions {
             tx.execute(
-                "INSERT OR REPLACE INTO rhombus_division (id, name, description) VALUES (?1, ?2, ?3)",
-                params!(division.id, division.name.as_str(), division.description.as_str()),
+                "INSERT OR REPLACE INTO rhombus_division (id, name, description, is_default) VALUES (?1, ?2, ?3, ?4)",
+                params!(division.id, division.name.as_str(), division.description.as_str(), division.is_default),
             )
             .await?;
         }
@@ -2099,133 +2077,50 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         Ok(())
     }
 
-    async fn get_team_divisions(&self, team_id: i64) -> Result<Vec<i64>> {
-        let divisions = self
-            .connect()
-            .await?
-            .query(
-                "SELECT division_id FROM rhombus_team_division WHERE team_id = ?1",
-                [team_id],
-            )
-            .await?
-            .into_stream()
-            .map(|row| row.unwrap().get::<i64>(0).unwrap())
-            .collect::<Vec<_>>()
-            .await;
-
-        Ok(divisions)
-    }
-
-    async fn get_team_division_last_edit_time(
+    async fn get_team_standing(
         &self,
         team_id: i64,
         division_id: i64,
-    ) -> Result<Option<DateTime<Utc>>> {
-        let last_edit_at_timestamp = self
-            .connect()
-            .await?
-            .query(
-                "
-                SELECT last_edit_at
-                FROM rhombus_team_division_last_edit
-                WHERE team_id = ?1 AND division_id = ?2
-                ",
-                [team_id, division_id],
-            )
-            .await?
-            .next()
-            .await?
-            .map(|row| row.get::<i64>(0).unwrap());
-
-        let last_edit_at =
-            last_edit_at_timestamp.and_then(|t| DateTime::<Utc>::from_timestamp(t, 0));
-
-        Ok(last_edit_at)
-    }
-
-    async fn set_team_division_last_edit_time(&self, team_id: i64, division_id: i64) -> Result<()> {
-        self.connect().await?
-            .execute(
-                "
-                INSERT OR REPLACE INTO rhombus_team_division_last_edit (team_id, division_id, last_edit_at)
-                VALUES (?1, ?2, ?3)
-            ",
-                [team_id, division_id, chrono::Utc::now().timestamp()],
-            )
-            .await?;
-
-        Ok(())
-    }
-
-    async fn set_team_division(&self, team_id: i64, division_id: i64, join: bool) -> Result<()> {
-        if join {
-            self.connect().await?
-                .execute(
-                    "INSERT OR IGNORE INTO rhombus_team_division (team_id, division_id) VALUES (?1, ?2)",
-                    [team_id, division_id],
-                )
-                .await?;
-        } else {
-            _ = self
-                .connect()
-                .await?
-                .execute(
-                    "DELETE FROM rhombus_team_division WHERE team_id = ?1 AND division_id = ?2",
-                    [team_id, division_id],
-                )
-                .await;
-        }
-
-        Ok(())
-    }
-
-    async fn get_team_standings(&self, team_id: i64) -> Result<TeamStandings> {
+    ) -> Result<Option<TeamStanding>> {
         #[derive(Debug, Deserialize)]
-        struct DbTeamDivisionPoints {
-            division_id: i64,
+        struct DbPointsRank {
             points: f64,
             rank: i64,
         }
 
-        let mut standings = BTreeMap::new();
-        let mut standing_rows = self
+        let standing = self
             .connect()
             .await?
             .query(
                 "
                 WITH ranked_teams AS (
                     SELECT
-                        team_id,
-                        division_id,
+                        rhombus_team_points.team_id,
                         points,
-                        RANK() OVER (PARTITION BY division_id ORDER BY points DESC) AS rank
-                    FROM
-                        rhombus_team_division_points
+                        RANK() OVER (ORDER BY points DESC) AS rank
+                    FROM rhombus_team_points
+                    JOIN rhombus_team ON
+                        rhombus_team_points.team_id = rhombus_team.id
+                        AND rhombus_team.division_id = ?2
                 )
-                SELECT
-                    division_id,
-                    points,
-                    rank
-                FROM
-                    ranked_teams
-                WHERE
-                    team_id = ?1
+                SELECT points, rank
+                FROM ranked_teams
+                WHERE team_id = ?1
             ",
-                [team_id],
+                [team_id, division_id],
             )
-            .await?;
-        while let Some(row) = standing_rows.next().await? {
-            let standing = de::from_row::<DbTeamDivisionPoints>(&row).unwrap();
-            standings.insert(
-                standing.division_id,
-                TeamStandingEntry {
-                    points: standing.points as u64,
-                    rank: standing.rank as u64,
-                },
-            );
-        }
+            .await?
+            .next()
+            .await?
+            .map(|row| {
+                let points_rank = de::from_row::<DbPointsRank>(&row).unwrap();
+                TeamStanding {
+                    points: points_rank.points as i64,
+                    rank: points_rank.rank as u64,
+                }
+            });
 
-        Ok(TeamStandings { standings })
+        Ok(standing)
     }
 
     async fn upload_file(&self, hash: &str, filename: &str, bytes: &[u8]) -> Result<()> {
@@ -2371,6 +2266,23 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 }
 
 pub async fn create_team(tx: &Transaction) -> Result<i64> {
+    let default_division_id = tx
+        .query(
+            "
+            SELECT id
+            FROM rhombus_division
+            WHERE is_default = TRUE
+            LIMIT 1
+        ",
+            (),
+        )
+        .await?
+        .next()
+        .await?
+        .unwrap()
+        .get::<i64>(0)
+        .unwrap();
+
     loop {
         let team_invite_token = create_team_invite_token();
 
@@ -2380,8 +2292,8 @@ pub async fn create_team(tx: &Transaction) -> Result<i64> {
 
         if let Ok(team_id) = tx
             .query(
-                "INSERT INTO rhombus_team (name, invite_token) VALUES (?1, ?2) RETURNING id",
-                [team_name, team_invite_token],
+                "INSERT INTO rhombus_team (name, invite_token, division_id) VALUES (?1, ?2, ?3) RETURNING id",
+                params!(team_name, team_invite_token, default_division_id),
             )
             .await?
             .next()
