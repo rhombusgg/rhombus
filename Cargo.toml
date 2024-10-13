@@ -8,3 +8,9 @@ members = [
     "examples/external-plugin",
     "examples/demo",
 ]
+
+[profile.release]
+strip = true
+lto = "fat"
+codegen-units = 1
+panic = "abort"
