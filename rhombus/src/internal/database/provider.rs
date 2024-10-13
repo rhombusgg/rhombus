@@ -102,8 +102,9 @@ pub struct TeamInner {
     pub users: BTreeMap<i64, TeamUser>,
     pub solves: BTreeMap<i64, ChallengeSolve>,
     pub writeups: BTreeMap<i64, Vec<Writeup>>,
-    pub division_id: i64,
     pub owner_user_id: i64,
+    pub division_id: i64,
+    pub last_division_change: Option<DateTime<Utc>>,
 }
 
 pub type Team = Arc<TeamInner>;
@@ -328,6 +329,7 @@ pub trait Database {
         team_id: i64,
         old_division_id: i64,
         new_division_id: i64,
+        now: DateTime<Utc>,
     ) -> Result<()>;
     async fn insert_divisions(&self, divisions: &[Division]) -> Result<()>;
     async fn get_team_standing(

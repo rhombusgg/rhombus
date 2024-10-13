@@ -17,7 +17,10 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use crate::internal::{
     auth::User,
-    database::{cache::TimedCache, provider::SetAccountNameError},
+    database::{
+        cache::TimedCache,
+        provider::{Email, SetAccountNameError},
+    },
     router::RouterState,
     routes::meta::PageMeta,
 };
@@ -150,26 +153,36 @@ pub async fn route_account_add_email(
 ) -> impl IntoResponse {
     if form.email.is_empty() || form.email.len() > 255 {
         return Response::builder()
-            .body(format!(
-                r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
-                state
-                    .localizer
-                    .localize(&page.lang, "account-error-email-length", None)
-                    .unwrap(),
-            ))
+            .status(StatusCode::BAD_REQUEST)
+            .header(
+                "HX-Trigger",
+                format!(
+                    r##"{{"toast":{{"kind":"error","message":"{}"}}}}"##,
+                    state
+                        .localizer
+                        .localize(&page.lang, "account-error-email-length", None)
+                        .unwrap(),
+                ),
+            )
+            .body("".to_owned())
             .unwrap();
     }
 
-    let emails = state.db.get_emails_for_user_id(user.id).await.unwrap();
+    let mut emails = state.db.get_emails_for_user_id(user.id).await.unwrap();
     if emails.iter().any(|email| email.address == form.email) {
         return Response::builder()
-            .body(format!(
-                r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
-                state
-                    .localizer
-                    .localize(&page.lang, "account-error-email-already-added", None)
-                    .unwrap(),
-            ))
+            .status(StatusCode::BAD_REQUEST)
+            .header(
+                "HX-Trigger",
+                format!(
+                    r##"{{"toast":{{"kind":"error","message":"{}"}}}}"##,
+                    state
+                        .localizer
+                        .localize(&page.lang, "account-error-email-already-added", None)
+                        .unwrap(),
+                ),
+            )
+            .body("".to_owned())
             .unwrap();
     }
 
@@ -180,13 +193,18 @@ pub async fn route_account_add_email(
             .await
         else {
             return Response::builder()
-                .body(format!(
-                    r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
-                    state
-                        .localizer
-                        .localize(&page.lang, "account-error-verification-email", None)
-                        .unwrap(),
-                ))
+                .status(StatusCode::BAD_REQUEST)
+                .header(
+                    "HX-Trigger",
+                    format!(
+                        r##"{{"toast":{{"kind":"error","message":"{}"}}}}"##,
+                        state
+                            .localizer
+                            .localize(&page.lang, "account-error-verification-email", None)
+                            .unwrap(),
+                    ),
+                )
+                .body("".to_owned())
                 .unwrap();
         };
 
@@ -203,13 +221,18 @@ pub async fn route_account_add_email(
             state.db.delete_email(user.id, &form.email).await.unwrap();
 
             return Response::builder()
-                .body(format!(
-                    r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
-                    state
-                        .localizer
-                        .localize(&page.lang, "account-error-verification-email", None)
-                        .unwrap(),
-                ))
+                .status(StatusCode::BAD_REQUEST)
+                .header(
+                    "HX-Trigger",
+                    format!(
+                        r##"{{"toast":{{"kind":"error","message":"{}"}}}}"##,
+                        state
+                            .localizer
+                            .localize(&page.lang, "account-error-verification-email", None)
+                            .unwrap(),
+                    ),
+                )
+                .body("".to_owned())
                 .unwrap();
         }
 
@@ -220,14 +243,34 @@ pub async fn route_account_add_email(
         );
     }
 
+    emails.push(Email {
+        address: form.email,
+        verified: false,
+    });
+
     Response::builder()
-        .body(format!(
-            r#"<div id="htmx-toaster" data-toast="success" hx-swap-oob="true">{}</div>"#,
+        .header(
+            "HX-Trigger",
+            format!(
+                r##"{{"toast":{{"kind":"success","message":"{}"}}}}"##,
+                state
+                    .localizer
+                    .localize(&page.lang, "account-check-email", None)
+                    .unwrap(),
+            ),
+        )
+        .body(
             state
-                .localizer
-                .localize(&page.lang, "account-check-email", None)
+                .jinja
+                .get_template("account-emails.html")
+                .unwrap()
+                .render(context! {
+                    page,
+                    emails,
+                    oob => true,
+                })
                 .unwrap(),
-        ))
+        )
         .unwrap()
 }
 
@@ -293,9 +336,10 @@ pub struct EmailRemove {
 pub async fn route_account_delete_email(
     state: State<RouterState>,
     Extension(user): Extension<User>,
+    Extension(page): Extension<PageMeta>,
     Query(query): Query<EmailRemove>,
 ) -> impl IntoResponse {
-    let emails = state.db.get_emails_for_user_id(user.id).await.unwrap();
+    let mut emails = state.db.get_emails_for_user_id(user.id).await.unwrap();
 
     if emails.len() == 1 {
         return Response::builder()
@@ -306,9 +350,21 @@ pub async fn route_account_delete_email(
 
     state.db.delete_email(user.id, &query.email).await.unwrap();
 
+    emails.retain(|email| email.address != query.email);
+
     Response::builder()
-        .header("HX-Trigger", "pageRefresh")
-        .body("".to_owned())
+        .body(
+            state
+                .jinja
+                .get_template("account-emails.html")
+                .unwrap()
+                .render(context! {
+                    page,
+                    emails,
+                    oob => true,
+                })
+                .unwrap(),
+        )
         .unwrap()
 }
 

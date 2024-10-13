@@ -858,10 +858,11 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             name: String,
             invite_token: String,
             division_id: i64,
+            last_division_change: Option<i64>,
         }
         let query_team_row = tx
             .query(
-                "SELECT name, invite_token, division_id FROM rhombus_team WHERE id = ?1",
+                "SELECT name, invite_token, division_id, last_division_change FROM rhombus_team WHERE id = ?1",
                 [team_id],
             )
             .await?
@@ -975,8 +976,11 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         Ok(Arc::new(TeamInner {
             id: team_id,
             name: query_team.name,
-            division_id: query_team.division_id,
             invite_token: query_team.invite_token,
+            division_id: query_team.division_id,
+            last_division_change: query_team
+                .last_division_change
+                .map(|t| DateTime::<Utc>::from_timestamp(t, 0).unwrap()),
             owner_user_id,
             users,
             solves,
@@ -2028,12 +2032,13 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         team_id: i64,
         _old_division_id: i64,
         new_division_id: i64,
+        now: DateTime<Utc>,
     ) -> Result<()> {
         let conn = self.connect().await?;
 
         conn.execute(
-            "UPDATE rhombus_team SET division_id = ?1 WHERE id = ?2",
-            params!(new_division_id, team_id),
+            "UPDATE rhombus_team SET division_id = ?1, last_division_change = ?2 WHERE id = ?3",
+            params!(new_division_id, now.timestamp(), team_id),
         )
         .await?;
 

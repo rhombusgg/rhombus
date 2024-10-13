@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS rhombus_user (
     FOREIGN KEY (owner_team_id) REFERENCES rhombus_team(id) ON DELETE CASCADE
 );
 
+CREATE INDEX IF NOT EXISTS rhombus_user_team_id ON rhombus_user(team_id);
 CREATE INDEX IF NOT EXISTS rhombus_user_owner_team_id ON rhombus_user(owner_team_id);
 
 CREATE TABLE IF NOT EXISTS rhombus_user_historical_names (
@@ -141,6 +142,7 @@ CREATE TABLE IF NOT EXISTS rhombus_team (
     invite_token TEXT NOT NULL,
     ctftime_id INTEGER UNIQUE,
     division_id INTEGER NOT NULL,
+    last_division_change INTEGER,
     FOREIGN KEY (division_id) REFERENCES rhombus_division(id)
 );
 

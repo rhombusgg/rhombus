@@ -201,12 +201,7 @@
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       document
-        .querySelectorAll('input[type="checkbox"][unchecked]')
-        .forEach((el) => {
-          el.checked = false;
-        });
-      document
-        .querySelectorAll('input[type="checkbox"][checked]')
+        .querySelectorAll('input[type="radio"][checked]')
         .forEach((el) => {
           el.checked = true;
         });

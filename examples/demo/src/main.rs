@@ -213,7 +213,8 @@ async fn create_team(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
     };
 
     let team = db.get_team_from_id(team_id).await?;
-    db.set_team_division(team_id, team.division_id, *division_id)
+    let now = Utc::now();
+    db.set_team_division(team_id, team.division_id, *division_id, now)
         .await?;
     set_user_to_bot(libsql.clone(), user_id).await?;
 
@@ -231,8 +232,6 @@ async fn create_team(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
         else {
             continue;
         };
-        db.set_team_division(team_id, team.division_id, *division_id)
-            .await?;
         set_user_to_bot(libsql.clone(), user_id).await?;
         db.add_user_to_team(user_id, team_id, None).await?;
     }

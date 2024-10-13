@@ -112,49 +112,32 @@
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
-            {% if emails | length > 0 %}
-              <ul class="mb-4">
-                {% for email in emails %}
-                  <li
-                    class="group flex justify-between even:bg-secondary p-2 {% if not email.verified %}italic{% endif %}"
-                    {% if not email.verified %}
-                      title="Pending verification"
-                    {% endif %}
-                  >
-                    <span>
-                      {{ email.address }}
-                      {% if not email.verified %}&nbsp;(pending verification){% endif %}
-                    </span>
-                    {% if emails | length > 1 %}
-                      <button
-                        class="text-destructive hidden group-hover:block"
-                        title="Unlink email from account"
-                        hx-delete="/account/email"
-                        hx-vals='{"email": "{{ email.address }}"}'
-                      >
-                        {{ icons.delete_x() }}
-                      </button>
-                    {% endif %}
-                  </li>
-                {% endfor %}
-              </ul>
-            {% endif %}
+            {% include "account-emails.html" %}
             <form
-              class="grow flex justify-end items-center relative"
+              class="flex gap-2"
               hx-post="/account/email"
               hx-indicator="#loader"
               hx-swap="none"
+              hx-on::after-request="if(event.detail.successful) this.reset()"
             >
-              <input
-                type="email"
-                required
-                name="email"
-                placeholder="New email to verify..."
-                class="bg-background border p-2 rounded-md w-full focus-visible:outline-none"
-              />
-              <div id="loader" class="absolute mr-2 pointer-events-none">
-                {{ icons.spinner(attrs='class="animate-spin"') }}
+              <div class="grow flex justify-end items-center relative">
+                <input
+                  type="email"
+                  required
+                  name="email"
+                  placeholder="New email to verify..."
+                  class="bg-background border p-2 rounded-md w-full focus-visible:outline-none"
+                />
+                <div id="loader" class="absolute mr-2 pointer-events-none">
+                  {{ icons.spinner(attrs='class="animate-spin"') }}
+                </div>
               </div>
+              <button
+                type="submit"
+                class="h-10 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center rounded-md text-sm font-medium whitespace-nowrap ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+              >
+                Verify Email
+              </button>
             </form>
           {% endcall %}
         {% endcall %}

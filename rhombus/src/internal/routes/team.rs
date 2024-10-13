@@ -103,6 +103,8 @@ pub async fn route_team(
         .map(MaxDivisionPlayers::Limited)
         .unwrap_or(MaxDivisionPlayers::Unlimited);
 
+    let now = chrono::Utc::now();
+
     Html(
         state
             .jinja
@@ -117,7 +119,8 @@ pub async fn route_team(
                 team,
                 team_invite_url,
                 max_players,
-                now => chrono::Utc::now(),
+                now,
+                minutes_until_division_change => team.last_division_change.map(|t| ((t + chrono::Duration::minutes(60)) - now).num_minutes() + 1),
                 challenges,
                 categories,
                 divisions,
@@ -295,6 +298,27 @@ pub async fn route_team_set_division(
     }
 
     let team = state.db.get_team_from_id(user.team_id).await.unwrap();
+
+    let next_allowed =
+        team.last_division_change.unwrap_or_default() + chrono::Duration::minutes(60);
+
+    let now = chrono::Utc::now();
+    if next_allowed > now {
+        let resets_in = next_allowed - now;
+
+        return Response::builder()
+            .header(
+                "HX-Trigger",
+                format!(r##"{{"toast":{{"kind":"error","message":"You can change this division status again in {} minutes"}}}}"##, resets_in.num_minutes() + 1)
+            )
+            .header(
+                "HX-Location",
+                r##"{"path":"/team","select":"#screen","target":"#screen","swap":"outerHTML"}"##,
+            )
+            .body("".to_owned())
+            .unwrap();
+    }
+
     let division = state.divisions.iter().find(|d| d.id == division_id);
     let Some(division) = division else {
         return Response::builder()
@@ -330,7 +354,7 @@ pub async fn route_team_set_division(
 
     state
         .db
-        .set_team_division(team.id, team.division_id, division_id)
+        .set_team_division(team.id, team.division_id, division_id, now)
         .await
         .unwrap();
 
@@ -392,6 +416,7 @@ pub async fn route_team_set_division(
             divisions,
             division_id,
             standing,
+            minutes_until_division_change => Some(60),
             oob => true,
         })
         .unwrap();

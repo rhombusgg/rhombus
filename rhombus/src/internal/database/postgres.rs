@@ -346,6 +346,7 @@ impl Database for Postgres {
         _team_id: i64,
         _old_division_id: i64,
         _new_division_id: i64,
+        _now: DateTime<Utc>,
     ) -> Result<()> {
         todo!()
     }

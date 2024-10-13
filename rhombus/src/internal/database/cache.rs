@@ -465,15 +465,17 @@ impl Database for DbCache {
         team_id: i64,
         old_division_id: i64,
         new_division_id: i64,
+        now: DateTime<Utc>,
     ) -> Result<()> {
         let result = self
             .inner
-            .set_team_division(team_id, old_division_id, new_division_id)
+            .set_team_division(team_id, old_division_id, new_division_id, now)
             .await;
         if result.is_ok() {
             TEAM_CACHE.alter(&team_id, |_, v| TimedCache {
                 value: Arc::new(TeamInner {
                     division_id: new_division_id,
+                    last_division_change: Some(now),
                     id: v.value.id,
                     name: v.value.name.clone(),
                     invite_token: v.value.invite_token.clone(),

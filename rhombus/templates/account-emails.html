@@ -1,0 +1,31 @@
+{% import "icons.html" as icons %}
+
+<div id="emails" {% if oob %}hx-swap-oob="true"{% endif %}>
+  {% if emails | length > 0 %}
+    <ul class="mb-4">
+      {% for email in emails %}
+        <li
+          class="group flex justify-between even:bg-secondary p-2 {% if not email.verified %}italic{% endif %}"
+          {% if not email.verified %}
+            title="Pending verification"
+          {% endif %}
+        >
+          <span>
+            {{- email.address -}}
+            {% if not email.verified %}&nbsp;(pending verification){% endif %}
+          </span>
+          {% if emails | length > 1 %}
+            <button
+              class="text-destructive hidden group-hover:block"
+              title="Unlink email from account"
+              hx-delete="/account/email"
+              hx-vals='{"email": "{{ email.address }}"}'
+            >
+              {{ icons.delete_x() }}
+            </button>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</div>
