@@ -11,6 +11,7 @@ members = [
 
 [profile.release]
 strip = true
+opt-level = "s"
 lto = "fat"
 codegen-units = 1
 panic = "abort"

@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{sync::LazyLock, time::Duration};
 
 use axum::{
     extract::{Path, State},
@@ -478,13 +478,11 @@ pub async fn route_ticket_submit(
         .into_response()
 }
 
+pub static TEAM_BURSTED_POINTS: LazyLock<DashMap<i64, i64>> = LazyLock::new(DashMap::new);
+
 #[derive(Deserialize)]
 pub struct SubmitChallenge {
     flag: String,
-}
-
-lazy_static::lazy_static! {
-    pub static ref TEAM_BURSTED_POINTS: DashMap<i64, i64> = DashMap::new();
 }
 
 pub async fn route_challenge_submit(

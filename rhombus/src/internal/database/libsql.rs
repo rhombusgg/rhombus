@@ -13,14 +13,14 @@ use argon2::{password_hash::SaltString, Argon2, PasswordHash, PasswordHasher, Pa
 use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
 use futures::stream::StreamExt;
-use inflector::{cases::titlecase::to_title_case, string::pluralize::to_plural};
 use libsql::{de, params, Builder, Transaction};
-use rand::{rngs::OsRng, Rng};
+use rand::rngs::OsRng;
 use rust_embed::RustEmbed;
 use serde::Deserialize;
 use tokio_util::bytes::Bytes;
 
 use crate::{
+    errors::RhombusError,
     internal::{
         auth::{User, UserInner},
         database::{
@@ -2279,29 +2279,23 @@ pub async fn create_team(tx: &Transaction) -> Result<i64> {
         .await?
         .next()
         .await?
-        .unwrap()
-        .get::<i64>(0)
-        .unwrap();
+        .ok_or(RhombusError::LibSQL(libsql::Error::QueryReturnedNoRows))?
+        .get::<i64>(0)?;
 
-    loop {
-        let team_invite_token = create_team_invite_token();
+    let team_invite_token = create_team_invite_token();
 
-        let petname = to_title_case(&to_plural(&petname::petname(2, " ").unwrap()));
-        let random_number = rand::thread_rng().gen_range(0..1000);
-        let team_name = format!("{} {}", petname, random_number);
+    let team_id = tx
+        .query(
+            "INSERT INTO rhombus_team (name, invite_token, division_id) VALUES ('Team ' || (SELECT COALESCE(MAX(id) + 1, 1) FROM rhombus_team), ?1, ?2) RETURNING id",
+            params!(team_invite_token, default_division_id),
+        )
+        .await?
+        .next()
+        .await?
+        .ok_or(RhombusError::LibSQL(libsql::Error::QueryReturnedNoRows))?
+        .get::<i64>(0)?;
 
-        if let Ok(team_id) = tx
-            .query(
-                "INSERT INTO rhombus_team (name, invite_token, division_id) VALUES (?1, ?2, ?3) RETURNING id",
-                params!(team_name, team_invite_token, default_division_id),
-            )
-            .await?
-            .next()
-            .await
-        {
-            break Ok(team_id.unwrap().get::<i64>(0).unwrap());
-        }
-    }
+    Ok(team_id)
 }
 
 #[cfg(test)]
