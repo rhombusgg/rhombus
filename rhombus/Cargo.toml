@@ -2,6 +2,7 @@
 name = "rhombus"
 version = "0.2.21"
 edition = "2021"
+rust-version = "1.80.0"
 description = "Next generation extendable CTF framework with batteries included"
 authors = ["Mark Bundschuh <mark@mbund.dev>"]
 license = "MPL-2.0"
@@ -12,7 +13,7 @@ keywords = ["web", "ctf", "http"]
 [dependencies]
 argon2 = { version = "0.5.3", features = ["std"] }
 async-hash = "0.5.4"
-async-imap = { version = "0.10.1", default-features = false, features = [
+async-imap = { version = "0.10.1", default-features = false, optional = true, features = [
   "runtime-tokio",
 ] }
 async-trait = "0.1.83"
@@ -24,16 +25,19 @@ dashmap = { version = "6.1.0", features = ["inline"] }
 dotenvy = "0.15.7"
 fancy-regex = "0.13.0"
 fluent = "0.16.1"
+futures = { version = "0.3.31", optional = true }
 healthscript = "1.0.3"
 intl-memoizer = "0.5.2"
 jsonwebtoken = "9.3.0"
-lettre = { version = "0.11.9", default-features = false, features = [
+lettre = { version = "0.11.9", default-features = false, optional = true, features = [
   "tokio1-rustls-tls",
   "smtp-transport",
   "builder",
   "pool",
 ] }
-mail-parser = "0.9.4"
+libsql = { version = "0.6.0", optional = true }
+listenfd = { version = "1.0.1", optional = true }
+mail-parser = { version = "0.9.4", optional = true }
 markdown = "1.0.0-alpha.21"
 mime_guess = "2.0.5"
 minify-html-onepass = "0.15.0"
@@ -48,15 +52,21 @@ reqwest = { version = "0.12.8", default-features = false, features = [
 resvg = "0.44.0"
 ring = "0.17.8"
 rust-embed = "8.5.0"
-rust-s3 = { version = "0.35.1", default-features = false, features = [
+rust-s3 = { version = "0.35.1", default-features = false, optional = true, features = [
   "tokio-rustls-tls",
 ] }
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = "1.0.128"
 serenity = { version = "0.12.2", features = ["chrono"] }
+sqlx = { version = "0.8.2", optional = true, features = [
+  "tls-rustls",
+  "runtime-tokio",
+  "chrono",
+  "macros",
+] }
 thiserror = "1.0.64"
 tokio = { version = "1.40.0", features = ["full"] }
-tokio-rustls = { version = "0.26.0", default-features = false, features = [
+tokio-rustls = { version = "0.26.0", default-features = false, optional = true, features = [
   "ring",
   "logging",
   "tls12",
@@ -70,17 +80,7 @@ tracing = "0.1.40"
 unic-langid = { version = "0.9.5", features = ["unic-langid-macros"] }
 unicode-segmentation = "1.12.0"
 urlencoding = "2.1.3"
-webpki-roots = "0.26.6"
-
-futures = { version = "0.3.31", optional = true }
-libsql = { version = "0.6.0", optional = true }
-listenfd = { version = "1.0.1", optional = true }
-sqlx = { version = "0.8.2", optional = true, features = [
-  "tls-rustls",
-  "runtime-tokio",
-  "chrono",
-  "macros",
-] }
+webpki-roots = { version = "0.26.6", optional = true }
 
 [build-dependencies]
 rustc_version = "0.4.1"
@@ -90,11 +90,20 @@ testcontainers = "0.23.1"
 testcontainers-modules = { version = "0.11.2", features = ["postgres"] }
 
 [features]
-default = ["libsql"]
+default = []
 postgres = ["dep:sqlx", "sqlx/postgres"]
 mysql = ["dep:sqlx", "sqlx/mysql"]
 libsql = ["dep:libsql", "dep:futures"]
 systemfd = ["dep:listenfd"]
+imap = [
+  "dep:async-imap",
+  "dep:futures",
+  "dep:mail-parser",
+  "dep:tokio-rustls",
+  "dep:webpki-roots",
+]
+smtp = ["dep:lettre"]
+s3 = ["dep:rust-s3", "dep:futures"]
 shuttle = []
 testcontainers = []
 internal = []
@@ -102,6 +111,9 @@ all = [
   "postgres",
   "mysql",
   "libsql",
+  "imap",
+  "smtp",
+  "s3",
   "systemfd",
   "shuttle",
   "testcontainers",

@@ -38,12 +38,15 @@ pub enum RhombusError {
     #[error("Discord: {0}")]
     Discord(#[from] serenity::Error),
 
+    #[cfg(feature = "smtp")]
     #[error("Email: {0}")]
     Email(#[from] lettre::address::AddressError),
 
+    #[cfg(feature = "smtp")]
     #[error("Email: {0}")]
     Email2(#[from] lettre::transport::smtp::Error),
 
+    #[cfg(feature = "smtp")]
     #[error("Email: {0}")]
     Email3(#[from] lettre::error::Error),
 
@@ -53,9 +56,11 @@ pub enum RhombusError {
     #[error("Reqwest error")]
     Reqwest(#[from] reqwest::Error),
 
+    #[cfg(feature = "s3")]
     #[error("S3 Error")]
     S3(#[from] s3::error::S3Error),
 
+    #[cfg(feature = "s3")]
     #[error("S3 Credentials Error")]
     S3Credentials(#[from] s3::creds::error::CredentialsError),
 

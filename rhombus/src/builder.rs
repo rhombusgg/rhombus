@@ -41,10 +41,7 @@ use crate::{
             Division, DivisionEligibilityProvider, EmailDivisionEligibilityProvider,
             MaxDivisionPlayers, OpenDivisionEligibilityProvider,
         },
-        email::{
-            imap::ImapEmailReciever, mailgun::MailgunProvider, outbound_mailer::OutboundMailer,
-            provider::InboundEmail, smtp::SmtpProvider,
-        },
+        email::{mailgun::MailgunProvider, outbound_mailer::OutboundMailer},
         health::{healthcheck_catch_up, healthcheck_runner},
         ip::{
             default_ip_extractor, ip_insert_blank_middleware, ip_insert_middleware,
@@ -86,10 +83,12 @@ use crate::{
         templates::Templates,
     },
     plugin::{DatabaseProviderContext, RunContext, UploadProviderContext},
-    s3_upload_provider::S3UploadProvider,
     upload_provider::UploadProvider,
     LocalUploadProvider, Plugin, Result,
 };
+
+#[cfg(feature = "imap")]
+use crate::internal::email::provider::InboundEmail;
 
 pub enum RawDb {
     #[cfg(feature = "postgres")]
@@ -669,6 +668,15 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
             let flag_fn_map = Arc::default();
 
+            #[cfg(not(feature = "s3"))]
+            if uploads_settings
+                .as_ref()
+                .and_then(|u| u.s3.as_ref())
+                .is_some()
+            {
+                tracing::warn!("S3 is configured but the `s3` feature is not enabled");
+            }
+
             let (plugin_router, upload_router) = {
                 let plugin_upload_provider_builder = UploadProviderContext {
                     settings: &old_settings,
@@ -679,121 +687,114 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     .upload_provider(&plugin_upload_provider_builder)
                     .await;
 
-                if let Some(plugin_upload_provider) = plugin_upload_provider {
-                    let upload_router = plugin_upload_provider.routes()?;
+                match (
+                    &plugin_upload_provider,
+                    &self_arc.upload_provider,
+                    uploads_settings.as_ref().and_then(|u| u.s3.as_ref()),
+                    uploads_settings.as_ref().and_then(|u| u.database),
+                ) {
+                    (Some(plugin_upload_provider), _, _, _) => {
+                        let upload_router = plugin_upload_provider.routes()?;
+                        let mut plugin_builder = RunContext {
+                            upload_provider: plugin_upload_provider,
+                            templates: &mut templates,
+                            localizations: &mut localizer,
+                            settings: settings.clone(),
+                            divisions: &mut divisions,
+                            rawdb: &rawdb,
+                            db: cached_db.clone(),
+                            score_type_map: &score_type_map,
+                            flag_fn_map: &flag_fn_map,
+                        };
+                        let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
+                        (plugin_router, upload_router)
+                    }
+                    (_, Some(upload_provider), _, _) => {
+                        let upload_router = upload_provider.routes()?;
+                        let mut plugin_builder = RunContext {
+                            upload_provider,
+                            templates: &mut templates,
+                            localizations: &mut localizer,
+                            settings: settings.clone(),
+                            divisions: &mut divisions,
+                            rawdb: &rawdb,
+                            db: cached_db.clone(),
+                            score_type_map: &score_type_map,
+                            flag_fn_map: &flag_fn_map,
+                        };
+                        let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
+                        (plugin_router, upload_router)
+                    }
+                    #[cfg(feature = "s3")]
+                    (_, _, Some(s3), _) => {
+                        let s3_upload_provider =
+                            crate::s3_upload_provider::S3UploadProvider::new(s3).await?;
+                        let upload_router = s3_upload_provider.routes()?;
+                        let mut plugin_builder = RunContext {
+                            upload_provider: &s3_upload_provider,
+                            templates: &mut templates,
+                            localizations: &mut localizer,
+                            settings: settings.clone(),
+                            divisions: &mut divisions,
+                            rawdb: &rawdb,
+                            db: cached_db.clone(),
+                            score_type_map: &score_type_map,
+                            flag_fn_map: &flag_fn_map,
+                        };
+                        let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
+                        (plugin_router, upload_router)
+                    }
+                    (_, _, _, Some(true)) => {
+                        let database_upload_provider = DatabaseUploadProvider::new(db).await;
+                        let upload_router = database_upload_provider.routes()?;
+                        let mut plugin_builder = RunContext {
+                            upload_provider: &database_upload_provider,
+                            templates: &mut templates,
+                            localizations: &mut localizer,
+                            settings: settings.clone(),
+                            divisions: &mut divisions,
+                            rawdb: &rawdb,
+                            db: cached_db.clone(),
+                            score_type_map: &score_type_map,
+                            flag_fn_map: &flag_fn_map,
+                        };
+                        let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
+                        (plugin_router, upload_router)
+                    }
+                    _ => {
+                        let base_path = if let Some(local_upload_provider_options) =
+                            uploads_settings.as_ref().and_then(|u| u.local.as_ref())
+                        {
+                            let base_path = &local_upload_provider_options.folder;
+                            tracing::info!(
+                                folder = base_path.as_str(),
+                                "Using configured local upload provider"
+                            );
+                            base_path.into()
+                        } else {
+                            tracing::warn!(
+                                folder = "uploads",
+                                "No upload provider set, using local upload provider"
+                            );
+                            "uploads".into()
+                        };
 
-                    let mut plugin_builder = RunContext {
-                        upload_provider: &plugin_upload_provider,
-                        templates: &mut templates,
-                        localizations: &mut localizer,
-                        settings: settings.clone(),
-                        divisions: &mut divisions,
-                        rawdb: &rawdb,
-                        db: cached_db.clone(),
-                        score_type_map: &score_type_map,
-                        flag_fn_map: &flag_fn_map,
-                    };
-
-                    let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
-
-                    (plugin_router, upload_router)
-                } else if let Some(upload_provider) = &self_arc.upload_provider {
-                    let upload_router = upload_provider.routes()?;
-
-                    let mut plugin_builder = RunContext {
-                        upload_provider,
-                        templates: &mut templates,
-                        localizations: &mut localizer,
-                        settings: settings.clone(),
-                        divisions: &mut divisions,
-                        rawdb: &rawdb,
-                        db: cached_db.clone(),
-                        score_type_map: &score_type_map,
-                        flag_fn_map: &flag_fn_map,
-                    };
-
-                    let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
-
-                    (plugin_router, upload_router)
-                } else if let Some(s3) = uploads_settings.as_ref().and_then(|u| u.s3.as_ref()) {
-                    let s3_upload_provider = S3UploadProvider::new(s3).await?;
-                    let upload_router = s3_upload_provider.routes()?;
-
-                    let mut plugin_builder = RunContext {
-                        upload_provider: &s3_upload_provider,
-                        templates: &mut templates,
-                        localizations: &mut localizer,
-                        settings: settings.clone(),
-                        divisions: &mut divisions,
-                        rawdb: &rawdb,
-                        db: cached_db.clone(),
-                        score_type_map: &score_type_map,
-                        flag_fn_map: &flag_fn_map,
-                    };
-
-                    let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
-
-                    (plugin_router, upload_router)
-                } else if uploads_settings
-                    .as_ref()
-                    .and_then(|u| u.database)
-                    .is_some_and(|d| d)
-                {
-                    let database_upload_provider = DatabaseUploadProvider::new(db).await;
-                    let upload_router = database_upload_provider.routes()?;
-
-                    let mut plugin_builder = RunContext {
-                        upload_provider: &database_upload_provider,
-                        templates: &mut templates,
-                        localizations: &mut localizer,
-                        settings: settings.clone(),
-                        divisions: &mut divisions,
-                        rawdb: &rawdb,
-                        db: cached_db.clone(),
-                        score_type_map: &score_type_map,
-                        flag_fn_map: &flag_fn_map,
-                    };
-
-                    let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
-
-                    (plugin_router, upload_router)
-                } else {
-                    let base_path = if let Some(local_upload_provider_options) =
-                        uploads_settings.as_ref().and_then(|u| u.local.as_ref())
-                    {
-                        let base_path = &local_upload_provider_options.folder;
-                        tracing::info!(
-                            folder = base_path.as_str(),
-                            "Using configured local upload provider"
-                        );
-                        base_path.into()
-                    } else {
-                        tracing::warn!(
-                            folder = "uploads",
-                            "No upload provider set, using local upload provider"
-                        );
-                        "uploads".into()
-                    };
-
-                    let local_upload_provider = LocalUploadProvider::new(base_path);
-
-                    let upload_router = local_upload_provider.routes()?;
-
-                    let mut plugin_builder = RunContext {
-                        upload_provider: &local_upload_provider,
-                        templates: &mut templates,
-                        localizations: &mut localizer,
-                        settings: settings.clone(),
-                        divisions: &mut divisions,
-                        rawdb: &rawdb,
-                        db: cached_db.clone(),
-                        score_type_map: &score_type_map,
-                        flag_fn_map: &flag_fn_map,
-                    };
-
-                    let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
-
-                    (plugin_router, upload_router)
+                        let local_upload_provider = LocalUploadProvider::new(base_path);
+                        let upload_router = local_upload_provider.routes()?;
+                        let mut plugin_builder = RunContext {
+                            upload_provider: &local_upload_provider,
+                            templates: &mut templates,
+                            localizations: &mut localizer,
+                            settings: settings.clone(),
+                            divisions: &mut divisions,
+                            rawdb: &rawdb,
+                            db: cached_db.clone(),
+                            score_type_map: &score_type_map,
+                            flag_fn_map: &flag_fn_map,
+                        };
+                        let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
+                        (plugin_router, upload_router)
+                    }
                 }
             };
 
@@ -866,16 +867,29 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                         ));
                         (Some(mailer), router)
                     } else if email.smtp_connection_url.is_some() {
-                        let mail_provider =
-                            Arc::new(SmtpProvider::new(settings.clone()).await.unwrap());
-                        let mailer = Arc::new(OutboundMailer::new(
-                            mail_provider,
-                            jinja.clone(),
-                            settings.clone(),
-                            cached_db.clone(),
-                            &logo_path,
-                        ));
-                        (Some(mailer), axum::Router::new())
+                        #[cfg(feature = "smtp")]
+                        {
+                            let mail_provider = Arc::new(
+                                crate::internal::email::smtp::SmtpProvider::new(settings.clone())
+                                    .await
+                                    .unwrap(),
+                            );
+                            let mailer = Arc::new(OutboundMailer::new(
+                                mail_provider,
+                                jinja.clone(),
+                                settings.clone(),
+                                cached_db.clone(),
+                                &logo_path,
+                            ));
+                            (Some(mailer), axum::Router::new())
+                        }
+                        #[cfg(not(feature = "smtp"))]
+                        {
+                            tracing::error!(
+                                "SMTP is configured but cargo feature `smtp` is not enabled"
+                            );
+                            (None, axum::Router::new())
+                        }
                     } else {
                         (None, axum::Router::new())
                     }
@@ -901,13 +915,17 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                         .as_ref()
                         .is_some_and(|e| e.imap.is_some())
                 {
-                    ImapEmailReciever::new(
+                    #[cfg(feature = "imap")]
+                    crate::internal::email::imap::ImapEmailReciever::new(
                         Arc::downgrade(&settings),
                         Arc::downgrade(bot.as_ref().unwrap()),
                         Arc::downgrade(&cached_db),
                     )
                     .receive_emails()
                     .await?;
+
+                    #[cfg(not(feature = "imap"))]
+                    tracing::error!("IMAP is configured but cargo feature `imap` is not enabled");
                 }
             }
 
