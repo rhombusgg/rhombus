@@ -6,7 +6,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use async_hash::{Digest, Sha256};
 use axum::Router;
 use config::Config;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
@@ -329,9 +328,8 @@ impl Plugin for ChallengeLoaderPlugin {
                             let src = challenge.root.join(src);
 
                             let data = tokio::fs::read(&src).await?;
-                            let mut hasher = Sha256::new();
-                            hasher.update(data);
-                            let hash = slice_to_hex_string(hasher.finalize().as_slice());
+                            let digest = ring::digest::digest(&ring::digest::SHA256, &data);
+                            let hash = slice_to_hex_string(digest.as_ref());
 
                             if let Some(previous) = previous {
                                 if previous.hash == hash {

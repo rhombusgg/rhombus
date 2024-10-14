@@ -1,6 +1,5 @@
 use std::{fmt::Write, net::IpAddr, num::NonZeroU64, sync::Arc};
 
-use async_hash::{Digest, Sha256};
 use axum::{
     body::Body,
     extract::{Query, State},
@@ -935,12 +934,15 @@ pub struct EmailSignInParams {
 }
 
 pub fn avatar_from_email(email: &str) -> String {
-    let hash = Sha256::digest(email.trim().to_lowercase().as_bytes())
-        .iter()
-        .fold(String::new(), |mut output, b| {
-            let _ = write!(output, "{:02x}", b);
-            output
-        });
+    let digest = ring::digest::digest(
+        &ring::digest::SHA256,
+        email.trim().to_lowercase().as_bytes(),
+    );
+
+    let hash = digest.as_ref().iter().fold(String::new(), |mut output, b| {
+        let _ = write!(output, "{:02x}", b);
+        output
+    });
 
     format!(
         "https://seccdn.libravatar.org/avatar/{}?s=80&default=retro",

@@ -1,6 +1,5 @@
 use std::{io, str::FromStr, sync::Arc};
 
-use async_hash::{Digest, Sha256};
 use axum::{body::Bytes, routing::post, Router};
 use futures::{Stream, TryStreamExt};
 
@@ -93,9 +92,8 @@ impl UploadProvider for S3UploadProvider {
             }
         }
 
-        let mut hasher = Sha256::new();
-        hasher.update(&buffer);
-        let hash = slice_to_hex_string(hasher.finalize().as_slice());
+        let digest = ring::digest::digest(&ring::digest::SHA256, &buffer);
+        let hash = slice_to_hex_string(digest.as_ref());
 
         let s3_path = format!("{}{}/{}", self.prefix, hash, filename);
 
