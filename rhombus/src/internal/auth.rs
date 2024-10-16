@@ -1,6 +1,5 @@
 use std::{fmt::Write, net::IpAddr, num::NonZeroU64, sync::Arc};
 
-use async_hash::{Digest, Sha256};
 use axum::{
     body::Body,
     extract::{Query, State},
@@ -142,7 +141,7 @@ pub async fn route_signin(
 ) -> Response<Body> {
     let mut invite_token_cookie = Cookie::build(("rhombus-invite-token", ""))
         .path("/")
-        .max_age(time::Duration::hours(-1))
+        .removal()
         .same_site(SameSite::Lax)
         .http_only(true);
 
@@ -220,7 +219,6 @@ pub async fn route_signin(
 
                 invite_token_cookie = Cookie::build(("rhombus-invite-token", url_invite_token))
                     .path("/")
-                    .max_age(time::Duration::hours(1))
                     .same_site(SameSite::Lax)
                     .http_only(true);
                 team_name = Some(team_meta.name.clone());
@@ -301,7 +299,6 @@ pub async fn route_signin_discord(state: State<RouterState>) -> impl IntoRespons
 
     let cookie = Cookie::build(("rhombus-oauth-discord", signed_oauth_state))
         .path("/")
-        .max_age(time::Duration::hours(1))
         .same_site(SameSite::Lax)
         .http_only(true)
         .build();
@@ -535,12 +532,16 @@ pub async fn route_signin_discord_callback(
         )
         .await
     else {
+        tracing::error!(
+            discord_id = discord_id.get(),
+            "failed to upsert user by discord id"
+        );
         return Redirect::temporary("/signin").into_response();
     };
 
     let unset_oauth_state_cookie = Cookie::build(("rhombus-oauth-discord", ""))
         .path("/")
-        .max_age(time::Duration::hours(-1))
+        .removal()
         .same_site(SameSite::Lax)
         .http_only(true);
 
@@ -786,7 +787,7 @@ pub async fn route_signin_ctftime(state: State<RouterState>) -> impl IntoRespons
 
     let cookie = Cookie::build(("rhombus-oauth-ctftime", signed_oauth_state))
         .path("/")
-        .max_age(time::Duration::hours(1))
+        .removal()
         .same_site(SameSite::Lax)
         .http_only(true)
         .build();
@@ -933,12 +934,15 @@ pub struct EmailSignInParams {
 }
 
 pub fn avatar_from_email(email: &str) -> String {
-    let hash = Sha256::digest(email.trim().to_lowercase().as_bytes())
-        .iter()
-        .fold(String::new(), |mut output, b| {
-            let _ = write!(output, "{:02x}", b);
-            output
-        });
+    let digest = ring::digest::digest(
+        &ring::digest::SHA256,
+        email.trim().to_lowercase().as_bytes(),
+    );
+
+    let hash = digest.as_ref().iter().fold(String::new(), |mut output, b| {
+        let _ = write!(output, "{:02x}", b);
+        output
+    });
 
     format!(
         "https://seccdn.libravatar.org/avatar/{}?s=80&default=retro",
@@ -1032,7 +1036,7 @@ async fn sign_in_cookie<'a>(
 
     let now = chrono::Utc::now();
     let iat = now.timestamp();
-    let exp = (now + chrono::Duration::try_hours(72).unwrap()).timestamp();
+    let exp = (now + chrono::Duration::hours(72)).timestamp();
     let claims = TokenClaims {
         sub: user_id,
         exp,
@@ -1058,7 +1062,6 @@ async fn sign_in_cookie<'a>(
 
     Cookie::build(("rhombus-token", token))
         .path("/")
-        .max_age(time::Duration::hours(72))
         .same_site(SameSite::Lax)
         .http_only(true)
         .build()
@@ -1067,7 +1070,7 @@ async fn sign_in_cookie<'a>(
 pub async fn route_signout() -> impl IntoResponse {
     let cookie = Cookie::build(("rhombus-token", ""))
         .path("/")
-        .max_age(time::Duration::hours(-1))
+        .removal()
         .same_site(SameSite::Lax)
         .http_only(true);
 

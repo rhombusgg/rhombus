@@ -1,13 +1,12 @@
 use std::{fmt::Write, sync::Arc, task::Poll};
 
-use async_hash::{Digest, Sha256};
 use axum::{
     body::Body,
     extract::{Request, State},
     response::IntoResponse,
     Extension,
 };
-use pin_project_lite::pin_project;
+use pin_project::pin_project;
 use reqwest::StatusCode;
 use tokio::io::AsyncRead;
 use tower_http::services::ServeFile;
@@ -67,25 +66,24 @@ pub fn slice_to_hex_string(slice: &[u8]) -> String {
     })
 }
 
-pin_project! {
-    pub struct HashRead<T> {
-        #[pin]
-        read: T,
+#[pin_project]
+pub struct HashRead<T> {
+    #[pin]
+    read: T,
 
-        hasher: Sha256,
-    }
+    hasher: ring::digest::Context,
 }
 
 impl<T> HashRead<T> {
     pub fn new(read: T) -> Self {
         Self {
             read,
-            hasher: Sha256::new(),
+            hasher: ring::digest::Context::new(&ring::digest::SHA256),
         }
     }
 
     pub fn hash(self) -> Vec<u8> {
-        self.hasher.finalize().as_slice().into()
+        self.hasher.finish().as_ref().into()
     }
 }
 

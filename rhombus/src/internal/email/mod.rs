@@ -1,6 +1,11 @@
-pub mod imap;
 pub mod mailgun;
 pub mod outbound_mailer;
 pub mod provider;
-pub mod reply_parser;
+
+#[cfg(feature = "smtp")]
 pub mod smtp;
+
+#[cfg(feature = "imap")]
+pub mod imap;
+#[cfg(feature = "imap")]
+pub mod reply_parser;

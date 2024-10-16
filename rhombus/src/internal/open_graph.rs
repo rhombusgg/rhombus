@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::sync::LazyLock;
 use std::time::Duration;
 
 use axum::extract::Path;
@@ -6,7 +7,6 @@ use axum::Json;
 use axum::{body::Body, extract::State, http::Response, response::IntoResponse};
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
-use lazy_static::lazy_static;
 use minijinja::context;
 use resvg::{tiny_skia, usvg};
 use rust_embed::RustEmbed;
@@ -25,42 +25,40 @@ use crate::internal::{
 #[folder = "fonts"]
 struct Fonts;
 
-lazy_static! {
-    static ref GLOBAL_OPTIONS: usvg::Options<'static> = {
-        let resolve_data = Box::new(|_: &str, _: std::sync::Arc<Vec<u8>>, _: &usvg::Options| None);
+static GLOBAL_OPTIONS: LazyLock<usvg::Options<'static>> = LazyLock::new(|| {
+    let resolve_data = Box::new(|_: &str, _: std::sync::Arc<Vec<u8>>, _: &usvg::Options| None);
 
-        let resolve_string = Box::new(move |href: &str, _: &usvg::Options| {
-            let logo = find_image_file("static/logo").and_then(|logo| {
-                let data = std::sync::Arc::new(std::fs::read(&logo).unwrap());
-                logo.extension().and_then(|ext| match ext.to_str() {
-                    Some("svg") => Some(usvg::ImageKind::SVG(
-                        usvg::Tree::from_data(&data, &usvg::Options::default()).unwrap(),
-                    )),
-                    Some("png") => Some(usvg::ImageKind::PNG(data)),
-                    Some("webp") => Some(usvg::ImageKind::WEBP(data)),
-                    Some("jpg") | Some("jpeg") => Some(usvg::ImageKind::JPEG(data)),
-                    Some("gif") => Some(usvg::ImageKind::GIF(data)),
-                    _ => None,
-                })
-            });
-
-            match href {
-                "logo" => logo,
+    let resolve_string = Box::new(move |href: &str, _: &usvg::Options| {
+        let logo = find_image_file("static/logo").and_then(|logo| {
+            let data = std::sync::Arc::new(std::fs::read(&logo).unwrap());
+            logo.extension().and_then(|ext| match ext.to_str() {
+                Some("svg") => Some(usvg::ImageKind::SVG(
+                    usvg::Tree::from_data(&data, &usvg::Options::default()).unwrap(),
+                )),
+                Some("png") => Some(usvg::ImageKind::PNG(data)),
+                Some("webp") => Some(usvg::ImageKind::WEBP(data)),
+                Some("jpg") | Some("jpeg") => Some(usvg::ImageKind::JPEG(data)),
+                Some("gif") => Some(usvg::ImageKind::GIF(data)),
                 _ => None,
-            }
+            })
         });
 
-        let mut opt = usvg::Options::default();
-        opt.fontdb_mut().load_system_fonts();
-        opt.fontdb_mut()
-            .load_font_data(Fonts::get("inter/Inter.ttc").unwrap().data.to_vec());
-        opt.image_href_resolver = usvg::ImageHrefResolver {
-            resolve_data,
-            resolve_string,
-        };
-        opt
+        match href {
+            "logo" => logo,
+            _ => None,
+        }
+    });
+
+    let mut opt = usvg::Options::default();
+    opt.fontdb_mut().load_system_fonts();
+    opt.fontdb_mut()
+        .load_font_data(Fonts::get("inter/Inter.ttc").unwrap().data.to_vec());
+    opt.image_href_resolver = usvg::ImageHrefResolver {
+        resolve_data,
+        resolve_string,
     };
-}
+    opt
+});
 
 fn convert_svg_to_png(svg: &str) -> Vec<u8> {
     let tree = usvg::Tree::from_data(svg.as_bytes(), &GLOBAL_OPTIONS).unwrap();
@@ -98,9 +96,8 @@ pub struct DivisionMeta {
     pub places: Vec<TeamMeta>,
 }
 
-lazy_static! {
-    pub static ref DEFAULT_IMAGE_CACHE: RwLock<Option<CachedImage>> = None.into();
-}
+pub static DEFAULT_IMAGE_CACHE: LazyLock<RwLock<Option<CachedImage>>> =
+    LazyLock::new(RwLock::default);
 
 pub struct CachedImage {
     pub at: DateTime<Utc>,
@@ -247,9 +244,8 @@ pub async fn route_default_og_image(state: State<RouterState>) -> impl IntoRespo
         .unwrap()
 }
 
-lazy_static::lazy_static! {
-    pub static ref TEAM_OG_IMAGE_CACHE: DashMap<i64, TimedCache<Vec<u8>>> = DashMap::new();
-}
+pub static TEAM_OG_IMAGE_CACHE: LazyLock<DashMap<i64, TimedCache<Vec<u8>>>> =
+    LazyLock::new(DashMap::new);
 
 pub async fn route_team_og_image(
     state: State<RouterState>,
@@ -378,9 +374,8 @@ pub async fn route_team_og_image(
         .unwrap()
 }
 
-lazy_static::lazy_static! {
-    pub static ref USER_OG_IMAGE_CACHE: DashMap<i64, TimedCache<Vec<u8>>> = DashMap::new();
-}
+pub static USER_OG_IMAGE_CACHE: LazyLock<DashMap<i64, TimedCache<Vec<u8>>>> =
+    LazyLock::new(DashMap::new);
 
 pub async fn route_user_og_image(
     state: State<RouterState>,

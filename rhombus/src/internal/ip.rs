@@ -9,6 +9,7 @@ use axum::{
 use dashmap::DashMap;
 use std::{
     net::{IpAddr, SocketAddr},
+    sync::LazyLock,
     time::Duration,
 };
 use tower_governor::{key_extractor::KeyExtractor, GovernorError};
@@ -43,9 +44,9 @@ pub fn track_flusher(db: Connection) {
     });
 }
 
-lazy_static::lazy_static! {
-    pub static ref TRACK_CACHE: DashMap<(IpAddr, Option<String>, Option<i64>), u64> = DashMap::new();
-}
+pub type TrackKey = (IpAddr, Option<String>, Option<i64>);
+
+pub static TRACK_CACHE: LazyLock<DashMap<TrackKey, u64>> = LazyLock::new(DashMap::new);
 
 /// Middleware to log the IP and user agent of the client in the database as track.
 /// Associates the track with the user if the user is logged in. Runs asynchronously,

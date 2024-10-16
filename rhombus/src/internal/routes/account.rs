@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, net::IpAddr, num::NonZeroU64, time::Duration};
+use std::{collections::BTreeMap, net::IpAddr, num::NonZeroU64, sync::LazyLock, time::Duration};
 
 use axum::{
     extract::{Query, State},
@@ -29,9 +29,8 @@ pub fn generate_email_callback_code() -> String {
     Alphanumeric.sample_string(&mut thread_rng(), 16)
 }
 
-lazy_static::lazy_static! {
-    pub static ref IS_IN_SERVER_CACHE: DashMap<NonZeroU64, TimedCache<bool>> = DashMap::new();
-}
+pub static IS_IN_SERVER_CACHE: LazyLock<DashMap<NonZeroU64, TimedCache<bool>>> =
+    LazyLock::new(DashMap::new);
 
 async fn is_in_server(
     discord_guild_id: NonZeroU64,

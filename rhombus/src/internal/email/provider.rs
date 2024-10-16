@@ -1,5 +1,6 @@
-use crate::Result;
 use axum::async_trait;
+
+use crate::Result;
 
 #[async_trait]
 pub trait OutboundEmailProvider {
@@ -14,7 +15,7 @@ pub trait OutboundEmailProvider {
     ) -> Result<String>;
 }
 
-#[allow(async_fn_in_trait)]
+#[allow(async_fn_in_trait, dead_code)]
 pub trait InboundEmail {
     async fn receive_emails(&self) -> Result<()>;
 }

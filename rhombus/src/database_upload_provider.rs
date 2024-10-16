@@ -1,6 +1,5 @@
 use std::{io, sync::Arc};
 
-use async_hash::{Digest, Sha256};
 use axum::{
     body::{Body, Bytes},
     extract::State,
@@ -10,7 +9,6 @@ use axum::{
     Extension, Router,
 };
 use futures::{Stream, TryStreamExt};
-
 use reqwest::StatusCode;
 use tokio::io::AsyncReadExt;
 use tokio_util::{bytes::BytesMut, io::StreamReader};
@@ -57,12 +55,15 @@ impl UploadProvider for DatabaseUploadProvider {
 
         futures::pin_mut!(body_reader);
 
-        let mut buffer = BytesMut::with_capacity(1024);
-        _ = body_reader.read_buf(&mut buffer).await?;
+        let mut buffer = BytesMut::new();
+        while let Ok(bytes_read) = body_reader.read_buf(&mut buffer).await {
+            if bytes_read == 0 {
+                break;
+            }
+        }
 
-        let mut hasher = Sha256::new();
-        hasher.update(&buffer);
-        let hash = slice_to_hex_string(hasher.finalize().as_slice());
+        let digest = ring::digest::digest(&ring::digest::SHA256, &buffer);
+        let hash = slice_to_hex_string(digest.as_ref());
 
         self.db.upload_file(&hash, filename, &buffer).await?;
 

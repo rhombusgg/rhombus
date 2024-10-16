@@ -1,4 +1,10 @@
-use std::{collections::BTreeMap, net::IpAddr, num::NonZeroU64, sync::Arc, time::Duration};
+use std::{
+    collections::BTreeMap,
+    net::IpAddr,
+    num::NonZeroU64,
+    sync::{Arc, LazyLock},
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -548,9 +554,7 @@ impl Database for DbCache {
     }
 }
 
-lazy_static::lazy_static! {
-    pub static ref CHALLENGES_CACHE: RwLock<Option<Challenges>> = None.into();
-}
+pub static CHALLENGES_CACHE: LazyLock<RwLock<Option<Challenges>>> = LazyLock::new(RwLock::default);
 
 pub async fn get_challenges(db: &Connection) -> Result<Challenges> {
     if let Some(challenges) = &*CHALLENGES_CACHE.read().await {
@@ -568,9 +572,7 @@ pub async fn get_challenges(db: &Connection) -> Result<Challenges> {
     challenges
 }
 
-lazy_static::lazy_static! {
-    pub static ref TEAM_CACHE: DashMap<i64, TimedCache<Team>> = DashMap::new();
-}
+pub static TEAM_CACHE: LazyLock<DashMap<i64, TimedCache<Team>>> = LazyLock::new(DashMap::new);
 
 pub async fn get_team_from_id(db: &Connection, team_id: i64) -> Result<Team> {
     if let Some(team) = TEAM_CACHE.get(&team_id) {
@@ -601,9 +603,7 @@ impl<T> TimedCache<T> {
     }
 }
 
-lazy_static::lazy_static! {
-    pub static ref USER_CACHE: DashMap<i64, TimedCache<User>> = DashMap::new();
-}
+pub static USER_CACHE: LazyLock<DashMap<i64, TimedCache<User>>> = LazyLock::new(DashMap::new);
 
 pub async fn get_user_from_id(db: &Connection, user_id: i64) -> Result<User> {
     if let Some(user) = USER_CACHE.get(&user_id) {
@@ -621,9 +621,8 @@ pub async fn get_user_from_id(db: &Connection, user_id: i64) -> Result<User> {
 
 pub type Writeups = BTreeMap<i64, Writeup>;
 
-lazy_static::lazy_static! {
-    pub static ref USER_WRITEUP_CACHE: DashMap<i64, TimedCache<Writeups>> = DashMap::new();
-}
+pub static USER_WRITEUP_CACHE: LazyLock<DashMap<i64, TimedCache<Writeups>>> =
+    LazyLock::new(DashMap::new);
 
 pub async fn get_writeups_from_user_id(db: &Connection, user_id: i64) -> Result<Writeups> {
     if let Some(writeups) = USER_WRITEUP_CACHE.get(&user_id) {
@@ -639,9 +638,7 @@ pub async fn get_writeups_from_user_id(db: &Connection, user_id: i64) -> Result<
     writeups
 }
 
-lazy_static::lazy_static! {
-    pub static ref SCOREBOARD_CACHE: DashMap<i64, Scoreboard> = DashMap::new();
-}
+pub static SCOREBOARD_CACHE: LazyLock<DashMap<i64, Scoreboard>> = LazyLock::new(DashMap::new);
 
 pub async fn get_scoreboard(db: &Connection, division_id: i64) -> Result<Scoreboard> {
     if let Some(scoreboard) = SCOREBOARD_CACHE.get(&division_id) {
@@ -657,9 +654,8 @@ pub async fn get_scoreboard(db: &Connection, division_id: i64) -> Result<Scorebo
     scoreboard
 }
 
-lazy_static::lazy_static! {
-    pub static ref LEADERBOARD_CACHE: DashMap<(i64, Option<u64>), Leaderboard> = DashMap::new();
-}
+pub static LEADERBOARD_CACHE: LazyLock<DashMap<(i64, Option<u64>), Leaderboard>> =
+    LazyLock::new(DashMap::new);
 
 pub async fn get_leaderboard(
     db: &Connection,
@@ -679,9 +675,8 @@ pub async fn get_leaderboard(
     leaderboard
 }
 
-lazy_static::lazy_static! {
-    pub static ref USER_EMAILS_CACHE: DashMap<i64, TimedCache<Vec<Email>>> = DashMap::new();
-}
+pub static USER_EMAILS_CACHE: LazyLock<DashMap<i64, TimedCache<Vec<Email>>>> =
+    LazyLock::new(DashMap::new);
 
 pub async fn get_emails_for_user_id(db: &Connection, user_id: i64) -> Result<Vec<Email>> {
     if let Some(emails) = USER_EMAILS_CACHE.get(&user_id) {
@@ -697,9 +692,8 @@ pub async fn get_emails_for_user_id(db: &Connection, user_id: i64) -> Result<Vec
     emails
 }
 
-lazy_static::lazy_static! {
-    pub static ref TEAM_STANDINGS: DashMap<i64, TimedCache<Option<TeamStanding>>> = DashMap::new();
-}
+pub static TEAM_STANDINGS: LazyLock<DashMap<i64, TimedCache<Option<TeamStanding>>>> =
+    LazyLock::new(DashMap::new);
 
 pub async fn get_team_standing(
     db: &Connection,

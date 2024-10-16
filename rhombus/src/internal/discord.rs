@@ -2,7 +2,7 @@ use std::{
     borrow::Cow,
     collections::{btree_map, BTreeMap},
     num::NonZeroU64,
-    sync::Arc,
+    sync::{Arc, LazyLock},
 };
 
 use chrono::{DateTime, Utc};
@@ -316,9 +316,8 @@ Default Ticket Template
     Ok(())
 }
 
-lazy_static::lazy_static! {
-    pub static ref DIGEST_DEBOUNCER: Mutex<BTreeMap<ChannelId, i64>> = Default::default();
-}
+pub static DIGEST_DEBOUNCER: LazyLock<Mutex<BTreeMap<ChannelId, i64>>> =
+    LazyLock::new(Mutex::default);
 
 #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DigestAuthor {
@@ -962,12 +961,12 @@ pub struct DiscordInviteUrlCache {
     pub timestamp: i64,
 }
 
-lazy_static::lazy_static! {
-    pub static ref INVITE_URL_CACHE: RwLock<DiscordInviteUrlCache> = RwLock::new(DiscordInviteUrlCache {
+pub static INVITE_URL_CACHE: LazyLock<RwLock<DiscordInviteUrlCache>> = LazyLock::new(|| {
+    RwLock::new(DiscordInviteUrlCache {
         url: String::new(),
         timestamp: 0,
-    });
-}
+    })
+});
 
 fn escape_discord_link(input: &str) -> Cow<str> {
     // Discord markdown parsing is frustration.
