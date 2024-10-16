@@ -11,6 +11,9 @@
       <span>{{ challenge.name }}</span>
     </div>
   </div>
+  <div class="mb-4 font-bold">
+    Facing an issue with the challenge? Submit a ticket to talk to an organizer.
+  </div>
   <div class="mb-4 prose dark:prose-invert">
     {{ challenge.description | safe }}
   </div>
@@ -28,7 +31,7 @@
   <script>
     (function () {
       require.config({
-        paths: { vs: "https://unpkg.com/monaco-editor@0.48.0/min/vs" },
+        paths: { vs: "https://unpkg.com/monaco-editor@0.52.0/min/vs" },
       });
       window.MonacoEnvironment = { getWorkerUrl: () => proxy };
 
@@ -37,9 +40,9 @@
           [
             `
 	self.MonacoEnvironment = {
-		baseUrl: 'https://unpkg.com/monaco-editor@0.48.0/min/'
+		baseUrl: 'https://unpkg.com/monaco-editor@0.52.0/min/'
 	};
-	importScripts('https://unpkg.com/monaco-editor@0.48.0/min/vs/base/worker/workerMain.js');
+	importScripts('https://unpkg.com/monaco-editor@0.52.0/min/vs/base/worker/workerMain.js');
 `,
           ],
           { type: "text/javascript" },

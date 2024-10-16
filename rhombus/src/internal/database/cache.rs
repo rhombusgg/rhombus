@@ -16,9 +16,9 @@ use crate::{
     internal::{
         auth::User,
         database::provider::{
-            Challenge, ChallengeData, Challenges, Connection, Database, Email, Leaderboard,
-            Scoreboard, SetAccountNameError, SetTeamNameError, SiteStatistics, Team, TeamInner,
-            TeamMeta, TeamStanding, Ticket, Writeup,
+            Challenge, ChallengeData, Challenges, Connection, Database, DiscordUpsertError, Email,
+            Leaderboard, Scoreboard, SetAccountNameError, SetTeamNameError, SiteStatistics, Team,
+            TeamInner, TeamMeta, TeamStanding, Ticket, ToBeClosedTicket, Writeup,
         },
         division::Division,
         settings::Settings,
@@ -52,18 +52,19 @@ impl Database for DbCache {
     async fn upsert_user_by_discord_id(
         &self,
         name: &str,
-        email: &str,
+        email: Option<&str>,
         avatar: &str,
         discord_id: NonZeroU64,
         user_id: Option<i64>,
-    ) -> Result<(i64, i64)> {
+    ) -> Result<std::result::Result<(i64, i64), DiscordUpsertError>> {
         let result = self
             .inner
             .upsert_user_by_discord_id(name, email, avatar, discord_id, user_id)
             .await;
-        if let Ok(result) = result {
+        if let Ok(Ok(result)) = result {
             USER_CACHE.remove(&result.0);
             TEAM_CACHE.remove(&result.1);
+            USER_EMAILS_CACHE.remove(&result.0);
         }
         result
     }
@@ -352,9 +353,16 @@ impl Database for DbCache {
         user_id: i64,
         challenge_id: i64,
         discord_channel_id: NonZeroU64,
+        panel_discord_message_id: NonZeroU64,
     ) -> Result<()> {
         self.inner
-            .create_ticket(ticket_number, user_id, challenge_id, discord_channel_id)
+            .create_ticket(
+                ticket_number,
+                user_id,
+                challenge_id,
+                discord_channel_id,
+                panel_discord_message_id,
+            )
             .await
     }
 
@@ -373,6 +381,17 @@ impl Database for DbCache {
 
     async fn close_ticket(&self, ticket_number: u64, time: DateTime<Utc>) -> Result<()> {
         self.inner.close_ticket(ticket_number, time).await
+    }
+
+    async fn close_tickets_for_challenge(
+        &self,
+        user_id: i64,
+        challenge_id: i64,
+        time: DateTime<Utc>,
+    ) -> Result<Vec<ToBeClosedTicket>> {
+        self.inner
+            .close_tickets_for_challenge(user_id, challenge_id, time)
+            .await
     }
 
     async fn reopen_ticket(&self, ticket_number: u64) -> Result<()> {

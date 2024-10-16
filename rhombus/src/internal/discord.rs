@@ -13,7 +13,7 @@ use serenity::{
     all::{
         ButtonStyle, ChannelId, ChannelType, CreateActionRow, CreateAttachment, CreateButton,
         CreateEmbed, CreateEmbedAuthor, CreateMessage, CreateThread, EditMessage, EditThread,
-        GatewayIntents, GetMessages, Http, MessageFlags, UserId,
+        GatewayIntents, GetMessages, Http, MessageFlags, MessageId, UserId,
     },
     Client,
 };
@@ -24,7 +24,7 @@ use crate::{
     internal::{
         auth::User,
         database::provider::{
-            Author, Category, Challenge, ChallengeDivision, Connection, Team, Ticket,
+            Author, Challenge, ChallengeData, Connection, Team, Ticket, ToBeClosedTicket,
         },
         email::outbound_mailer::OutboundMailer,
         settings::Settings,
@@ -188,13 +188,7 @@ pub async fn support_panel(ctx: Context<'_>) -> std::result::Result<(), DiscordE
             ]))
             .await?;
 
-        ctx.reply(format!(
-            "Sent https://discord.com/channels/{}/{}/{}",
-            ctx.guild_id().unwrap(),
-            message.channel_id,
-            message.id
-        ))
-        .await?;
+        ctx.reply(format!("Sent {}", message.link())).await?;
     } else {
         ctx.reply("No support channel selected").await?;
     }
@@ -710,11 +704,7 @@ impl Bot {
             )
             .await?;
 
-        self.db
-            .create_ticket(ticket_number, user.id, challenge.id, thread.id.into())
-            .await?;
-
-        thread
+        let panel_message = thread
             .send_message(
                 &self.http,
                 CreateMessage::new()
@@ -773,6 +763,16 @@ impl Bot {
             )
             .await?;
 
+        self.db
+            .create_ticket(
+                ticket_number,
+                user.id,
+                challenge.id,
+                thread.id.into(),
+                panel_message.id.into(),
+            )
+            .await?;
+
         thread
             .send_message(&self.http, CreateMessage::new().content(content.as_ref()))
             .await?;
@@ -790,21 +790,71 @@ impl Bot {
         Ok(())
     }
 
+    pub async fn close_tickets(&self, to_be_closed_tickets: &[ToBeClosedTicket]) -> Result<()> {
+        let celebration_messages = [
+            "Nice job on solving the challenge! 🎉",
+            "Great work solving the challenge! 🚩",
+            "Congratulations on solving the challenge! 🏆",
+            "Well done on solving the challenge! 🏅",
+        ];
+
+        for to_be_closed_ticket in to_be_closed_tickets {
+            let thread = ChannelId::from(to_be_closed_ticket.discord_channel_id);
+
+            let mut panel_message = thread
+                .message(
+                    &self.http,
+                    MessageId::from(to_be_closed_ticket.discord_panel_message_id),
+                )
+                .await
+                .unwrap();
+            panel_message
+                .edit(
+                    &self.http,
+                    EditMessage::new().components(vec![CreateActionRow::Buttons(vec![
+                        CreateButton::new(format!(
+                            "reopen-ticket-{}",
+                            to_be_closed_ticket.ticket_number
+                        ))
+                        .style(ButtonStyle::Primary)
+                        .label("Reopen Ticket")
+                        .emoji('🔓'),
+                    ])]),
+                )
+                .await
+                .unwrap();
+
+            let message = celebration_messages
+                .choose(&mut thread_rng())
+                .unwrap()
+                .to_string();
+            thread
+                .send_message(&self.http, CreateMessage::new().content(message))
+                .await?;
+            thread
+                .edit_thread(&self.http, EditThread::new().archived(true))
+                .await?;
+        }
+
+        Ok(())
+    }
+
     pub async fn send_first_blood(
         &self,
         user: &User,
         team: &Team,
         challenge: &Challenge,
-        divisions: &BTreeMap<i64, ChallengeDivision>,
-        categories: &[Category],
-        division_id: i64,
+        challenge_data: &ChallengeData,
     ) -> Result<()> {
-        let category = categories
+        let category = challenge_data
+            .categories
             .iter()
             .find(|category| category.id == challenge.category_id)
             .unwrap();
 
-        let division_name = divisions[&division_id].name.as_str();
+        let author = challenge_data.authors.get(&challenge.author_id).unwrap();
+
+        let division_name = challenge_data.divisions[&team.division_id].name.as_str();
 
         let emoji = [
             "🩸",
@@ -855,7 +905,7 @@ impl Bot {
             )
         };
 
-        channel_id.send_message(
+        let message = channel_id.send_message(
             &self.http,
             CreateMessage::new().flags(MessageFlags::SUPPRESS_EMBEDS).content({
                 let user_link = match user.discord_id {
@@ -876,6 +926,22 @@ impl Bot {
             }),
         )
         .await?;
+
+        let author_discord: UserId = author.discord_id.into();
+
+        author_discord.direct_message(
+            &self.http,
+            CreateMessage::new()
+                .content(format!(
+                    "**Check it out!** Someone just first blooded **[{} / {}]({location_url}/challenges#{})** 🩸 {}",
+                    category.name,
+                    challenge.name,
+                    urlencoding::encode(&challenge.name),
+                    message.link(),
+                )),
+            )
+            .await?;
+
         Ok(())
     }
 

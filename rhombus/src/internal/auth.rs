@@ -330,7 +330,7 @@ struct DiscordOAuthToken {
 #[allow(dead_code)]
 struct DiscordProfile {
     id: String,
-    email: String,
+    email: Option<String>,
     username: String,
     avatar: Option<String>,
     global_name: String,
@@ -339,7 +339,8 @@ struct DiscordProfile {
 
 pub async fn route_signin_discord_callback(
     state: State<RouterState>,
-    user: Extension<MaybeUser>,
+    Extension(user): Extension<MaybeUser>,
+    Extension(page): Extension<PageMeta>,
     params: Query<DiscordCallback>,
     cookie_jar: CookieJar,
 ) -> impl IntoResponse {
@@ -521,11 +522,11 @@ pub async fn route_signin_discord_callback(
         )
     };
 
-    let Ok((user_id, team_id)) = state
+    let Ok(upsert_result) = state
         .db
         .upsert_user_by_discord_id(
             &profile.global_name,
-            &profile.email,
+            profile.email.as_deref(),
             &avatar,
             discord_id,
             user.as_ref().map(|u| u.id),
@@ -537,6 +538,26 @@ pub async fn route_signin_discord_callback(
             "failed to upsert user by discord id"
         );
         return Redirect::temporary("/signin").into_response();
+    };
+
+    let (user_id, team_id) = match upsert_result {
+        Ok(r) => r,
+        Err(e) => match e {
+            crate::internal::database::provider::DiscordUpsertError::AlreadyInUse => {
+                let html = state
+                    .jinja
+                    .get_template("discord-taken-error.html")
+                    .unwrap()
+                    .render(context! {
+                        global => state.global_page_meta,
+                        page,
+                        title => format!("Discord Sign In Error | {}", state.global_page_meta.title),
+                        user,
+                    })
+                    .unwrap();
+                return Html(html).into_response();
+            }
+        },
     };
 
     let unset_oauth_state_cookie = Cookie::build(("rhombus-oauth-discord", ""))

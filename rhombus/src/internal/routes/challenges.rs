@@ -492,8 +492,9 @@ pub async fn route_challenge_submit(
     challenge_id: Path<i64>,
     Form(form): Form<SubmitChallenge>,
 ) -> impl IntoResponse {
+    let now = chrono::Utc::now();
     if let Some(start_time) = state.settings.read().await.start_time {
-        if !user.is_admin && chrono::Utc::now() < start_time {
+        if !user.is_admin && now < start_time {
             return Response::builder()
                 .header("content-type", "text/html")
                 .status(403)
@@ -550,7 +551,7 @@ pub async fn route_challenge_submit(
     }
 
     if let Some(end_time) = state.settings.read().await.end_time {
-        if chrono::Utc::now() > end_time {
+        if now > end_time {
             let html = state
                 .jinja
                 .get_template("challenge-submit.html")
@@ -646,6 +647,23 @@ pub async fn route_challenge_submit(
         .or_insert(1);
 
     if let Some(ref bot) = state.bot {
+        {
+            let bot = bot.clone();
+            let db = state.db.clone();
+            let user_id = user.id;
+            let challenge_id = challenge.id;
+            tokio::task::spawn(async move {
+                if let Ok(to_be_closed_tickets) = db
+                    .close_tickets_for_challenge(user_id, challenge_id, now)
+                    .await
+                {
+                    if bot.close_tickets(&to_be_closed_tickets).await.is_err() {
+                        tracing::error!(user_id, challenge_id, "Failed to close tickets on solve");
+                    }
+                }
+            });
+        }
+
         let first_blood_enabled = {
             let settings = state.settings.read().await;
             settings
@@ -657,14 +675,7 @@ pub async fn route_challenge_submit(
 
         if first_blood_enabled && first_blooded {
             if let Err(error) = bot
-                .send_first_blood(
-                    &user,
-                    &team,
-                    challenge,
-                    &challenge_data.divisions,
-                    &challenge_data.categories,
-                    team.division_id,
-                )
+                .send_first_blood(&user, &team, challenge, &challenge_data)
                 .await
             {
                 tracing::error!(

@@ -165,6 +165,7 @@ CREATE TABLE IF NOT EXISTS rhombus_ticket (
     opened_at INTEGER NOT NULL DEFAULT(strftime('%s', 'now')),
     closed_at INTEGER,
     discord_channel_id INTEGER NOT NULL UNIQUE,
+    discord_panel_message_id INTEGER NOT NULL UNIQUE,
     discord_last_message_id INTEGER,
     PRIMARY KEY (ticket_number),
     FOREIGN KEY (user_id) REFERENCES rhombus_user(id),

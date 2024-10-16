@@ -27,10 +27,11 @@ use crate::{
             cache::Writeups,
             provider::{
                 Author, Category, Challenge, ChallengeAttachment, ChallengeData, ChallengeDivision,
-                ChallengeSolve, Challenges, Database, Email, Leaderboard, LeaderboardEntry,
-                Scoreboard, ScoreboardSeriesPoint, ScoreboardTeam, SetAccountNameError,
-                SetTeamNameError, SiteStatistics, StatisticsCategory, Team, TeamInner, TeamMeta,
-                TeamMetaInner, TeamStanding, TeamUser, Ticket, Writeup,
+                ChallengeSolve, Challenges, Database, DiscordUpsertError, Email, Leaderboard,
+                LeaderboardEntry, Scoreboard, ScoreboardSeriesPoint, ScoreboardTeam,
+                SetAccountNameError, SetTeamNameError, SiteStatistics, StatisticsCategory, Team,
+                TeamInner, TeamMeta, TeamMetaInner, TeamStanding, TeamUser, Ticket,
+                ToBeClosedTicket, Writeup,
             },
         },
         division::Division,
@@ -220,15 +221,15 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     async fn upsert_user_by_discord_id(
         &self,
         name: &str,
-        email: &str,
+        email: Option<&str>,
         avatar: &str,
         discord_id: NonZeroU64,
         user_id: Option<i64>,
-    ) -> Result<(i64, i64)> {
+    ) -> Result<std::result::Result<(i64, i64), DiscordUpsertError>> {
         let tx = self.transaction().await?;
 
         let existing_user = if let Some(user_id) = user_id {
-            let team_id = tx
+            let rows = tx
                 .query(
                     "
                     UPDATE rhombus_user
@@ -240,19 +241,24 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                 )
                 .await?
                 .next()
-                .await?
-                .unwrap()
-                .get::<i64>(0)
-                .unwrap();
+                .await;
+            let team_id = match rows {
+                Ok(Some(row)) => row.get::<i64>(0).unwrap(),
+                Err(_) => {
+                    // There is already a discord user with this discord id
+                    return Ok(Err(DiscordUpsertError::AlreadyInUse));
+                }
+                _ => return Err(RhombusError::LibSQL(libsql::Error::QueryReturnedNoRows)),
+            };
             Some((user_id, team_id))
         } else {
             tx.query(
                 "
-                    UPDATE rhombus_user
-                    SET name = ?1, avatar = ?2
-                    WHERE discord_id = ?3
-                    RETURNING id, team_id
-                ",
+                UPDATE rhombus_user
+                SET name = ?1, avatar = ?2
+                WHERE discord_id = ?3
+                RETURNING id, team_id
+            ",
                 params!(name, avatar, discord_id.get()),
             )
             .await?
@@ -269,7 +275,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await?;
 
             tx.commit().await?;
-            return Ok(existing_user);
+            return Ok(Ok(existing_user));
         }
 
         let team_id = create_team(&tx).await?;
@@ -293,7 +299,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         .await?;
 
         tx.commit().await?;
-        return Ok((user_id, team_id));
+        return Ok(Ok((user_id, team_id)));
     }
 
     async fn upsert_user_by_email(
@@ -1380,14 +1386,15 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         user_id: i64,
         challenge_id: i64,
         discord_channel_id: NonZeroU64,
+        panel_discord_message_id: NonZeroU64,
     ) -> Result<()> {
         self
             .connect().await?
             .execute(
                 "
-                INSERT INTO rhombus_ticket (ticket_number, user_id, challenge_id, discord_channel_id) VALUES (?1, ?2, ?3, ?4)
+                INSERT INTO rhombus_ticket (ticket_number, user_id, challenge_id, discord_channel_id, discord_panel_message_id) VALUES (?1, ?2, ?3, ?4, ?5)
             ",
-                params!(ticket_number, user_id, challenge_id, discord_channel_id.get()),
+                params!(ticket_number, user_id, challenge_id, discord_channel_id.get(), panel_discord_message_id.get()),
             )
             .await?;
 
@@ -1401,6 +1408,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             pub challenge_id: i64,
             pub closed_at: Option<i64>,
             pub discord_channel_id: NonZeroU64,
+            pub discord_panel_message_id: NonZeroU64,
         }
 
         let tx = self.transaction().await?;
@@ -1408,7 +1416,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         let ticket_row = tx
             .query(
                 "
-                SELECT user_id, challenge_id, closed_at, discord_channel_id
+                SELECT user_id, challenge_id, closed_at, discord_channel_id, discord_panel_message_id
                 FROM rhombus_ticket
                 WHERE ticket_number = ?1
             ",
@@ -1451,6 +1459,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                 .closed_at
                 .map(|ts| DateTime::<Utc>::from_timestamp(ts, 0).unwrap()),
             discord_channel_id: db_ticket.discord_channel_id,
+            discord_panel_message_id: db_ticket.discord_panel_message_id,
             email_in_reply_to: email_references
                 .iter()
                 .find(|r| !r.user_sent)
@@ -1470,6 +1479,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             pub challenge_id: i64,
             pub closed_at: Option<i64>,
             pub discord_channel_id: NonZeroU64,
+            pub discord_panel_message_id: NonZeroU64,
         }
 
         let tx = self.transaction().await?;
@@ -1479,7 +1489,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await?
             .query(
                 "
-                SELECT ticket_number, user_id, challenge_id, closed_at, discord_channel_id
+                SELECT ticket_number, user_id, challenge_id, closed_at, discord_channel_id, discord_panel_message_id
                 FROM rhombus_ticket
                 WHERE discord_channel_id = ?1
             ",
@@ -1522,6 +1532,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                 .closed_at
                 .map(|ts| DateTime::<Utc>::from_timestamp(ts, 0).unwrap()),
             discord_channel_id: db_ticket.discord_channel_id,
+            discord_panel_message_id: db_ticket.discord_panel_message_id,
             email_in_reply_to: email_references
                 .iter()
                 .find(|r| !r.user_sent)
@@ -1544,6 +1555,45 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await?;
 
         Ok(())
+    }
+
+    async fn close_tickets_for_challenge(
+        &self,
+        user_id: i64,
+        challenge_id: i64,
+        time: DateTime<Utc>,
+    ) -> Result<Vec<ToBeClosedTicket>> {
+        let conn = self.connect().await?;
+
+        #[derive(Debug, Deserialize)]
+        struct DbTicket {
+            pub discord_channel_id: NonZeroU64,
+            pub discord_panel_message_id: NonZeroU64,
+            pub ticket_number: u64,
+        }
+
+        let tickets = conn
+            .query(
+                "
+                UPDATE rhombus_ticket
+                SET closed_at = ?3
+                WHERE user_id = ?1 AND challenge_id = ?2 AND closed_at IS NULL
+                RETURNING ticket_number, discord_channel_id, discord_panel_message_id
+            ",
+                params!(user_id, challenge_id, time.timestamp()),
+            )
+            .await?
+            .into_stream()
+            .map(|row| de::from_row::<DbTicket>(&row.unwrap()).unwrap())
+            .map(|db_ticket| ToBeClosedTicket {
+                discord_channel_id: db_ticket.discord_channel_id,
+                discord_panel_message_id: db_ticket.discord_panel_message_id,
+                ticket_number: db_ticket.ticket_number,
+            })
+            .collect::<Vec<_>>()
+            .await;
+
+        Ok(tickets)
     }
 
     async fn reopen_ticket(&self, ticket_number: u64) -> Result<()> {
