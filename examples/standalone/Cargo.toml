@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+reqwest = { version = "0.12.8", default-features = false, features = [
+    "rustls-tls",
+] }
 rhombus = { path = "../../rhombus", features = ["libsql"] }
 tokio = { version = "1.40.0", features = ["full"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

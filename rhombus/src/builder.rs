@@ -3,13 +3,14 @@ use std::{
     collections::BTreeMap,
     fmt::Debug,
     hash::{BuildHasher, BuildHasherDefault, Hasher},
+    net::IpAddr,
     num::NonZeroU32,
     sync::Arc,
     time::Duration,
 };
 
 use axum::{
-    http::StatusCode,
+    http::{Extensions, HeaderMap, StatusCode},
     middleware,
     response::{Html, IntoResponse},
     routing::{delete, get, post},
@@ -153,9 +154,12 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
     /// Choose a client IP extractor for your environment
     /// Read more about doing this securely: <https://adam-p.ca/blog/2022/03/x-forwarded-for>
-    pub fn extractor(self, ip_extractor: IpExtractorFn) -> Self {
+    pub fn extractor(
+        self,
+        ip_extractor: impl Fn(&HeaderMap, &Extensions) -> Option<IpAddr> + Send + Sync + 'static,
+    ) -> Self {
         Self {
-            ip_extractor: Some(ip_extractor),
+            ip_extractor: Some(Arc::new(ip_extractor)),
             ..self
         }
     }
@@ -798,7 +802,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 }
             };
 
-            let ip_extractor = match self_arc.ip_extractor {
+            let ip_extractor = match self_arc.ip_extractor.clone() {
                 Some(ip_extractor) => Some(ip_extractor),
                 None => settings
                     .read()
@@ -808,27 +812,27 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     .map(|preset| match preset {
                         IpPreset::RightmostXForwardedFor => {
                             info!("Selecting preset Rightmost X-Forwarded-For");
-                            maybe_rightmost_x_forwarded_for
+                            Arc::new(maybe_rightmost_x_forwarded_for) as IpExtractorFn
                         }
                         IpPreset::XRealIp => {
                             info!("Selecting preset X-Real-Ip");
-                            maybe_x_real_ip
+                            Arc::new(maybe_x_real_ip) as IpExtractorFn
                         }
                         IpPreset::FlyClientIp => {
                             info!("Selecting preset Fly-Client-Ip");
-                            maybe_fly_client_ip
+                            Arc::new(maybe_fly_client_ip)
                         }
                         IpPreset::TrueClientIp => {
                             info!("Selecting preset True-Client-Ip");
-                            maybe_true_client_ip
+                            Arc::new(maybe_true_client_ip)
                         }
                         IpPreset::CFConnectingIp => {
                             info!("Selecting preset CF-Connecting-IP");
-                            maybe_cf_connecting_ip
+                            Arc::new(maybe_cf_connecting_ip)
                         }
                         IpPreset::PeerIp => {
                             info!("Selecting preset peer ip");
-                            maybe_peer_ip
+                            Arc::new(maybe_peer_ip)
                         }
                     }),
             };
@@ -955,7 +959,9 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 jinja,
                 localizer,
                 settings: settings.clone(),
-                ip_extractor: ip_extractor.unwrap_or(default_ip_extractor),
+                ip_extractor: ip_extractor
+                    .clone()
+                    .unwrap_or(Arc::new(default_ip_extractor)),
                 outbound_mailer,
                 divisions: Arc::new(divisions),
                 router: rr.clone(),
@@ -1067,7 +1073,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     auth_injector_middleware,
                 ));
 
-            let router = if ip_extractor.is_some() {
+            let router = if ip_extractor.as_ref().is_some() {
                 router.layer(middleware::from_fn_with_state(
                     router_state.clone(),
                     ip_insert_middleware,

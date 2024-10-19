@@ -1,4 +1,4 @@
-use std::{net::IpAddr, num::NonZeroU64};
+use std::{collections::BTreeMap, net::IpAddr, num::NonZeroU64};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -13,7 +13,7 @@ use crate::{
             provider::{
                 Challenge, Challenges, Database, DiscordUpsertError, Email, Leaderboard,
                 Scoreboard, SetAccountNameError, SetTeamNameError, SiteStatistics, Team, TeamMeta,
-                TeamStanding, Ticket, ToBeClosedTicket,
+                TeamStanding, Ticket, ToBeClosedTicket, UserTrack,
             },
         },
         division::Division,
@@ -316,6 +316,10 @@ impl Database for Postgres {
     }
 
     async fn get_emails_for_user_id(&self, _user_id: i64) -> Result<Vec<Email>> {
+        todo!()
+    }
+
+    async fn get_team_tracks(&self, _team_id: i64) -> Result<BTreeMap<i64, UserTrack>> {
         todo!()
     }
 

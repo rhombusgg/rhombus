@@ -47,6 +47,7 @@
   - [x] Email confirmation
   - [x] Gravatar lookup
 - [x] Challenge loader plugin
+- [ ] Admin estimate true users (based on multiple ip/user agent for a single user)
 - [ ] API
   - [ ] Access tokens
 - [x] Documentation/marketing site

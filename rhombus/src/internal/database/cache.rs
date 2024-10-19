@@ -18,7 +18,7 @@ use crate::{
         database::provider::{
             Challenge, ChallengeData, Challenges, Connection, Database, DiscordUpsertError, Email,
             Leaderboard, Scoreboard, SetAccountNameError, SetTeamNameError, SiteStatistics, Team,
-            TeamInner, TeamMeta, TeamStanding, Ticket, ToBeClosedTicket, Writeup,
+            TeamInner, TeamMeta, TeamStanding, Ticket, ToBeClosedTicket, UserTrack, Writeup,
         },
         division::Division,
         settings::Settings,
@@ -431,6 +431,10 @@ impl Database for DbCache {
 
     async fn get_emails_for_user_id(&self, user_id: i64) -> Result<Vec<Email>> {
         get_emails_for_user_id(&self.inner, user_id).await
+    }
+
+    async fn get_team_tracks(&self, team_id: i64) -> Result<BTreeMap<i64, UserTrack>> {
+        self.inner.get_team_tracks(team_id).await
     }
 
     async fn create_email_verification_callback_code(

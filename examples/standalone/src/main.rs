@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{net::IpAddr, path::PathBuf};
 
 use rhombus::challenge_loader_plugin::ChallengeLoaderPlugin;
 use tracing_subscriber::EnvFilter;
@@ -13,10 +13,21 @@ async fn main() {
         )
         .init();
 
+    let ip = reqwest::get("https://icanhazip.com")
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap()
+        .trim()
+        .parse::<IpAddr>()
+        .unwrap();
+
     let app = rhombus::Builder::default()
         .load_env()
         .config_source(rhombus::config::File::with_name("config"))
         .plugin(ChallengeLoaderPlugin::new(PathBuf::from("challenges")))
+        .extractor(move |_, _| Some(ip))
         .build()
         .await
         .unwrap();

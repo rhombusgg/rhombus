@@ -188,6 +188,12 @@ pub struct SiteStatistics {
     pub categories: Vec<StatisticsCategory>,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct UserTrack {
+    pub ip: IpAddr,
+    pub last_seen_at: DateTime<Utc>,
+}
+
 pub enum SetAccountNameError {
     Timeout(DateTime<Utc>),
     Taken,
@@ -332,6 +338,7 @@ pub trait Database {
     async fn get_scoreboard(&self, division_id: i64) -> Result<Scoreboard>;
     async fn get_leaderboard(&self, division_id: i64, page: Option<u64>) -> Result<Leaderboard>;
     async fn get_emails_for_user_id(&self, user_id: i64) -> Result<Vec<Email>>;
+    async fn get_team_tracks(&self, team_id: i64) -> Result<BTreeMap<i64, UserTrack>>;
     async fn create_email_verification_callback_code(
         &self,
         user_id: i64,

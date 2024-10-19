@@ -9,7 +9,7 @@ use axum::{
 use dashmap::DashMap;
 use std::{
     net::{IpAddr, SocketAddr},
-    sync::LazyLock,
+    sync::{Arc, LazyLock},
     time::Duration,
 };
 use tower_governor::{key_extractor::KeyExtractor, GovernorError};
@@ -155,7 +155,7 @@ pub fn default_ip_extractor(_: &HeaderMap, _: &Extensions) -> Option<IpAddr> {
     None
 }
 
-pub type IpExtractorFn = fn(&HeaderMap, &Extensions) -> Option<IpAddr>;
+pub type IpExtractorFn = Arc<dyn Fn(&HeaderMap, &Extensions) -> Option<IpAddr> + Send + Sync>;
 
 #[derive(Clone)]
 pub struct KeyExtractorShim {

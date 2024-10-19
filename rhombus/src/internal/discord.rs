@@ -1,13 +1,17 @@
 use std::{
     borrow::Cow,
     collections::{btree_map, BTreeMap},
+    net::IpAddr,
     num::NonZeroU64,
     sync::{Arc, LazyLock},
 };
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
+use chrono_tz::Tz;
+use dashmap::DashMap;
+use futures::future::join_all;
 use rand::{prelude::SliceRandom, thread_rng, Rng};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serenity::{
     all::{
@@ -46,33 +50,134 @@ pub struct Data {
 pub type DiscordError = Box<dyn std::error::Error + Send + Sync>;
 pub type Context<'a> = poise::Context<'a, Data, DiscordError>;
 
+pub static IP_CACHE: LazyLock<DashMap<IpAddr, IPInfo>> = LazyLock::new(DashMap::new);
+
+#[derive(Clone, Debug)]
+pub struct IPInfo {
+    pub country: [u8; 2],
+    pub timezone: Tz,
+}
+
+async fn ip_info(ip: IpAddr) -> Result<IPInfo> {
+    if let Some(ip_info) = IP_CACHE.get(&ip) {
+        return Ok(ip_info.clone());
+    }
+
+    #[derive(Deserialize)]
+    struct IPInfoResponse {
+        country: String,
+        timezone: String,
+    }
+    let mut response = reqwest::get(&format!("https://ipinfo.io/{}/json", ip))
+        .await?
+        .json::<IPInfoResponse>()
+        .await?;
+
+    response.country.make_ascii_lowercase();
+    let country_bytes = response.country.as_bytes();
+
+    let info = IPInfo {
+        country: [country_bytes[0], country_bytes[1]],
+        timezone: response.timezone.parse().unwrap_or(Tz::UTC),
+    };
+
+    IP_CACHE.insert(ip, info.clone());
+
+    Ok(info)
+}
+
+fn get_local_time(tz: &Tz) -> String {
+    let local_time: DateTime<Tz> = Local::now().with_timezone(tz);
+
+    local_time.format("%H:%M").to_string()
+}
+
 /// Go to the CTF profile page of a corresponding user
 #[poise::command(slash_command, ephemeral)]
 pub async fn whois(
     ctx: Context<'_>,
     #[description = "User to look up"] user: serenity::all::User,
 ) -> std::result::Result<(), DiscordError> {
+    let author_discord_id = ctx.author().id;
+
+    let author_discord_role_id = ctx
+        .data()
+        .settings
+        .read()
+        .await
+        .discord
+        .as_ref()
+        .and_then(|d| d.author_role_id);
+
+    let is_author = if let Some(author_discord_role_id) = author_discord_role_id {
+        ctx.author()
+            .has_role(ctx.http(), ctx.guild_id().unwrap(), author_discord_role_id)
+            .await
+            .unwrap()
+    } else {
+        false
+    };
+
+    let is_admin = ctx
+        .data()
+        .db
+        .get_user_from_discord_id(author_discord_id.into())
+        .await
+        .map(|user| user.is_admin)
+        .unwrap_or(false);
+
+    let is_privileged = is_author || is_admin;
+
     if let Ok(rhombus_user) = ctx.data().db.get_user_from_discord_id(user.id.into()).await {
         let rhombus_team = ctx.data().db.get_team_from_id(rhombus_user.team_id).await?;
+        let team_tracks = Arc::new(ctx.data().db.get_team_tracks(rhombus_team.id).await?);
         let location_url = &ctx.data().settings.read().await.location_url;
-        let team_members_string = rhombus_team
-            .users
-            .iter()
-            .map(|(user_id, user)| {
-                if let Some(discord_id) = user.discord_id {
+
+        let team_members_futures = rhombus_team.users.iter().map(|(user_id, user)| {
+            let team_tracks = team_tracks.clone();
+            let user_name = user.name.clone();
+            let discord_id = user.discord_id;
+            let user_id = *user_id;
+
+            async move {
+                let mut flag = String::default();
+
+                if is_privileged {
+                    if let Some(track) = team_tracks.get(&user_id) {
+                        flag = if let Ok(info) = ip_info(track.ip).await {
+                            format!(
+                                ":flag_{}: {} local time, last seen <t:{}:R> ||`{}`||",
+                                String::from_utf8_lossy(&info.country),
+                                get_local_time(&info.timezone),
+                                track.last_seen_at.timestamp(),
+                                track.ip
+                            )
+                        } else {
+                            format!(
+                                "last seen <t:{}:R> ||`{}`||",
+                                track.last_seen_at.timestamp(),
+                                track.ip
+                            )
+                        }
+                    };
+                }
+
+                if let Some(discord_id) = discord_id {
                     format!(
-                        ":identification_card: <@{}> is [{}]({}/user/{})",
-                        discord_id, user.name, location_url, user_id
+                        ":identification_card: <@{}> | [{}]({}/user/{})   {}",
+                        discord_id, user_name, location_url, user_id, flag
                     )
                 } else {
                     format!(
-                        ":identification_card: [{}]({}/user/{})",
-                        user.name, location_url, user_id
+                        ":identification_card: [{}]({}/user/{})   {}",
+                        user_name, location_url, user_id, flag
                     )
                 }
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
+            }
+        });
+
+        let team_members_string = join_all(team_members_futures).await.join("\n");
+
         ctx.reply(format!(
             "Looked up <@{}>\n\n:red_square: Team [{}]({}/team/{})\n{}",
             user.id, rhombus_team.name, location_url, rhombus_team.id, team_members_string,

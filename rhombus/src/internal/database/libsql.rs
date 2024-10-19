@@ -31,7 +31,7 @@ use crate::{
                 LeaderboardEntry, Scoreboard, ScoreboardSeriesPoint, ScoreboardTeam,
                 SetAccountNameError, SetTeamNameError, SiteStatistics, StatisticsCategory, Team,
                 TeamInner, TeamMeta, TeamMetaInner, TeamStanding, TeamUser, Ticket,
-                ToBeClosedTicket, Writeup,
+                ToBeClosedTicket, UserTrack, Writeup,
             },
         },
         division::Division,
@@ -1949,6 +1949,51 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await;
 
         Ok(emails)
+    }
+
+    async fn get_team_tracks(&self, team_id: i64) -> Result<BTreeMap<i64, UserTrack>> {
+        #[derive(Debug, Deserialize)]
+        struct DbTrack {
+            user_id: i64,
+            ip: [u8; 16],
+            last_seen_at: i64,
+        }
+
+        let mut tracks = BTreeMap::new();
+
+        let mut query_locations = self
+            .connect()
+            .await?
+            .query(
+                "
+                WITH RankedTracks AS (
+                    SELECT
+                        user_id,
+                        ip,
+                        last_seen_at,
+                        ROW_NUMBER() OVER (PARTITION BY rhombus_user.id ORDER BY last_seen_at DESC) as rn
+                    FROM rhombus_user
+                    JOIN rhombus_track_ip ON rhombus_user.id = rhombus_track_ip.user_id
+                    JOIN rhombus_track ON rhombus_track.id = rhombus_track_ip.track_id
+                    WHERE rhombus_user.team_id = 1
+                )
+                SELECT user_id, ip, last_seen_at
+                FROM RankedTracks
+                WHERE rn = 1
+            ",
+                [team_id],
+            )
+            .await?;
+
+        while let Some(row) = query_locations.next().await? {
+            let db_track = de::from_row::<DbTrack>(&row).unwrap();
+            let ip = IpAddr::from(db_track.ip);
+            let last_seen_at = DateTime::<Utc>::from_timestamp(db_track.last_seen_at, 0).unwrap();
+            let track = UserTrack { ip, last_seen_at };
+            tracks.insert(db_track.user_id, track);
+        }
+
+        Ok(tracks)
     }
 
     async fn create_email_verification_callback_code(
