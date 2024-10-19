@@ -11,9 +11,9 @@ use crate::{
         database::{
             cache::Writeups,
             provider::{
-                Challenge, Challenges, Database, Email, Leaderboard, Scoreboard,
-                SetAccountNameError, SetTeamNameError, SiteStatistics, Team, TeamMeta,
-                TeamStanding, Ticket,
+                Challenge, Challenges, Database, DiscordUpsertError, Email, Leaderboard,
+                Scoreboard, SetAccountNameError, SetTeamNameError, SiteStatistics, Team, TeamMeta,
+                TeamStanding, Ticket, ToBeClosedTicket,
             },
         },
         division::Division,
@@ -44,11 +44,11 @@ impl Database for Postgres {
     async fn upsert_user_by_discord_id(
         &self,
         name: &str,
-        email: &str,
+        email: Option<&str>,
         avatar: &str,
         discord_id: NonZeroU64,
         _user_id: Option<i64>,
-    ) -> Result<(i64, i64)> {
+    ) -> Result<std::result::Result<(i64, i64), DiscordUpsertError>> {
         #[derive(FromRow)]
         struct InsertUserResult {
             id: i64,
@@ -69,7 +69,7 @@ impl Database for Postgres {
         .fetch_one(&self.pool)
         .await?;
 
-        Ok((user.id, user.team_id))
+        Ok(Ok((user.id, user.team_id)))
     }
 
     async fn upsert_user_by_email(
@@ -253,6 +253,7 @@ impl Database for Postgres {
         _user_id: i64,
         _challenge_id: i64,
         _discord_channel_id: NonZeroU64,
+        _panel_discord_message_id: NonZeroU64,
     ) -> Result<()> {
         todo!()
     }
@@ -269,6 +270,15 @@ impl Database for Postgres {
     }
 
     async fn close_ticket(&self, _ticket_number: u64, _time: DateTime<Utc>) -> Result<()> {
+        todo!()
+    }
+
+    async fn close_tickets_for_challenge(
+        &self,
+        _user_id: i64,
+        _challenge_id: i64,
+        _time: DateTime<Utc>,
+    ) -> Result<Vec<ToBeClosedTicket>> {
         todo!()
     }
 

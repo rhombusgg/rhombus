@@ -167,6 +167,7 @@ pub struct Ticket {
     pub challenge_id: i64,
     pub closed_at: Option<DateTime<Utc>>,
     pub discord_channel_id: NonZeroU64,
+    pub discord_panel_message_id: NonZeroU64,
     pub email_references: Vec<String>,
     pub email_in_reply_to: Option<String>,
 }
@@ -197,6 +198,16 @@ pub enum SetTeamNameError {
     Taken,
 }
 
+pub enum DiscordUpsertError {
+    AlreadyInUse,
+}
+
+pub struct ToBeClosedTicket {
+    pub ticket_number: u64,
+    pub discord_channel_id: NonZeroU64,
+    pub discord_panel_message_id: NonZeroU64,
+}
+
 #[async_trait]
 pub trait Database {
     async fn migrate(&self) -> Result<()>;
@@ -210,11 +221,11 @@ pub trait Database {
     async fn upsert_user_by_discord_id(
         &self,
         name: &str,
-        email: &str,
+        email: Option<&str>,
         avatar: &str,
         discord_id: NonZeroU64,
         user_id: Option<i64>,
-    ) -> Result<(i64, i64)>;
+    ) -> Result<std::result::Result<(i64, i64), DiscordUpsertError>>;
     async fn upsert_user_by_email(
         &self,
         name: &str,
@@ -293,6 +304,7 @@ pub trait Database {
         user_id: i64,
         challenge_id: i64,
         discord_channel_id: NonZeroU64,
+        panel_discord_message_id: NonZeroU64,
     ) -> Result<()>;
     async fn get_ticket_by_ticket_number(&self, ticket_number: u64) -> Result<Ticket>;
     async fn get_ticket_by_discord_channel_id(
@@ -301,6 +313,13 @@ pub trait Database {
     ) -> Result<Ticket>;
     async fn close_ticket(&self, ticket_number: u64, time: DateTime<Utc>) -> Result<()>;
     async fn reopen_ticket(&self, ticket_number: u64) -> Result<()>;
+    /// Returns discord channel ids that were closed
+    async fn close_tickets_for_challenge(
+        &self,
+        user_id: i64,
+        challenge_id: i64,
+        time: DateTime<Utc>,
+    ) -> Result<Vec<ToBeClosedTicket>>;
     async fn add_email_message_id_to_ticket(
         &self,
         ticket_number: u64,
