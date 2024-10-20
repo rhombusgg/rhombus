@@ -326,6 +326,10 @@ pub trait Database {
         challenge_id: i64,
         time: DateTime<Utc>,
     ) -> Result<Vec<ToBeClosedTicket>>;
+    async fn get_discord_ticket_channel_ids_for_challenge(
+        &self,
+        challenge_id: i64,
+    ) -> Result<Vec<u64>>;
     async fn add_email_message_id_to_ticket(
         &self,
         ticket_number: u64,

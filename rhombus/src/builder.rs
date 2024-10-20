@@ -903,7 +903,13 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
             let bot = if settings.clone().read().await.discord.is_some() {
                 let bot = Arc::new(
-                    Bot::new(settings.clone(), cached_db.clone(), outbound_mailer.clone()).await,
+                    Bot::new(
+                        settings.clone(),
+                        cached_db.clone(),
+                        outbound_mailer.clone(),
+                        jinja.clone(),
+                    )
+                    .await,
                 );
                 discord_cache_evictor();
                 Some(bot)

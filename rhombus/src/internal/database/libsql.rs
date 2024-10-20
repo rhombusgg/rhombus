@@ -1497,9 +1497,10 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             )
             .await?
             .next()
-            .await?;
+            .await?
+            .ok_or(libsql::Error::QueryReturnedNoRows)?;
 
-        let db_ticket = de::from_row::<DbTicket>(&ticket_row.unwrap()).unwrap();
+        let db_ticket = de::from_row::<DbTicket>(&ticket_row).unwrap();
 
         #[derive(Debug, Deserialize)]
         struct DbTicketEmailMessageIdReference {
@@ -1594,6 +1595,30 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await;
 
         Ok(tickets)
+    }
+
+    async fn get_discord_ticket_channel_ids_for_challenge(
+        &self,
+        challenge_id: i64,
+    ) -> Result<Vec<u64>> {
+        let conn = self.connect().await?;
+
+        let discord_channel_ids = conn
+            .query(
+                "
+                SELECT discord_channel_id
+                FROM rhombus_ticket
+                WHERE challenge_id = ?1
+            ",
+                [challenge_id],
+            )
+            .await?
+            .into_stream()
+            .map(|row| row.unwrap().get::<u64>(0).unwrap())
+            .collect::<Vec<_>>()
+            .await;
+
+        Ok(discord_channel_ids)
     }
 
     async fn reopen_ticket(&self, ticket_number: u64) -> Result<()> {

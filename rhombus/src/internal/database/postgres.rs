@@ -282,6 +282,13 @@ impl Database for Postgres {
         todo!()
     }
 
+    async fn get_discord_ticket_channel_ids_for_challenge(
+        &self,
+        _challenge_id: i64,
+    ) -> Result<Vec<u64>> {
+        todo!()
+    }
+
     async fn reopen_ticket(&self, _ticket_number: u64) -> Result<()> {
         todo!()
     }
