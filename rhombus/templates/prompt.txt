@@ -18,9 +18,9 @@ The following are conversations between the author and the user. You must respon
 ----------------------------------------------
 {% for message in chat %}
 {% if message.is_author %}
-Author:
+Author ({{ message.timestamp }}):
 {% else %}
-User:
+User ({{ message.timestamp }}):
 {% endif %}
 {{ message.content }}
 

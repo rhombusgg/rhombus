@@ -390,6 +390,7 @@ struct ResponseMessage {
 struct AIMessage {
     content: String,
     is_author: bool,
+    timestamp: DateTime<Utc>,
 }
 
 /// Ask AI for a suggested answer to this ticket (author only)
@@ -462,11 +463,10 @@ pub async fn ai(ctx: Context<'_>) -> std::result::Result<(), DiscordError> {
     let mut chats = vec![];
     for channel_id in ticket_channel_ids {
         let channel: ChannelId = channel_id.into();
-        let mut discord_messages = channel.messages(ctx, GetMessages::new().limit(100)).await?;
-        discord_messages.sort_by_key(|message| message.timestamp);
+        let mut discord_messages = channel.messages_iter(&ctx).boxed();
 
         let mut messages = vec![];
-        for discord_message in &discord_messages {
+        while let Some(Ok(discord_message)) = discord_messages.next().await {
             if discord_message.content.is_empty() {
                 continue;
             }
@@ -480,8 +480,10 @@ pub async fn ai(ctx: Context<'_>) -> std::result::Result<(), DiscordError> {
             messages.push(AIMessage {
                 is_author,
                 content: discord_message.content.clone(),
+                timestamp: discord_message.timestamp.to_utc(),
             });
         }
+        messages.sort_by_key(|m| m.timestamp);
         chats.push(messages);
     }
 
@@ -1237,7 +1239,8 @@ impl Bot {
 
         let author_discord: UserId = author.discord_id.into();
 
-        author_discord.direct_message(
+        let dm_channel = author_discord.create_dm_channel(&self.http).await?;
+        dm_channel.send_message(
             &self.http,
             CreateMessage::new()
                 .content(format!(
