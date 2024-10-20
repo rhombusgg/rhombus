@@ -394,6 +394,15 @@ impl Database for DbCache {
             .await
     }
 
+    async fn get_discord_ticket_channel_ids_for_challenge(
+        &self,
+        challenge_id: i64,
+    ) -> Result<Vec<u64>> {
+        self.inner
+            .get_discord_ticket_channel_ids_for_challenge(challenge_id)
+            .await
+    }
+
     async fn reopen_ticket(&self, ticket_number: u64) -> Result<()> {
         self.inner.reopen_ticket(ticket_number).await
     }

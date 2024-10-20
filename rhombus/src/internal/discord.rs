@@ -9,8 +9,10 @@ use std::{
 use chrono::{DateTime, Local, Utc};
 use chrono_tz::Tz;
 use dashmap::DashMap;
-use futures::future::join_all;
+use futures::{future::join_all, StreamExt};
+use minijinja::context;
 use rand::{prelude::SliceRandom, thread_rng, Rng};
+use reqwest::header;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serenity::{
@@ -46,6 +48,7 @@ pub struct Data {
     settings: Arc<RwLock<Settings>>,
     db: Connection,
     outbound_mailer: Option<Arc<OutboundMailer>>,
+    jinja: Arc<minijinja::Environment<'static>>,
 }
 pub type DiscordError = Box<dyn std::error::Error + Send + Sync>;
 pub type Context<'a> = poise::Context<'a, Data, DiscordError>;
@@ -351,6 +354,204 @@ pub async fn verified(
         role.id
     ))
     .await?;
+
+    Ok(())
+}
+
+#[derive(Debug, Serialize)]
+struct ChatCompletionRequest {
+    model: String,
+    messages: Vec<ChatMessage>,
+    temperature: f32,
+}
+
+#[derive(Debug, Serialize)]
+struct ChatMessage {
+    role: String,
+    content: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatCompletionResponse {
+    choices: Vec<Choice>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Choice {
+    message: ResponseMessage,
+}
+
+#[derive(Debug, Deserialize)]
+struct ResponseMessage {
+    content: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct AIMessage {
+    content: String,
+    is_author: bool,
+}
+
+/// Ask AI for a suggested answer to this ticket (author only)
+#[poise::command(slash_command, ephemeral)]
+pub async fn ai(ctx: Context<'_>) -> std::result::Result<(), DiscordError> {
+    ctx.defer_ephemeral().await.unwrap();
+
+    let (openai_api_key, author_discord_role_id) = {
+        let settings = ctx.data().settings.read().await;
+        (
+            settings.openai_api_key.clone(),
+            settings.discord.as_ref().and_then(|d| d.author_role_id),
+        )
+    };
+
+    let Some(author_discord_role_id) = author_discord_role_id else {
+        ctx.reply("AI is not configured. Author role not set")
+            .await?;
+        return Ok(());
+    };
+
+    let is_author = ctx
+        .author()
+        .has_role(ctx.http(), ctx.guild_id().unwrap(), author_discord_role_id)
+        .await
+        .unwrap_or(false);
+
+    if !is_author {
+        ctx.reply("You do not have permission to run this command")
+            .await?;
+        return Ok(());
+    }
+
+    let Some(openai_api_key) = openai_api_key else {
+        ctx.reply("OpenAI API key not set").await?;
+        return Ok(());
+    };
+
+    let thread = ctx.channel_id();
+
+    let Ok(ticket) = ctx
+        .data()
+        .db
+        .get_ticket_by_discord_channel_id(thread.into())
+        .await
+    else {
+        ctx.reply("Could not find associated ticket in the database")
+            .await?;
+        return Ok(());
+    };
+
+    let challenge_data = ctx.data().db.get_challenges().await.unwrap();
+    let challenge = challenge_data
+        .challenges
+        .iter()
+        .find(|c| c.id == ticket.challenge_id)
+        .unwrap();
+    let category = challenge_data
+        .categories
+        .iter()
+        .find(|c| c.id == challenge.category_id)
+        .unwrap();
+
+    let ticket_channel_ids = ctx
+        .data()
+        .db
+        .get_discord_ticket_channel_ids_for_challenge(ticket.challenge_id)
+        .await?;
+
+    let mut chats = vec![];
+    for channel_id in ticket_channel_ids {
+        let channel: ChannelId = channel_id.into();
+        let mut discord_messages = channel.messages(ctx, GetMessages::new().limit(100)).await?;
+        discord_messages.sort_by_key(|message| message.timestamp);
+
+        let mut messages = vec![];
+        for discord_message in &discord_messages {
+            if discord_message.content.is_empty() {
+                continue;
+            }
+
+            let is_author = discord_message
+                .author
+                .has_role(ctx.http(), ctx.guild_id().unwrap(), author_discord_role_id)
+                .await
+                .unwrap_or(false);
+
+            messages.push(AIMessage {
+                is_author,
+                content: discord_message.content.clone(),
+            });
+        }
+        chats.push(messages);
+    }
+
+    let prompt = ctx
+        .data()
+        .jinja
+        .get_template("prompt.txt")
+        .unwrap()
+        .render(context! {
+            challenge,
+            category,
+            chats,
+        })
+        .unwrap();
+
+    let mut last_message = String::default();
+    let mut discord_messages = thread.messages_iter(&ctx).boxed();
+    while let Some(discord_message) = discord_messages.next().await {
+        if let Ok(discord_message) = discord_message {
+            if !discord_message.content.is_empty() {
+                last_message = discord_message.content;
+                break;
+            }
+        }
+    }
+
+    let mut headers = header::HeaderMap::new();
+    headers.insert(
+        "Authorization",
+        header::HeaderValue::from_str(&format!("Bearer {}", openai_api_key))?,
+    );
+    headers.insert(
+        "Content-Type",
+        header::HeaderValue::from_static("application/json"),
+    );
+
+    let client = reqwest::Client::builder()
+        .default_headers(headers)
+        .build()?;
+
+    let request = ChatCompletionRequest {
+        model: "gpt-3.5-turbo".to_string(),
+        messages: vec![
+            ChatMessage {
+                role: "system".to_string(),
+                content: prompt,
+            },
+            ChatMessage {
+                role: "user".to_string(),
+                content: last_message,
+            },
+        ],
+        temperature: 0.2,
+    };
+
+    let response = client
+        .post("https://api.openai.com/v1/chat/completions")
+        .json(&request)
+        .send()
+        .await?;
+
+    if response.status().is_success() {
+        let completion: ChatCompletionResponse = response.json().await?;
+        if let Some(choice) = completion.choices.first() {
+            ctx.reply(&choice.message.content).await?;
+        }
+    } else {
+        tracing::info!(response=?response);
+        ctx.reply(response.text().await?).await?;
+    }
 
     Ok(())
 }
@@ -666,6 +867,7 @@ impl Bot {
         settings: Arc<RwLock<Settings>>,
         db: Connection,
         outbound_mailer: Option<Arc<OutboundMailer>>,
+        jinja: Arc<minijinja::Environment<'static>>,
     ) -> Self {
         let bot_token = {
             settings
@@ -683,7 +885,7 @@ impl Bot {
 
         let framework = poise::Framework::builder()
             .options(poise::FrameworkOptions {
-                commands: vec![admin(), whois()],
+                commands: vec![admin(), whois(), ai()],
                 event_handler: |ctx, event, framework, data| {
                     Box::pin(event_handler(ctx, event, framework, data))
                 },
@@ -696,6 +898,7 @@ impl Bot {
                         settings: framework_rhombus_settings,
                         db: framework_rhombus_db,
                         outbound_mailer,
+                        jinja,
                     })
                 })
             })

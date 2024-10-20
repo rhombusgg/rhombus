@@ -167,6 +167,7 @@ pub struct Settings {
     pub uploads: Option<UploadProviderSettings>,
     pub auth: Vec<AuthProvider>,
     pub ctftime: Option<CTFtimeSettings>,
+    pub openai_api_key: Option<String>,
 
     /// `false` will disable the in memory cache.
     ///
