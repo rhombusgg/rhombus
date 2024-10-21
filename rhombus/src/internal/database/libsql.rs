@@ -292,11 +292,12 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .get::<i64>(0)
             .unwrap();
 
-        tx.execute(
-            "INSERT INTO rhombus_email (email, user_id) VALUES (?1, ?2)",
-            params!(email, user_id),
-        )
-        .await?;
+        _ = tx
+            .execute(
+                "INSERT INTO rhombus_email (email, user_id) VALUES (?1, ?2)",
+                params!(email, user_id),
+            )
+            .await;
 
         tx.commit().await?;
         return Ok(Ok((user_id, team_id)));
@@ -1099,15 +1100,38 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         }))
     }
 
-    async fn kick_user(&self, user_id: i64, _team_id: i64) -> Result<()> {
-        self.connect()
-            .await?
-            .execute(
-                "UPDATE rhombus_user SET team_id = owner_team_id WHERE id = ?1",
+    async fn kick_user(&self, user_id: i64, _team_id: i64) -> Result<i64> {
+        let tx = self.transaction().await?;
+
+        let new_team_id = tx
+            .query(
+                "
+                UPDATE rhombus_user
+                SET team_id = owner_team_id
+                WHERE id = ?1
+                RETURNING owner_team_id
+            ",
                 [user_id],
             )
-            .await?;
-        Ok(())
+            .await?
+            .next()
+            .await?
+            .unwrap()
+            .get::<i64>(0)
+            .unwrap();
+
+        tx.execute(
+            "
+            UPDATE rhombus_solve
+            SET team_id = ?2
+            WHERE user_id = ?1
+        ",
+            [user_id, new_team_id],
+        )
+        .await?;
+
+        tx.commit().await?;
+        Ok(new_team_id)
     }
 
     async fn roll_invite_token(&self, team_id: i64) -> Result<String> {

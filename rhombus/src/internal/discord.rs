@@ -19,7 +19,7 @@ use serenity::{
     all::{
         ButtonStyle, ChannelId, ChannelType, CreateActionRow, CreateAttachment, CreateButton,
         CreateEmbed, CreateEmbedAuthor, CreateMessage, CreateThread, EditMessage, EditThread,
-        GatewayIntents, GetMessages, Http, MessageFlags, MessageId, UserId,
+        FullEvent, GatewayIntents, GetMessages, Http, MessageFlags, MessageId, UserId,
     },
     Client,
 };
@@ -32,6 +32,7 @@ use crate::{
         database::provider::{
             Author, Challenge, ChallengeData, Connection, Team, Ticket, ToBeClosedTicket,
         },
+        division::Division,
         email::outbound_mailer::OutboundMailer,
         settings::Settings,
     },
@@ -49,6 +50,7 @@ pub struct Data {
     db: Connection,
     outbound_mailer: Option<Arc<OutboundMailer>>,
     jinja: Arc<minijinja::Environment<'static>>,
+    divisions: Arc<Vec<Division>>,
 }
 pub type DiscordError = Box<dyn std::error::Error + Send + Sync>;
 pub type Context<'a> = poise::Context<'a, Data, DiscordError>;
@@ -745,6 +747,93 @@ async fn event_handler(
     _framework: poise::FrameworkContext<'_, Data, Box<dyn std::error::Error + Send + Sync>>,
     data: &Data,
 ) -> std::result::Result<(), DiscordError> {
+    if let FullEvent::GuildMemberAddition { new_member } = &event {
+        let discord_user_id = new_member.user.id;
+        if let Ok(user) = data
+            .db
+            .get_user_from_discord_id(discord_user_id.into())
+            .await
+        {
+            if let Some(verified_role_id) = data
+                .settings
+                .read()
+                .await
+                .discord
+                .as_ref()
+                .unwrap()
+                .verified_role_id
+            {
+                if let Err(error) = ctx
+                    .http
+                    .add_member_role(
+                        new_member.guild_id,
+                        discord_user_id,
+                        verified_role_id.into(),
+                        Some("Rhombus restored verified role"),
+                    )
+                    .await
+                {
+                    tracing::error!(?error, "Failed to restore verified role to user");
+                }
+            }
+
+            let team = data.db.get_team_from_id(user.team_id).await.unwrap();
+            let division = data
+                .divisions
+                .iter()
+                .find(|d| d.id == team.division_id)
+                .unwrap();
+            if let Some(discord_role_id) = division.discord_role_id {
+                if let Err(error) = ctx
+                    .http
+                    .add_member_role(
+                        new_member.guild_id,
+                        discord_user_id,
+                        discord_role_id.into(),
+                        Some("Rhombus restored division role"),
+                    )
+                    .await
+                {
+                    tracing::error!(
+                        ?error,
+                        discord_role_id,
+                        "Failed to restore division role to user"
+                    );
+                }
+            }
+        }
+
+        let challenge_data = data.db.get_challenges().await.unwrap();
+        for author in challenge_data.authors.values() {
+            if discord_user_id.get() == author.discord_id.get() {
+                if let Some(author_role_id) = data
+                    .settings
+                    .read()
+                    .await
+                    .discord
+                    .as_ref()
+                    .unwrap()
+                    .author_role_id
+                {
+                    if let Err(error) = ctx
+                        .http
+                        .add_member_role(
+                            new_member.guild_id,
+                            discord_user_id,
+                            author_role_id.into(),
+                            Some("Rhombus restored author role"),
+                        )
+                        .await
+                    {
+                        tracing::error!(?error, "Failed to restore author role to user");
+                    }
+                }
+            }
+        }
+
+        return Ok(());
+    }
+
     let (support_channel_id, rhombus_user_id) = {
         let settings = data.settings.read().await;
         (
@@ -870,6 +959,7 @@ impl Bot {
         db: Connection,
         outbound_mailer: Option<Arc<OutboundMailer>>,
         jinja: Arc<minijinja::Environment<'static>>,
+        divisions: Arc<Vec<Division>>,
     ) -> Self {
         let bot_token = {
             settings
@@ -901,17 +991,42 @@ impl Bot {
                         db: framework_rhombus_db,
                         outbound_mailer,
                         jinja,
+                        divisions,
                     })
                 })
             })
             .build();
 
-        let intents = GatewayIntents::non_privileged();
+        let intents = GatewayIntents::GUILD_MEMBERS;
         let mut discord_client = Client::builder(&bot_token, intents)
             .framework(framework)
             .await
             .unwrap();
         let h = discord_client.http.clone();
+
+        let challenge_data = db.get_challenges().await.unwrap();
+        for author in challenge_data.authors.values() {
+            let (author_role_id, guild_id) = {
+                let settings = settings.read().await;
+                (
+                    settings.discord.as_ref().unwrap().author_role_id,
+                    settings.discord.as_ref().unwrap().guild_id,
+                )
+            };
+            if let Some(author_role_id) = author_role_id {
+                if let Err(error) = h
+                    .add_member_role(
+                        guild_id.into(),
+                        author.discord_id.into(),
+                        author_role_id.into(),
+                        Some("Rhombus set author role"),
+                    )
+                    .await
+                {
+                    tracing::error!(?error, "Failed to set author role to user");
+                }
+            }
+        }
 
         tokio::task::spawn(async move {
             discord_client.start().await.unwrap();
@@ -1265,11 +1380,9 @@ impl Bot {
             )
         };
 
-        if verified_role_id.is_none() {
+        let Some(verified_role_id) = verified_role_id else {
             return Ok(());
-        }
-
-        let verified_role_id = verified_role_id.unwrap();
+        };
 
         self.http
             .add_member_role(
@@ -1325,6 +1438,68 @@ impl Bot {
             .await?;
 
         Ok(())
+    }
+
+    pub async fn give_role_to_users(&self, discord_user_ids: &[NonZeroU64], role_id: NonZeroU64) {
+        let guild_id = {
+            let settings = self.settings.read().await;
+            settings.discord.as_ref().unwrap().guild_id.into()
+        };
+
+        let role_id = role_id.into();
+
+        for discord_user_id in discord_user_ids {
+            if let Err(e) = self
+                .http
+                .add_member_role(
+                    guild_id,
+                    (*discord_user_id).into(),
+                    role_id,
+                    Some("Rhombus"),
+                )
+                .await
+            {
+                tracing::error!(
+                    ?discord_user_id,
+                    ?role_id,
+                    ?e,
+                    "Failed to give role to user",
+                );
+            }
+        }
+    }
+
+    pub async fn remove_role_from_users(
+        &self,
+        discord_user_ids: &[NonZeroU64],
+        role_id: NonZeroU64,
+    ) {
+        let guild_id = {
+            let settings = self.settings.read().await;
+            settings.discord.as_ref().unwrap().guild_id.into()
+        };
+
+        let role_id = role_id.into();
+
+        for discord_user_id in discord_user_ids {
+            if let Err(e) = self
+                .http
+                .remove_member_role(
+                    guild_id,
+                    (*discord_user_id).into(),
+                    role_id,
+                    Some("Rhombus"),
+                )
+                .await
+            {
+                tracing::error!(
+                    ?discord_user_id,
+                    ?role_id,
+                    ?e,
+                    "Failed to give role to user",
+                );
+            }
+        }
     }
 }
 

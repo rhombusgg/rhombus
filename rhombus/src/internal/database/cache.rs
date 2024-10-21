@@ -215,11 +215,12 @@ impl Database for DbCache {
         self.inner.get_user_from_discord_id(discord_id).await
     }
 
-    async fn kick_user(&self, user_id: i64, team_id: i64) -> Result<()> {
+    async fn kick_user(&self, user_id: i64, team_id: i64) -> Result<i64> {
         let result = self.inner.kick_user(user_id, team_id).await;
-        if result.is_ok() {
+        if let Ok(new_team_id) = result {
             USER_CACHE.remove(&user_id);
             TEAM_CACHE.remove(&team_id);
+            TEAM_CACHE.remove(&new_team_id);
         }
         result
     }
