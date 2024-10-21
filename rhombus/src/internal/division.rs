@@ -1,4 +1,7 @@
-use std::{num::NonZeroU32, sync::Arc};
+use std::{
+    num::{NonZeroU32, NonZeroU64},
+    sync::Arc,
+};
 
 use async_trait::async_trait;
 use fancy_regex::Regex;
@@ -63,6 +66,7 @@ pub struct Division {
     pub description: String,
     pub max_players: MaxDivisionPlayers,
     pub is_default: bool,
+    pub discord_role_id: Option<NonZeroU64>,
 
     #[serde(skip)]
     pub division_eligibility: DivisionEligibilityProvider,

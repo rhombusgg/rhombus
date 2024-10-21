@@ -214,6 +214,31 @@ pub async fn route_signin(
                         .add_user_to_team(user.id, team_meta.id, Some(old_team.id))
                         .await
                         .unwrap();
+
+                    if let (Some(bot), Some(user_discord_id)) =
+                        (state.bot.as_ref(), user.discord_id)
+                    {
+                        let new_division = state
+                            .divisions
+                            .iter()
+                            .find(|d| d.id == new_team.division_id)
+                            .unwrap();
+                        if let Some(discord_role_id) = new_division.discord_role_id {
+                            bot.give_role_to_users(&[user_discord_id], discord_role_id)
+                                .await;
+                        }
+
+                        let old_division = state
+                            .divisions
+                            .iter()
+                            .find(|d| d.id == old_team.division_id)
+                            .unwrap();
+                        if let Some(discord_role_id) = old_division.discord_role_id {
+                            bot.remove_role_from_users(&[user_discord_id], discord_role_id)
+                                .await;
+                        }
+                    }
+
                     return Redirect::to("/team").into_response();
                 }
 
@@ -424,8 +449,6 @@ pub async fn route_signin_discord_callback(
         return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
     };
 
-    let bot = state.bot.as_ref().unwrap();
-
     let client = Client::new();
     let res = client
         .post("https://discord.com/api/oauth2/token")
@@ -474,34 +497,7 @@ pub async fn route_signin_discord_callback(
         panic!();
     };
 
-    // join the user to the guild
-    let client = Client::new();
-    let res = client
-        .put(format!(
-            "https://discord.com/api/guilds/{}/members/{}",
-            discord.guild_id, profile.id
-        ))
-        .header("Authorization", format!("Bot {}", discord.bot_token))
-        .json(&json!({
-            "access_token": oauth_token.access_token,
-        }))
-        .send()
-        .await
-        .unwrap();
-    if !res.status().is_success() {
-        let json_error = ErrorResponse {
-            message: format!("Discord returned an error: {:?}", res.text().await),
-        };
-        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
-    }
-
     let discord_id = profile.id.parse::<NonZeroU64>().unwrap();
-    if let Err(err) = bot.verify_user(discord_id).await {
-        let json_error = ErrorResponse {
-            message: format!("Discord returned an error: {:?}", err),
-        };
-        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
-    }
 
     let avatar = if let Some(avatar) = profile.avatar {
         format!(
@@ -559,6 +555,46 @@ pub async fn route_signin_discord_callback(
             }
         },
     };
+
+    if let Some(bot) = state.bot.as_ref() {
+        if let Err(err) = bot.verify_user(discord_id).await {
+            let json_error = ErrorResponse {
+                message: format!("Discord returned an error: {:?}", err),
+            };
+            return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+        }
+
+        let team = state.db.get_team_from_id(team_id).await.unwrap();
+        let division = state
+            .divisions
+            .iter()
+            .find(|d| d.id == team.division_id)
+            .unwrap();
+        if let Some(discord_role_id) = division.discord_role_id {
+            bot.give_role_to_users(&[discord_id], discord_role_id).await;
+        }
+    }
+
+    // join the user to the guild
+    let client = Client::new();
+    let res = client
+        .put(format!(
+            "https://discord.com/api/guilds/{}/members/{}",
+            discord.guild_id, profile.id
+        ))
+        .header("Authorization", format!("Bot {}", discord.bot_token))
+        .json(&json!({
+            "access_token": oauth_token.access_token,
+        }))
+        .send()
+        .await
+        .unwrap();
+    if !res.status().is_success() {
+        let json_error = ErrorResponse {
+            message: format!("Discord returned an error: {:?}", res.text().await),
+        };
+        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+    }
 
     let unset_oauth_state_cookie = Cookie::build(("rhombus-oauth-discord", ""))
         .path("/")
@@ -795,7 +831,7 @@ pub async fn route_signin_ctftime(state: State<RouterState>) -> impl IntoRespons
 
     // ctftime doesn't like dots in the state (or any non-base64url-encoded characters)
     // so we replace them with a statistically unlikely sequence of underscores. This is
-    // then re-replaced in [[route_signin_discord_callback]]
+    // then re-replaced in [[route_signin_ctftime_callback]]
     let signed_oauth_state =
         signed_oauth_state.replace('.', "______________________________________");
 

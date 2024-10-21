@@ -116,6 +116,7 @@ pub struct Division {
     pub requirement: Option<String>,
     pub email_regex: Option<String>,
     pub max_players: Option<String>,
+    pub discord_role_id: Option<NonZeroU64>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]

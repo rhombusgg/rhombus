@@ -494,6 +494,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                             description: division.description.clone(),
                             max_players,
                             division_eligibility,
+                            discord_role_id: division.discord_role_id,
                             is_default: i == 0,
                         }
                     })
@@ -508,6 +509,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     max_players: MaxDivisionPlayers::Unlimited,
                     division_eligibility: Arc::new(OpenDivisionEligibilityProvider {}),
                     is_default: true,
+                    discord_role_id: None,
                 }]
             };
 
@@ -802,6 +804,8 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 }
             };
 
+            let divisions = Arc::new(divisions);
+
             let ip_extractor = match self_arc.ip_extractor.clone() {
                 Some(ip_extractor) => Some(ip_extractor),
                 None => settings
@@ -908,6 +912,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                         cached_db.clone(),
                         outbound_mailer.clone(),
                         jinja.clone(),
+                        divisions.clone(),
                     )
                     .await,
                 );
@@ -969,7 +974,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     .clone()
                     .unwrap_or(Arc::new(default_ip_extractor)),
                 outbound_mailer,
-                divisions: Arc::new(divisions),
+                divisions,
                 router: rr.clone(),
                 global_page_meta,
                 score_type_map,
