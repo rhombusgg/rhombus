@@ -240,10 +240,35 @@ pub async fn route_team_set_name(
 pub async fn route_user_kick(
     state: State<RouterState>,
     Extension(user): Extension<User>,
-    user_id: Path<i64>,
+    Path(user_id): Path<i64>,
 ) -> impl IntoResponse {
-    if user_id.0 == user.id && !user.is_team_owner {
-        state.db.kick_user(user.id, user.team_id).await.unwrap();
+    if user_id == user.id && !user.is_team_owner {
+        let new_team_id = state.db.kick_user(user.id, user.team_id).await.unwrap();
+
+        if let (Some(bot), Some(user_discord_id)) = (state.bot.as_ref(), user.discord_id) {
+            let team = state.db.get_team_from_id(user.team_id).await.unwrap();
+            let old_division = state
+                .divisions
+                .iter()
+                .find(|d| d.id == team.division_id)
+                .unwrap();
+            if let Some(discord_role_id) = old_division.discord_role_id {
+                bot.remove_role_from_users(&[user_discord_id], discord_role_id)
+                    .await;
+            }
+
+            let new_team = state.db.get_team_from_id(new_team_id).await.unwrap();
+            let new_division = state
+                .divisions
+                .iter()
+                .find(|d| d.id == new_team.division_id)
+                .unwrap();
+            if let Some(discord_role_id) = new_division.discord_role_id {
+                bot.give_role_to_users(&[user_discord_id], discord_role_id)
+                    .await;
+            }
+        }
+
         return Response::builder()
             .header("Content-Type", "text/html")
             .header("HX-Trigger", "pageRefresh")
@@ -259,16 +284,38 @@ pub async fn route_user_kick(
     }
 
     let team = state.db.get_team_from_id(user.team_id).await.unwrap();
-    let user_in_team = team.users.keys().any(|&id| id == user_id.0);
-
-    if !user_in_team {
+    let Some(user_in_team) = team.users.get(&user_id) else {
         return Response::builder()
             .status(StatusCode::NOT_FOUND)
             .body("".to_owned())
             .unwrap();
-    }
+    };
 
-    state.db.kick_user(user_id.0, user.team_id).await.unwrap();
+    let new_team_id = state.db.kick_user(user_id, user.team_id).await.unwrap();
+
+    if let (Some(bot), Some(user_discord_id)) = (state.bot.as_ref(), user_in_team.discord_id) {
+        let old_division = state
+            .divisions
+            .iter()
+            .find(|d| d.id == team.division_id)
+            .unwrap();
+        if let Some(discord_role_id) = old_division.discord_role_id {
+            tracing::info!(user_discord_id, "remove");
+            bot.remove_role_from_users(&[user_discord_id], discord_role_id)
+                .await;
+        }
+
+        let new_team = state.db.get_team_from_id(new_team_id).await.unwrap();
+        let new_division = state
+            .divisions
+            .iter()
+            .find(|d| d.id == new_team.division_id)
+            .unwrap();
+        if let Some(discord_role_id) = new_division.discord_role_id {
+            bot.give_role_to_users(&[user_discord_id], discord_role_id)
+                .await;
+        }
+    }
 
     Response::builder()
         .header("Content-Type", "text/html")
@@ -357,6 +404,34 @@ pub async fn route_team_set_division(
         .set_team_division(team.id, team.division_id, division_id, now)
         .await
         .unwrap();
+
+    if let Some(bot) = state.bot.as_ref() {
+        let user_discord_ids = team
+            .users
+            .values()
+            .filter_map(|u| u.discord_id)
+            .collect::<Vec<_>>();
+
+        let old_division = state
+            .divisions
+            .iter()
+            .find(|d| d.id == team.division_id)
+            .unwrap();
+        if let Some(discord_role_id) = old_division.discord_role_id {
+            bot.remove_role_from_users(&user_discord_ids, discord_role_id)
+                .await;
+        }
+
+        let new_division = state
+            .divisions
+            .iter()
+            .find(|d| d.id == division_id)
+            .unwrap();
+        if let Some(discord_role_id) = new_division.discord_role_id {
+            bot.give_role_to_users(&user_discord_ids, discord_role_id)
+                .await;
+        }
+    }
 
     tracing::trace!(team_id = team.id, division_id, "Set division");
 
