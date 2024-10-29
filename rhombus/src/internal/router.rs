@@ -47,7 +47,7 @@ pub struct RouterStateInner {
     pub router: Arc<Router>,
     pub global_page_meta: Arc<GlobalPageMeta>,
     pub score_type_map: Arc<Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>>,
-    pub flag_fn_map: Arc<Mutex<BTreeMap<i64, Box<dyn ChallengeFlag + Send + Sync>>>>,
+    pub flag_fn_map: Arc<Mutex<BTreeMap<String, Box<dyn ChallengeFlag + Send + Sync>>>>,
 }
 
 pub struct Router {

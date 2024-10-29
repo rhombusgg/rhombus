@@ -156,7 +156,7 @@ impl Database for Postgres {
 
     async fn set_challenge_health(
         &self,
-        _challenge_id: i64,
+        _challenge_id: &str,
         _healthy: Option<bool>,
         _checked_at: DateTime<Utc>,
     ) -> Result<()> {
@@ -222,7 +222,7 @@ impl Database for Postgres {
         &self,
         _user_id: i64,
         _team_id: i64,
-        _division_id: i64,
+        _division_id: &str,
         _challenge: &Challenge,
         _next_points: i64,
     ) -> Result<()> {
@@ -255,7 +255,7 @@ impl Database for Postgres {
         &self,
         _ticket_number: u64,
         _user_id: i64,
-        _challenge_id: i64,
+        _challenge_id: &str,
         _discord_channel_id: NonZeroU64,
         _panel_discord_message_id: NonZeroU64,
     ) -> Result<()> {
@@ -280,7 +280,7 @@ impl Database for Postgres {
     async fn close_tickets_for_challenge(
         &self,
         _user_id: i64,
-        _challenge_id: i64,
+        _challenge_id: &str,
         _time: DateTime<Utc>,
     ) -> Result<Vec<ToBeClosedTicket>> {
         todo!()
@@ -288,7 +288,7 @@ impl Database for Postgres {
 
     async fn get_discord_ticket_channel_ids_for_challenge(
         &self,
-        _challenge_id: i64,
+        _challenge_id: &str,
     ) -> Result<Vec<u64>> {
         todo!()
     }
@@ -318,11 +318,11 @@ impl Database for Postgres {
         todo!()
     }
 
-    async fn get_scoreboard(&self, _division_id: i64) -> Result<Scoreboard> {
+    async fn get_scoreboard(&self, _division_id: &str) -> Result<Scoreboard> {
         todo!()
     }
 
-    async fn get_leaderboard(&self, _division_id: i64, _page: Option<u64>) -> Result<Leaderboard> {
+    async fn get_leaderboard(&self, _division_id: &str, _page: Option<u64>) -> Result<Leaderboard> {
         todo!()
     }
 
@@ -373,8 +373,8 @@ impl Database for Postgres {
     async fn set_team_division(
         &self,
         _team_id: i64,
-        _old_division_id: i64,
-        _new_division_id: i64,
+        _old_division_id: &str,
+        _new_division_id: &str,
         _now: DateTime<Utc>,
     ) -> Result<()> {
         todo!()
@@ -387,7 +387,7 @@ impl Database for Postgres {
     async fn get_team_standing(
         &self,
         _team_id: i64,
-        _division_id: i64,
+        _division_id: &str,
     ) -> Result<Option<TeamStanding>> {
         todo!()
     }

@@ -27,12 +27,12 @@ pub struct ChallengeAttachment {
 
 #[derive(Debug, Serialize, Clone)]
 pub struct Challenge {
-    pub id: i64,
+    pub id: String,
     pub name: String,
     pub description: String,
     pub flag: String,
-    pub category_id: i64,
-    pub author_id: i64,
+    pub category_id: String,
+    pub author_id: String,
     pub ticket_template: Option<String>,
     pub healthscript: Option<String>,
     pub healthy: Option<bool>,
@@ -41,23 +41,25 @@ pub struct Challenge {
     pub metadata: Value,
     pub points: i64,
     pub attachments: Vec<ChallengeAttachment>,
-    pub division_solves: BTreeMap<i64, u64>,
+    pub division_solves: BTreeMap<String, u64>,
 }
 
 #[derive(Debug, Serialize, Clone)]
 pub struct ChallengeDivision {
+    pub id: String,
     pub name: String,
 }
 
 #[derive(Debug, Serialize, Clone)]
 pub struct Category {
-    pub id: i64,
+    pub id: String,
     pub name: String,
     pub color: String,
 }
 
 #[derive(Debug, Serialize, Clone)]
 pub struct Author {
+    pub id: String,
     pub name: String,
     pub avatar_url: String,
     pub discord_id: NonZeroU64,
@@ -65,10 +67,10 @@ pub struct Author {
 
 #[derive(Debug, Serialize, Clone)]
 pub struct ChallengeData {
-    pub challenges: Vec<Challenge>,
-    pub categories: Vec<Category>,
-    pub authors: BTreeMap<i64, Author>,
-    pub divisions: BTreeMap<i64, ChallengeDivision>,
+    pub challenges: BTreeMap<String, Challenge>,
+    pub categories: BTreeMap<String, Category>,
+    pub authors: BTreeMap<String, Author>,
+    pub divisions: BTreeMap<String, ChallengeDivision>,
 }
 
 pub type Challenges = Arc<ChallengeData>;
@@ -100,10 +102,10 @@ pub struct TeamInner {
     pub name: String,
     pub invite_token: String,
     pub users: BTreeMap<i64, TeamUser>,
-    pub solves: BTreeMap<i64, ChallengeSolve>,
-    pub writeups: BTreeMap<i64, Vec<Writeup>>,
+    pub solves: BTreeMap<String, ChallengeSolve>,
+    pub writeups: BTreeMap<String, Vec<Writeup>>,
     pub owner_user_id: i64,
-    pub division_id: i64,
+    pub division_id: String,
     pub last_division_change: Option<DateTime<Utc>>,
 }
 
@@ -164,7 +166,7 @@ pub struct TeamStanding {
 pub struct Ticket {
     pub ticket_number: u64,
     pub user_id: i64,
-    pub challenge_id: i64,
+    pub challenge_id: String,
     pub closed_at: Option<DateTime<Utc>>,
     pub discord_channel_id: NonZeroU64,
     pub discord_panel_message_id: NonZeroU64,
@@ -220,7 +222,7 @@ pub trait Database {
     async fn get_challenges(&self) -> Result<Challenges>;
     async fn set_challenge_health(
         &self,
-        challenge_id: i64,
+        challenge_id: &str,
         healthy: Option<bool>,
         checked_at: DateTime<Utc>,
     ) -> Result<()>;
@@ -273,7 +275,7 @@ pub trait Database {
         &self,
         user_id: i64,
         team_id: i64,
-        division_id: i64,
+        division_id: &str,
         challenge: &Challenge,
         next_points: i64,
     ) -> Result<()>;
@@ -308,7 +310,7 @@ pub trait Database {
         &self,
         ticket_number: u64,
         user_id: i64,
-        challenge_id: i64,
+        challenge_id: &str,
         discord_channel_id: NonZeroU64,
         panel_discord_message_id: NonZeroU64,
     ) -> Result<()>;
@@ -323,12 +325,12 @@ pub trait Database {
     async fn close_tickets_for_challenge(
         &self,
         user_id: i64,
-        challenge_id: i64,
+        challenge_id: &str,
         time: DateTime<Utc>,
     ) -> Result<Vec<ToBeClosedTicket>>;
     async fn get_discord_ticket_channel_ids_for_challenge(
         &self,
-        challenge_id: i64,
+        challenge_id: &str,
     ) -> Result<Vec<u64>>;
     async fn add_email_message_id_to_ticket(
         &self,
@@ -339,8 +341,8 @@ pub trait Database {
     async fn get_ticket_number_by_message_id(&self, message_id: &str) -> Result<Option<u64>>;
     async fn save_settings(&self, settings: &Settings) -> Result<()>;
     async fn load_settings(&self, settings: &mut Settings) -> Result<()>;
-    async fn get_scoreboard(&self, division_id: i64) -> Result<Scoreboard>;
-    async fn get_leaderboard(&self, division_id: i64, page: Option<u64>) -> Result<Leaderboard>;
+    async fn get_scoreboard(&self, division_id: &str) -> Result<Scoreboard>;
+    async fn get_leaderboard(&self, division_id: &str, page: Option<u64>) -> Result<Leaderboard>;
     async fn get_top10_discord_ids(&self) -> Result<BTreeSet<NonZeroU64>>;
     async fn get_emails_for_user_id(&self, user_id: i64) -> Result<Vec<Email>>;
     async fn get_team_tracks(&self, team_id: i64) -> Result<BTreeMap<i64, UserTrack>>;
@@ -358,15 +360,15 @@ pub trait Database {
     async fn set_team_division(
         &self,
         team_id: i64,
-        old_division_id: i64,
-        new_division_id: i64,
+        old_division_id: &str,
+        new_division_id: &str,
         now: DateTime<Utc>,
     ) -> Result<()>;
     async fn insert_divisions(&self, divisions: &[Division]) -> Result<()>;
     async fn get_team_standing(
         &self,
         team_id: i64,
-        division_id: i64,
+        division_id: &str,
     ) -> Result<Option<TeamStanding>>;
     async fn upload_file(&self, hash: &str, filename: &str, bytes: &[u8]) -> Result<()>;
     async fn download_file(&self, hash: &str) -> Result<(Bytes, String)>;

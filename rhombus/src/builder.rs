@@ -463,7 +463,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                                 Arc::new(OpenDivisionEligibilityProvider {})
                             };
 
-                        let id = hash(division.stable_id.as_ref().unwrap_or(&division.name));
+                        let id = division.stable_id.as_ref().unwrap_or(&division.name);
 
                         let max_players = if let Some(max_players) = &division.max_players {
                             match max_players.as_str() {
@@ -489,7 +489,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                         };
 
                         Division {
-                            id,
+                            id: id.to_owned(),
                             name: division.name.clone(),
                             description: division.description.clone(),
                             max_players,
@@ -501,7 +501,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     .collect()
             } else {
                 let name = "Open".to_owned();
-                let id = hash(&name);
+                let id = "open".to_owned();
                 vec![Division {
                     id,
                     name,

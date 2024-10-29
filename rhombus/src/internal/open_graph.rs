@@ -192,7 +192,7 @@ pub async fn route_default_og_image(state: State<RouterState>) -> impl IntoRespo
         let mut places = Vec::with_capacity(3);
         let leaderboard = state
             .db
-            .get_leaderboard(division.id, Some(0))
+            .get_leaderboard(&division.id, Some(0))
             .await
             .unwrap();
         leaderboard.entries.iter().take(3).for_each(|entry| {
@@ -266,7 +266,7 @@ pub async fn route_team_og_image(
     }
 
     let challenge_data = state.db.get_challenges();
-    let standing = state.db.get_team_standing(team_id.0, team.division_id);
+    let standing = state.db.get_team_standing(team_id.0, &team.division_id);
     let (challenge_data, standings) = tokio::join!(challenge_data, standing);
     let challenge_data = challenge_data.unwrap();
     let standing = standings.unwrap();
@@ -313,20 +313,15 @@ pub async fn route_team_og_image(
     let num_solves = team.solves.len();
     let num_users = team.users.len();
 
-    let mut categories = BTreeMap::<i64, StatisticsCategory>::new();
+    let mut categories = BTreeMap::<String, StatisticsCategory>::new();
     for challenge_id in team.solves.keys() {
-        let challenge = challenge_data
-            .challenges
-            .iter()
-            .find(|c| c.id == *challenge_id)
-            .unwrap();
+        let challenge = challenge_data.challenges.get(challenge_id).unwrap();
         let category = challenge_data
             .categories
-            .iter()
-            .find(|c| c.id == challenge.category_id)
+            .get(&challenge.category_id)
             .unwrap();
         categories
-            .entry(category.id)
+            .entry(category.id.clone())
             .and_modify(|c| c.num += 1)
             .or_insert_with(|| StatisticsCategory {
                 color: category.color.clone(),
@@ -438,7 +433,7 @@ pub async fn route_user_og_image(
         .end_time
         .map(|end_time| end_time.format("%A, %B %-d, %Y at %H:%MZ").to_string());
 
-    let mut categories = BTreeMap::<i64, StatisticsCategory>::new();
+    let mut categories = BTreeMap::<String, StatisticsCategory>::new();
     let mut num_solves = 0;
     for (challenge_id, solve) in team.solves.iter() {
         if solve.user_id != user.id {
@@ -447,18 +442,13 @@ pub async fn route_user_og_image(
 
         num_solves += 1;
 
-        let challenge = challenge_data
-            .challenges
-            .iter()
-            .find(|c| c.id == *challenge_id)
-            .unwrap();
+        let challenge = challenge_data.challenges.get(challenge_id).unwrap();
         let category = challenge_data
             .categories
-            .iter()
-            .find(|c| c.id == challenge.category_id)
+            .get(&challenge.category_id)
             .unwrap();
         categories
-            .entry(category.id)
+            .entry(category.id.clone())
             .and_modify(|c| c.num += 1)
             .or_insert_with(|| StatisticsCategory {
                 color: category.color.clone(),

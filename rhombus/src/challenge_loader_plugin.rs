@@ -135,23 +135,27 @@ impl Plugin for ChallengeLoaderPlugin {
                 let new_challenge_ids = challenges
                     .iter()
                     .map(|challenge| {
-                        hash(challenge.stable_id.as_ref().unwrap_or(&challenge.name)) as i64
+                        challenge
+                            .stable_id
+                            .as_ref()
+                            .unwrap_or(&challenge.name)
+                            .as_str()
                     })
                     .collect::<Vec<_>>();
                 let mut challenge_id_rows =
                     tx.query("SELECT id FROM rhombus_challenge", ()).await?;
                 while let Some(row) = challenge_id_rows.next().await? {
-                    let challenge_id = row.get::<i64>(0).unwrap();
-                    if !new_challenge_ids.contains(&challenge_id) {
+                    let challenge_id = row.get::<String>(0).unwrap();
+                    if !new_challenge_ids.contains(&challenge_id.as_str()) {
                         tx.execute(
                             "DELETE FROM rhombus_file_attachment WHERE challenge_id = ?1",
-                            [challenge_id],
+                            [challenge_id.as_str()],
                         )
                         .await?;
 
                         tx.execute(
                             "DELETE FROM rhombus_challenge WHERE id = ?1",
-                            [challenge_id],
+                            [challenge_id.as_str()],
                         )
                         .await?;
                     }
@@ -160,14 +164,17 @@ impl Plugin for ChallengeLoaderPlugin {
                 let new_author_ids = config
                     .authors
                     .iter()
-                    .map(|author| hash(author.stable_id.as_ref().unwrap_or(&author.name)) as i64)
+                    .map(|author| author.stable_id.as_ref().unwrap_or(&author.name).as_str())
                     .collect::<Vec<_>>();
                 let mut author_id_rows = tx.query("SELECT id FROM rhombus_author", ()).await?;
                 while let Some(row) = author_id_rows.next().await? {
-                    let author_id = row.get::<i64>(0).unwrap();
-                    if !new_author_ids.contains(&author_id) {
-                        tx.execute("DELETE FROM rhombus_author WHERE id = ?1", [author_id])
-                            .await?;
+                    let author_id = row.get::<String>(0).unwrap();
+                    if !new_author_ids.contains(&author_id.as_str()) {
+                        tx.execute(
+                            "DELETE FROM rhombus_author WHERE id = ?1",
+                            [author_id.as_str()],
+                        )
+                        .await?;
                     }
                 }
 
@@ -175,25 +182,29 @@ impl Plugin for ChallengeLoaderPlugin {
                     .categories
                     .iter()
                     .map(|category| {
-                        hash(category.stable_id.as_ref().unwrap_or(&category.name)) as i64
+                        category
+                            .stable_id
+                            .as_ref()
+                            .unwrap_or(&category.name)
+                            .as_str()
                     })
                     .collect::<Vec<_>>();
 
                 let mut category_id_rows = tx.query("SELECT id FROM rhombus_category", ()).await?;
                 while let Some(row) = category_id_rows.next().await? {
-                    let category_id = row.get::<i64>(0).unwrap();
-                    if !new_category_ids.contains(&category_id) {
+                    let category_id = row.get::<String>(0).unwrap();
+                    if !new_category_ids.contains(&category_id.as_str()) {
                         tx.execute("DELETE FROM rhombus_category WHERE id = ?1", [category_id])
                             .await?;
                     }
                 }
 
                 for author in &config.authors {
-                    let id = hash(author.stable_id.as_ref().unwrap_or(&author.name));
+                    let id = author.stable_id.as_ref().unwrap_or(&author.name);
                     _ = tx
                         .execute(
                             "INSERT OR REPLACE INTO rhombus_author (id, name, avatar, discord_id) VALUES (?1, ?2, ?3, ?4)",
-                            params!(id, author.name.as_str(), author.avatar.as_str(), author.discord_id.as_deref()),
+                            params!(id.as_str(), author.name.as_str(), author.avatar.as_str(), author.discord_id.as_deref()),
                         )
                         .await?;
                 }
@@ -202,38 +213,34 @@ impl Plugin for ChallengeLoaderPlugin {
                     let color = category
                         .color
                         .as_deref()
-                        .unwrap_or(get_color(hash(&category.name) as usize));
-                    let id = hash(category.stable_id.as_ref().unwrap_or(&category.name));
+                        .unwrap_or(get_color(&category.name));
+                    let id = category.stable_id.as_ref().unwrap_or(&category.name);
                     let _ = tx
                         .execute(
                             "INSERT OR REPLACE INTO rhombus_category (id, name, color, sequence) VALUES (?1, ?2, ?3, ?4)",
-                            params!(id, category.name.as_str(), color, sequence as i64),
+                            params!(id.as_str(), category.name.as_str(), color, sequence as i64),
                         )
                         .await?;
                 }
 
                 for challenge in &challenges {
-                    let category_id = hash(
-                        config
-                            .categories
-                            .iter()
-                            .find(|category| category.name == challenge.category)
-                            .unwrap()
-                            .stable_id
-                            .as_ref()
-                            .unwrap_or(&challenge.category),
-                    );
-                    let author_id = hash(
-                        config
-                            .authors
-                            .iter()
-                            .find(|author| author.name == challenge.author)
-                            .unwrap()
-                            .stable_id
-                            .as_ref()
-                            .unwrap_or(&challenge.author),
-                    );
-                    let id = hash(challenge.stable_id.as_ref().unwrap_or(&challenge.name));
+                    let category_id = config
+                        .categories
+                        .iter()
+                        .find(|category| category.name == challenge.category)
+                        .unwrap()
+                        .stable_id
+                        .as_ref()
+                        .unwrap_or(&challenge.category);
+                    let author_id = config
+                        .authors
+                        .iter()
+                        .find(|author| author.name == challenge.author)
+                        .unwrap()
+                        .stable_id
+                        .as_ref()
+                        .unwrap_or(&challenge.author);
+                    let id = challenge.stable_id.as_ref().unwrap_or(&challenge.name);
 
                     tracing::info!(name = challenge.name);
 
@@ -277,12 +284,12 @@ impl Plugin for ChallengeLoaderPlugin {
                                 metadata = excluded.metadata
                         ",
                             params!(
-                                id,
+                                id.as_str(),
                                 challenge.name.as_str(),
                                 description.as_str(),
                                 challenge.flag.as_str(),
-                                category_id,
-                                author_id,
+                                category_id.as_str(),
+                                author_id.as_str(),
                                 challenge.ticket_template.as_str(),
                                 challenge.healthscript.as_deref(),
                                 challenge.score_type.as_str(),
@@ -295,7 +302,7 @@ impl Plugin for ChallengeLoaderPlugin {
                     let mut attachment_urls = tx
                         .query(
                             "SELECT url FROM rhombus_file_attachment WHERE challenge_id = ?1",
-                            [id],
+                            [id.as_str()],
                         )
                         .await?
                         .into_stream()
@@ -313,7 +320,7 @@ impl Plugin for ChallengeLoaderPlugin {
                         let previous = tx
                             .query(
                                 "SELECT hash, url FROM rhombus_file_attachment WHERE challenge_id = ?1 AND name = ?2",
-                                params!(id, file.dst.clone()),
+                                params!(id.as_str(), file.dst.as_str()),
                             )
                             .await?
                             .next()
@@ -362,7 +369,7 @@ impl Plugin for ChallengeLoaderPlugin {
                                 INSERT OR REPLACE INTO rhombus_file_attachment (challenge_id, name, url, hash)
                                 VALUES (?1, ?2, ?3, ?4)
                             ",
-                                params!(id, dst, url.as_str(), hash),
+                                params!(id.as_str(), dst, url.as_str(), hash),
                             )
                             .await?;
                         attachment_urls.remove(&url);
@@ -371,7 +378,7 @@ impl Plugin for ChallengeLoaderPlugin {
                     for url in attachment_urls {
                         tx.execute(
                             "DELETE FROM rhombus_file_attachment WHERE challenge_id = ?1 AND url = ?2",
-                            params!(id, url),
+                            params!(id.as_str(), url),
                         )
                         .await?;
                     }
@@ -385,20 +392,13 @@ impl Plugin for ChallengeLoaderPlugin {
     }
 }
 
-// 53 bits because these ids will be sent to javascript and js always uses the "number"
-// type which is a double precision float (53 bits is the max precision for integers for doubles)
-pub fn hash(s: impl AsRef<str>) -> u64 {
-    let s = s.as_ref();
+pub fn get_color(category_id: &str) -> &'static str {
     let mut hasher =
         BuildHasherDefault::<std::collections::hash_map::DefaultHasher>::default().build_hasher();
-    hasher.write(s.as_bytes());
-    let hash_value = hasher.finish();
-    hash_value >> 11
-}
-
-pub fn get_color(hash: usize) -> &'static str {
+    hasher.write(category_id.as_bytes());
+    let hash_value = hasher.finish() as usize;
     let colors = ["#ef4444", "#f97316", "#f59e0b"];
-    colors[hash % colors.len()]
+    colors[hash_value % colors.len()]
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

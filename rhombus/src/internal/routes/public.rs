@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use axum::{
     extract::{Path, State},
     response::{Html, IntoResponse},
@@ -29,16 +27,6 @@ pub async fn route_public_user(
     let challenge_data = challenge_data.unwrap();
     let team = team.unwrap();
 
-    let mut challenges = BTreeMap::new();
-    for challenge in &challenge_data.challenges {
-        challenges.insert(challenge.id, challenge);
-    }
-
-    let mut categories = BTreeMap::new();
-    for category in &challenge_data.categories {
-        categories.insert(category.id, category);
-    }
-
     Html(
         state
             .jinja
@@ -53,8 +41,8 @@ pub async fn route_public_user(
                 public_user,
                 public_team => team,
                 now => chrono::Utc::now(),
-                challenges,
-                categories,
+                challenges => challenge_data.challenges,
+                categories => challenge_data.categories,
             })
             .unwrap(),
     )
@@ -65,9 +53,9 @@ pub async fn route_public_team(
     state: State<RouterState>,
     Extension(user): Extension<MaybeUser>,
     Extension(page): Extension<PageMeta>,
-    team_id: Path<i64>,
+    Path(team_id): Path<i64>,
 ) -> impl IntoResponse {
-    let Ok(team) = state.db.get_team_from_id(team_id.0).await else {
+    let Ok(team) = state.db.get_team_from_id(team_id).await else {
         return Json(json!({
             "error": "Team not found",
         }))
@@ -75,20 +63,10 @@ pub async fn route_public_team(
     };
 
     let challenge_data = state.db.get_challenges();
-    let standing = state.db.get_team_standing(team_id.0, team.division_id);
+    let standing = state.db.get_team_standing(team_id, &team.division_id);
     let (challenge_data, standing) = tokio::join!(challenge_data, standing);
     let challenge_data = challenge_data.unwrap();
     let standing = standing.unwrap();
-
-    let mut challenges = BTreeMap::new();
-    for challenge in &challenge_data.challenges {
-        challenges.insert(challenge.id, challenge);
-    }
-
-    let mut categories = BTreeMap::new();
-    for category in &challenge_data.categories {
-        categories.insert(category.id, category);
-    }
 
     Html(
         state
@@ -103,8 +81,8 @@ pub async fn route_public_team(
                 user,
                 public_team => team,
                 now => chrono::Utc::now(),
-                challenges,
-                categories,
+                challenges => challenge_data.challenges,
+                categories => challenge_data.categories,
                 divisions => state.divisions,
                 standing,
             })

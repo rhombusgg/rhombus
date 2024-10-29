@@ -252,14 +252,14 @@ pub async fn route_signin(
                         {
                             let old_team_top_10 = state
                                 .db
-                                .get_team_standing(old_team.id, old_team.division_id)
+                                .get_team_standing(old_team.id, &old_team.division_id)
                                 .await
                                 .unwrap()
                                 .map(|standing| standing.rank <= 10)
                                 .unwrap_or(false);
                             let new_team_top_10 = state
                                 .db
-                                .get_team_standing(new_team.id, new_team.division_id)
+                                .get_team_standing(new_team.id, &new_team.division_id)
                                 .await
                                 .unwrap()
                                 .map(|standing| standing.rank <= 10)
@@ -1104,9 +1104,12 @@ pub async fn route_signin_email_confirm_callback(
 
     let avatar = avatar_from_email(&email);
 
-    let Ok((user_id, team_id)) = state.db.upsert_user_by_email(name, &email, &avatar).await else {
-        tracing::info!(email, "failed to upsert user by email");
-        return Redirect::temporary("/signin").into_response();
+    let (user_id, team_id) = match state.db.upsert_user_by_email(name, &email, &avatar).await {
+        Ok((user_id, team_id)) => (user_id, team_id),
+        Err(err) => {
+            tracing::info!("Failed to upsert user by email {} {}", email, err);
+            return Redirect::temporary("/signin").into_response();
+        }
     };
 
     let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar, &state.db).await;

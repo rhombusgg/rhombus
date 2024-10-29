@@ -62,13 +62,7 @@ pub async fn route_scoreboard_division(
 ) -> impl IntoResponse {
     let page_num = params.page.unwrap_or(1).saturating_sub(1);
 
-    let Ok(division_id) = division_id
-        .strip_suffix(".json")
-        .unwrap_or(&division_id)
-        .parse()
-    else {
-        return Err::<(), &str>("Failed to parse division ID as integer").into_response();
-    };
+    let division_id = division_id.strip_suffix(".json").unwrap_or(&division_id);
 
     let scoreboard = state.db.get_scoreboard(division_id);
     let challenge_data = state.db.get_challenges();
@@ -107,14 +101,14 @@ pub async fn route_scoreboard_division(
 /// Implements the feed as described by https://ctftime.org/json-scoreboard-feed
 pub async fn route_scoreboard_division_ctftime(
     state: State<RouterState>,
-    Path(division_id): Path<i64>,
+    Path(division_id): Path<String>,
 ) -> impl IntoResponse {
     let challenge_data = state.db.get_challenges().await.unwrap();
-    let leaderboard = state.db.get_leaderboard(division_id, None).await.unwrap();
+    let leaderboard = state.db.get_leaderboard(&division_id, None).await.unwrap();
 
     let tasks = challenge_data
         .challenges
-        .iter()
+        .values()
         .map(|challenge| &challenge.name)
         .collect::<Vec<_>>();
 

@@ -8,7 +8,7 @@ use fake::{
 use futures::stream::StreamExt;
 use rand::{
     distributions::{Alphanumeric, DistString},
-    seq::SliceRandom,
+    seq::{IteratorRandom, SliceRandom},
     Rng,
 };
 use sha2::{Digest, Sha256};
@@ -193,7 +193,7 @@ async fn create_team(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
         .await?
         .divisions
         .iter()
-        .map(|d| *d.0)
+        .map(|d| d.0.clone())
         .collect::<Vec<_>>();
 
     let mut rng = rand::rngs::OsRng;
@@ -214,7 +214,7 @@ async fn create_team(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
 
     let team = db.get_team_from_id(team_id).await?;
     let now = Utc::now();
-    db.set_team_division(team_id, team.division_id, *division_id, now)
+    db.set_team_division(team_id, &team.division_id, division_id, now)
         .await?;
     set_user_to_bot(libsql.clone(), user_id).await?;
 
@@ -265,12 +265,18 @@ async fn solve_challenge(
             (
                 row.get::<i64>(0).unwrap(),
                 row.get::<i64>(1).unwrap(),
-                row.get::<i64>(2).unwrap(),
+                row.get::<String>(2).unwrap(),
             )
         })
     {
         let mut rng = rand::rngs::OsRng;
-        if let Some(challenge) = db.get_challenges().await?.challenges.choose(&mut rng) {
+        if let Some(challenge) = db
+            .get_challenges()
+            .await?
+            .challenges
+            .values()
+            .choose(&mut rng)
+        {
             let user = db.get_user_from_id(user_id).await?;
             let team = db.get_team_from_id(team_id).await?;
             let next_points = score_type_map
@@ -282,7 +288,7 @@ async fn solve_challenge(
                 .await
                 .unwrap();
 
-            db.solve_challenge(user_id, team_id, division_id, challenge, next_points)
+            db.solve_challenge(user_id, team_id, &division_id, challenge, next_points)
                 .await?;
             tracing::info!(user_id, challenge_id = challenge.id, "Solved challenge");
         }
