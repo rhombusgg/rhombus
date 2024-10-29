@@ -1,4 +1,8 @@
-use std::{collections::BTreeMap, net::IpAddr, num::NonZeroU64};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    net::IpAddr,
+    num::NonZeroU64,
+};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -319,6 +323,10 @@ impl Database for Postgres {
     }
 
     async fn get_leaderboard(&self, _division_id: i64, _page: Option<u64>) -> Result<Leaderboard> {
+        todo!()
+    }
+
+    async fn get_top10_discord_ids(&self) -> Result<BTreeSet<NonZeroU64>> {
         todo!()
     }
 

@@ -218,24 +218,61 @@ pub async fn route_signin(
                     if let (Some(bot), Some(user_discord_id)) =
                         (state.bot.as_ref(), user.discord_id)
                     {
-                        let new_division = state
-                            .divisions
-                            .iter()
-                            .find(|d| d.id == new_team.division_id)
-                            .unwrap();
-                        if let Some(discord_role_id) = new_division.discord_role_id {
-                            bot.give_role_to_users(&[user_discord_id], discord_role_id)
-                                .await;
-                        }
-
                         let old_division = state
                             .divisions
                             .iter()
                             .find(|d| d.id == old_team.division_id)
                             .unwrap();
-                        if let Some(discord_role_id) = old_division.discord_role_id {
-                            bot.remove_role_from_users(&[user_discord_id], discord_role_id)
-                                .await;
+
+                        let new_division = state
+                            .divisions
+                            .iter()
+                            .find(|d| d.id == new_team.division_id)
+                            .unwrap();
+
+                        if old_division.discord_role_id != new_division.discord_role_id {
+                            if let Some(discord_role_id) = old_division.discord_role_id {
+                                bot.remove_role_from_users(&[user_discord_id], discord_role_id)
+                                    .await;
+                            }
+
+                            if let Some(discord_role_id) = new_division.discord_role_id {
+                                bot.give_role_to_users(&[user_discord_id], discord_role_id)
+                                    .await;
+                            }
+                        }
+
+                        if let Some(top10_role_id) = state
+                            .settings
+                            .read()
+                            .await
+                            .discord
+                            .as_ref()
+                            .and_then(|discord| discord.top10_role_id)
+                        {
+                            let old_team_top_10 = state
+                                .db
+                                .get_team_standing(old_team.id, old_team.division_id)
+                                .await
+                                .unwrap()
+                                .map(|standing| standing.rank <= 10)
+                                .unwrap_or(false);
+                            let new_team_top_10 = state
+                                .db
+                                .get_team_standing(new_team.id, new_team.division_id)
+                                .await
+                                .unwrap()
+                                .map(|standing| standing.rank <= 10)
+                                .unwrap_or(false);
+                            if old_team_top_10 != new_team_top_10 {
+                                if new_team_top_10 {
+                                    bot.give_role_to_users(&[user_discord_id], top10_role_id)
+                                        .await;
+                                } else {
+                                    bot.remove_role_from_users(&[user_discord_id], top10_role_id)
+                                        .await;
+                                }
+                            }
                         }
                     }
 

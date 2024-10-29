@@ -916,7 +916,14 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     )
                     .await,
                 );
+
                 discord_cache_evictor();
+
+                let b = bot.clone();
+                tokio::task::spawn(async move {
+                    b.sync_top10_discord_role().await;
+                });
+
                 Some(bot)
             } else {
                 None

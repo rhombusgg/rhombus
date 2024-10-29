@@ -1,5 +1,5 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     net::IpAddr,
     num::NonZeroU64,
     sync::{Arc, LazyLock},
@@ -437,6 +437,10 @@ impl Database for DbCache {
 
     async fn get_leaderboard(&self, division_id: i64, page: Option<u64>) -> Result<Leaderboard> {
         get_leaderboard(&self.inner, division_id, page).await
+    }
+
+    async fn get_top10_discord_ids(&self) -> Result<BTreeSet<NonZeroU64>> {
+        self.inner.get_top10_discord_ids().await
     }
 
     async fn get_emails_for_user_id(&self, user_id: i64) -> Result<Vec<Email>> {

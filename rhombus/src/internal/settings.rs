@@ -13,6 +13,7 @@ pub struct DiscordSettings {
     pub support_channel_id: Option<NonZeroU64>,
     pub author_role_id: Option<NonZeroU64>,
     pub verified_role_id: Option<NonZeroU64>,
+    pub top10_role_id: Option<NonZeroU64>,
     pub invite_url: Option<String>,
 }
 

@@ -661,6 +661,8 @@ pub async fn route_challenge_submit(
                         tracing::error!(user_id, challenge_id, "Failed to close tickets on solve");
                     }
                 }
+
+                bot.sync_top10_discord_role().await;
             });
         }
 

@@ -1,5 +1,5 @@
 use std::{
-    collections::{btree_map::Entry, BTreeMap},
+    collections::{btree_map::Entry, BTreeMap, BTreeSet},
     future::Future,
     net::IpAddr,
     num::NonZeroU64,
@@ -1969,6 +1969,38 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                 num_pages: 1,
             })
         }
+    }
+
+    async fn get_top10_discord_ids(&self) -> Result<BTreeSet<NonZeroU64>> {
+        let top10_discord_ids = self
+            .connect()
+            .await?
+            .query(
+                "
+                WITH ranked_teams AS (
+                    SELECT
+                        rhombus_team_points.team_id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY rhombus_team.division_id
+                            ORDER BY rhombus_team_points.points DESC, rhombus_team_points.last_solved_at ASC
+                        ) as rank
+                    FROM rhombus_team_points
+                    JOIN rhombus_team ON rhombus_team.id = rhombus_team_points.team_id
+                )
+                SELECT rhombus_user.discord_id
+                FROM ranked_teams
+                JOIN rhombus_user ON rhombus_user.team_id = ranked_teams.team_id
+                WHERE ranked_teams.rank <= 10 AND rhombus_user.discord_id IS NOT NULL
+            ",
+                (),
+            )
+            .await?
+            .into_stream()
+            .map(|row| NonZeroU64::new(row.unwrap().get::<u64>(0).unwrap()).unwrap())
+            .collect()
+            .await;
+
+        Ok(top10_discord_ids)
     }
 
     async fn get_emails_for_user_id(&self, user_id: i64) -> Result<Vec<Email>> {

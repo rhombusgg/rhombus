@@ -19,7 +19,8 @@ use serenity::{
     all::{
         ButtonStyle, ChannelId, ChannelType, CreateActionRow, CreateAttachment, CreateButton,
         CreateEmbed, CreateEmbedAuthor, CreateMessage, CreateThread, EditMessage, EditThread,
-        FullEvent, GatewayIntents, GetMessages, Http, MessageFlags, MessageId, UserId,
+        FullEvent, GatewayIntents, GetMessages, GuildId, Http, MessageFlags, MessageId, RoleId,
+        UserId,
     },
     Client,
 };
@@ -801,6 +802,39 @@ async fn event_handler(
                     );
                 }
             }
+
+            if let Some(top10_role_id) = data
+                .settings
+                .read()
+                .await
+                .discord
+                .as_ref()
+                .unwrap()
+                .top10_role_id
+            {
+                let standing = data
+                    .db
+                    .get_team_standing(user.team_id, team.division_id)
+                    .await
+                    .unwrap();
+
+                if let Some(standing) = standing {
+                    if standing.rank <= 10 {
+                        if let Err(error) = ctx
+                            .http
+                            .add_member_role(
+                                new_member.guild_id,
+                                discord_user_id,
+                                top10_role_id.into(),
+                                Some("Rhombus restored top 10 role"),
+                            )
+                            .await
+                        {
+                            tracing::error!(?error, "Failed to restore top 10 role to user");
+                        }
+                    }
+                }
+            }
         }
 
         let challenge_data = data.db.get_challenges().await.unwrap();
@@ -1465,6 +1499,69 @@ impl Bot {
                     ?e,
                     "Failed to give role to user",
                 );
+            }
+        }
+    }
+
+    pub async fn sync_top10_discord_role(&self) {
+        let (guild_id, top10_role_id): (GuildId, Option<RoleId>) = {
+            let settings = self.settings.read().await;
+            let discord = settings.discord.as_ref().unwrap();
+            (
+                discord.guild_id.into(),
+                discord.top10_role_id.map(|role_id| role_id.into()),
+            )
+        };
+
+        let Some(top10_role_id) = top10_role_id else {
+            return;
+        };
+
+        let discord_ids = self.db.get_top10_discord_ids().await.unwrap();
+
+        let mut members = guild_id.members_iter(&self.http).boxed();
+        while let Some(member_result) = members.next().await {
+            match member_result {
+                Ok(member) => {
+                    if discord_ids.contains(&NonZeroU64::new(member.user.id.get()).unwrap()) {
+                        if let Err(error) = self
+                            .http
+                            .add_member_role(
+                                guild_id,
+                                member.user.id,
+                                top10_role_id,
+                                Some("Rhombus"),
+                            )
+                            .await
+                        {
+                            tracing::error!(
+                                ?member.user.id,
+                                ?top10_role_id,
+                                ?error,
+                                "Failed to give role to user",
+                            );
+                        }
+                    } else if let Err(error) = self
+                        .http
+                        .remove_member_role(
+                            guild_id,
+                            member.user.id,
+                            top10_role_id,
+                            Some("Rhombus"),
+                        )
+                        .await
+                    {
+                        tracing::error!(
+                            ?member.user.id,
+                            ?top10_role_id,
+                            ?error,
+                            "Failed to remove role from user",
+                        );
+                    }
+                }
+                Err(error) => {
+                    tracing::error!(?error, "Failed to get member");
+                }
             }
         }
     }
