@@ -33,14 +33,12 @@
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
-            {% with x=team_invite_url %}
-            {% endwith %}
             <h4 class="text-sm">Invite Link</h4>
             <p class="mb-2 text-sm text-muted-foreground">
               Send this invite link to your team members
             </p>
             <div class="flex mb-4 gap-2">
-              {% include "team-token.html" %}
+              {% include "team/team-token.html" %}
               <button
                 class="px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center rounded-md text-sm font-medium whitespace-nowrap ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
                 onclick="copyInviteTokenToClipboard()"
@@ -78,9 +76,7 @@
                 }
               </script>
             </div>
-            {% with x=team, y=max_players, z=lang %}
-            {% endwith %}
-            {% include "team-members.html" %}
+            {% include "team/team-members.html" %}
           {% endcall %}
         {% endcall %}
 
@@ -96,7 +92,7 @@
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
-            {% include "team-divisions.html" %}
+            {% include "team/team-divisions.html" %}
           {% endcall %}
         {% endcall %}
 
@@ -140,8 +136,6 @@
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
-            {% with x=lang %}
-            {% endwith %}
             {% if team.solves | length > 0 %}
               <ol class="flex flex-col gap-2">
                 {% for challenge_id, solve in team.solves | dictsort(by="value", reverse=true) %}

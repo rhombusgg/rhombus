@@ -67,7 +67,7 @@ impl Plugin for DemoPlugin {
             .add_template("head.html", include_str!("../templates/head.html"));
 
         context.templates.add_template(
-            "account-cards.html",
+            "account/account-cards.html",
             include_str!("../templates/account-cards.html"),
         );
 

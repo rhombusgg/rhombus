@@ -27,6 +27,7 @@ use crate::internal::{
     locales::Languages,
     router::RouterState,
     routes::{meta::PageMeta, team::create_team_invite_token},
+    templates::{toast_header, ToastKind},
 };
 
 use super::database::provider::Database;
@@ -165,7 +166,7 @@ pub async fn route_signin(
                     if old_team.users.len() > 1 {
                         let html = state
                             .jinja
-                            .get_template("join-error-existing-team.html")
+                            .get_template("team/join-error-existing-team.html")
                             .unwrap()
                             .render(context! {
                                 global => state.global_page_meta,
@@ -193,7 +194,7 @@ pub async fn route_signin(
                             if new_team.users.len() >= max_players.get() as usize {
                                 let html = state
                                     .jinja
-                                    .get_template("join-error-max.html")
+                                    .get_template("team/join-error-max.html")
                                     .unwrap()
                                     .render(context! {
                                         global => state.global_page_meta,
@@ -579,7 +580,7 @@ pub async fn route_signin_discord_callback(
             crate::internal::database::provider::DiscordUpsertError::AlreadyInUse => {
                 let html = state
                     .jinja
-                    .get_template("discord-taken-error.html")
+                    .get_template("account/discord-taken-error.html")
                     .unwrap()
                     .render(context! {
                         global => state.global_page_meta,
@@ -905,13 +906,17 @@ pub async fn route_signin_email(
 ) -> impl IntoResponse {
     if form.email.is_empty() || form.email.len() > 255 {
         return Response::builder()
-            .body(format!(
-                r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
-                state
-                    .localizer
-                    .localize(&lang, "account-error-email-length", None)
-                    .unwrap(),
-            ))
+            .header(
+                "HX-Trigger",
+                toast_header(
+                    ToastKind::Error,
+                    &state
+                        .localizer
+                        .localize(&lang, "account-error-email-length", None)
+                        .unwrap(),
+                ),
+            )
+            .body("".to_owned())
             .unwrap();
     }
 
@@ -929,26 +934,34 @@ pub async fn route_signin_email(
         .is_err()
     {
         return Response::builder()
-            .body(format!(
-                r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
-                state
-                    .localizer
-                    .localize(&lang, "account-error-signin-email", None)
-                    .unwrap(),
-            ))
+            .header(
+                "HX-Trigger",
+                toast_header(
+                    ToastKind::Error,
+                    &state
+                        .localizer
+                        .localize(&lang, "account-error-signin-email", None)
+                        .unwrap(),
+                ),
+            )
+            .body("".to_owned())
             .unwrap();
     }
 
     tracing::info!(email = form.email, "sent email signin");
 
     Response::builder()
-        .body(format!(
-            r#"<div id="htmx-toaster" data-toast="success" hx-swap-oob="true">{}</div>"#,
-            state
-                .localizer
-                .localize(&lang, "account-check-email", None)
-                .unwrap(),
-        ))
+        .header(
+            "HX-Trigger",
+            toast_header(
+                ToastKind::Success,
+                &state
+                    .localizer
+                    .localize(&lang, "account-check-email", None)
+                    .unwrap(),
+            ),
+        )
+        .body("".to_owned())
         .unwrap()
 }
 
@@ -967,29 +980,35 @@ pub async fn route_signin_credentials(
     let username_graphemes = form.username.graphemes(true).count();
     if !(3..=30).contains(&username_graphemes) || !(0..=256).contains(&form.username.len()) {
         return Response::builder()
-            .body(format!(
-                r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
-                state
-                    .localizer
-                    .localize(&lang, "account-error-name-length", None)
-                    .unwrap(),
-            ))
-            .unwrap()
-            .into_response();
+            .header(
+                "HX-Trigger",
+                toast_header(
+                    ToastKind::Error,
+                    &state
+                        .localizer
+                        .localize(&lang, "account-error-name-length", None)
+                        .unwrap(),
+                ),
+            )
+            .body("".to_owned())
+            .unwrap();
     }
 
     let password_graphemes = form.password.graphemes(true).count();
     if !(8..=256).contains(&password_graphemes) || !(0..=256).contains(&form.password.len()) {
         return Response::builder()
-            .body(format!(
-                r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
-                state
-                    .localizer
-                    .localize(&lang, "account-error-password-length", None)
-                    .unwrap(),
-            ))
-            .unwrap()
-            .into_response();
+            .header(
+                "HX-Trigger",
+                toast_header(
+                    ToastKind::Error,
+                    &state
+                        .localizer
+                        .localize(&lang, "account-error-password-length", None)
+                        .unwrap(),
+                ),
+            )
+            .body("".to_owned())
+            .unwrap();
     }
 
     let avatar = avatar_from_email(&form.username.trim().to_lowercase());
@@ -1001,15 +1020,18 @@ pub async fn route_signin_credentials(
         .unwrap()
     else {
         return Response::builder()
-            .body(format!(
-                r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">{}</div>"#,
-                state
-                    .localizer
-                    .localize(&lang, "account-error-invalid-credentials", None)
-                    .unwrap(),
-            ))
-            .unwrap()
-            .into_response();
+            .header(
+                "HX-Trigger",
+                toast_header(
+                    ToastKind::Error,
+                    &state
+                        .localizer
+                        .localize(&lang, "account-error-invalid-credentials", None)
+                        .unwrap(),
+                ),
+            )
+            .body("".to_owned())
+            .unwrap();
     };
 
     let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar, &state.db).await;
@@ -1019,7 +1041,6 @@ pub async fn route_signin_credentials(
         .header(header::SET_COOKIE, cookie.to_string())
         .body("".to_owned())
         .unwrap()
-        .into_response()
 }
 
 #[derive(Deserialize)]
@@ -1071,7 +1092,7 @@ pub async fn route_signin_email_callback(
     Html(
         state
             .jinja
-            .get_template("email-signin.html")
+            .get_template("account/email-signin.html")
             .unwrap()
             .render(context! {
                 global => state.global_page_meta,

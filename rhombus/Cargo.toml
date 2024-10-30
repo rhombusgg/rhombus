@@ -16,8 +16,9 @@ async-imap = { version = "0.10.1", default-features = false, optional = true, fe
   "runtime-tokio",
 ] }
 async-trait = "0.1.83"
-axum = { version = "0.7.7", features = ["multipart"] }
+axum = { version = "0.7.7", features = ["multipart", "http2"] }
 axum-extra = { version = "0.9.4", features = ["cookie"] }
+base64 = "0.22.1"
 chrono = { version = "0.4.38", features = ["serde"] }
 chrono-tz = "0.10.0"
 config = "0.14.0"

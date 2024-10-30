@@ -336,7 +336,7 @@ pub async fn route_team_og_image(
 
     let svg = state
         .jinja
-        .get_template("og-team.svg")
+        .get_template("team/og-team.svg")
         .unwrap()
         .render(context! {
             site,
@@ -463,7 +463,7 @@ pub async fn route_user_og_image(
 
     let svg = state
         .jinja
-        .get_template("og-user.svg")
+        .get_template("account/og-user.svg")
         .unwrap()
         .render(context! {
             site,

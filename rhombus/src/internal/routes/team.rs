@@ -96,7 +96,7 @@ pub async fn route_team(
     Html(
         state
             .jinja
-            .get_template("team.html")
+            .get_template("team/team.html")
             .unwrap()
             .render(context! {
                 global => state.global_page_meta,
@@ -136,7 +136,7 @@ pub async fn route_team_roll_token(
     Ok(Html(
         state
             .jinja
-            .get_template("team-token.html")
+            .get_template("team/team-token.html")
             .unwrap()
             .render(context! {
                 page,
@@ -197,7 +197,7 @@ pub async fn route_team_set_name(
         }
     }
 
-    let team_name_template = state.jinja.get_template("team-set-name.html").unwrap();
+    let team_name_template = state.jinja.get_template("team/team-set-name.html").unwrap();
 
     if errors.is_empty() {
         let html = team_name_template
@@ -542,7 +542,7 @@ pub async fn route_team_set_division(
 
     let html = state
         .jinja
-        .get_template("team-set-division-partial.html")
+        .get_template("team/team-set-division-partial.html")
         .unwrap()
         .render(context! {
             page,

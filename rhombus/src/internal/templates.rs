@@ -3,7 +3,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use base64::{engine::general_purpose::STANDARD, Engine};
 use rust_embed::RustEmbed;
+use serde_json::json;
 
 #[derive(RustEmbed)]
 #[folder = "templates"]
@@ -103,4 +105,29 @@ impl Templates {
 
         jinja
     }
+}
+
+pub enum ToastKind {
+    Success,
+    Error,
+}
+
+pub fn base64_encode(message: &str) -> String {
+    STANDARD.encode(message.as_bytes())
+}
+
+pub fn toast_header(kind: ToastKind, message: &str) -> String {
+    let message = base64_encode(message);
+    let kind = match kind {
+        ToastKind::Success => "success",
+        ToastKind::Error => "error",
+    };
+
+    json!({
+        "toast": {
+            "kind": kind,
+            "message": message,
+        }
+    })
+    .to_string()
 }
