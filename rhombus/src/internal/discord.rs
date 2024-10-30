@@ -446,15 +446,10 @@ pub async fn ai(ctx: Context<'_>) -> std::result::Result<(), DiscordError> {
     };
 
     let challenge_data = ctx.data().db.get_challenges().await.unwrap();
-    let challenge = challenge_data
-        .challenges
-        .values()
-        .find(|c| c.id == ticket.challenge_id)
-        .unwrap();
+    let challenge = challenge_data.challenges.get(&ticket.challenge_id).unwrap();
     let category = challenge_data
         .categories
-        .values()
-        .find(|c| c.id == challenge.category_id)
+        .get(&challenge.category_id)
         .unwrap();
 
     let ticket_channel_ids = ctx
@@ -1305,11 +1300,7 @@ impl Bot {
         challenge: &Challenge,
         challenge_data: &ChallengeData,
     ) -> Result<()> {
-        let category = challenge_data
-            .categories
-            .values()
-            .find(|category| category.id == challenge.category_id)
-            .unwrap();
+        let category = challenge_data.categories.get(&challenge.id).unwrap();
 
         let author = challenge_data.authors.get(&challenge.author_id).unwrap();
 
