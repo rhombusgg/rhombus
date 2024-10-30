@@ -23,6 +23,7 @@ use crate::internal::{
     },
     router::RouterState,
     routes::meta::PageMeta,
+    templates::{toast_header, ToastKind},
 };
 
 pub fn generate_email_callback_code() -> String {
@@ -119,7 +120,7 @@ pub async fn route_account(
     Html(
         state
             .jinja
-            .get_template("account.html")
+            .get_template("account/account.html")
             .unwrap()
             .render(context! {
                 global => state.global_page_meta,
@@ -155,9 +156,9 @@ pub async fn route_account_add_email(
             .status(StatusCode::BAD_REQUEST)
             .header(
                 "HX-Trigger",
-                format!(
-                    r##"{{"toast":{{"kind":"error","message":"{}"}}}}"##,
-                    state
+                toast_header(
+                    ToastKind::Error,
+                    &state
                         .localizer
                         .localize(&page.lang, "account-error-email-length", None)
                         .unwrap(),
@@ -173,9 +174,9 @@ pub async fn route_account_add_email(
             .status(StatusCode::BAD_REQUEST)
             .header(
                 "HX-Trigger",
-                format!(
-                    r##"{{"toast":{{"kind":"error","message":"{}"}}}}"##,
-                    state
+                toast_header(
+                    ToastKind::Error,
+                    &state
                         .localizer
                         .localize(&page.lang, "account-error-email-already-added", None)
                         .unwrap(),
@@ -195,9 +196,9 @@ pub async fn route_account_add_email(
                 .status(StatusCode::BAD_REQUEST)
                 .header(
                     "HX-Trigger",
-                    format!(
-                        r##"{{"toast":{{"kind":"error","message":"{}"}}}}"##,
-                        state
+                    toast_header(
+                        ToastKind::Error,
+                        &state
                             .localizer
                             .localize(&page.lang, "account-error-verification-email", None)
                             .unwrap(),
@@ -223,9 +224,9 @@ pub async fn route_account_add_email(
                 .status(StatusCode::BAD_REQUEST)
                 .header(
                     "HX-Trigger",
-                    format!(
-                        r##"{{"toast":{{"kind":"error","message":"{}"}}}}"##,
-                        state
+                    toast_header(
+                        ToastKind::Error,
+                        &state
                             .localizer
                             .localize(&page.lang, "account-error-verification-email", None)
                             .unwrap(),
@@ -250,9 +251,9 @@ pub async fn route_account_add_email(
     Response::builder()
         .header(
             "HX-Trigger",
-            format!(
-                r##"{{"toast":{{"kind":"success","message":"{}"}}}}"##,
-                state
+            toast_header(
+                ToastKind::Success,
+                &state
                     .localizer
                     .localize(&page.lang, "account-check-email", None)
                     .unwrap(),
@@ -261,7 +262,7 @@ pub async fn route_account_add_email(
         .body(
             state
                 .jinja
-                .get_template("account-emails.html")
+                .get_template("account/account-emails.html")
                 .unwrap()
                 .render(context! {
                     page,
@@ -299,7 +300,7 @@ pub async fn route_account_email_verify_callback(
     Html(
         state
             .jinja
-            .get_template("email-verify.html")
+            .get_template("account/email-verify.html")
             .unwrap()
             .render(context! {
                 global => state.global_page_meta,
@@ -355,7 +356,7 @@ pub async fn route_account_delete_email(
         .body(
             state
                 .jinja
-                .get_template("account-emails.html")
+                .get_template("account/account-emails.html")
                 .unwrap()
                 .render(context! {
                     page,
@@ -426,7 +427,10 @@ pub async fn route_account_set_name(
         }
     }
 
-    let account_name_template = state.jinja.get_template("account-set-name.html").unwrap();
+    let account_name_template = state
+        .jinja
+        .get_template("account/account-set-name.html")
+        .unwrap();
 
     if errors.is_empty() {
         let html = account_name_template

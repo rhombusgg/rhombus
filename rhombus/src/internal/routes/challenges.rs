@@ -17,6 +17,7 @@ use crate::internal::{
     database::provider::{Challenge, Team},
     router::RouterState,
     routes::meta::PageMeta,
+    templates::{base64_encode, toast_header, ToastKind},
 };
 
 pub async fn route_challenges(
@@ -29,7 +30,7 @@ pub async fn route_challenges(
         if !user.is_admin && chrono::Utc::now() < start_time {
             let html = state
                 .jinja
-                .get_template("locked.html")
+                .get_template("challenges/locked.html")
                 .unwrap()
                 .render(context! {
                     global => state.global_page_meta,
@@ -129,7 +130,7 @@ pub async fn route_challenges(
 
     let html = state
         .jinja
-        .get_template("challenges.html")
+        .get_template("challenges/challenges.html")
         .unwrap()
         .render(context! {
             global => state.global_page_meta,
@@ -264,7 +265,7 @@ pub async fn route_challenge_view(
     Html(
         state
             .jinja
-            .get_template("challenge.html")
+            .get_template("challenges/challenge.html")
             .unwrap()
             .render(context! {
                 global => state.global_page_meta,
@@ -309,10 +310,18 @@ pub async fn route_ticket_view(
     if Utc::now() < next_allowed_ticket_at {
         let minutes_until = (next_allowed_ticket_at - Utc::now()).num_minutes() + 1;
         return Response::builder()
-            .body(format!(
-                r#"<div id="htmx-toaster" data-toast="error" hx-swap-oob="true">You must wait {} minute{} before submitting another ticket.</div>"#,
-                minutes_until, if minutes_until == 1 { "" } else { "s" }
-            ))
+            .header(
+                "HX-Trigger",
+                toast_header(
+                    ToastKind::Error,
+                    &format!(
+                        "You must wait {} minute{} before submitting another ticket.",
+                        minutes_until,
+                        if minutes_until == 1 { "" } else { "s" }
+                    ),
+                ),
+            )
+            .body("".to_owned())
             .unwrap()
             .into_response();
     }
@@ -343,7 +352,7 @@ pub async fn route_ticket_view(
     Html(
         state
             .jinja
-            .get_template("ticket.html")
+            .get_template("challenges/ticket.html")
             .unwrap()
             .render(context! {
                 global => state.global_page_meta,
@@ -420,7 +429,7 @@ pub async fn route_ticket_submit(
     if content.len() > 1000 {
         let html = state
             .jinja
-            .get_template("challenge-submit.html")
+            .get_template("challenges/challenge-submit.html")
             .unwrap()
             .render(context! {
                 page,
@@ -464,16 +473,14 @@ pub async fn route_ticket_submit(
             "HX-Trigger",
             json!({
                 "closeModal": true,
+                "toast": {
+                    "kind": "success",
+                    "message": base64_encode(&state.localizer.localize(&page.lang, "challenges-ticket-submitted", None).unwrap())
+                }
             })
             .to_string(),
         )
-        .body(format!(
-            r#"<div id="htmx-toaster" data-toast="success" hx-swap-oob="true">{}</div>"#,
-            state
-                .localizer
-                .localize(&page.lang, "challenges-ticket-submitted", None)
-                .unwrap()
-        ))
+        .body("".to_owned())
         .unwrap()
         .into_response()
 }
@@ -521,7 +528,7 @@ pub async fn route_challenge_submit(
         Ok(false) => {
             let html = state
                 .jinja
-                .get_template("challenge-submit.html")
+                .get_template("challenges/challenge-submit.html")
                 .unwrap()
                 .render(context! {
                     page,
@@ -536,7 +543,7 @@ pub async fn route_challenge_submit(
         Err(error) => {
             let html = state
                 .jinja
-                .get_template("challenge-submit.html")
+                .get_template("challenges/challenge-submit.html")
                 .unwrap()
                 .render(context! {
                     page,
@@ -554,7 +561,7 @@ pub async fn route_challenge_submit(
         if now > end_time {
             let html = state
                 .jinja
-                .get_template("challenge-submit.html")
+                .get_template("challenges/challenge-submit.html")
                 .unwrap()
                 .render(context! {
                     page,
@@ -577,7 +584,7 @@ pub async fn route_challenge_submit(
     if num_solves >= 3 {
         let html = state
             .jinja
-            .get_template("challenge-submit.html")
+            .get_template("challenges/challenge-submit.html")
             .unwrap()
             .render(context! {
                 page,
@@ -628,7 +635,7 @@ pub async fn route_challenge_submit(
         tracing::error!("{:#?}", error);
         let html = state
             .jinja
-            .get_template("challenge-submit.html")
+            .get_template("challenges/challenge-submit.html")
             .unwrap()
             .render(context! {
                 page,
@@ -707,16 +714,14 @@ pub async fn route_challenge_submit(
             json!({
                 "manualRefresh": true,
                 "closeModal": true,
+                "toast": {
+                    "kind": "success",
+                    "message": base64_encode(&state.localizer.localize(&page.lang, "challenges-challenge-solved", None).unwrap())
+                }
             })
             .to_string(),
         )
-        .body(format!(
-            r#"<div id="htmx-toaster" data-toast="success" hx-swap-oob="true">{}</div>"#,
-            state
-                .localizer
-                .localize(&page.lang, "challenges-challenge-solved", None)
-                .unwrap(),
-        ))
+        .body("".to_owned())
         .unwrap()
 }
 
@@ -745,7 +750,7 @@ pub async fn route_writeup_submit(
     if form.url.len() > 256 {
         let html = state
             .jinja
-            .get_template("challenge-submit.html")
+            .get_template("challenges/challenge-submit.html")
             .unwrap()
             .render(context! {
                 page,
@@ -764,7 +769,7 @@ pub async fn route_writeup_submit(
     if url.is_err() {
         let html = state
             .jinja
-            .get_template("challenge-submit.html")
+            .get_template("challenges/challenge-submit.html")
             .unwrap()
             .render(context! {
                 page,
@@ -791,7 +796,7 @@ pub async fn route_writeup_submit(
     if response.is_err() {
         let html = state
             .jinja
-            .get_template("challenge-submit.html")
+            .get_template("challenges/challenge-submit.html")
             .unwrap()
             .render(context! {
                 page,
@@ -811,7 +816,7 @@ pub async fn route_writeup_submit(
     if !response.status().is_success() {
         let html = state
             .jinja
-            .get_template("challenge-submit.html")
+            .get_template("challenges/challenge-submit.html")
             .unwrap()
             .render(context! {
                 page,

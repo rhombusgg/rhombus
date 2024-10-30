@@ -553,11 +553,12 @@ const ChallengesComponent = ({
                               </Tooltip.Portal>
                               <Tooltip.Trigger as="span" class="cursor-pointer">
                                 {translate("solves-points", {
-                                  solves: challenge.division_solves.find(
-                                    (division_solves) =>
-                                      division_solves.division_id ===
-                                      data().division_id,
-                                  ).solves,
+                                  solves:
+                                    challenge.division_solves.find(
+                                      (division_solves) =>
+                                        division_solves.division_id ===
+                                        data().division_id,
+                                    )?.solves || 0,
                                   points: solve?.points || challenge.points,
                                 })}
                               </Tooltip.Trigger>
@@ -775,10 +776,18 @@ document.addEventListener("DOMContentLoaded", () => {
     (
       evt: Event & { detail: { kind: "success" | "error"; message: string } },
     ) => {
+      const binaryString = atob(evt.detail.message);
+      let bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const decoder = new TextDecoder("utf-8");
+      const message = decoder.decode(bytes);
+
       if (evt.detail.kind === "success") {
-        toast.success(evt.detail.message);
+        toast.success(message);
       } else if (evt.detail.kind === "error") {
-        toast.error(evt.detail.message);
+        toast.error(message);
       } else {
         console.log("Unknown toast kind", evt.detail.kind);
       }

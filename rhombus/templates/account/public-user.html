@@ -59,8 +59,6 @@
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
-            {% with x=lang %}
-            {% endwith %}
             {% if public_team.solves | length > 0 %}
               <ol class="flex flex-col gap-2">
                 {% for challenge_id, solve in public_team.solves | dictsort(by="value", reverse=true) %}

@@ -18,15 +18,9 @@
           {% call card.root() %}
             {% call card.header() %}
               {% call card.title() %}
-                {% with minijinja_lift=lang %}
-                {% endwith %}
-
                 {{ t("account-discord-integration") }}
               {% endcall %}
               {% call card.description() %}
-                {% with minijinja_lift=lang %}
-                {% endwith %}
-
                 {{ t("account-discord-integration-description") }}
               {% endcall %}
             {% endcall %}
@@ -113,7 +107,7 @@
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
-            {% include "account-emails.html" %}
+            {% include "account/account-emails.html" %}
             <form
               class="flex gap-2"
               hx-post="/account/email"
@@ -169,7 +163,7 @@
             <div></div>
           {% endcall %}
         {% endcall %}
-        {% include "account-cards.html" %}
+        {% include "account/account-cards.html" %}
       </div>
       <div>
         {% call card.root() %}
@@ -182,8 +176,6 @@
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
-            {% with x=lang %}
-            {% endwith %}
             {% if team.solves | length > 0 %}
               <ol class="flex flex-col gap-2">
                 {% for challenge_id, solve in team.solves | dictsort(by="value", reverse=true) %}

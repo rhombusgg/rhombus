@@ -42,7 +42,7 @@ pub async fn route_public_user(
     Html(
         state
             .jinja
-            .get_template("public-user.html")
+            .get_template("account/public-user.html")
             .unwrap()
             .render(context! {
                 global => state.global_page_meta,
@@ -93,7 +93,7 @@ pub async fn route_public_team(
     Html(
         state
             .jinja
-            .get_template("public-team.html")
+            .get_template("team/public-team.html")
             .unwrap()
             .render(context! {
                 global => state.global_page_meta,

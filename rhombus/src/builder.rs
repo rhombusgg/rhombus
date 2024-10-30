@@ -805,6 +805,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
             };
 
             let divisions = Arc::new(divisions);
+            cached_db.insert_divisions(&divisions).await?;
 
             let ip_extractor = match self_arc.ip_extractor.clone() {
                 Some(ip_extractor) => Some(ip_extractor),
@@ -958,8 +959,6 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 });
             }
             healthcheck_runner(Arc::downgrade(&cached_db));
-
-            cached_db.insert_divisions(&divisions).await?;
 
             let global_page_meta = Arc::new(GlobalPageMeta {
                 title: settings.read().await.title.clone(),
