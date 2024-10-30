@@ -46,7 +46,7 @@ pub struct RunContext<'a, U: UploadProvider> {
 
     pub score_type_map: &'a Arc<Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>>,
 
-    pub flag_fn_map: &'a Arc<Mutex<BTreeMap<i64, Box<dyn ChallengeFlag + Send + Sync>>>>,
+    pub flag_fn_map: &'a Arc<Mutex<BTreeMap<String, Box<dyn ChallengeFlag + Send + Sync>>>>,
 }
 
 pub struct UploadProviderContext<'a> {

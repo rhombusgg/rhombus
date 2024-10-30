@@ -146,7 +146,7 @@ impl Database for DbCache {
 
     async fn set_challenge_health(
         &self,
-        challenge_id: i64,
+        challenge_id: &str,
         healthy: Option<bool>,
         checked_at: DateTime<Utc>,
     ) -> Result<()> {
@@ -157,7 +157,7 @@ impl Database for DbCache {
         if let Some(ref mut cached) = &mut *CHALLENGES_CACHE.write().await {
             let mut challenges = cached.challenges.clone();
             if let Some(challenge) = challenges
-                .iter_mut()
+                .values_mut()
                 .find(|challenge| challenge.id == challenge_id)
             {
                 challenge.healthy = healthy;
@@ -275,7 +275,7 @@ impl Database for DbCache {
         &self,
         user_id: i64,
         team_id: i64,
-        division_id: i64,
+        division_id: &str,
         solved_challenge: &Challenge,
         next_points: i64,
     ) -> Result<()> {
@@ -293,10 +293,10 @@ impl Database for DbCache {
             if let Some(ref mut cached) = &mut *CHALLENGES_CACHE.write().await {
                 let mut challenges = cached.challenges.clone();
                 if let Some(challenge) = challenges
-                    .iter_mut()
+                    .values_mut()
                     .find(|challenge| challenge.id == solved_challenge.id)
                 {
-                    *challenge.division_solves.get_mut(&division_id).unwrap() += 1;
+                    *challenge.division_solves.get_mut(division_id).unwrap() += 1;
                     challenge.points = next_points;
                 }
                 *cached = Arc::new(ChallengeData {
@@ -352,7 +352,7 @@ impl Database for DbCache {
         &self,
         ticket_number: u64,
         user_id: i64,
-        challenge_id: i64,
+        challenge_id: &str,
         discord_channel_id: NonZeroU64,
         panel_discord_message_id: NonZeroU64,
     ) -> Result<()> {
@@ -387,7 +387,7 @@ impl Database for DbCache {
     async fn close_tickets_for_challenge(
         &self,
         user_id: i64,
-        challenge_id: i64,
+        challenge_id: &str,
         time: DateTime<Utc>,
     ) -> Result<Vec<ToBeClosedTicket>> {
         self.inner
@@ -397,7 +397,7 @@ impl Database for DbCache {
 
     async fn get_discord_ticket_channel_ids_for_challenge(
         &self,
-        challenge_id: i64,
+        challenge_id: &str,
     ) -> Result<Vec<u64>> {
         self.inner
             .get_discord_ticket_channel_ids_for_challenge(challenge_id)
@@ -431,11 +431,11 @@ impl Database for DbCache {
         self.inner.load_settings(settings).await
     }
 
-    async fn get_scoreboard(&self, division_id: i64) -> Result<Scoreboard> {
+    async fn get_scoreboard(&self, division_id: &str) -> Result<Scoreboard> {
         get_scoreboard(&self.inner, division_id).await
     }
 
-    async fn get_leaderboard(&self, division_id: i64, page: Option<u64>) -> Result<Leaderboard> {
+    async fn get_leaderboard(&self, division_id: &str, page: Option<u64>) -> Result<Leaderboard> {
         get_leaderboard(&self.inner, division_id, page).await
     }
 
@@ -506,8 +506,8 @@ impl Database for DbCache {
     async fn set_team_division(
         &self,
         team_id: i64,
-        old_division_id: i64,
-        new_division_id: i64,
+        old_division_id: &str,
+        new_division_id: &str,
         now: DateTime<Utc>,
     ) -> Result<()> {
         let result = self
@@ -517,7 +517,7 @@ impl Database for DbCache {
         if result.is_ok() {
             TEAM_CACHE.alter(&team_id, |_, v| TimedCache {
                 value: Arc::new(TeamInner {
-                    division_id: new_division_id,
+                    division_id: new_division_id.to_owned(),
                     last_division_change: Some(now),
                     id: v.value.id,
                     name: v.value.name.clone(),
@@ -539,11 +539,11 @@ impl Database for DbCache {
                 let team = self.get_team_from_id(team_id).await?;
                 for (challenge_id, _) in team.solves.iter() {
                     if let Some(challenge) = challenges
-                        .iter_mut()
+                        .values_mut()
                         .find(|challenge| challenge.id == *challenge_id)
                     {
-                        *challenge.division_solves.get_mut(&new_division_id).unwrap() += 1;
-                        *challenge.division_solves.get_mut(&old_division_id).unwrap() -= 1;
+                        *challenge.division_solves.get_mut(new_division_id).unwrap() += 1;
+                        *challenge.division_solves.get_mut(old_division_id).unwrap() -= 1;
                     }
                 }
 
@@ -569,7 +569,7 @@ impl Database for DbCache {
     async fn get_team_standing(
         &self,
         team_id: i64,
-        division_id: i64,
+        division_id: &str,
     ) -> Result<Option<TeamStanding>> {
         get_team_standing(&self.inner, team_id, division_id).await
     }
@@ -675,10 +675,10 @@ pub async fn get_writeups_from_user_id(db: &Connection, user_id: i64) -> Result<
     writeups
 }
 
-pub static SCOREBOARD_CACHE: LazyLock<DashMap<i64, Scoreboard>> = LazyLock::new(DashMap::new);
+pub static SCOREBOARD_CACHE: LazyLock<DashMap<String, Scoreboard>> = LazyLock::new(DashMap::new);
 
-pub async fn get_scoreboard(db: &Connection, division_id: i64) -> Result<Scoreboard> {
-    if let Some(scoreboard) = SCOREBOARD_CACHE.get(&division_id) {
+pub async fn get_scoreboard(db: &Connection, division_id: &str) -> Result<Scoreboard> {
+    if let Some(scoreboard) = SCOREBOARD_CACHE.get(division_id) {
         return Ok(scoreboard.clone());
     }
     tracing::trace!(division_id, "cache miss: get_scoreboard");
@@ -686,20 +686,20 @@ pub async fn get_scoreboard(db: &Connection, division_id: i64) -> Result<Scorebo
     let scoreboard = db.get_scoreboard(division_id).await;
 
     if let Ok(scoreboard) = &scoreboard {
-        SCOREBOARD_CACHE.insert(division_id, scoreboard.clone());
+        SCOREBOARD_CACHE.insert(division_id.to_owned(), scoreboard.clone());
     }
     scoreboard
 }
 
-pub static LEADERBOARD_CACHE: LazyLock<DashMap<(i64, Option<u64>), Leaderboard>> =
+pub static LEADERBOARD_CACHE: LazyLock<DashMap<(String, Option<u64>), Leaderboard>> =
     LazyLock::new(DashMap::new);
 
 pub async fn get_leaderboard(
     db: &Connection,
-    division_id: i64,
+    division_id: &str,
     page: Option<u64>,
 ) -> Result<Leaderboard> {
-    if let Some(leaderboard) = LEADERBOARD_CACHE.get(&(division_id, page)) {
+    if let Some(leaderboard) = LEADERBOARD_CACHE.get(&(division_id.to_owned(), page)) {
         return Ok(leaderboard.clone());
     }
     tracing::trace!(division_id, page, "cache miss: get_leaderboard");
@@ -707,7 +707,7 @@ pub async fn get_leaderboard(
     let leaderboard = db.get_leaderboard(division_id, page).await;
 
     if let Ok(leaderboard) = &leaderboard {
-        LEADERBOARD_CACHE.insert((division_id, page), leaderboard.clone());
+        LEADERBOARD_CACHE.insert((division_id.to_owned(), page), leaderboard.clone());
     }
     leaderboard
 }
@@ -735,7 +735,7 @@ pub static TEAM_STANDINGS: LazyLock<DashMap<i64, TimedCache<Option<TeamStanding>
 pub async fn get_team_standing(
     db: &Connection,
     team_id: i64,
-    division_id: i64,
+    division_id: &str,
 ) -> Result<Option<TeamStanding>> {
     if let Some(standing) = TEAM_STANDINGS.get(&team_id) {
         return Ok(standing.value.clone());

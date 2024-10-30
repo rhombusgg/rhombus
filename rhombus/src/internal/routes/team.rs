@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use axum::{
     extract::{Path, State},
     response::{Html, IntoResponse, Response},
@@ -25,7 +23,7 @@ pub fn create_team_invite_token() -> String {
 
 #[derive(Debug, Serialize)]
 pub struct TeamDivision<'a> {
-    pub id: i64,
+    pub id: String,
     pub name: &'a str,
     pub description: &'a str,
     pub eligible: bool,
@@ -47,23 +45,13 @@ pub async fn route_team(
 
     let standing = state
         .db
-        .get_team_standing(user.team_id, team.division_id)
+        .get_team_standing(user.team_id, &team.division_id)
         .await
         .unwrap();
 
     let location_url = state.settings.read().await.location_url.clone();
 
     let team_invite_url = format!("{}/signin?token={}", location_url, team.invite_token);
-
-    let mut challenges = BTreeMap::new();
-    for challenge in &challenge_data.challenges {
-        challenges.insert(challenge.id, challenge);
-    }
-
-    let mut categories = BTreeMap::new();
-    for category in &challenge_data.categories {
-        categories.insert(category.id, category);
-    }
 
     let mut divisions = vec![];
     for division in state.divisions.iter() {
@@ -82,7 +70,7 @@ pub async fn route_team(
         let joined = team.division_id == division.id;
 
         divisions.push(TeamDivision {
-            id: division.id,
+            id: division.id.clone(),
             name: &division.name,
             description: &division.description,
             eligible: eligible.is_ok() && oversized,
@@ -121,8 +109,8 @@ pub async fn route_team(
                 max_players,
                 now,
                 minutes_until_division_change => team.last_division_change.map(|t| ((t + chrono::Duration::minutes(60)) - now).num_minutes() + 1),
-                challenges,
-                categories,
+                challenges => challenge_data.challenges,
+                categories => challenge_data.categories,
                 divisions,
                 standing,
                 division_id => team.division_id,
@@ -282,14 +270,14 @@ pub async fn route_user_kick(
             {
                 let old_team_top_10 = state
                     .db
-                    .get_team_standing(old_team.id, old_team.division_id)
+                    .get_team_standing(old_team.id, &old_team.division_id)
                     .await
                     .unwrap()
                     .map(|standing| standing.rank <= 10)
                     .unwrap_or(false);
                 let new_team_top_10 = state
                     .db
-                    .get_team_standing(new_team.id, new_team.division_id)
+                    .get_team_standing(new_team.id, &new_team.division_id)
                     .await
                     .unwrap()
                     .map(|standing| standing.rank <= 10)
@@ -366,14 +354,14 @@ pub async fn route_user_kick(
         {
             let old_team_top_10 = state
                 .db
-                .get_team_standing(team.id, team.division_id)
+                .get_team_standing(team.id, &team.division_id)
                 .await
                 .unwrap()
                 .map(|standing| standing.rank <= 10)
                 .unwrap_or(false);
             let new_team_top_10 = state
                 .db
-                .get_team_standing(new_team.id, new_team.division_id)
+                .get_team_standing(new_team.id, &new_team.division_id)
                 .await
                 .unwrap()
                 .map(|standing| standing.rank <= 10)
@@ -401,7 +389,7 @@ pub async fn route_team_set_division(
     state: State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
-    Path(division_id): Path<i64>,
+    Path(division_id): Path<String>,
 ) -> impl IntoResponse {
     if !user.is_team_owner {
         return Response::builder()
@@ -474,7 +462,7 @@ pub async fn route_team_set_division(
 
     state
         .db
-        .set_team_division(team.id, team.division_id, division_id, now)
+        .set_team_division(team.id, &team.division_id, &division_id, now)
         .await
         .unwrap();
 
@@ -510,7 +498,7 @@ pub async fn route_team_set_division(
 
     let standing = state
         .db
-        .get_team_standing(user.team_id, division_id)
+        .get_team_standing(user.team_id, &division_id)
         .await
         .unwrap();
 
@@ -531,7 +519,7 @@ pub async fn route_team_set_division(
         let joined = division_id == division.id;
 
         divisions.push(TeamDivision {
-            id: division.id,
+            id: division.id.clone(),
             name: &division.name,
             description: &division.description,
             eligible: eligible.is_ok() && oversized,

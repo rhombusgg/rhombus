@@ -8,7 +8,7 @@ pub async fn healthcheck_catch_up(db: Connection) {
     tracing::info!("Running healthcheck catch-up");
     let challenges = db.get_challenges().await.unwrap();
 
-    for challenge in &challenges.challenges {
+    for challenge in challenges.challenges.values() {
         if challenge.healthscript.is_none() {
             continue;
         }
@@ -26,7 +26,7 @@ pub async fn healthcheck_catch_up(db: Connection) {
         };
 
         _ = db
-            .set_challenge_health(challenge.id, healthy, chrono::Utc::now())
+            .set_challenge_health(&challenge.id, healthy, chrono::Utc::now())
             .await;
 
         tracing::trace!(challenge_id = challenge.id, challenge_name = challenge.name, healthy = ?healthy, "Healthcheck catch-up");
@@ -47,7 +47,7 @@ pub fn healthcheck_runner(db: WeakConnection) {
 
             if let Some(challenge) = challenges
                 .challenges
-                .iter()
+                .values()
                 .filter(|challenge| challenge.healthscript.is_some())
                 .min_by_key(|challenge| {
                     challenge
@@ -64,7 +64,7 @@ pub fn healthcheck_runner(db: WeakConnection) {
                 };
 
                 _ = db
-                    .set_challenge_health(challenge.id, healthy, chrono::Utc::now())
+                    .set_challenge_health(&challenge.id, healthy, chrono::Utc::now())
                     .await;
 
                 tracing::trace!(challenge_id = challenge.id, challenge_name = challenge.name, healthy = ?healthy, "Healthcheck");

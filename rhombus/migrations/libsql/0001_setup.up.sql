@@ -3,15 +3,15 @@ PRAGMA journal_mode=WAL;
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS rhombus_challenge (
-    id INTEGER PRIMARY KEY NOT NULL,
+    id TEXT PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
     description TEXT NOT NULL,
     flag TEXT NOT NULL,
-    category_id INTEGER NOT NULL,
-    author_id INTEGER NOT NULL,
+    category_id TEXT NOT NULL,
+    author_id TEXT NOT NULL,
     ticket_template TEXT,
     healthscript TEXT,
-    healthy BOOLEAN,
+    healthy INTEGER, -- 0 or 1
     last_healthcheck INTEGER,
     score_type TEXT NOT NULL,
     metadata TEXT,
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS rhombus_challenge (
 );
 
 CREATE TABLE IF NOT EXISTS rhombus_file_attachment (
-    challenge_id INTEGER NOT NULL,
+    challenge_id TEXT NOT NULL,
     name TEXT NOT NULL,
     url TEXT NOT NULL,
     hash TEXT,
@@ -37,14 +37,14 @@ CREATE TABLE IF NOT EXISTS rhombus_file (
 );
 
 CREATE TABLE IF NOT EXISTS rhombus_division (
-    id INTEGER PRIMARY KEY NOT NULL,
+    id TEXT PRIMARY KEY NOT NULL,
     name TEXT NOT NULL UNIQUE,
     description TEXT NOT NULL,
-    is_default BOOLEAN NOT NULL DEFAULT(FALSE)
+    is_default INTEGER NOT NULL DEFAULT(FALSE) -- 0 or 1
 );
 
 CREATE TABLE IF NOT EXISTS rhombus_author (
-    id INTEGER PRIMARY KEY NOT NULL,
+    id TEXT PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
     avatar TEXT NOT NULL,
     discord_id INTEGER NOT NULL
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS rhombus_author (
 
 CREATE TABLE IF NOT EXISTS rhombus_points_snapshot (
     team_id INTEGER NOT NULL,
-    division_id INTEGER NOT NULL,
+    division_id TEXT NOT NULL,
     at INTEGER NOT NULL DEFAULT(strftime('%s', 'now')),
     points INTEGER NOT NULL,
     PRIMARY KEY (team_id, division_id, at),
@@ -61,14 +61,14 @@ CREATE TABLE IF NOT EXISTS rhombus_points_snapshot (
 );
 
 CREATE TABLE IF NOT EXISTS rhombus_category (
-    id INTEGER PRIMARY KEY NOT NULL,
+    id TEXT PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
     color TEXT NOT NULL,
     sequence INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS rhombus_solve (
-    challenge_id INTEGER NOT NULL,
+    challenge_id TEXT NOT NULL,
     user_id INTEGER NOT NULL,
     team_id INTEGER NOT NULL,
     solved_at INTEGER NOT NULL DEFAULT(strftime('%s', 'now')),
@@ -88,8 +88,8 @@ CREATE TABLE IF NOT EXISTS rhombus_user (
     password TEXT,
     team_id INTEGER NOT NULL,
     owner_team_id INTEGER NOT NULL,
-    disabled BOOLEAN NOT NULL DEFAULT(FALSE),
-    is_admin BOOLEAN NOT NULL DEFAULT(FALSE),
+    disabled INTEGER NOT NULL DEFAULT(FALSE), -- 0 or 1
+    is_admin INTEGER NOT NULL DEFAULT(FALSE), -- 0 or 1
     FOREIGN KEY (team_id) REFERENCES rhombus_team(id),
     FOREIGN KEY (owner_team_id) REFERENCES rhombus_team(id) ON DELETE CASCADE
 );
@@ -129,7 +129,7 @@ END;
 
 CREATE TABLE IF NOT EXISTS rhombus_writeup (
     user_id INTEGER NOT NULL,
-    challenge_id INTEGER NOT NULL,
+    challenge_id TEXT NOT NULL,
     url TEXT NOT NULL,
     PRIMARY KEY (user_id, challenge_id),
     FOREIGN KEY (user_id) REFERENCES rhombus_user(id),
@@ -141,7 +141,7 @@ CREATE TABLE IF NOT EXISTS rhombus_team (
     name TEXT NOT NULL UNIQUE,
     invite_token TEXT NOT NULL,
     ctftime_id INTEGER UNIQUE,
-    division_id INTEGER NOT NULL,
+    division_id TEXT NOT NULL,
     last_division_change INTEGER,
     FOREIGN KEY (division_id) REFERENCES rhombus_division(id)
 );
@@ -161,7 +161,7 @@ CREATE TABLE IF NOT EXISTS rhombus_team_historical_names (
 CREATE TABLE IF NOT EXISTS rhombus_ticket (
     ticket_number INTEGER NOT NULL UNIQUE,
     user_id INTEGER NOT NULL,
-    challenge_id INTEGER NOT NULL,
+    challenge_id TEXT NOT NULL,
     opened_at INTEGER NOT NULL DEFAULT(strftime('%s', 'now')),
     closed_at INTEGER,
     discord_channel_id INTEGER NOT NULL UNIQUE,
@@ -175,7 +175,7 @@ CREATE TABLE IF NOT EXISTS rhombus_ticket (
 CREATE TABLE IF NOT EXISTS rhombus_ticket_email_message_id_reference (
     message_id TEXT NOT NULL,
     ticket_number INTEGER NOT NULL,
-    user_sent BOOLEAN NOT NULL DEFAULT(FALSE),
+    user_sent INTEGER NOT NULL DEFAULT(FALSE), -- 0 or 1
     PRIMARY KEY (message_id),
     FOREIGN KEY (ticket_number) REFERENCES rhombus_ticket(ticket_number)
 );
@@ -183,6 +183,7 @@ CREATE TABLE IF NOT EXISTS rhombus_ticket_email_message_id_reference (
 CREATE TABLE IF NOT EXISTS rhombus_ticket_number_counter (
     ticket_number INTEGER NOT NULL
 );
+
 INSERT OR IGNORE INTO rhombus_ticket_number_counter (ticket_number) VALUES (0);
 
 CREATE TABLE IF NOT EXISTS rhombus_config (

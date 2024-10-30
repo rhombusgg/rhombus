@@ -446,21 +446,16 @@ pub async fn ai(ctx: Context<'_>) -> std::result::Result<(), DiscordError> {
     };
 
     let challenge_data = ctx.data().db.get_challenges().await.unwrap();
-    let challenge = challenge_data
-        .challenges
-        .iter()
-        .find(|c| c.id == ticket.challenge_id)
-        .unwrap();
+    let challenge = challenge_data.challenges.get(&ticket.challenge_id).unwrap();
     let category = challenge_data
         .categories
-        .iter()
-        .find(|c| c.id == challenge.category_id)
+        .get(&challenge.category_id)
         .unwrap();
 
     let ticket_channel_ids = ctx
         .data()
         .db
-        .get_discord_ticket_channel_ids_for_challenge(ticket.challenge_id)
+        .get_discord_ticket_channel_ids_for_challenge(&ticket.challenge_id)
         .await?;
 
     let mut chats = vec![];
@@ -814,7 +809,7 @@ async fn event_handler(
             {
                 let standing = data
                     .db
-                    .get_team_standing(user.team_id, team.division_id)
+                    .get_team_standing(user.team_id, &team.division_id)
                     .await
                     .unwrap();
 
@@ -1226,7 +1221,7 @@ impl Bot {
             .create_ticket(
                 ticket_number,
                 user.id,
-                challenge.id,
+                &challenge.id,
                 thread.id.into(),
                 panel_message.id.into(),
             )
@@ -1305,11 +1300,7 @@ impl Bot {
         challenge: &Challenge,
         challenge_data: &ChallengeData,
     ) -> Result<()> {
-        let category = challenge_data
-            .categories
-            .iter()
-            .find(|category| category.id == challenge.category_id)
-            .unwrap();
+        let category = challenge_data.categories.get(&challenge.id).unwrap();
 
         let author = challenge_data.authors.get(&challenge.author_id).unwrap();
 

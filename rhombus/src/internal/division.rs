@@ -61,7 +61,7 @@ impl DivisionEligible for OpenDivisionEligibilityProvider {
 
 #[derive(Serialize, Clone)]
 pub struct Division {
-    pub id: i64,
+    pub id: String,
     pub name: String,
     pub description: String,
     pub max_players: MaxDivisionPlayers,

@@ -26,11 +26,11 @@ pub async fn route_command_palette_items(
 
         let challenges = challenge_data
             .categories
-            .iter()
+            .values()
             .map(|category| {
                 let challenges = challenge_data
                     .challenges
-                    .iter()
+                    .values()
                     .filter(|challenge| challenge.category_id == category.id)
                     .map(|challenge| challenge.name.clone())
                     .collect::<Value>();

@@ -67,7 +67,7 @@ pub async fn route_challenges(
     let challenge_json = json!({
         "division_id": team.division_id,
         "ticket_enabled": ticket_enabled,
-        "challenges": challenge_data.challenges.iter().map(|challenge| json!({
+        "challenges": challenge_data.challenges.values().map(|challenge| json!({
             "id": challenge.id,
             "name": challenge.name,
             "description": challenge.description,
@@ -91,20 +91,20 @@ pub async fn route_challenges(
                 "url": attachment.url,
             })).collect::<serde_json::Value>(),
         })).collect::<serde_json::Value>(),
-        "categories": challenge_data.categories.iter().map(|category| json!({
+        "categories": challenge_data.categories.values().map(|category| json!({
             "id": category.id,
             "name": category.name,
             "color": category.color,
         })).collect::<serde_json::Value>(),
-        "authors": challenge_data.authors.iter().map(|author|
-            (author.0.to_string(), json!({
-                "name": author.1.name,
-                "avatar_url": author.1.avatar_url,
+        "authors": challenge_data.authors.values().map(|author|
+            (author.id.clone(), json!({
+                "name": author.name,
+                "avatar_url": author.avatar_url,
             }))
         ).collect::<serde_json::Value>(),
-        "divisions": challenge_data.divisions.iter().map(|division|
-            (division.0.to_string(), json!({
-                "name": division.1.name,
+        "divisions": challenge_data.divisions.values().map(|division|
+            (division.id.clone(), json!({
+                "name": division.name,
             }))
         ).collect::<serde_json::Value>(),
         "team": json!({
@@ -114,11 +114,11 @@ pub async fn route_challenges(
                     "avatar_url": user.1.avatar_url,
                 }))
             ).collect::<serde_json::Value>(),
-            "solves": team.solves.iter().map(|solve|
-                (solve.0.to_string(), json!({
-                    "solved_at": solve.1.solved_at,
-                    "user_id": solve.1.user_id,
-                    "points": solve.1.points,
+            "solves": team.solves.iter().map(|(challenge_id, solve)|
+                (challenge_id.to_string(), json!({
+                    "solved_at": solve.solved_at,
+                    "user_id": solve.user_id,
+                    "points": solve.points,
                 }))
             ).collect::<serde_json::Value>(),
         })
@@ -230,7 +230,7 @@ pub async fn route_challenge_view(
     state: State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
-    challenge_id: Path<i64>,
+    Path(challenge_id): Path<String>,
 ) -> impl IntoResponse {
     if let Some(start_time) = state.settings.read().await.start_time {
         if !user.is_admin && chrono::Utc::now() < start_time {
@@ -251,15 +251,10 @@ pub async fn route_challenge_view(
     let team = team.unwrap();
     let user_writeups = user_writeups.unwrap();
 
-    let challenge = challenge_data
-        .challenges
-        .iter()
-        .find(|c| challenge_id.eq(&c.id))
-        .unwrap();
+    let challenge = challenge_data.challenges.get(&challenge_id).unwrap();
     let category = challenge_data
         .categories
-        .iter()
-        .find(|c| challenge.category_id.eq(&c.id))
+        .get(&challenge.category_id)
         .unwrap();
 
     Html(
@@ -286,7 +281,7 @@ pub async fn route_ticket_view(
     state: State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
-    challenge_id: Path<i64>,
+    Path(challenge_id): Path<String>,
 ) -> impl IntoResponse {
     if let Some(start_time) = state.settings.read().await.start_time {
         if !user.is_admin && chrono::Utc::now() < start_time {
@@ -332,15 +327,10 @@ pub async fn route_ticket_view(
     let challenge_data = challenge_data.unwrap();
     let team = team.unwrap();
 
-    let challenge = challenge_data
-        .challenges
-        .iter()
-        .find(|c| challenge_id.eq(&c.id))
-        .unwrap();
+    let challenge = challenge_data.challenges.get(&challenge_id).unwrap();
     let category = challenge_data
         .categories
-        .iter()
-        .find(|c| challenge.category_id.eq(&c.id))
+        .get(&challenge.category_id)
         .unwrap();
 
     let ticket_template = if let Some(ticket_template) = &challenge.ticket_template {
@@ -377,7 +367,7 @@ pub async fn route_ticket_submit(
     state: State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
-    challenge_id: Path<i64>,
+    Path(challenge_id): Path<String>,
     Form(form): Form<TicketSubmit>,
 ) -> impl IntoResponse {
     if let Some(start_time) = state.settings.read().await.start_time {
@@ -451,11 +441,7 @@ pub async fn route_ticket_submit(
     let challenge_data = challenge_data.unwrap();
     let team = team.unwrap();
 
-    let challenge = challenge_data
-        .challenges
-        .iter()
-        .find(|c| challenge_id.eq(&c.id))
-        .unwrap();
+    let challenge = challenge_data.challenges.get(&challenge_id).unwrap();
 
     let author = challenge_data.authors.get(&challenge.author_id).unwrap();
 
@@ -496,7 +482,7 @@ pub async fn route_challenge_submit(
     state: State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
-    challenge_id: Path<i64>,
+    Path(challenge_id): Path<String>,
     Form(form): Form<SubmitChallenge>,
 ) -> impl IntoResponse {
     let now = chrono::Utc::now();
@@ -511,11 +497,7 @@ pub async fn route_challenge_submit(
     }
 
     let challenge_data = state.db.get_challenges().await.unwrap();
-    let challenge = challenge_data
-        .challenges
-        .iter()
-        .find(|c| challenge_id.eq(&c.id))
-        .unwrap();
+    let challenge = challenge_data.challenges.get(&challenge_id).unwrap();
 
     let correct_flag = if let Some(custom) = state.flag_fn_map.lock().await.get(&challenge_id) {
         custom.correct_flag(challenge, &form.flag).await
@@ -629,7 +611,7 @@ pub async fn route_challenge_submit(
 
     if let Err(error) = state
         .db
-        .solve_challenge(user.id, team.id, team.division_id, challenge, next_points)
+        .solve_challenge(user.id, team.id, &team.division_id, challenge, next_points)
         .await
     {
         tracing::error!("{:#?}", error);
@@ -658,10 +640,10 @@ pub async fn route_challenge_submit(
             let bot = bot.clone();
             let db = state.db.clone();
             let user_id = user.id;
-            let challenge_id = challenge.id;
+            let challenge_id = challenge.id.clone();
             tokio::task::spawn(async move {
                 if let Ok(to_be_closed_tickets) = db
-                    .close_tickets_for_challenge(user_id, challenge_id, now)
+                    .close_tickets_for_challenge(user_id, &challenge_id, now)
                     .await
                 {
                     if bot.close_tickets(&to_be_closed_tickets).await.is_err() {

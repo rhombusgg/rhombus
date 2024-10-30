@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, net::IpAddr, num::NonZeroU64, sync::LazyLock, time::Duration};
+use std::{net::IpAddr, num::NonZeroU64, sync::LazyLock, time::Duration};
 
 use axum::{
     extract::{Query, State},
@@ -107,16 +107,6 @@ pub async fn route_account(
     let (challenge_data, team, emails) = tokio::join!(challenge_data, team, emails);
     let (challenge_data, team, emails) = (challenge_data.unwrap(), team.unwrap(), emails.unwrap());
 
-    let mut challenges = BTreeMap::new();
-    for challenge in &challenge_data.challenges {
-        challenges.insert(challenge.id, challenge);
-    }
-
-    let mut categories = BTreeMap::new();
-    for category in &challenge_data.categories {
-        categories.insert(category.id, category);
-    }
-
     Html(
         state
             .jinja
@@ -131,8 +121,8 @@ pub async fn route_account(
                 discord,
                 now => chrono::Utc::now(),
                 team,
-                challenges,
-                categories,
+                challenges => challenge_data.challenges,
+                categories => challenge_data.categories,
                 emails,
             })
             .unwrap(),

@@ -689,21 +689,21 @@ type CommandPaletteData = {
 };
 
 type ChallengesData = {
-  division_id: number;
+  division_id: string;
   ticket_enabled: boolean;
   challenges: {
-    id: number;
+    id: string;
     name: string;
     description: string;
     health: {
       healthy: boolean;
       last_checked: string;
     } | null;
-    category_id: number;
-    author_id: number;
+    category_id: string;
+    author_id: string;
     points: number;
     division_solves: {
-      division_id: number;
+      division_id: string;
       solves: number;
     }[];
     attachments: {
@@ -712,19 +712,19 @@ type ChallengesData = {
     }[];
   }[];
   categories: {
-    id: number;
+    id: string;
     name: string;
     color: string;
   }[];
   authors: Record<
-    number,
+    string,
     {
       name: string;
       avatar_url: string;
     }
   >;
   divisions: Record<
-    number,
+    string,
     {
       name: string;
     }
@@ -738,7 +738,7 @@ type ChallengesData = {
       }
     >;
     solves: Record<
-      number,
+      string,
       {
         solved_at: Date;
         user_id: number;

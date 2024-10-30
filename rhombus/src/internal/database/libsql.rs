@@ -614,15 +614,16 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await?;
         #[derive(Debug, Deserialize)]
         struct DbDivision {
-            id: i64,
+            id: String,
             name: String,
         }
-        let mut divisions: BTreeMap<i64, ChallengeDivision> = Default::default();
+        let mut divisions: BTreeMap<String, ChallengeDivision> = Default::default();
         while let Some(row) = division_rows.next().await? {
             let query_division = de::from_row::<DbDivision>(&row).unwrap();
             divisions.insert(
-                query_division.id,
+                query_division.id.clone(),
                 ChallengeDivision {
+                    id: query_division.id,
                     name: query_division.name,
                 },
             );
@@ -643,8 +644,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await;
         #[derive(Debug, Deserialize)]
         struct DbChallengeDivisionSolves {
-            challenge_id: i64,
-            division_id: i64,
+            challenge_id: String,
+            division_id: String,
             solves: i64,
         }
         let mut challenge_division_solves = BTreeMap::new();
@@ -672,7 +673,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await?;
         #[derive(Debug, Deserialize)]
         struct QueryChallengeFileAttachment {
-            challenge_id: i64,
+            challenge_id: String,
             name: String,
             url: String,
         }
@@ -705,12 +706,12 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await?;
         #[derive(Debug, Deserialize)]
         struct DbChallenge {
-            id: i64,
+            id: String,
             name: String,
             description: String,
             flag: String,
-            category_id: i64,
-            author_id: i64,
+            category_id: String,
+            author_id: String,
             ticket_template: Option<String>,
             healthscript: Option<String>,
             healthy: Option<bool>,
@@ -722,40 +723,45 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         let challenges = challenge_rows
             .into_stream()
             .map(|row| de::from_row::<DbChallenge>(&row.unwrap()).unwrap())
-            .map(|challenge| Challenge {
-                id: challenge.id,
-                name: challenge.name,
-                description: challenge.description,
-                flag: challenge.flag,
-                category_id: challenge.category_id,
-                author_id: challenge.author_id,
-                ticket_template: challenge.ticket_template,
-                healthscript: challenge.healthscript,
-                healthy: challenge.healthy,
-                last_healthcheck: challenge
-                    .last_healthcheck
-                    .map(|t| Utc.timestamp_opt(t, 0).unwrap()),
-                score_type: challenge.score_type,
-                metadata: serde_json::from_str(&challenge.metadata).unwrap(),
-                points: challenge.points,
-                attachments: challenge_attachments
-                    .get(&challenge.id)
-                    .unwrap_or(&vec![])
-                    .to_vec(),
-                division_solves: {
-                    let mut division_solves = challenge_division_solves
-                        .get(&challenge.id)
-                        .unwrap_or(&BTreeMap::new())
-                        .clone();
-                    for (division_id, _) in divisions.iter() {
-                        if !division_solves.contains_key(division_id) {
-                            division_solves.insert(*division_id, 0);
-                        }
-                    }
-                    division_solves
-                },
+            .map(|challenge| {
+                (
+                    challenge.id.clone(),
+                    Challenge {
+                        id: challenge.id.clone(),
+                        name: challenge.name,
+                        description: challenge.description,
+                        flag: challenge.flag,
+                        category_id: challenge.category_id,
+                        author_id: challenge.author_id,
+                        ticket_template: challenge.ticket_template,
+                        healthscript: challenge.healthscript,
+                        healthy: challenge.healthy,
+                        last_healthcheck: challenge
+                            .last_healthcheck
+                            .map(|t| Utc.timestamp_opt(t, 0).unwrap()),
+                        score_type: challenge.score_type,
+                        metadata: serde_json::from_str(&challenge.metadata).unwrap(),
+                        points: challenge.points,
+                        attachments: challenge_attachments
+                            .get(&challenge.id)
+                            .unwrap_or(&vec![])
+                            .to_vec(),
+                        division_solves: {
+                            let mut division_solves = challenge_division_solves
+                                .get(&challenge.id)
+                                .unwrap_or(&BTreeMap::new())
+                                .clone();
+                            for (division_id, _) in divisions.iter() {
+                                if !division_solves.contains_key(division_id) {
+                                    division_solves.insert(division_id.clone(), 0);
+                                }
+                            }
+                            division_solves
+                        },
+                    },
+                )
             })
-            .collect::<Vec<Challenge>>()
+            .collect::<BTreeMap<_, _>>()
             .await;
 
         let category_rows = tx
@@ -763,35 +769,41 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await?;
         #[derive(Debug, Deserialize)]
         struct DbCategory {
-            id: i64,
+            id: String,
             name: String,
             color: String,
         }
         let categories = category_rows
             .into_stream()
             .map(|row| de::from_row::<DbCategory>(&row.unwrap()).unwrap())
-            .map(|category| Category {
-                id: category.id,
-                name: category.name,
-                color: category.color,
+            .map(|category| {
+                (
+                    category.id.clone(),
+                    Category {
+                        id: category.id,
+                        name: category.name,
+                        color: category.color,
+                    },
+                )
             })
-            .collect::<Vec<Category>>()
+            .collect::<BTreeMap<String, Category>>()
             .await;
 
         let mut author_rows = tx.query("SELECT * FROM rhombus_author", ()).await?;
         #[derive(Debug, Deserialize)]
         struct DbAuthor {
-            id: i64,
+            id: String,
             name: String,
             avatar: String,
             discord_id: NonZeroU64,
         }
-        let mut authors: BTreeMap<i64, Author> = Default::default();
+        let mut authors = BTreeMap::new();
         while let Some(row) = author_rows.next().await? {
             let query_author = de::from_row::<DbAuthor>(&row).unwrap();
             authors.insert(
-                query_author.id,
+                query_author.id.clone(),
                 Author {
+                    id: query_author.id,
                     name: query_author.name,
                     avatar_url: query_author.avatar,
                     discord_id: query_author.discord_id,
@@ -811,7 +823,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
     async fn set_challenge_health(
         &self,
-        challenge_id: i64,
+        challenge_id: &str,
         healthy: Option<bool>,
         checked_at: DateTime<Utc>,
     ) -> Result<()> {
@@ -864,7 +876,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         struct QueryTeam {
             name: String,
             invite_token: String,
-            division_id: i64,
+            division_id: String,
             last_division_change: Option<i64>,
         }
         let query_team_row = tx
@@ -912,7 +924,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
         #[derive(Debug, Deserialize)]
         struct QuerySolve {
-            pub challenge_id: i64,
+            pub challenge_id: String,
             pub user_id: i64,
             pub solved_at: i64,
             pub points: Option<i64>,
@@ -927,7 +939,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                 [team_id],
             )
             .await?;
-        let mut solves: BTreeMap<i64, ChallengeSolve> = Default::default();
+        let mut solves: BTreeMap<String, ChallengeSolve> = Default::default();
         while let Some(row) = query_solves.next().await? {
             let query_solve = de::from_row::<QuerySolve>(&row).unwrap();
             let solve = ChallengeSolve {
@@ -937,9 +949,9 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             };
 
             // favor the earliest solve
-            if match solves.entry(query_solve.challenge_id) {
-                Entry::Occupied(old) => solve < *old.get(),
-                Entry::Vacant(_) => true,
+            if match solves.get(&query_solve.challenge_id) {
+                Some(old) => solve < *old,
+                None => true,
             } {
                 solves.insert(query_solve.challenge_id, solve);
             }
@@ -948,7 +960,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         #[derive(Debug, Deserialize)]
         struct QueryWriteup {
             pub user_id: i64,
-            pub challenge_id: i64,
+            pub challenge_id: String,
             pub url: String,
         }
         let mut query_writeups = tx
@@ -1141,7 +1153,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await?
             .execute(
                 "UPDATE rhombus_team SET invite_token = ?2 WHERE id = ?1",
-                params!(team_id, new_invite_token.clone()),
+                params!(team_id, new_invite_token.as_str()),
             )
             .await?;
 
@@ -1269,7 +1281,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         &self,
         user_id: i64,
         team_id: i64,
-        division_id: i64,
+        division_id: &str,
         challenge: &Challenge,
         next_points: i64,
     ) -> Result<()> {
@@ -1279,7 +1291,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
         tx.execute(
             "INSERT INTO rhombus_solve (challenge_id, user_id, team_id, solved_at) VALUES (?1, ?2, ?3, ?4)",
-            [challenge.id, user_id, team_id, now],
+            params!(challenge.id.as_str(), user_id, team_id, now),
         )
         .await?;
 
@@ -1289,7 +1301,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             SET points = ?2
             WHERE id = ?1
         ",
-            [challenge.id, next_points],
+            params!(challenge.id.as_str(), next_points),
         )
         .await?;
 
@@ -1304,7 +1316,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             ORDER BY points DESC
             LIMIT 20
         ",
-            [division_id, now],
+            params!(division_id, now),
         )
         .await?;
 
@@ -1408,7 +1420,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         &self,
         ticket_number: u64,
         user_id: i64,
-        challenge_id: i64,
+        challenge_id: &str,
         discord_channel_id: NonZeroU64,
         panel_discord_message_id: NonZeroU64,
     ) -> Result<()> {
@@ -1429,7 +1441,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         #[derive(Debug, Deserialize)]
         struct DbTicket {
             pub user_id: i64,
-            pub challenge_id: i64,
+            pub challenge_id: String,
             pub closed_at: Option<i64>,
             pub discord_channel_id: NonZeroU64,
             pub discord_panel_message_id: NonZeroU64,
@@ -1500,7 +1512,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         struct DbTicket {
             pub ticket_number: u64,
             pub user_id: i64,
-            pub challenge_id: i64,
+            pub challenge_id: String,
             pub closed_at: Option<i64>,
             pub discord_channel_id: NonZeroU64,
             pub discord_panel_message_id: NonZeroU64,
@@ -1585,7 +1597,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     async fn close_tickets_for_challenge(
         &self,
         user_id: i64,
-        challenge_id: i64,
+        challenge_id: &str,
         time: DateTime<Utc>,
     ) -> Result<Vec<ToBeClosedTicket>> {
         let conn = self.connect().await?;
@@ -1623,7 +1635,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
     async fn get_discord_ticket_channel_ids_for_challenge(
         &self,
-        challenge_id: i64,
+        challenge_id: &str,
     ) -> Result<Vec<u64>> {
         let conn = self.connect().await?;
 
@@ -1750,7 +1762,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         Ok(())
     }
 
-    async fn get_scoreboard(&self, division_id: i64) -> Result<Scoreboard> {
+    async fn get_scoreboard(&self, division_id: &str) -> Result<Scoreboard> {
         let tx = self.transaction().await?;
 
         #[derive(Debug, Deserialize)]
@@ -1861,7 +1873,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         Ok(Scoreboard { teams })
     }
 
-    async fn get_leaderboard(&self, division_id: i64, page: Option<u64>) -> Result<Leaderboard> {
+    async fn get_leaderboard(&self, division_id: &str, page: Option<u64>) -> Result<Leaderboard> {
         #[derive(Debug, Deserialize)]
         struct DbLeaderboard {
             team_id: i64,
@@ -2206,8 +2218,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     async fn set_team_division(
         &self,
         team_id: i64,
-        _old_division_id: i64,
-        new_division_id: i64,
+        _old_division_id: &str,
+        new_division_id: &str,
         now: DateTime<Utc>,
     ) -> Result<()> {
         let conn = self.connect().await?;
@@ -2228,7 +2240,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .query("SELECT id FROM rhombus_division", ())
             .await?
             .into_stream()
-            .map(|row| row.unwrap().get::<i64>(0).unwrap())
+            .map(|row| row.unwrap().get::<String>(0).unwrap())
             .collect::<Vec<_>>()
             .await;
 
@@ -2243,7 +2255,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         for division in divisions {
             tx.execute(
                 "INSERT OR REPLACE INTO rhombus_division (id, name, description, is_default) VALUES (?1, ?2, ?3, ?4)",
-                params!(division.id, division.name.as_str(), division.description.as_str(), division.is_default),
+                params!(division.id.as_str(), division.name.as_str(), division.description.as_str(), division.is_default),
             )
             .await?;
         }
@@ -2256,7 +2268,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     async fn get_team_standing(
         &self,
         team_id: i64,
-        division_id: i64,
+        division_id: &str,
     ) -> Result<Option<TeamStanding>> {
         #[derive(Debug, Deserialize)]
         struct DbPointsRank {
@@ -2283,7 +2295,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                 FROM ranked_teams
                 WHERE team_id = ?1
             ",
-                [team_id, division_id],
+                params!(team_id, division_id),
             )
             .await?
             .next()
@@ -2456,7 +2468,7 @@ pub async fn create_team(tx: &Transaction) -> Result<i64> {
         .next()
         .await?
         .ok_or(RhombusError::LibSQL(libsql::Error::QueryReturnedNoRows))?
-        .get::<i64>(0)?;
+        .get::<String>(0)?;
 
     let team_invite_token = create_team_invite_token();
 
