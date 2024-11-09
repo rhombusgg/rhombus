@@ -1,14 +1,14 @@
 {% extends "layout.html" %}
 
 {% block content %}
-  <div class="w-full grow flex flex-col items-center justify-center gap-y-6">
+  <div class="flex w-full grow flex-col items-center justify-center gap-y-6">
     <div>
       Are you sure you want to sign in with
       <span class="font-bold">{{ email }}</span>?
     </div>
     <a
       href="/signin/email/confirm?code={{ code }}"
-      class="h-10 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center rounded-md text-sm font-medium whitespace-nowrap ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+      class="border-input bg-background hover:bg-accent hover:text-accent-foreground ring-offset-background focus-visible:ring-ring inline-flex h-10 items-center justify-center whitespace-nowrap rounded-md border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
       >Sign in with email</a
     >
   </div>
