@@ -1,4 +1,4 @@
-use std::{any::Any, collections::BTreeMap, sync::Arc};
+use std::{any::Any, borrow::Cow, collections::BTreeMap, sync::Arc};
 
 use axum::Router;
 use tokio::sync::{Mutex, RwLock};
@@ -14,15 +14,15 @@ use crate::{
         settings::Settings,
         templates::Templates,
     },
-    upload_provider::EitherUploadProvider,
-    Result, UploadProvider,
+    upload_provider::ErasedUploadProvider,
+    Result,
 };
 
-pub struct RunContext<'a, U: UploadProvider> {
+pub struct RunContext<'a> {
     /// The selected upload provider which can be used to upload files with.
     /// For a plugin to provide a custom upload provider, implement the [upload_provider](Plugin::upload_provider)
     /// function of the [Plugin] trait.
-    pub upload_provider: &'a U,
+    pub upload_provider: Box<dyn ErasedUploadProvider>,
 
     pub templates: &'a mut Templates,
 
@@ -62,6 +62,13 @@ pub struct DatabaseProviderContext<'a> {
     pub settings: &'a mut Settings,
 }
 
+pub struct PluginMeta {
+    pub name: Cow<'static, str>,
+    pub version: Cow<'static, str>,
+    pub description: Cow<'static, str>,
+    pub path: Cow<'static, str>,
+}
+
 /// A plugin can be used to extend Rhombus with custom functionality, themes, or localization.
 ///
 /// ## Order of execution
@@ -72,8 +79,10 @@ pub struct DatabaseProviderContext<'a> {
 ///    order of plugins defined until the first plugin is found which implements a custom upload provider, which is then used.
 ///    If no plugin implements a custom upload provider, the default upload provider creation process will happen.
 /// 2. The [run](Plugin::run) function is called for each plugin in the order they are defined.
-#[allow(async_fn_in_trait)]
+#[async_trait::async_trait]
 pub trait Plugin {
+    fn meta(&self) -> PluginMeta;
+
     /// Supply a custom [UploadProvider].
     ///
     /// ```
@@ -94,9 +103,9 @@ pub trait Plugin {
     async fn upload_provider(
         &self,
         context: &UploadProviderContext<'_>,
-    ) -> Option<impl UploadProvider + Send + Sync> {
+    ) -> Option<Box<dyn ErasedUploadProvider>> {
         _ = context;
-        None::<()>
+        None
     }
 
     async fn database_provider(
@@ -106,78 +115,8 @@ pub trait Plugin {
         None
     }
 
-    async fn run<U: UploadProvider>(
-        &self,
-        context: &mut RunContext<'_, U>,
-    ) -> Result<Router<RouterState>> {
+    async fn run(&self, context: &mut RunContext<'_>) -> Result<Router<RouterState>> {
         _ = context;
         Ok(Router::new())
-    }
-}
-
-/// Empty plugin implementation for internal heterogeneous plugin tuples.
-impl Plugin for () {}
-
-/// Plugin implementation for internal single plugin heterogenous plugin tuple.
-impl<P: Plugin> Plugin for (P,) {
-    async fn upload_provider(
-        &self,
-        context: &UploadProviderContext<'_>,
-    ) -> Option<impl UploadProvider + Send + Sync> {
-        self.0.upload_provider(context).await
-    }
-
-    async fn database_provider(
-        &self,
-        context: &mut DatabaseProviderContext<'_>,
-    ) -> Option<(Connection, Box<dyn Any + Send + Sync>)> {
-        self.0.database_provider(context).await
-    }
-
-    async fn run<U: UploadProvider>(
-        &self,
-        context: &mut RunContext<'_, U>,
-    ) -> Result<Router<RouterState>> {
-        self.0.run(context).await
-    }
-}
-
-/// Plugin implementation for internal two plugin tuple heterogenous plugin tuple.
-impl<P, P2> Plugin for (P, P2)
-where
-    P: Plugin,
-    P2: Plugin,
-{
-    async fn upload_provider(
-        &self,
-        context: &UploadProviderContext<'_>,
-    ) -> Option<impl UploadProvider + Send + Sync> {
-        match self.0.upload_provider(context).await {
-            Some(u) => Some(EitherUploadProvider::Left(u)),
-            None => self
-                .1
-                .upload_provider(context)
-                .await
-                .map(EitherUploadProvider::Right),
-        }
-    }
-
-    async fn database_provider(
-        &self,
-        context: &mut DatabaseProviderContext<'_>,
-    ) -> Option<(Connection, Box<dyn Any + Send + Sync>)> {
-        match self.0.database_provider(context).await {
-            Some(u) => Some(u),
-            None => self.1.database_provider(context).await,
-        }
-    }
-
-    async fn run<U: UploadProvider>(
-        &self,
-        context: &mut RunContext<'_, U>,
-    ) -> Result<Router<RouterState>> {
-        let mut router = self.1.run(context).await?;
-        router = router.merge(self.0.run(context).await?);
-        Ok(router)
     }
 }
