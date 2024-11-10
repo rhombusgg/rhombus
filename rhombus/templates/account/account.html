@@ -12,7 +12,7 @@
         {% endwith %}
       </p>
     </div>
-    <div class="grid lg:grid-cols-2 gap-6">
+    <div class="grid gap-6 lg:grid-cols-2">
       <div class="flex flex-col gap-6">
         {% if discord %}
           {% call card.root() %}
@@ -30,11 +30,11 @@
                   class="flex items-center text-xl font-semibold tracking-tight"
                 >
                   <div
-                    class="absolute ml-[-50px] inline-flex size-9 items-center justify-center rounded-full border-4 {% if user.discord_id %}
+                    class="{% if user.discord_id %}
                       bg-green-300 dark:bg-green-500
                     {% else %}
                       bg-border
-                    {% endif %}"
+                    {% endif %} absolute ml-[-50px] inline-flex size-9 items-center justify-center rounded-full border-4"
                   >
                     {% if user.discord_id %}
                       {{ icons.check(class="size-4") }}
@@ -61,11 +61,11 @@
                   class="mt-8 flex items-center text-xl font-semibold tracking-tight"
                 >
                   <div
-                    class="absolute ml-[-50px] inline-flex size-9 items-center justify-center rounded-full border-4 {% if discord.in_server %}
+                    class="{% if discord.in_server %}
                       bg-green-300 dark:bg-green-500
                     {% else %}
                       bg-border
-                    {% endif %}"
+                    {% endif %} absolute ml-[-50px] inline-flex size-9 items-center justify-center rounded-full border-4"
                   >
                     {% if discord.in_server %}
                       {{ icons.check(class="size-4") }}
@@ -115,21 +115,21 @@
               hx-swap="none"
               hx-on::after-request="if(event.detail.successful) this.reset()"
             >
-              <div class="grow flex justify-end items-center relative">
+              <div class="relative flex grow items-center justify-end">
                 <input
                   type="email"
                   required
                   name="email"
                   placeholder="New email to verify..."
-                  class="bg-background border p-2 rounded-md w-full focus-visible:outline-none"
+                  class="bg-background w-full rounded-md border p-2 focus-visible:outline-none"
                 />
-                <div id="loader" class="absolute mr-2 pointer-events-none">
+                <div id="loader" class="pointer-events-none absolute mr-2">
                   {{ icons.spinner(attrs='class="animate-spin"') }}
                 </div>
               </div>
               <button
                 type="submit"
-                class="h-10 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center rounded-md text-sm font-medium whitespace-nowrap ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                class="border-input bg-background hover:bg-accent hover:text-accent-foreground ring-offset-background focus-visible:ring-ring inline-flex h-10 items-center justify-center whitespace-nowrap rounded-md border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
               >
                 Verify Email
               </button>
@@ -148,7 +148,7 @@
           {% endcall %}
           {% call card.content() %}
             <h4 class="text-sm">Change name</h4>
-            <p class="text-sm text-muted-foreground mb-2">
+            <p class="text-muted-foreground mb-2 text-sm">
               Must be between 3 and 30 characters. May only be changed every 30
               minutes.
             </p>
@@ -156,7 +156,7 @@
               type="text"
               name="name"
               value="{{ user.name }}"
-              class="bg-background border p-2 rounded-md w-full focus-visible:outline-none"
+              class="bg-background w-full rounded-md border p-2 focus-visible:outline-none"
               hx-post="/account/name"
               hx-target="next"
             />
@@ -181,7 +181,7 @@
                 {% for challenge_id, solve in team.solves | dictsort(by="value", reverse=true) %}
                   {% if solve.user_id == user.id %}
                     {% with challenge=challenges[challenge_id], solver=team.users[solve.user_id], category=categories[challenge.category_id] %}
-                      <li class="flex items-center h-8">
+                      <li class="flex h-8 items-center">
                         <a
                           hx-select="#screen"
                           hx-target="#screen"

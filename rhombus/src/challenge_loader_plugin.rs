@@ -21,7 +21,7 @@ use crate::{
         database::libsql::LibSQLConnection, local_upload_provider::slice_to_hex_string,
         router::RouterState,
     },
-    plugin::RunContext,
+    plugin::{PluginMeta, RunContext},
     Plugin, Result, UploadProvider,
 };
 
@@ -41,11 +41,18 @@ impl ChallengeLoaderPlugin {
     }
 }
 
+#[async_trait::async_trait]
 impl Plugin for ChallengeLoaderPlugin {
-    async fn run<U: UploadProvider>(
-        &self,
-        context: &mut RunContext<'_, U>,
-    ) -> Result<Router<RouterState>> {
+    fn meta(&self) -> PluginMeta {
+        PluginMeta {
+            name: "Challenge Loader".into(),
+            version: "0.0.1".into(),
+            description: "Loads challenges from local files".into(),
+            path: env!("CARGO_MANIFEST_DIR").into(),
+        }
+    }
+
+    async fn run(&self, context: &mut RunContext<'_>) -> Result<Router<RouterState>> {
         let config = Config::builder()
             .add_source(config::File::from(self.path.join("loader.yaml")))
             .build()

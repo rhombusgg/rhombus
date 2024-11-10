@@ -4,9 +4,8 @@ tasks:
   dev:
     deps:
       - watch-standalone
-      - watch-tailwindcss
       - watch-clientjs
-    desc: Run cargo watch and tailwindcss concurrently
+    desc: Run cargo watch concurrently
 
   watch-standalone:
     desc: Start cargo watch
@@ -29,13 +28,6 @@ tasks:
     desc: Start cargo watch using systemfd to not drop connections on restart
     cmds:
       - systemfd --no-pid -s http::3000 -- mold -run cargo watch -x 'run -p standalone'
-
-  watch-tailwindcss:
-    desc: Start Tailwind CSS in watch mode
-    dir: rhombus
-    silent: true
-    cmds:
-      - tailwindcss --input app.css -w -o static/tailwind.css
 
   watch-clientjs:
     desc: Build the client js bundle in watch mode

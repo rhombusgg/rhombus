@@ -66,6 +66,7 @@ impl S3UploadProvider {
     }
 }
 
+#[async_trait::async_trait]
 impl UploadProvider for S3UploadProvider {
     fn routes(&self) -> Result<Router> {
         let provider_state = Arc::new(self.clone());
@@ -77,7 +78,7 @@ impl UploadProvider for S3UploadProvider {
 
     async fn upload<S, E>(&self, filename: &str, stream: S) -> Result<String>
     where
-        S: Stream<Item = std::result::Result<Bytes, E>> + Send,
+        S: Stream<Item = std::result::Result<Bytes, E>> + Send + 'async_trait,
         E: Into<axum::BoxError>,
     {
         let body_with_io_error = stream.map_err(|err| io::Error::new(io::ErrorKind::Other, err));

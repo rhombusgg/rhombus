@@ -1,5 +1,6 @@
 use std::{
     any::Any,
+    cell::RefCell,
     collections::BTreeMap,
     fmt::Debug,
     hash::{BuildHasher, BuildHasherDefault, Hasher},
@@ -84,8 +85,8 @@ use crate::{
         templates::Templates,
     },
     plugin::{DatabaseProviderContext, RunContext, UploadProviderContext},
-    upload_provider::UploadProvider,
-    LocalUploadProvider, Plugin, Result,
+    upload_provider::ErasedUploadProvider,
+    LocalUploadProvider, Plugin, Result, UploadProvider,
 };
 
 #[cfg(feature = "imap")]
@@ -101,7 +102,7 @@ pub enum RawDb {
     Plugin(Box<dyn Any + Send + Sync>),
 }
 
-pub fn builder() -> Builder<(), ()> {
+pub fn builder() -> Builder {
     Builder::default()
 }
 
@@ -114,31 +115,27 @@ pub fn builder() -> Builder<(), ()> {
 /// 3. Load settings from database (if mutable configuration is enabled)
 /// 4. Execute plugins
 /// 5. Merge routers and return the final router
-pub struct Builder<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'static> {
-    pub plugins: P,
-    pub num_plugins: u32,
+pub struct Builder {
+    pub plugins: Vec<Box<dyn Plugin + Send + Sync>>,
     pub database: Option<DbConfig>,
-    pub upload_provider: Option<U>,
+    pub upload_provider: RefCell<Option<Box<dyn ErasedUploadProvider>>>,
     pub config_builder: config::ConfigBuilder<config::builder::DefaultState>,
     pub ip_extractor: Option<IpExtractorFn>,
 }
 
-impl Default for Builder<(), ()> {
-    fn default() -> Builder<(), ()> {
+impl Default for Builder {
+    fn default() -> Builder {
         Builder {
-            plugins: (),
-            num_plugins: 0,
+            plugins: vec![],
             database: None,
-            upload_provider: None,
+            upload_provider: RefCell::default(),
             config_builder: config::ConfigBuilder::<config::builder::DefaultState>::default(),
             ip_extractor: None,
         }
     }
 }
 
-impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'static> Debug
-    for Builder<P, U>
-{
+impl Debug for Builder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Builder")
             .field("ip_extractor", &"...")
@@ -146,7 +143,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
     }
 }
 
-impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'static> Builder<P, U> {
+impl Builder {
     pub fn load_env(self) -> Self {
         _ = dotenvy::dotenv();
         self
@@ -227,27 +224,24 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
         self
     }
 
-    pub fn upload_provider<Un: UploadProvider + Send + Sync>(
-        self,
-        upload_provider: Un,
-    ) -> Builder<P, Un> {
+    pub fn upload_provider(self, upload_provider: impl UploadProvider + 'static) -> Builder {
         Builder {
             plugins: self.plugins,
-            num_plugins: self.num_plugins,
             config_builder: self.config_builder,
             database: self.database,
             ip_extractor: self.ip_extractor,
-            upload_provider: Some(upload_provider),
+            upload_provider: RefCell::new(Some(Box::new(upload_provider))),
         }
     }
 
-    pub fn plugin<Pn>(self, plugin: Pn) -> Builder<(Pn, P), U>
+    pub fn plugin<Pn>(self, plugin: Pn) -> Builder
     where
         Pn: Plugin + Send + Sync + 'static,
     {
+        let mut plugins = self.plugins;
+        plugins.push(Box::new(plugin));
         Builder {
-            plugins: (plugin, self.plugins),
-            num_plugins: self.num_plugins + 1,
+            plugins,
             config_builder: self.config_builder,
             database: self.database,
             ip_extractor: self.ip_extractor,
@@ -434,10 +428,19 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                 settings: &mut settings,
             };
 
-            let custom_provider = self_arc
-                .plugins
-                .database_provider(&mut database_provider_context)
-                .await;
+            let custom_provider = {
+                let mut custom_provider = None;
+                for plugin in self_arc.plugins.iter() {
+                    if let Some(database_provider) = plugin
+                        .database_provider(&mut database_provider_context)
+                        .await
+                    {
+                        custom_provider = Some(database_provider);
+                        break;
+                    }
+                }
+                custom_provider
+            };
 
             let (db, rawdb) = if let Some(custom_provider) = custom_provider {
                 let rawdb = RawDb::Plugin(custom_provider.1);
@@ -674,135 +677,107 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
 
             let flag_fn_map = Arc::default();
 
-            #[cfg(not(feature = "s3"))]
-            if uploads_settings
-                .as_ref()
-                .and_then(|u| u.s3.as_ref())
-                .is_some()
-            {
-                tracing::warn!("S3 is configured but the `s3` feature is not enabled");
+            for plugin in self_arc.plugins.iter() {
+                let meta = plugin.meta();
+                tracing::info!(
+                    name = meta.name.as_ref(),
+                    version = meta.version.as_ref(),
+                    description = meta.description.as_ref(),
+                    path = meta.path.as_ref(),
+                    "Loading plugin"
+                );
             }
 
-            let (plugin_router, upload_router) = {
+            let upload_provider: Box<dyn ErasedUploadProvider> = 'u: {
+                if let Some(builder_upload_provider) = self_arc.upload_provider.borrow_mut().take()
+                {
+                    break 'u builder_upload_provider;
+                }
+
                 let plugin_upload_provider_builder = UploadProviderContext {
                     settings: &old_settings,
                     db: cached_db.clone(),
                 };
-                let plugin_upload_provider = self_arc
-                    .plugins
-                    .upload_provider(&plugin_upload_provider_builder)
-                    .await;
-
-                match (
-                    &plugin_upload_provider,
-                    &self_arc.upload_provider,
-                    uploads_settings.as_ref().and_then(|u| u.s3.as_ref()),
-                    uploads_settings.as_ref().and_then(|u| u.database),
-                ) {
-                    (Some(plugin_upload_provider), _, _, _) => {
-                        let upload_router = plugin_upload_provider.routes()?;
-                        let mut plugin_builder = RunContext {
-                            upload_provider: plugin_upload_provider,
-                            templates: &mut templates,
-                            localizations: &mut localizer,
-                            settings: settings.clone(),
-                            divisions: &mut divisions,
-                            rawdb: &rawdb,
-                            db: cached_db.clone(),
-                            score_type_map: &score_type_map,
-                            flag_fn_map: &flag_fn_map,
-                        };
-                        let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
-                        (plugin_router, upload_router)
-                    }
-                    (_, Some(upload_provider), _, _) => {
-                        let upload_router = upload_provider.routes()?;
-                        let mut plugin_builder = RunContext {
-                            upload_provider,
-                            templates: &mut templates,
-                            localizations: &mut localizer,
-                            settings: settings.clone(),
-                            divisions: &mut divisions,
-                            rawdb: &rawdb,
-                            db: cached_db.clone(),
-                            score_type_map: &score_type_map,
-                            flag_fn_map: &flag_fn_map,
-                        };
-                        let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
-                        (plugin_router, upload_router)
-                    }
-                    #[cfg(feature = "s3")]
-                    (_, _, Some(s3), _) => {
-                        let s3_upload_provider =
-                            crate::s3_upload_provider::S3UploadProvider::new(s3).await?;
-                        let upload_router = s3_upload_provider.routes()?;
-                        let mut plugin_builder = RunContext {
-                            upload_provider: &s3_upload_provider,
-                            templates: &mut templates,
-                            localizations: &mut localizer,
-                            settings: settings.clone(),
-                            divisions: &mut divisions,
-                            rawdb: &rawdb,
-                            db: cached_db.clone(),
-                            score_type_map: &score_type_map,
-                            flag_fn_map: &flag_fn_map,
-                        };
-                        let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
-                        (plugin_router, upload_router)
-                    }
-                    (_, _, _, Some(true)) => {
-                        let database_upload_provider = DatabaseUploadProvider::new(db).await;
-                        let upload_router = database_upload_provider.routes()?;
-                        let mut plugin_builder = RunContext {
-                            upload_provider: &database_upload_provider,
-                            templates: &mut templates,
-                            localizations: &mut localizer,
-                            settings: settings.clone(),
-                            divisions: &mut divisions,
-                            rawdb: &rawdb,
-                            db: cached_db.clone(),
-                            score_type_map: &score_type_map,
-                            flag_fn_map: &flag_fn_map,
-                        };
-                        let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
-                        (plugin_router, upload_router)
-                    }
-                    _ => {
-                        let base_path = if let Some(local_upload_provider_options) =
-                            uploads_settings.as_ref().and_then(|u| u.local.as_ref())
-                        {
-                            let base_path = &local_upload_provider_options.folder;
-                            tracing::info!(
-                                folder = base_path.as_str(),
-                                "Using configured local upload provider"
-                            );
-                            base_path.into()
-                        } else {
-                            tracing::warn!(
-                                folder = "uploads",
-                                "No upload provider set, using local upload provider"
-                            );
-                            "uploads".into()
-                        };
-
-                        let local_upload_provider = LocalUploadProvider::new(base_path);
-                        let upload_router = local_upload_provider.routes()?;
-                        let mut plugin_builder = RunContext {
-                            upload_provider: &local_upload_provider,
-                            templates: &mut templates,
-                            localizations: &mut localizer,
-                            settings: settings.clone(),
-                            divisions: &mut divisions,
-                            rawdb: &rawdb,
-                            db: cached_db.clone(),
-                            score_type_map: &score_type_map,
-                            flag_fn_map: &flag_fn_map,
-                        };
-                        let plugin_router = self_arc.plugins.run(&mut plugin_builder).await?;
-                        (plugin_router, upload_router)
+                for plugin in self_arc.plugins.iter() {
+                    if let Some(plugin_upload_provider) = plugin
+                        .upload_provider(&plugin_upload_provider_builder)
+                        .await
+                    {
+                        break 'u plugin_upload_provider;
                     }
                 }
+
+                if let Some(s3) = uploads_settings.as_ref().and_then(|u| u.s3.as_ref()) {
+                    #[cfg(feature = "s3")]
+                    {
+                        let s3_upload_provider =
+                            crate::s3_upload_provider::S3UploadProvider::new(s3).await?;
+                        let erased_upload_provider: Box<dyn ErasedUploadProvider> =
+                            Box::new(s3_upload_provider);
+                        break 'u erased_upload_provider;
+                        // break 'u Box::new(s3_upload_provider);
+                    }
+
+                    #[cfg(not(feature = "s3"))]
+                    {
+                        _ = s3;
+                        tracing::warn!("S3 is configured but the `s3` feature is not enabled");
+                    }
+                }
+
+                if uploads_settings
+                    .as_ref()
+                    .and_then(|u| u.database)
+                    .unwrap_or(false)
+                {
+                    let database_upload_provider = DatabaseUploadProvider::new(db).await;
+                    let erased_upload_provider: Box<dyn ErasedUploadProvider> =
+                        Box::new(database_upload_provider);
+                    break 'u erased_upload_provider;
+                    // break 'u Box::new(database_upload_provider);
+                }
+
+                let base_path = if let Some(local_upload_provider_options) =
+                    uploads_settings.as_ref().and_then(|u| u.local.as_ref())
+                {
+                    let base_path = &local_upload_provider_options.folder;
+                    tracing::info!(
+                        folder = base_path.as_str(),
+                        "Using configured local upload provider"
+                    );
+                    base_path.into()
+                } else {
+                    tracing::warn!(
+                        folder = "uploads",
+                        "No upload provider set, using local upload provider"
+                    );
+                    "uploads".into()
+                };
+
+                let local_upload_provider = LocalUploadProvider::new(base_path);
+                let erased_upload_provider: Box<dyn ErasedUploadProvider> =
+                    Box::new(local_upload_provider);
+                break 'u erased_upload_provider;
+                // Box::new(local_upload_provider)
             };
+
+            let upload_router = upload_provider.routes()?;
+
+            let mut plugin_builder = RunContext {
+                upload_provider,
+                templates: &mut templates,
+                localizations: &mut localizer,
+                settings: settings.clone(),
+                divisions: &mut divisions,
+                rawdb: &rawdb,
+                db: cached_db.clone(),
+                score_type_map: &score_type_map,
+                flag_fn_map: &flag_fn_map,
+            };
+            let mut plugin_router = axum::Router::new();
+            for plugin in self_arc.plugins.iter() {
+                plugin_router = plugin_router.merge(plugin.run(&mut plugin_builder).await?);
+            }
 
             let divisions = Arc::new(divisions);
             cached_db.insert_divisions(&divisions).await?;
@@ -990,7 +965,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
             let rhombus_router = axum::Router::new()
                 .fallback(handler_404)
                 .route("/admin", get(|| async { (StatusCode::OK, Html("Admin")) }))
-                .route("/reload", get(route_reload::<P, U>))
+                .route("/reload", get(route_reload))
                 .route_layer(middleware::from_fn(enforce_admin_middleware))
                 .route(
                     "/account/verify/confirm",
@@ -1068,7 +1043,7 @@ impl<P: Plugin + Send + Sync + 'static, U: UploadProvider + Send + Sync + 'stati
                     auth_injector_middleware,
                 )));
 
-            let router = if self_arc.num_plugins > 0 {
+            let router = if !self_arc.plugins.is_empty() {
                 axum::Router::new()
                     .fallback_service(rhombus_router)
                     .nest("/", plugin_router.with_state(router_state.clone()))

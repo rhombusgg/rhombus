@@ -23,7 +23,7 @@
         {% endif %}
       </p>
     </div>
-    <div class="grid lg:grid-cols-2 gap-6">
+    <div class="grid gap-6 lg:grid-cols-2">
       <div class="flex flex-col gap-6">
         {% call card.root() %}
           {% call card.header() %}
@@ -44,7 +44,7 @@
                     hx-target="#screen"
                     hx-swap="outerHTML"
                     href="/user/{{ player_id }}"
-                    class="flex gap-2 items-center"
+                    class="flex items-center gap-2"
                     title="Go to public user profile"
                   >
                     <img
@@ -79,7 +79,7 @@
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
-            <table id="division-table" class="w-full text-left table-fixed">
+            <table id="division-table" class="w-full table-fixed text-left">
               <tr>
                 <th class="w-2/3">Division Name</th>
                 <th>Points</th>

@@ -1,5 +1,5 @@
 {% macro root() %}
-  <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+  <div class="bg-card text-card-foreground rounded-lg border shadow-sm">
     {{ caller() }}
   </div>
 {% endmacro %}
@@ -9,13 +9,13 @@
 {% endmacro %}
 
 {% macro title(class="") %}
-  <div class="text-lg font-semibold leading-none tracking-tight {{ class }}">
+  <div class="{{ class }} text-lg font-semibold leading-none tracking-tight">
     {{ caller() }}
   </div>
 {% endmacro %}
 
 {% macro description() %}
-  <div class="text-sm text-muted-foreground">{{ caller() }}</div>
+  <div class="text-muted-foreground text-sm">{{ caller() }}</div>
 {% endmacro %}
 
 {% macro content() %}

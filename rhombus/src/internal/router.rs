@@ -16,21 +16,18 @@ use axum::{
 use tokio::sync::{Mutex, RwLock};
 use tower::{make::Shared, Service, ServiceExt};
 
-use crate::{
-    internal::{
-        database::provider::Connection,
-        discord::Bot,
-        division::Division,
-        email::outbound_mailer::OutboundMailer,
-        ip::IpExtractorFn,
-        locales::Localizations,
-        routes::{
-            challenges::{ChallengeFlag, ChallengePoints},
-            meta::GlobalPageMeta,
-        },
-        settings::Settings,
+use crate::internal::{
+    database::provider::Connection,
+    discord::Bot,
+    division::Division,
+    email::outbound_mailer::OutboundMailer,
+    ip::IpExtractorFn,
+    locales::Localizations,
+    routes::{
+        challenges::{ChallengeFlag, ChallengePoints},
+        meta::GlobalPageMeta,
     },
-    Plugin, UploadProvider,
+    settings::Settings,
 };
 
 pub type RouterState = Arc<RouterStateInner>;
@@ -125,13 +122,7 @@ impl Router {
     }
 }
 
-pub fn rebuild_router<
-    P: Plugin + Send + Sync + 'static,
-    U: UploadProvider + Send + Sync + 'static,
->(
-    builder: crate::Builder<P, U>,
-    rr: Arc<crate::internal::router::Router>,
-) {
+pub fn rebuild_router(builder: crate::Builder, rr: Arc<crate::internal::router::Router>) {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -153,14 +144,11 @@ pub fn rebuild_router<
     });
 }
 
-pub type BuilderExtension<P, U> = Extension<Arc<Mutex<Option<crate::Builder<P, U>>>>>;
+pub type BuilderExtension = Extension<Arc<Mutex<Option<crate::Builder>>>>;
 
-pub async fn route_reload<
-    P: Plugin + Send + Sync + 'static,
-    U: UploadProvider + Send + Sync + 'static,
->(
+pub async fn route_reload(
     state: State<RouterState>,
-    Extension(builder): BuilderExtension<P, U>,
+    Extension(builder): BuilderExtension,
 ) -> impl IntoResponse {
     if let Some(builder) = builder.lock().await.take() {
         let builder = builder.config_override("auth", vec!["discord"]);

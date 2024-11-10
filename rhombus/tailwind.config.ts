@@ -1,7 +1,9 @@
-import plugin from "tailwindcss/plugin";
+import { type Config } from "https://esm.sh/tailwindcss/types/config.d.ts?raw";
+import plugin from "https://esm.sh/tailwindcss/plugin";
+import animate from "https://esm.sh/tailwindcss-animate";
+import typography from "https://cdn.skypack.dev/@tailwindcss/typography?dts";
 
-/** @type {import('tailwindcss').Config} */
-module.exports = {
+export const tailwind: Config = {
   content: [
     "./static/**/*.js",
     "./templates/**/*.html",
@@ -9,9 +11,6 @@ module.exports = {
     "./src/**/*.rs",
   ],
   darkMode: "selector",
-  theme: {
-    extend: {},
-  },
   plugins: [
     plugin(function ({ addVariant }) {
       addVariant("htmx-settling", ["&.htmx-settling", ".htmx-settling &"]);
@@ -19,8 +18,8 @@ module.exports = {
       addVariant("htmx-swapping", ["&.htmx-swapping", ".htmx-swapping &"]);
       addVariant("htmx-added", ["&.htmx-added", ".htmx-added &"]);
     }),
-    require("tailwindcss-animate"),
-    require("@tailwindcss/typography"),
+    animate,
+    typography,
   ],
   theme: {
     container: {
@@ -31,7 +30,7 @@ module.exports = {
       },
     },
     extend: {
-      typography(theme) {
+      typography() {
         return {
           DEFAULT: {
             css: {

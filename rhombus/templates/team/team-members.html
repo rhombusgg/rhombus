@@ -4,7 +4,7 @@
   <div class="flex justify-between">
     <div>
       <h4 class="text-sm">Members</h4>
-      <p class="mb-2 text-sm text-muted-foreground">Your team members</p>
+      <p class="text-muted-foreground mb-2 text-sm">Your team members</p>
     </div>
     {% with num_members=team.users | length %}
       {% if max_players == "Unlimited" %}
@@ -28,7 +28,7 @@
   </div>
   <ul class="flex flex-col gap-2">
     {% for player_id, player in team.users | items %}
-      <li class="flex items-center justify-between group">
+      <li class="group flex items-center justify-between">
         <div class="flex items-center gap-2">
           <a
             hx-boost="true"
@@ -36,7 +36,7 @@
             hx-target="#screen"
             hx-swap="outerHTML"
             href="/user/{{ player_id }}"
-            class="flex gap-2 items-center"
+            class="flex items-center gap-2"
             title="Go to public user profile"
           >
             <img class="size-8 rounded-full" src="{{ player.avatar_url }}" />

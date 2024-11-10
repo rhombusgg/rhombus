@@ -4,8 +4,8 @@
 
 {% block content %}
   <div class="container mb-6">
-    <div class="w-full mt-4 relative" style="height: 600px">
-      <div class="size-full absolute" id="chart" hx-preserve="true"></div>
+    <div class="relative mt-4 w-full" style="height: 600px">
+      <div class="absolute size-full" id="chart" hx-preserve="true"></div>
       <div
         id="empty-banner"
         style="display: none;"
@@ -15,7 +15,7 @@
       </div>
     </div>
 
-    <div class="flex gap-6 mt-6 flex-col lg:flex-row">
+    <div class="mt-6 flex flex-col gap-6 lg:flex-row">
       {% if divisions | length > 1 %}
         <div class="lg:max-w-96">
           {% call card.root() %}
@@ -28,7 +28,7 @@
               {% endcall %}
             {% endcall %}
             {% call card.content() %}
-              <div class="flex gap-2 flex-wrap">
+              <div class="flex flex-wrap gap-2">
                 {% for division_id, division in divisions | items %}
                   <a
                     hx-boost="true"
@@ -39,22 +39,22 @@
                     class="relative"
                   >
                     <div
-                      class="flex items-center px-3 py-2 rounded-md border border-input text-sm hover:bg-secondary"
+                      class="border-input hover:bg-secondary flex items-center rounded-md border px-3 py-2 text-sm"
                     >
                       {{ division.name }}
                     </div>
                     {% if selected_division_id == division_id %}
                       <div
-                        class="size-3 rounded-full cursor-pointer bg-primary absolute -top-1 -right-1"
+                        class="bg-primary absolute -right-1 -top-1 size-3 cursor-pointer rounded-full"
                       ></div>
                     {% endif %}
                   </a>
                 {% endfor %}
               </div>
               {% if user.is_admin %}
-                <div class="flex mt-4">
+                <div class="mt-4 flex">
                   <button
-                    class="px-4 py-2 gap-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center rounded-md text-sm font-medium whitespace-nowrap ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                    class="border-input bg-background hover:bg-accent hover:text-accent-foreground ring-offset-background focus-visible:ring-ring inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
                     onclick="copyDivisionCTFtimeScoreboardFeed()"
                     title="Copy CTFtime scoreboard feed to clipboard"
                   >
@@ -94,8 +94,8 @@
           {% endcall %}
           {% call card.content() %}
             {% if leaderboard.entries | length > 0 %}
-              <div class="w-full flex">
-                <table class="table-fixed grow">
+              <div class="flex w-full">
+                <table class="grow table-fixed">
                   {% for entry in leaderboard.entries %}
                     <tr class="even:bg-secondary *:p-2">
                       <td>{{ entry.rank }}</td>

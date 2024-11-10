@@ -36,6 +36,7 @@ impl LocalUploadProvider {
     }
 }
 
+#[async_trait::async_trait]
 impl UploadProvider for LocalUploadProvider {
     fn routes(&self) -> Result<Router> {
         let provider_state = Arc::new(self.clone());
@@ -48,7 +49,7 @@ impl UploadProvider for LocalUploadProvider {
 
     async fn upload<S, E>(&self, filename: &str, stream: S) -> Result<String>
     where
-        S: Stream<Item = std::result::Result<Bytes, E>> + Send,
+        S: Stream<Item = std::result::Result<Bytes, E>> + Send + 'async_trait,
         E: Into<axum::BoxError>,
     {
         async {

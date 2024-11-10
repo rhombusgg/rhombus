@@ -5,7 +5,7 @@
     <ul class="mb-4">
       {% for email in emails %}
         <li
-          class="group flex justify-between even:bg-secondary p-2 {% if not email.verified %}italic{% endif %}"
+          class="even:bg-secondary {% if not email.verified %}italic{% endif %} group flex justify-between p-2"
           {% if not email.verified %}
             title="Pending verification"
           {% endif %}

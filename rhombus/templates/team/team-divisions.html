@@ -1,7 +1,7 @@
 {% import "icons.html" as icons %}
 
 <div id="divisions" {% if oob %}hx-swap-oob="true"{% endif %}>
-  <table class="w-full text-left table-fixed">
+  <table class="w-full table-fixed text-left">
     <tr>
       <th class="w-2/3">Division Name</th>
       <th>Points</th>
@@ -73,7 +73,7 @@
   </table>
 
   {% if user.is_team_owner and minutes_until_division_change and minutes_until_division_change > 0 %}
-    <div class="mt-2 text-sm text-muted-foreground">
+    <div class="text-muted-foreground mt-2 text-sm">
       Your team must wait {{ minutes_until_division_change }}
       minute{% if minutes_until_division_change != 1 %}s{% endif %} before
       changing divisions again.

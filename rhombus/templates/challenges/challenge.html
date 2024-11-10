@@ -2,7 +2,7 @@
 
 <dialog
   data-onload-showmodal
-  class="backdrop:bg-background/50 bg-background max-w-prose w-full rounded-lg text-foreground border-4 p-6 shadow-lg"
+  class="backdrop:bg-background/50 bg-background text-foreground w-full max-w-prose rounded-lg border-4 p-6 shadow-lg"
   style="border-color: {{ category.color }}"
 >
   <div class="mb-2 flex justify-between">
@@ -31,7 +31,7 @@
       </rhombus-tooltip>
     </div>
   </div>
-  <div class="mb-4 prose dark:prose-invert">
+  <div class="prose dark:prose-invert mb-4">
     {{ challenge.description | safe }}
   </div>
   {% with solve=team.solves[challenge.id] %}
@@ -46,9 +46,9 @@
           name="flag"
           placeholder="Enter flag..."
           autocomplete="off"
-          class="bg-background border p-2 rounded-lg grow focus-visible:outline-none"
+          class="bg-background grow rounded-lg border p-2 focus-visible:outline-none"
         />
-        <button class="border rounded-lg p-2" type="submit">Submit Flag</button>
+        <button class="rounded-lg border p-2" type="submit">Submit Flag</button>
       </form>
       <div></div>
     {% else %}
@@ -59,19 +59,19 @@
           hx-target="next"
           hx-indicator="#loader"
         >
-          <div class="grow flex justify-end items-center relative">
+          <div class="relative flex grow items-center justify-end">
             <input
               type="url"
               name="url"
               placeholder="Enter writeup link..."
               autocomplete="off"
-              class="bg-background border p-2 rounded-lg w-full focus-visible:outline-none"
+              class="bg-background w-full rounded-lg border p-2 focus-visible:outline-none"
             />
-            <div id="loader" class="absolute mr-2 pointer-events-none">
+            <div id="loader" class="pointer-events-none absolute mr-2">
               {{ icons.spinner(attrs='class="animate-spin"') }}
             </div>
           </div>
-          <button class="border rounded-lg p-2" type="submit">
+          <button class="rounded-lg border p-2" type="submit">
             Submit Writeup
           </button>
         </form>
@@ -79,7 +79,7 @@
         <div class="mb-2"></div>
       {% else %}
         <button
-          class="bg-destructive p-2 mb-2 rounded-lg"
+          class="bg-destructive mb-2 rounded-lg p-2"
           hx-delete="/challenges/{{ challenge.id }}/writeup"
         >
           Rescind writeup
@@ -92,7 +92,7 @@
             {% for writeup in team.writeups[challenge.id] %}
               <li class="flex justify-between">
                 <a
-                  class="underline text-blue-300"
+                  class="text-blue-300 underline"
                   target="_blank"
                   href="{{ writeup.url }}"
                   >{{ writeup.url }}</a
@@ -106,10 +106,10 @@
     {% endif %}
   {% endwith %}
   {% if challenge.attachments | length > 0 %}
-    <div class="flex gap-2 mt-4">
+    <div class="mt-4 flex gap-2">
       {% for attachment in challenge.attachments %}
         <a
-          class="pr-2 py-1 pl-1 max-w-fit rounded-lg flex"
+          class="flex max-w-fit rounded-lg py-1 pl-1 pr-2"
           style="background-color: {{ category.color }}77"
           href="{{ attachment.url }}"
         >

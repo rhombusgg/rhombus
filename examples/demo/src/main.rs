@@ -16,7 +16,7 @@ use tokio::sync::{Mutex, RwLock};
 use tracing_subscriber::EnvFilter;
 
 use rhombus::{
-    axum::{http::Response, response::IntoResponse, routing, Extension, Router},
+    axum::{async_trait, http::Response, response::IntoResponse, routing, Extension, Router},
     challenge_loader_plugin::ChallengeLoaderPlugin,
     internal::{
         auth::User,
@@ -29,6 +29,7 @@ use rhombus::{
         settings::Settings,
     },
     libsql::params,
+    plugin::PluginMeta,
     Plugin, Result,
 };
 
@@ -57,10 +58,20 @@ async fn main() {
 
 struct DemoPlugin;
 
+#[async_trait]
 impl Plugin for DemoPlugin {
-    async fn run<U: rhombus::UploadProvider>(
+    fn meta(&self) -> PluginMeta {
+        PluginMeta {
+            name: env!("CARGO_PKG_NAME").into(),
+            version: env!("CARGO_PKG_VERSION").into(),
+            description: env!("CARGO_PKG_DESCRIPTION").into(),
+            path: env!("CARGO_MANIFEST_DIR").into(),
+        }
+    }
+
+    async fn run(
         &self,
-        context: &mut rhombus::plugin::RunContext<'_, U>,
+        context: &mut rhombus::plugin::RunContext<'_>,
     ) -> rhombus::Result<rhombus::axum::Router<rhombus::internal::router::RouterState>> {
         context
             .templates

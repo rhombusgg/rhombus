@@ -3,7 +3,7 @@
 {% extends "layout.html" %}
 
 {% block content %}
-  <div class="container my-4 flex justify-center items-center">
+  <div class="container my-4 flex items-center justify-center">
     <div class="max-w-prose">
       {% call card.root() %}
         {% call card.header() %}
@@ -19,7 +19,7 @@
           <div class="flex justify-between">
             <div>
               <h4 class="text-sm">Members</h4>
-              <p class="mb-2 text-sm text-muted-foreground">
+              <p class="text-muted-foreground mb-2 text-sm">
                 {{ team.name }}'s team members
               </p>
             </div>
@@ -34,12 +34,12 @@
           </div>
           <ul class="flex flex-col gap-2">
             {% for player_id, player in team.users | items %}
-              <li class="flex items-center justify-between group">
+              <li class="group flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <a
                     hx-boost="true"
                     href="/user/{{ player_id }}"
-                    class="flex gap-2 items-center"
+                    class="flex items-center gap-2"
                     title="Go to public user profile"
                   >
                     <img
