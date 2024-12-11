@@ -1,0 +1,14 @@
+[package]
+name = "rhombus-build"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80.0"
+description = "Compile-time assets for the Rhombus CTF framework"
+authors = ["Mark Bundschuh <mark@mbund.dev>"]
+license = "MPL-2.0"
+repository = "https://github.com/rhombusgg/rhombus"
+homepage = "https://rhombus.gg"
+keywords = ["web", "ctf", "http"]
+
+[dependencies]
+rust-embed = { version = "8" }

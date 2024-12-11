@@ -1,3 +1,4 @@
+// deno-lint-ignore-file no-window
 import { render } from "solid-js/web";
 import { Tooltip } from "@kobalte/core/tooltip";
 import {
@@ -36,10 +37,10 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "./command";
+} from "./command.tsx";
 
 function navigate(url: string) {
-  // @ts-ignore
+  // @ts-ignore defined in browser by htmx import
   htmx.ajax("GET", url, {
     select: "#screen",
     target: "#screen",
@@ -68,7 +69,7 @@ const CommandMenu = () => {
       }
     };
 
-    // @ts-ignore
+    // @ts-ignore window is an any
     window.openCommandPalette = () => setOpen(true);
 
     document.addEventListener("keydown", down);

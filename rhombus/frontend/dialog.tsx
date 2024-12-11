@@ -2,7 +2,7 @@ import { Dialog as DialogPrimitive } from "@kobalte/core";
 import { type DialogOverlayProps } from "@kobalte/core/dialog";
 import { X } from "lucide-solid";
 import { Component, JSX, ParentComponent } from "solid-js";
-import { cn } from "./utils";
+import { cn } from "./utils.tsx";
 
 const Dialog = DialogPrimitive.Root;
 

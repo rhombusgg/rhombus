@@ -9,8 +9,8 @@ import {
   CommandItemProps,
 } from "cmdk-solid";
 
-import { cn } from "./utils";
-import { Dialog, DialogContent } from "./dialog";
+import { cn } from "./utils.tsx";
+import { Dialog, DialogContent } from "./dialog.tsx";
 import { Component, JSX, ParentComponent } from "solid-js";
 import { type DialogRootProps } from "@kobalte/core/dialog";
 import { Search } from "lucide-solid";

@@ -6,6 +6,7 @@ use std::{
     hash::{BuildHasher, BuildHasherDefault, Hasher},
     net::IpAddr,
     num::NonZeroU32,
+    rc::Rc,
     sync::Arc,
     time::Duration,
 };
@@ -115,24 +116,13 @@ pub fn builder() -> Builder {
 /// 3. Load settings from database (if mutable configuration is enabled)
 /// 4. Execute plugins
 /// 5. Merge routers and return the final router
+#[derive(Default)]
 pub struct Builder {
     pub plugins: Vec<Box<dyn Plugin + Send + Sync>>,
     pub database: Option<DbConfig>,
     pub upload_provider: RefCell<Option<Box<dyn ErasedUploadProvider>>>,
     pub config_builder: config::ConfigBuilder<config::builder::DefaultState>,
     pub ip_extractor: Option<IpExtractorFn>,
-}
-
-impl Default for Builder {
-    fn default() -> Builder {
-        Builder {
-            plugins: vec![],
-            database: None,
-            upload_provider: RefCell::default(),
-            config_builder: config::ConfigBuilder::<config::builder::DefaultState>::default(),
-            ip_extractor: None,
-        }
-    }
 }
 
 impl Debug for Builder {
@@ -404,9 +394,9 @@ impl Builder {
         rr: Arc<crate::internal::router::Router>,
     ) -> std::result::Result<axum::Router, RhombusError> {
         let (self_arc, router) = {
-            let self_arc = Arc::new(self);
+            let self_rc = Rc::new(self);
 
-            let mut settings: Settings = self_arc
+            let mut settings: Settings = self_rc
                 .config_builder
                 .clone()
                 .add_source(config::Environment::with_prefix("rhombus").separator("__"))
@@ -430,7 +420,7 @@ impl Builder {
 
             let custom_provider = {
                 let mut custom_provider = None;
-                for plugin in self_arc.plugins.iter() {
+                for plugin in self_rc.plugins.iter() {
                     if let Some(database_provider) = plugin
                         .database_provider(&mut database_provider_context)
                         .await
@@ -447,7 +437,7 @@ impl Builder {
                 let db = custom_provider.0;
                 (db, rawdb)
             } else {
-                self_arc.build_database(&settings).await?
+                self_rc.build_database(&settings).await?
             };
 
             let mut divisions = if let Some(divisions) = &settings.divisions {
@@ -677,20 +667,18 @@ impl Builder {
 
             let flag_fn_map = Arc::default();
 
-            for plugin in self_arc.plugins.iter() {
+            for plugin in self_rc.plugins.iter() {
                 let meta = plugin.meta();
                 tracing::info!(
                     name = meta.name.as_ref(),
                     version = meta.version.as_ref(),
                     description = meta.description.as_ref(),
-                    path = meta.path.as_ref(),
                     "Loading plugin"
                 );
             }
 
             let upload_provider: Box<dyn ErasedUploadProvider> = 'u: {
-                if let Some(builder_upload_provider) = self_arc.upload_provider.borrow_mut().take()
-                {
+                if let Some(builder_upload_provider) = self_rc.upload_provider.borrow_mut().take() {
                     break 'u builder_upload_provider;
                 }
 
@@ -698,7 +686,7 @@ impl Builder {
                     settings: &old_settings,
                     db: cached_db.clone(),
                 };
-                for plugin in self_arc.plugins.iter() {
+                for plugin in self_rc.plugins.iter() {
                     if let Some(plugin_upload_provider) = plugin
                         .upload_provider(&plugin_upload_provider_builder)
                         .await
@@ -775,14 +763,14 @@ impl Builder {
                 flag_fn_map: &flag_fn_map,
             };
             let mut plugin_router = axum::Router::new();
-            for plugin in self_arc.plugins.iter() {
+            for plugin in self_rc.plugins.iter() {
                 plugin_router = plugin_router.merge(plugin.run(&mut plugin_builder).await?);
             }
 
             let divisions = Arc::new(divisions);
             cached_db.insert_divisions(&divisions).await?;
 
-            let ip_extractor = match self_arc.ip_extractor.clone() {
+            let ip_extractor = match self_rc.ip_extractor.clone() {
                 Some(ip_extractor) => Some(ip_extractor),
                 None => settings
                     .read()
@@ -1043,7 +1031,7 @@ impl Builder {
                     auth_injector_middleware,
                 )));
 
-            let router = if !self_arc.plugins.is_empty() {
+            let router = if !self_rc.plugins.is_empty() {
                 axum::Router::new()
                     .fallback_service(rhombus_router)
                     .nest("/", plugin_router.with_state(router_state.clone()))
@@ -1109,10 +1097,10 @@ impl Builder {
 
             let router = router.layer(CompressionLayer::new());
 
-            (self_arc, router)
+            (self_rc, router)
         };
 
-        let builder = Arc::try_unwrap(self_arc).unwrap();
+        let builder = Rc::try_unwrap(self_arc).unwrap();
         let builder = Arc::new(Mutex::new(Some(builder)));
         let router = router.layer(Extension(builder));
 

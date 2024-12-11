@@ -67,6 +67,7 @@
             deno
             nodePackages.pnpm
           ];
+          LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
         };
       }
     );

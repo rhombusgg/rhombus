@@ -48,7 +48,6 @@ impl Plugin for ChallengeLoaderPlugin {
             name: "Challenge Loader".into(),
             version: "0.0.1".into(),
             description: "Loads challenges from local files".into(),
-            path: env!("CARGO_MANIFEST_DIR").into(),
         }
     }
 

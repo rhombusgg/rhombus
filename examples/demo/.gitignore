@@ -1,2 +1,4 @@
+/node_modules/
 /uploads/
-/tailwind.config.js
+/rhombus.css
+/static/demo.css

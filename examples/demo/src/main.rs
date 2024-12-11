@@ -65,7 +65,6 @@ impl Plugin for DemoPlugin {
             name: env!("CARGO_PKG_NAME").into(),
             version: env!("CARGO_PKG_VERSION").into(),
             description: env!("CARGO_PKG_DESCRIPTION").into(),
-            path: env!("CARGO_MANIFEST_DIR").into(),
         }
     }
 

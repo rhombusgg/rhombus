@@ -6,8 +6,9 @@ COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
+COPY --from=denoland/deno:bin-2.1.3 /deno /usr/local/bin/deno
 COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json
+RUN cargo chef cook --release -p demo --recipe-path recipe.json
 COPY . .
 RUN cargo build --release --bin demo
 

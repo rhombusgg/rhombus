@@ -66,7 +66,6 @@ pub struct PluginMeta {
     pub name: Cow<'static, str>,
     pub version: Cow<'static, str>,
     pub description: Cow<'static, str>,
-    pub path: Cow<'static, str>,
 }
 
 /// A plugin can be used to extend Rhombus with custom functionality, themes, or localization.
@@ -86,17 +85,20 @@ pub trait Plugin {
     /// Supply a custom [UploadProvider].
     ///
     /// ```
-    /// # use rhombus::{Plugin, LocalUploadProvider, UploadProvider, plugin::UploadProviderContext};
+    /// # use rhombus::{Plugin, LocalUploadProvider, upload_provider::ErasedUploadProvider, plugin::{UploadProviderContext, PluginMeta}};
+    /// # use async_trait::async_trait;
     /// struct MyUploadProviderPlugin;
     ///
     /// /// Simple local upload provider wrapper
+    /// #[async_trait]
     /// impl Plugin for MyUploadProviderPlugin {
+    ///     # fn meta(&self) -> PluginMeta { todo!() }
     ///     async fn upload_provider(
     ///         &self,
     ///         context: &UploadProviderContext<'_>,
-    ///     ) -> Option<impl UploadProvider + Send + Sync> {
+    ///     ) -> Option<Box<dyn ErasedUploadProvider>> {
     ///          let local = LocalUploadProvider::new("myplugin-uploads".into());
-    ///          Some(local)
+    ///          Some(Box::new(local))
     ///     }
     /// }
     /// ```

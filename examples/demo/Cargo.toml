@@ -13,3 +13,6 @@ rhombus = { path = "../../rhombus", features = ["libsql", "internal"] }
 tokio = { version = "1.40.0", features = ["full"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 tracing = "0.1.40"
+
+[build-dependencies]
+rhombus-build = { path = "../../rhombus-build" }

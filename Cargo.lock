@@ -1368,6 +1368,7 @@ dependencies = [
  "futures",
  "rand",
  "rhombus",
+ "rhombus-build",
  "sha2",
  "tokio",
  "tracing",
@@ -4586,6 +4587,13 @@ dependencies = [
  "unicode-segmentation",
  "urlencoding",
  "webpki-roots 0.26.6",
+]
+
+[[package]]
+name = "rhombus-build"
+version = "0.1.0"
+dependencies = [
+ "rust-embed",
 ]
 
 [[package]]

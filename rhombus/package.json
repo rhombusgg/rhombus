@@ -11,6 +11,9 @@
   "keywords": [],
   "author": "Mark Bundschuh",
   "license": "MPL-2.0",
+  "dependencies": {
+    "@tailwindcss/cli": "^4.0.0-beta.6"
+  },
   "devDependencies": {
     "@fluent/bundle": "^0.18.0",
     "@fluent/langneg": "^0.7.0",
@@ -24,7 +27,7 @@
     "solid-element": "^1.8.0",
     "solid-js": "^1.8.17",
     "solid-toast": "^0.5.0",
-    "tailwindcss": "^3.4.3",
+    "tailwindcss": "4.0.0-beta.6",
     "tailwindcss-animate": "^1.0.7"
   }
 }
