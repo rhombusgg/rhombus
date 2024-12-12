@@ -700,10 +700,7 @@ impl Builder {
                     {
                         let s3_upload_provider =
                             crate::s3_upload_provider::S3UploadProvider::new(s3).await?;
-                        let erased_upload_provider: Box<dyn ErasedUploadProvider> =
-                            Box::new(s3_upload_provider);
-                        break 'u erased_upload_provider;
-                        // break 'u Box::new(s3_upload_provider);
+                        break 'u Box::new(s3_upload_provider);
                     }
 
                     #[cfg(not(feature = "s3"))]
@@ -719,10 +716,7 @@ impl Builder {
                     .unwrap_or(false)
                 {
                     let database_upload_provider = DatabaseUploadProvider::new(db).await;
-                    let erased_upload_provider: Box<dyn ErasedUploadProvider> =
-                        Box::new(database_upload_provider);
-                    break 'u erased_upload_provider;
-                    // break 'u Box::new(database_upload_provider);
+                    break 'u Box::new(database_upload_provider);
                 }
 
                 let base_path = if let Some(local_upload_provider_options) =
@@ -743,10 +737,7 @@ impl Builder {
                 };
 
                 let local_upload_provider = LocalUploadProvider::new(base_path);
-                let erased_upload_provider: Box<dyn ErasedUploadProvider> =
-                    Box::new(local_upload_provider);
-                break 'u erased_upload_provider;
-                // Box::new(local_upload_provider)
+                break 'u Box::new(local_upload_provider);
             };
 
             let upload_router = upload_provider.routes()?;
