@@ -34,6 +34,7 @@
           version = "0.1.0";
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
+          nativeBuildInputs = with pkgs; [deno];
         };
 
         apps.rhombus-cli = {
@@ -56,16 +57,16 @@
             vscode-langservers-extracted
             alejandra
 
-            nodejs_20
+            deno
+
             sqlite
             mold
             go-task
-            tailwindcss
             cargo-watch
             systemfd
             rust-toolchain
-            nodePackages.pnpm
           ];
+          LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
         };
       }
     );

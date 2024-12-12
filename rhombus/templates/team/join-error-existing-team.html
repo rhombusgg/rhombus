@@ -3,7 +3,7 @@
 {% extends "layout.html" %}
 
 {% block content %}
-  <div class="container my-4 flex justify-center items-center">
+  <div class="container my-4 flex items-center justify-center">
     <div class="max-w-prose">
       {% call card.root() %}
         {% call card.header() %}
@@ -20,7 +20,7 @@
           <div class="flex justify-between">
             <div>
               <h4 class="text-sm">Members</h4>
-              <p class="mb-2 text-sm text-muted-foreground">
+              <p class="text-muted-foreground mb-2 text-sm">
                 Your team members
               </p>
             </div>
@@ -35,12 +35,12 @@
           </div>
           <ul class="flex flex-col gap-2">
             {% for player_id, player in team.users | items %}
-              <li class="flex items-center justify-between group">
+              <li class="group flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <a
                     hx-boost="true"
                     href="/user/{{ player_id }}"
-                    class="flex gap-2 items-center"
+                    class="flex items-center gap-2"
                     title="Go to public user profile"
                   >
                     <img
@@ -63,12 +63,12 @@
           <hr class="my-4" />
           <p>
             Go to
-            <a class="underline font-medium" hx-boost="true" href="/team"
+            <a class="font-medium underline" hx-boost="true" href="/team"
               >your team</a
             >
             and kick all your members, then try again.
           </p>
-          <p class="flex items-center mt-3">
+          <p class="mt-3 flex items-center">
             <span class="text-primary font-bold">Tip:&nbsp;</span>Reroll your
             own team's invite link so that your old members can't join back.
           </p>

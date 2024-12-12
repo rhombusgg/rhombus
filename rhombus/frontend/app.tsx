@@ -1,3 +1,4 @@
+// deno-lint-ignore-file no-window
 import { render } from "solid-js/web";
 import { Tooltip } from "@kobalte/core/tooltip";
 import {
@@ -36,10 +37,10 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "./command";
+} from "./command.tsx";
 
 function navigate(url: string) {
-  // @ts-ignore
+  // @ts-ignore defined in browser by htmx import
   htmx.ajax("GET", url, {
     select: "#screen",
     target: "#screen",
@@ -68,7 +69,7 @@ const CommandMenu = () => {
       }
     };
 
-    // @ts-ignore
+    // @ts-ignore window is an any
     window.openCommandPalette = () => setOpen(true);
 
     document.addEventListener("keydown", down);
@@ -432,11 +433,11 @@ const ChallengesComponent = ({
                             decodeURIComponent(location.hash.substring(1)) ===
                             challenge.name,
                         }}
-                        class="border-l-4 bg-card p-4 ring-offset-4 ring-offset-background"
+                        class="bg-card ring-offset-background border-l-4 p-4 ring-offset-4"
                         style={`border-color: ${category.color}; --tw-ring-color: ${category.color}`}
                       >
-                        <div class="mb-2 flex justify-between h-8">
-                          <div class="font-bold flex items-center gap-2">
+                        <div class="mb-2 flex h-8 justify-between">
+                          <div class="flex items-center gap-2 font-bold">
                             <button
                               hx-trigger="click"
                               hx-get={`/challenges/${challenge.id}`}
@@ -484,7 +485,7 @@ const ChallengesComponent = ({
                                 </Tooltip.Portal>
                                 <Tooltip.Trigger
                                   as="div"
-                                  class={`size-3 rounded-full cursor-pointer ${challenge.health.healthy ? "bg-green-500" : "bg-red-500"}`}
+                                  class={`size-3 cursor-pointer rounded-full ${challenge.health.healthy ? "bg-green-500" : "bg-red-500"}`}
                                 />
                               </Tooltip>
                             </Show>
@@ -512,7 +513,7 @@ const ChallengesComponent = ({
                                   href={`/user/${solve.user_id}`}
                                 >
                                   <img
-                                    class="aspect-square rounded-full h-8"
+                                    class="aspect-square h-8 rounded-full"
                                     alt={translate("solved-by", {
                                       name: data().team.users[solve.user_id]
                                         .name,
@@ -577,7 +578,7 @@ const ChallengesComponent = ({
                                 </Tooltip.Portal>
                                 <Tooltip.Trigger
                                   as="img"
-                                  class="aspect-square rounded-full h-8"
+                                  class="aspect-square h-8 rounded-full"
                                   alt={translate("authored-by", {
                                     name: author.name,
                                   })}
@@ -640,11 +641,11 @@ const ChallengesComponent = ({
                           innerHTML={challenge.description}
                         ></div>
                         <Show when={challenge.attachments.length > 0}>
-                          <div class="flex gap-2 mt-4">
+                          <div class="mt-4 flex gap-2">
                             <For each={challenge.attachments}>
                               {(attachment) => (
                                 <a
-                                  class="pr-2 py-1 pl-1 max-w-fit rounded-lg flex"
+                                  class="flex max-w-fit rounded-lg py-1 pl-1 pr-2"
                                   style={`background-color: ${category.color}77`}
                                   href={attachment.url}
                                 >

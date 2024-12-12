@@ -3,73 +3,12 @@
 
 {% block content %}
   <div
-    class="w-full h-fit my-4 px-4 gap-4 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(600px,1fr))]"
+    class="my-4 grid h-fit w-full grid-cols-1 gap-4 px-4 md:grid-cols-[repeat(auto-fit,minmax(600px,1fr))]"
     id="challenges"
   ></div>
 
   <div class="hidden" id="initial-challenge-json">
     {{- challenge_json | tojson -}}
   </div>
-  <script>
-    (function () {
-      rhombus.renderChallenges(
-        document.getElementById("challenges"),
-        JSON.parse(document.getElementById("initial-challenge-json").innerHTML),
-      );
-
-      window.addEventListener("focus", window.challengeRefetchHandler);
-      window.addEventListener("manualRefresh", window.challengeRefetchHandler);
-
-      window.deregister = () => {
-        window.removeEventListener("focus", window.challengeRefetchHandler);
-        window.removeEventListener(
-          "manualRefresh",
-          window.challengeRefetchHandler,
-        );
-      };
-
-      document.body.addEventListener("htmx:afterSettle", function (detail) {
-        const dialog = detail.target.querySelector(
-          "dialog[data-onload-showmodal]",
-        );
-        if (dialog) {
-          dialog.addEventListener("close", () => {
-            dialog.remove();
-          });
-          dialog.addEventListener("mousedown", (event) => {
-            const rect = event.target.getBoundingClientRect();
-
-            if (
-              event.clientX - rect.left <= 0 ||
-              rect.right - event.clientX <= 0 ||
-              event.clientY - rect.top <= 0 ||
-              rect.bottom - event.clientY <= 0
-            ) {
-              dialog.isMouseDown = true;
-            }
-          });
-          dialog.addEventListener("mouseup", (event) => {
-            const rect = event.target.getBoundingClientRect();
-
-            if (
-              (event.clientX - rect.left <= 0 ||
-                rect.right - event.clientX <= 0 ||
-                event.clientY - rect.top <= 0 ||
-                rect.bottom - event.clientY <= 0) &&
-              dialog.isMouseDown
-            ) {
-              dialog.close();
-            }
-
-            dialog.isMouseDown = false;
-          });
-          dialog.showModal();
-        }
-      });
-
-      document.body.addEventListener("closeModal", function () {
-        document.querySelector("dialog[open]")?.close();
-      });
-    })();
-  </script>
+  <script src="/static/challenges.js"></script>
 {% endblock %}

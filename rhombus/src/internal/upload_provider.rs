@@ -1,29 +1,13 @@
 use std::sync::Arc;
 
 use axum::{
-    body::Bytes,
     extract::{Path, Request, State},
     response::IntoResponse,
-    Extension, Router,
+    Extension,
 };
-use futures::Stream;
 use reqwest::StatusCode;
 
-use crate::{internal::auth::MaybeUser, Result, UploadProvider};
-
-impl UploadProvider for () {
-    fn routes(&self) -> Result<Router> {
-        unreachable!()
-    }
-
-    async fn upload<S, E>(&self, _filename: &str, _stream: S) -> Result<String>
-    where
-        S: Stream<Item = std::result::Result<Bytes, E>> + Send,
-        E: Into<axum::BoxError>,
-    {
-        unreachable!()
-    }
-}
+use crate::{internal::auth::MaybeUser, UploadProvider};
 
 pub async fn route_upload_file<U: UploadProvider>(
     State(upload_provider): State<Arc<U>>,

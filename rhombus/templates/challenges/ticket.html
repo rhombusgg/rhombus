@@ -2,7 +2,7 @@
 
 <dialog
   data-onload-showmodal
-  class="backdrop:bg-background/50 bg-background max-w-prose w-full rounded-lg text-foreground border-4 p-6 shadow-lg"
+  class="backdrop:bg-background/50 bg-background text-foreground w-full max-w-prose rounded-lg border-4 p-6 shadow-lg"
   style="border-color: {{ category.color }}"
 >
   <div class="mb-2 flex justify-between">
@@ -14,12 +14,12 @@
   <div class="mb-4 font-bold">
     Facing an issue with the challenge? Submit a ticket to talk to an organizer.
   </div>
-  <div class="mb-4 prose dark:prose-invert">
+  <div class="prose dark:prose-invert mb-4">
     {{ challenge.description | safe }}
   </div>
-  <div class="h-60 mb-2" id="editor"></div>
+  <div class="mb-2 h-60" id="editor"></div>
   <button
-    class="p-2 rounded-lg"
+    class="rounded-lg p-2"
     style="background-color: {{ category.color }}aa"
     hx-post="/challenges/{{ challenge.id }}/ticket"
     hx-vals="js:{content: window.editor.getValue()}"

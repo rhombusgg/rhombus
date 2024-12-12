@@ -9,6 +9,15 @@ auto-format = true
 name = "css"
 language-servers = ["vscode-css-language-server", "tailwindcss-ls"]
 
+[language-server.deno-language-server]
+command = "deno"
+args = ["lsp"]
+
+[[language]]
+name = "typescript"
+file-types = ["ts", "tsx"]
+language-servers = ["deno-language-server"]
+
 [language-server.tailwindcss-ls]
 config = { userLanguages = { jinja = "html" } }
 

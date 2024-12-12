@@ -1,0 +1,22 @@
+{
+  "nodeModulesDir": "auto",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "solid-js",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"]
+  },
+  "imports": {
+    "@tailwindcss/cli": "npm:@tailwindcss/cli@^4.0.0-beta.6",
+    "@fluent/bundle": "npm:@fluent/bundle@^0.18.0",
+    "@fluent/langneg": "npm:@fluent/langneg@^0.7.0",
+    "@kobalte/core": "npm:@kobalte/core@^0.13.2",
+    "clsx": "npm:clsx@^2.1.1",
+    "cmdk-solid": "npm:cmdk-solid@^1.1.0",
+    "esbuild": "npm:esbuild@^0.24.0",
+    "esbuild-plugin-solid": "npm:esbuild-plugin-solid@^0.6.0",
+    "lucide-solid": "npm:lucide-solid@^0.468.0",
+    "solid-element": "npm:solid-element@^1.9.1",
+    "solid-js": "npm:solid-js@^1.9.3",
+    "solid-toast": "npm:solid-toast@^0.5.0"
+  }
+}

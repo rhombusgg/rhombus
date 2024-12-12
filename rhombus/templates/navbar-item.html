@@ -1,11 +1,11 @@
 {% macro navbarItem(label, href, uri, icon="") %}
   {% set active = uri == href %}
-  <a class="whitespace-nowrap py-2 group relative" href="{{ href }}">
+  <a class="group relative whitespace-nowrap py-2" href="{{ href }}">
     <div
-      class="px-3 py-2 flex items-center rounded-md hover:bg-secondary after:absolute after:bottom-0 after:right-3 after:left-3 after:h-0.5 after:bg-primary text-foreground after:rounded-sm {% if active %}after:visible{% else %}after:invisible{% endif %}"
+      class="hover:bg-secondary after:bg-primary text-foreground {% if active %}after:visible{% else %}after:invisible{% endif %} flex items-center rounded-md px-3 py-2 after:absolute after:bottom-0 after:left-3 after:right-3 after:h-0.5 after:rounded-sm"
     >
       {% if icon %}
-        <div class="mr-2 [&>*]:size-5 hidden sm:inline-block">
+        <div class="mr-2 hidden sm:inline-block [&>*]:size-5">
           {{ icon | safe }}
         </div>
       {% endif %}

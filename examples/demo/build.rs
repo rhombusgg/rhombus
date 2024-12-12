@@ -1,12 +1,8 @@
 use std::process::Command;
 
-use rustc_version::{version_meta, Channel};
-
 fn main() {
-    println!("cargo:rerun-if-changed=fonts");
-    println!("cargo:rerun-if-changed=locales");
-    println!("cargo:rerun-if-changed=migrations");
-    println!("cargo:rerun-if-changed=static");
+    let app_css = rhombus_build::Assets::get("app.css").unwrap();
+    std::fs::write("rhombus.css", app_css.data).unwrap();
 
     if is_in_path("deno") {
         Command::new("deno")
@@ -23,24 +19,14 @@ fn main() {
                 "--input",
                 "app.css",
                 "--output",
-                "static/rhombus.css",
+                "static/demo.css",
             ])
             .spawn()
             .expect("Failed to run tailwindcss");
-
-        Command::new("deno")
-            .args(["run", "-A", "build.ts"])
-            .spawn()
-            .expect("Failed to run js build");
     }
 
-    let channel = match version_meta().unwrap().channel {
-        Channel::Stable => "CHANNEL_STABLE",
-        Channel::Beta => "CHANNEL_BETA",
-        Channel::Nightly => "CHANNEL_NIGHTLY",
-        Channel::Dev => "CHANNEL_DEV",
-    };
-    println!("cargo:rustc-cfg={}", channel)
+    println!("cargo:rerun-if-changed=static");
+    println!("cargo:rerun-if-changed=app.css");
 }
 
 fn is_in_path(command: &str) -> bool {

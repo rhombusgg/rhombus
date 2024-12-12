@@ -16,8 +16,8 @@ use rhombus::{
         router::RouterState,
         routes::meta::PageMeta,
     },
-    plugin::{DatabaseProviderContext, RunContext},
-    Plugin, UploadProvider,
+    plugin::{DatabaseProviderContext, PluginMeta, RunContext},
+    Plugin,
 };
 use sqlx::Executor;
 
@@ -39,7 +39,16 @@ impl MyPlugin {
     }
 }
 
+#[async_trait]
 impl Plugin for MyPlugin {
+    fn meta(&self) -> PluginMeta {
+        PluginMeta {
+            name: env!("CARGO_PKG_NAME").into(),
+            version: env!("CARGO_PKG_VERSION").into(),
+            description: env!("CARGO_PKG_DESCRIPTION").into(),
+        }
+    }
+
     // async fn upload_provider(
     //     &self,
     //     _: &UploadProviderContext<'_>,
@@ -69,10 +78,7 @@ impl Plugin for MyPlugin {
         Some((Arc::new(core_db), Box::new(mysql)))
     }
 
-    async fn run<U: UploadProvider>(
-        &self,
-        context: &mut RunContext<'_, U>,
-    ) -> rhombus::Result<Router<RouterState>> {
+    async fn run(&self, context: &mut RunContext<'_>) -> rhombus::Result<Router<RouterState>> {
         context
             .templates
             .add_template("home.html", include_str!("../templates/home.html"));

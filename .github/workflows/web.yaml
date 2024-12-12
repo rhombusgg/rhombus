@@ -1,64 +1,25 @@
 name: Web
 on:
+  pull_request:
   push:
     branches:
       - main
 
 jobs:
-  build:
-    name: Build Typescript
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Install dependencies
-        working-directory: rhombus
-        run: |
-          pnpm install
-
-      - name: Build
-        working-directory: rhombus
-        run: |
-          pnpm build-js
-
-  tailwindcss:
-    name: Build TailwindCSS
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Install dependencies
-        working-directory: rhombus
-        run: |
-          pnpm install
-
-      - name: Build
-        working-directory: rhombus
-        run: |
-          pnpm build-tailwind
-
   format:
     name: Check Format
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: denoland/setup-deno@v2
         with:
-          version: 9
+          deno-version: v2.x
 
       - name: Install dependencies
         run: |
-          pnpm install
+          deno install
 
       - name: Check formatting
         run: |
-          pnpm check-format
+          deno task check-format
