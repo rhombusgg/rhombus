@@ -11,4 +11,4 @@ homepage = "https://rhombus.gg"
 keywords = ["web", "ctf", "http"]
 
 [dependencies]
-rust-embed = { version = "8" }
+rust-embed = "8"
