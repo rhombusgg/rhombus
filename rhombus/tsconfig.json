@@ -1,9 +1,0 @@
-{
-    "compilerOptions": {
-        "target": "ESNext",
-        "jsx": "preserve",
-        "jsxImportSource": "solid-js",
-        "moduleResolution": "Bundler",
-        "outDir": "./static"
-    }
-}

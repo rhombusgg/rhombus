@@ -18,7 +18,7 @@ fn main() {
             .args([
                 "run",
                 "-A",
-                "npm:@tailwindcss/cli",
+                "npm:@tailwindcss/cli@^4.0.0-beta.6",
                 "--minify",
                 "--input",
                 "app.css",
@@ -29,7 +29,7 @@ fn main() {
             .expect("Failed to run tailwindcss");
 
         Command::new("deno")
-            .args(["run", "-A", "build.mjs"])
+            .args(["run", "-A", "build.ts"])
             .spawn()
             .expect("Failed to run js build");
     }

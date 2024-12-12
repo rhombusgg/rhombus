@@ -1,5 +1,6 @@
 import { build, context } from "esbuild";
 import { solidPlugin } from "esbuild-plugin-solid";
+import process from "node:process";
 
 const options = {
   entryPoints: ["frontend/app.tsx"],
