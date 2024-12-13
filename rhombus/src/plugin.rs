@@ -82,7 +82,7 @@ pub struct PluginMeta {
 pub trait Plugin {
     fn meta(&self) -> PluginMeta;
 
-    /// Supply a custom [UploadProvider].
+    /// Supply a custom [crate::upload_provider::UploadProvider].
     ///
     /// ```
     /// # use rhombus::{Plugin, LocalUploadProvider, upload_provider::ErasedUploadProvider, plugin::{UploadProviderContext, PluginMeta}};

@@ -1,6 +1,6 @@
 //! Host a CTF
-#![cfg_attr(all(doc, CHANNEL_NIGHTLY), feature(doc_auto_cfg))]
-#![cfg_attr(all(doc, CHANNEL_NIGHTLY), feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 #[cfg(feature = "internal")]
 pub mod internal;
@@ -19,7 +19,9 @@ pub use libsql;
 /// Builder module
 pub mod builder;
 
+#[cfg(feature = "libsql")]
 pub mod challenge_loader_plugin;
+
 pub mod database_upload_provider;
 mod local_upload_provider;
 pub mod plugin;

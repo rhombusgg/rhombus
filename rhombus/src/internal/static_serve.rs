@@ -21,13 +21,15 @@ pub async fn route_static_serve(uri: Uri, req: Request<Body>) -> impl IntoRespon
     }
 
     let service = ServeDir::new("static");
-    if let Ok(response) = service.oneshot(req).await {
-        if response.status().is_informational()
-            || response.status().is_success()
-            || response.status().is_redirection()
-        {
-            return response.into_response();
-        }
+    let Ok(response) = service.oneshot(req).await else {
+        unreachable!()
+    };
+
+    if response.status().is_informational()
+        || response.status().is_success()
+        || response.status().is_redirection()
+    {
+        return response.into_response();
     }
 
     if let Some(content) = StaticDir::get(file) {

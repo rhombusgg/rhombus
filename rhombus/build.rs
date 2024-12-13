@@ -1,7 +1,5 @@
 use std::process::Command;
 
-use rustc_version::{version_meta, Channel};
-
 fn main() {
     println!("cargo:rerun-if-changed=fonts");
     println!("cargo:rerun-if-changed=locales");
@@ -33,14 +31,6 @@ fn main() {
             .spawn()
             .expect("Failed to run js build");
     }
-
-    let channel = match version_meta().unwrap().channel {
-        Channel::Stable => "CHANNEL_STABLE",
-        Channel::Beta => "CHANNEL_BETA",
-        Channel::Nightly => "CHANNEL_NIGHTLY",
-        Channel::Dev => "CHANNEL_DEV",
-    };
-    println!("cargo:rustc-cfg={}", channel)
 }
 
 fn is_in_path(command: &str) -> bool {

@@ -98,7 +98,7 @@ pub async fn route_scoreboard_division(
     .into_response()
 }
 
-/// Implements the feed as described by https://ctftime.org/json-scoreboard-feed
+/// Implements the feed as described by <https://ctftime.org/json-scoreboard-feed>
 pub async fn route_scoreboard_division_ctftime(
     state: State<RouterState>,
     Path(division_id): Path<String>,
