@@ -1300,7 +1300,10 @@ impl Bot {
         challenge: &Challenge,
         challenge_data: &ChallengeData,
     ) -> Result<()> {
-        let category = challenge_data.categories.get(&challenge.id).unwrap();
+        let category = challenge_data
+            .categories
+            .get(&challenge.category_id)
+            .unwrap();
 
         let author = challenge_data.authors.get(&challenge.author_id).unwrap();
 

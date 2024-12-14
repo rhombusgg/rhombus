@@ -1,7 +1,7 @@
 {
   "scripts": {
-    "check-format": "prettier --check rhombus/**/*.tsx rhombus/**/*.ts rhombus/**/*.html",
-    "format": "prettier --write rhombus/**/*.tsx rhombus/**/*.ts rhombus/**/*.html",
+    "check-format": "prettier --check rhombus/**/*.tsx rhombus/**/*.ts rhombus/**/*.html **/*.md",
+    "format": "prettier --write rhombus/**/*.tsx rhombus/**/*.ts rhombus/**/*.html **/*.md",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs"

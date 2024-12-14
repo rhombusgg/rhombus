@@ -13,6 +13,7 @@ CodeSandbox standalone example.
 The core of Rhombus is configured in `yaml` and with environment variables. There is a JSON schema available for validation and autocomplete.
 
 ::: code-group
+
 ```yaml [config.yaml]
 # yaml-language-server: $schema=https://raw.githubusercontent.com/rhombusgg/rhombus/main/schema.json
 title: Rhombus Demo
@@ -61,6 +62,7 @@ home:
     - Include rules/sponsors
     - Anything else! 🚀
 ```
+
 :::
 
 Environment variables are the exact same keys as in `yaml`, but in all caps, and prefixed by `RHOMBUS__`. Nested keys are separated by `__` (two underscores). For example,
@@ -70,8 +72,7 @@ RHOMBUS__JWT_SECRET="my-super-secret-jwt-secret"
 RHOMBUS__HOME__CONTENT="# My CTF"
 ```
 
-> [!NOTE]
-> `json` and `toml` files are also supported, but the documentation is standardized on `yaml`
+> [!NOTE] > `json` and `toml` files are also supported, but the documentation is standardized on `yaml`
 
 ## Standalone Binary
 
@@ -102,12 +103,14 @@ cargo init
 Then, add the following dependencies to your `Cargo.toml`
 
 ::: code-group
+
 ```toml [Cargo.toml]
 [dependencies]
 rhombus = { version = "0.1.0", features = ["libsql"] }
 tokio = { version = "1.37.0", features = ["full"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 ```
+
 :::
 
 Depending on your desired [database backend](/docs/database/) you will need to enable different `features` for `rhombus`. We will use `libsql` here to get started by using a local SQLite database with zero configuration required.
@@ -115,6 +118,7 @@ Depending on your desired [database backend](/docs/database/) you will need to e
 Now, edit `src/main.rs` to contain the following code
 
 ::: code-group
+
 ```rust {8-12} [src/main.rs]
 #[tokio::main]
 async fn main() {
@@ -141,6 +145,7 @@ async fn main() {
     .unwrap();
 }
 ```
+
 :::
 
 In the highlighted section, notice the 1st party [Challenge Loader Plugin](/docs/challenges) being loaded into the Rhombus instance. To add your own plugins, add them as dependencies to your Rust project (in the `Cargo.toml`), and make more calls to `.plugin` on the Rhombus builder.

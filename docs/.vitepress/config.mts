@@ -38,18 +38,20 @@ export default defineConfig({
         text: "Introduction",
         items: [
           { text: "Getting Started", link: "/docs/getting-started" },
-          { text: "Deploy", link: "/docs/deploy" },
-          {
-            text: "Concepts",
-            link: "/docs/concepts/",
-            items: [
-              { text: "Tickets", link: "/docs/concepts/tickets" },
-              { text: "Health Checks", link: "/docs/concepts/healthchecks" },
-              { text: "CTFtime", link: "/docs/concepts/ctftime" },
-            ],
-          },
+          { text: "Showcase", link: "/docs/showcase" },
+          // { text: "Benchmarks", link: "/docs/benches" },
         ],
       },
+      // {
+      //   text: "Deployment Recipes",
+      //   items: [
+      //     { text: "Fly.io", link: "/docs/deploy/fly" },
+      //     {
+      //       text: "Raspberry Pi / Cloudflare Tunnel",
+      //       link: "/docs/deploy/raspi",
+      //     },
+      //   ],
+      // },
       {
         text: "Configuration",
         items: [
@@ -58,6 +60,7 @@ export default defineConfig({
           { text: "Divisions", link: "/docs/divisions" },
           { text: "Challenges", link: "/docs/challenges" },
           { text: "CTFtime", link: "/docs/ctftime" },
+          { text: "IP Extractor", link: "/docs/ip" },
           {
             text: "Email",
             link: "/docs/email/",
@@ -84,8 +87,6 @@ export default defineConfig({
               { text: "S3", link: "/docs/uploads/s3" },
             ],
           },
-          { text: "IP Extractor", link: "/docs/ip" },
-          { text: "Rate Limiting", link: "/docs/rate-limit" },
         ],
       },
       {

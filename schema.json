@@ -479,22 +479,27 @@
         },
         "first_blood_channel_id": {
           "title": "First Blood Channel ID",
-          "description": "Snowflake Discord ID for the channel which first bloods should be sent to",
+          "description": "Discord ID for the channel which first bloods should be sent to",
           "type": ["string", "integer"]
         },
         "support_channel_id": {
           "title": "Support Channel ID",
-          "description": "Snowflake Discord ID for the channel which support threads should be branched off of",
+          "description": "Discord ID for the channel which support threads should be branched off of",
           "type": ["string", "integer"]
         },
         "author_role_id": {
           "title": "Author Role ID",
-          "description": "Snowflake Discord ID for the author role to link authors",
+          "description": "Discord ID for the author role to link authors",
           "type": ["string", "integer"]
         },
         "verified_role_id": {
-          "title": "Author Role ID",
-          "description": "Snowflake Discord ID for the verified role to give to users who sign in to the CTF website",
+          "title": "Verified Role ID",
+          "description": "Discord ID for the verified role to give to users who sign in to the CTF website",
+          "type": ["string", "integer"]
+        },
+        "top10_role_id": {
+          "title": "Top 10 Role ID",
+          "description": "Discord ID for the role to give to the players in the top 10 teams in each division",
           "type": ["string", "integer"]
         },
         "invite_url": {
