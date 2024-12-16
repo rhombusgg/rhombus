@@ -1,4 +1,4 @@
-use std::{sync::LazyLock, time::Duration};
+use std::{cmp::max, sync::LazyLock, time::Duration};
 
 use axum::{
     extract::{Path, State},
@@ -196,8 +196,10 @@ impl ChallengePoints for DynamicPoints {
         let total_solves = challenge.division_solves.values().sum::<u64>() as f64;
 
         let solves = total_solves + 1.;
-        let points =
-            (((minimum - initial) / (decay * decay) * (solves * solves)) + initial).ceil() as i64;
+        let points = max(
+            (((minimum - initial) / (decay * decay) * (solves * solves)) + initial).ceil() as i64,
+            minimum as i64,
+        );
 
         Ok(points)
     }
@@ -611,7 +613,14 @@ pub async fn route_challenge_submit(
 
     if let Err(error) = state
         .db
-        .solve_challenge(user.id, team.id, &team.division_id, challenge, next_points)
+        .solve_challenge(
+            user.id,
+            team.id,
+            &team.division_id,
+            challenge,
+            next_points,
+            now,
+        )
         .await
     {
         tracing::error!("{:#?}", error);

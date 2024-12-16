@@ -278,10 +278,18 @@ impl Database for DbCache {
         division_id: &str,
         solved_challenge: &Challenge,
         next_points: i64,
+        now: DateTime<Utc>,
     ) -> Result<()> {
         let result = self
             .inner
-            .solve_challenge(user_id, team_id, division_id, solved_challenge, next_points)
+            .solve_challenge(
+                user_id,
+                team_id,
+                division_id,
+                solved_challenge,
+                next_points,
+                now,
+            )
             .await;
         if result.is_ok() {
             USER_CACHE.remove(&user_id);

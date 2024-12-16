@@ -298,7 +298,8 @@ async fn solve_challenge(
                 .await
                 .unwrap();
 
-            db.solve_challenge(user_id, team_id, &division_id, challenge, next_points)
+            let now = Utc::now();
+            db.solve_challenge(user_id, team_id, &division_id, challenge, next_points, now)
                 .await?;
             tracing::info!(user_id, challenge_id = challenge.id, "Solved challenge");
         }
@@ -314,7 +315,7 @@ fn solver(
 ) {
     tokio::task::spawn(async move {
         loop {
-            tokio::time::sleep(Duration::from_secs(10)).await;
+            tokio::time::sleep(Duration::from_secs(1)).await;
             _ = solve_challenge(libsql.clone(), db.clone(), score_type_map.clone()).await;
         }
     });
@@ -323,7 +324,7 @@ fn solver(
 fn team_creator(libsql: Arc<LibSQL>, db: Connection) {
     tokio::task::spawn(async move {
         loop {
-            tokio::time::sleep(Duration::from_secs(30)).await;
+            tokio::time::sleep(Duration::from_secs(5)).await;
             _ = create_team(libsql.clone(), db.clone()).await;
         }
     });

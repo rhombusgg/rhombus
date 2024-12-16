@@ -1,20 +1,20 @@
 stable_id: my-first-web
-name: my-first-web
+name: quotes
 description: |
-  this is a super [cool](https://example.com) *web* challenge
+  I'm launching 🚀 my new ✨ SaaS providing quotes 📝 as an API 💪!
 
-  hi!
-flag: flag{this_is_a_fake_flag}
+  [quotes.challs.pwnoh.io/quote](https://quotes.challs.pwnoh.io/quote)
+flag: bctf{numb3r5_4nd_57r1n65_4r3_4mb16u0u5_1n_j5_831b8aa8cbe58ed4}
 category: web
 author: mbund
-score_type: dynamic
-dynamic:
-  decay: 20
+difficulty: easy
+points: dynamic
+ticket_template: |
+  ## Please describe the issue you are experiencing
+
+  ## Steps to reproduce
+
 files:
   - src: hello.py
-    dst: main.py
-  - url: https://upload.wikimedia.org/wikipedia/commons/1/14/Symmetries_of_square.svg
-    dst: quadrilaterals.svg
-ticket_template: |
-  # Web template
+    dst: quotes.zip
 healthscript: https://example.com

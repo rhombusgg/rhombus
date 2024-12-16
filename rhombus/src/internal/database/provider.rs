@@ -278,6 +278,7 @@ pub trait Database {
         division_id: &str,
         challenge: &Challenge,
         next_points: i64,
+        now: DateTime<Utc>,
     ) -> Result<()>;
     async fn get_user_from_id(&self, user_id: i64) -> Result<User>;
     async fn get_user_from_discord_id(&self, discord_id: NonZeroU64) -> Result<User>;

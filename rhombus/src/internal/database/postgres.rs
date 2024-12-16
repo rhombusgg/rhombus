@@ -225,6 +225,7 @@ impl Database for Postgres {
         _division_id: &str,
         _challenge: &Challenge,
         _next_points: i64,
+        _now: DateTime<Utc>,
     ) -> Result<()> {
         todo!()
     }

@@ -3,7 +3,6 @@ location_url: http://localhost:3000
 contact_email: demo@rhombus.gg
 database_url: file://rhombus.db
 start_time: 2024-09-04T03:14:00Z
-end_time: 2024-09-09T03:16:00Z
 uploads:
   local:
     folder: uploads
@@ -23,7 +22,7 @@ discord:
   guild_id: 1160610137703186636
   client_id: 1160076447977848945
   author_role_id: 1198496803130183770
-  first_blood_channel_id: 1240422645938389102
+  # first_blood_channel_id: 1240422645938389102
   support_channel_id: 1173026578385617010
   verified_role_id: 1170429782270431283
 ctftime:
