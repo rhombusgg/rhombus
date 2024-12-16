@@ -60,20 +60,32 @@ pub async fn route_scoreboard_division(
     params: Query<PageParams>,
     uri: Uri,
 ) -> impl IntoResponse {
-    let page_num = params.page.unwrap_or(1).saturating_sub(1);
+    let page_num = params.page.unwrap_or(1).saturating_sub(1) as usize;
 
     let division_id = division_id.strip_suffix(".json").unwrap_or(&division_id);
 
     let scoreboard = state.db.get_scoreboard(division_id);
     let challenge_data = state.db.get_challenges();
-    let leaderboard = state.db.get_leaderboard(division_id, Some(page_num));
+    let leaderboard = state.db.get_leaderboard(division_id);
     let (scoreboard, challenge_data, leaderboard) =
         futures::future::try_join3(scoreboard, challenge_data, leaderboard)
             .await
             .unwrap();
 
+    const PAGE_SIZE: usize = 25;
+    let num_pages = (leaderboard.len() + (PAGE_SIZE - 1)) / PAGE_SIZE;
+    let page_num = page_num.min(num_pages);
+
+    let start = std::cmp::min(leaderboard.len(), page_num * PAGE_SIZE);
+    let end = std::cmp::min(leaderboard.len(), start + PAGE_SIZE);
+    let leaderboard = &leaderboard[start..end];
+
     if uri.path().ends_with(".json") {
-        return Json(scoreboard.teams).into_response();
+        return (
+            [("Content-Type", "application/json")],
+            scoreboard.cached_json.clone(),
+        )
+            .into_response();
     }
 
     Html(
@@ -92,6 +104,7 @@ pub async fn route_scoreboard_division(
                 leaderboard,
                 selected_division_id => division_id,
                 page_num,
+                num_pages,
             })
             .unwrap(),
     )
@@ -104,7 +117,7 @@ pub async fn route_scoreboard_division_ctftime(
     Path(division_id): Path<String>,
 ) -> impl IntoResponse {
     let challenge_data = state.db.get_challenges().await.unwrap();
-    let leaderboard = state.db.get_leaderboard(&division_id, None).await.unwrap();
+    let leaderboard = state.db.get_leaderboard(&division_id).await.unwrap();
 
     let tasks = challenge_data
         .challenges
@@ -113,7 +126,6 @@ pub async fn route_scoreboard_division_ctftime(
         .collect::<Vec<_>>();
 
     let standings = leaderboard
-        .entries
         .iter()
         .map(|team| {
             json!({

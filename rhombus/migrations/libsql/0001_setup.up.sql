@@ -194,12 +194,6 @@ FROM rhombus_solve
 JOIN rhombus_team ON rhombus_solve.team_id = rhombus_team.id
 GROUP BY rhombus_solve.challenge_id, rhombus_team.division_id;
 
--- CREATE VIEW IF NOT EXISTS rhombus_team_points AS
--- SELECT rhombus_solve.team_id, SUM(COALESCE(rhombus_solve.points, rhombus_challenge.points)) AS points, MAX(rhombus_solve.solved_at) AS last_solved_at
--- FROM rhombus_solve
--- JOIN rhombus_challenge ON rhombus_solve.challenge_id = rhombus_challenge.id
--- GROUP BY rhombus_solve.team_id;
-
 CREATE TABLE IF NOT EXISTS rhombus_track (
     id INTEGER PRIMARY KEY NOT NULL,
     ip BLOB NOT NULL,

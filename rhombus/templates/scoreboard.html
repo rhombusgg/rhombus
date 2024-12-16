@@ -93,10 +93,10 @@
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
-            {% if leaderboard.entries | length > 0 %}
+            {% if leaderboard | length > 0 %}
               <div class="flex w-full">
                 <table class="grow table-fixed">
-                  {% for entry in leaderboard.entries %}
+                  {% for entry in leaderboard %}
                     <tr class="even:bg-secondary *:p-2">
                       <td>{{ entry.rank }}</td>
                       <td class="w-2/3">
@@ -114,10 +114,10 @@
                   {% endfor %}
                 </table>
               </div>
-              {% if leaderboard.num_pages > 1 %}
+              {% if num_pages > 1 %}
                 <div class="flex justify-center">
                   <div>
-                    {% for i in range(leaderboard.num_pages) %}
+                    {% for i in range(num_pages) %}
                       {% if i == 0 and page_num != 0 %}
                         <a
                           hx-boost="true"

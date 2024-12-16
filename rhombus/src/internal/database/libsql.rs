@@ -28,10 +28,10 @@ use crate::{
             provider::{
                 Author, Category, Challenge, ChallengeAttachment, ChallengeData, ChallengeDivision,
                 ChallengeSolve, Challenges, Database, DiscordUpsertError, Email, Leaderboard,
-                LeaderboardEntry, Scoreboard, ScoreboardSeriesPoint, ScoreboardTeam,
-                SetAccountNameError, SetTeamNameError, SiteStatistics, StatisticsCategory, Team,
-                TeamInner, TeamMeta, TeamMetaInner, TeamStanding, TeamUser, Ticket,
-                ToBeClosedTicket, UserTrack, Writeup,
+                LeaderboardEntry, Scoreboard, ScoreboardInner, ScoreboardSeriesPoint,
+                ScoreboardTeam, SetAccountNameError, SetTeamNameError, SiteStatistics,
+                StatisticsCategory, Team, TeamInner, TeamMeta, TeamMetaInner, TeamStanding,
+                TeamUser, Ticket, ToBeClosedTicket, UserTrack, Writeup,
             },
         },
         division::Division,
@@ -1902,10 +1902,10 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
         tx.commit().await?;
 
-        Ok(Scoreboard { teams })
+        Ok(Arc::new(ScoreboardInner::new(teams)))
     }
 
-    async fn get_leaderboard(&self, division_id: &str, page: Option<u64>) -> Result<Leaderboard> {
+    async fn get_leaderboard(&self, division_id: &str) -> Result<Leaderboard> {
         #[derive(Debug, Deserialize)]
         struct DbLeaderboard {
             team_id: i64,
@@ -1913,100 +1913,36 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             points: f64,
         }
 
-        if let Some(page) = page {
-            let tx = self.transaction().await?;
+        let mut rank = 0;
 
-            let num_teams = tx
-                .query(
-                    "
-                    SELECT COUNT(*)
-                    FROM rhombus_team
-                    WHERE rhombus_team.division_id = ?1
-                ",
-                    [division_id],
-                )
-                .await?
-                .next()
-                .await?
-                .unwrap()
-                .get::<u64>(0)
-                .unwrap();
-
-            const PAGE_SIZE: u64 = 25;
-
-            let num_pages = (num_teams + (PAGE_SIZE - 1)) / PAGE_SIZE;
-
-            let page = page.min(num_pages);
-
-            let mut rank = page * PAGE_SIZE;
-
-            let leaderboard_entries = tx
-                .query(
-                    "
-                    SELECT id AS team_id, name, points
-                    FROM rhombus_team
-                    WHERE division_id = ?1
-                    ORDER BY points DESC, last_solved_at ASC
-                    LIMIT ?3 OFFSET ?2
-                ",
-                    params!(division_id, page * PAGE_SIZE, PAGE_SIZE),
-                )
-                .await?
-                .into_stream()
-                .map(|row| {
-                    let db_leaderboard = de::from_row::<DbLeaderboard>(&row.unwrap()).unwrap();
-                    rank += 1;
-                    LeaderboardEntry {
-                        rank,
-                        team_id: db_leaderboard.team_id,
-                        team_name: db_leaderboard.name,
-                        score: db_leaderboard.points.round() as i64,
-                    }
-                })
-                .collect::<Vec<_>>()
-                .await;
-
-            tx.commit().await?;
-
-            Ok(Leaderboard {
-                entries: leaderboard_entries,
-                num_pages,
+        let leaderboard_entries = self
+            .connect()
+            .await?
+            .query(
+                "
+                SELECT id AS team_id, name, points
+                FROM rhombus_team
+                WHERE division_id = ?1
+                ORDER BY points DESC, last_solved_at ASC
+            ",
+                params!(division_id),
+            )
+            .await?
+            .into_stream()
+            .map(|row| {
+                let db_leaderboard = de::from_row::<DbLeaderboard>(&row.unwrap()).unwrap();
+                rank += 1;
+                LeaderboardEntry {
+                    rank,
+                    team_id: db_leaderboard.team_id,
+                    team_name: db_leaderboard.name,
+                    score: db_leaderboard.points.round() as i64,
+                }
             })
-        } else {
-            let mut rank = 0;
+            .collect::<Vec<_>>()
+            .await;
 
-            let leaderboard_entries = self
-                .connect()
-                .await?
-                .query(
-                    "
-                    SELECT id AS team_id, name, points
-                    FROM rhombus_team
-                    WHERE division_id = ?1
-                    ORDER BY points DESC, last_solved_at ASC
-                ",
-                    params!(division_id),
-                )
-                .await?
-                .into_stream()
-                .map(|row| {
-                    let db_leaderboard = de::from_row::<DbLeaderboard>(&row.unwrap()).unwrap();
-                    rank += 1;
-                    LeaderboardEntry {
-                        rank,
-                        team_id: db_leaderboard.team_id,
-                        team_name: db_leaderboard.name,
-                        score: db_leaderboard.points.round() as i64,
-                    }
-                })
-                .collect::<Vec<_>>()
-                .await;
-
-            Ok(Leaderboard {
-                entries: leaderboard_entries,
-                num_pages: 1,
-            })
-        }
+        Ok(Arc::new(leaderboard_entries))
     }
 
     async fn get_top10_discord_ids(&self) -> Result<BTreeSet<NonZeroU64>> {

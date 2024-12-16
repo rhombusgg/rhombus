@@ -443,8 +443,8 @@ impl Database for DbCache {
         get_scoreboard(&self.inner, division_id).await
     }
 
-    async fn get_leaderboard(&self, division_id: &str, page: Option<u64>) -> Result<Leaderboard> {
-        get_leaderboard(&self.inner, division_id, page).await
+    async fn get_leaderboard(&self, division_id: &str) -> Result<Leaderboard> {
+        get_leaderboard(&self.inner, division_id).await
     }
 
     async fn get_top10_discord_ids(&self) -> Result<BTreeSet<NonZeroU64>> {
@@ -699,23 +699,18 @@ pub async fn get_scoreboard(db: &Connection, division_id: &str) -> Result<Scoreb
     scoreboard
 }
 
-pub static LEADERBOARD_CACHE: LazyLock<DashMap<(String, Option<u64>), Leaderboard>> =
-    LazyLock::new(DashMap::new);
+pub static LEADERBOARD_CACHE: LazyLock<DashMap<String, Leaderboard>> = LazyLock::new(DashMap::new);
 
-pub async fn get_leaderboard(
-    db: &Connection,
-    division_id: &str,
-    page: Option<u64>,
-) -> Result<Leaderboard> {
-    if let Some(leaderboard) = LEADERBOARD_CACHE.get(&(division_id.to_owned(), page)) {
+pub async fn get_leaderboard(db: &Connection, division_id: &str) -> Result<Leaderboard> {
+    if let Some(leaderboard) = LEADERBOARD_CACHE.get(division_id) {
         return Ok(leaderboard.clone());
     }
-    tracing::trace!(division_id, page, "cache miss: get_leaderboard");
+    tracing::trace!(division_id, "cache miss: get_leaderboard");
 
-    let leaderboard = db.get_leaderboard(division_id, page).await;
+    let leaderboard = db.get_leaderboard(division_id).await;
 
     if let Ok(leaderboard) = &leaderboard {
-        LEADERBOARD_CACHE.insert((division_id.to_owned(), page), leaderboard.clone());
+        LEADERBOARD_CACHE.insert(division_id.to_owned(), leaderboard.clone());
     }
     leaderboard
 }
