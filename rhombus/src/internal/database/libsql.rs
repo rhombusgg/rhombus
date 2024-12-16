@@ -1871,6 +1871,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             )
             .await?;
 
+        tx.commit().await?;
+
         let mut teams: BTreeMap<i64, ScoreboardTeam> = BTreeMap::new();
         let now = chrono::Utc::now().timestamp();
         while let Some(row) = db_teams.next().await? {
@@ -1899,8 +1901,6 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                 .series
                 .push(series_point);
         }
-
-        tx.commit().await?;
 
         Ok(Arc::new(ScoreboardInner::new(teams)))
     }

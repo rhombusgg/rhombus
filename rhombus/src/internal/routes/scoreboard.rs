@@ -49,7 +49,7 @@ pub async fn route_scoreboard(
 
 #[derive(Deserialize)]
 pub struct PageParams {
-    page: Option<u64>,
+    page: Option<usize>,
 }
 
 pub async fn route_scoreboard_division(
@@ -60,7 +60,7 @@ pub async fn route_scoreboard_division(
     params: Query<PageParams>,
     uri: Uri,
 ) -> impl IntoResponse {
-    let page_num = params.page.unwrap_or(1).saturating_sub(1) as usize;
+    let page_num = params.page.unwrap_or(1).saturating_sub(1);
 
     let division_id = division_id.strip_suffix(".json").unwrap_or(&division_id);
 
