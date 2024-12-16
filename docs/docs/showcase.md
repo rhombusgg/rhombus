@@ -62,7 +62,7 @@ When a user signs in or links their account with Discord, they will be assigned 
 
 Rhombus implements the [CTFtime Json Scoreboard Feed](https://ctftime.org/json-scoreboard-feed) and updates it live as the competition progresses. This is useful to easily export at the end of the competition, and to show the current standings to participants during it. No additional configuration is required to enable this feature.
 
-To use it, just append `/ctftime` to the URL of the currently scoreboard. For example, this could be `https://myctf.example.com/scoreboard/open/ctftime` or `https://myctf.example.com/scoreboard/undergraduate/ctftime`. Note that only one [division](/docs/divisions) may be active and polled by CTFtime at a time. Then, configure your event on CTFtime with the link.
+To use it, just append `/ctftime.json` to the URL of the currently scoreboard. For example, this could be `https://myctf.example.com/scoreboard/open/ctftime.json` or `https://myctf.example.com/scoreboard/undergraduate/ctftime.json`. Note that only one [division](/docs/divisions) may be active and polled by CTFtime at a time. Then, configure your event on CTFtime with the link.
 
 ![CTFtime scoreboard feed](/showcase/ctftime-scoreboard-feed.png)
 

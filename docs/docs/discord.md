@@ -18,6 +18,7 @@ Then go to the OAuth2 tab and scroll to the `OAuth2 URL Generator`. Enable the `
 
 - `Manage Roles`
 - `Send Messages`
+- `Manage Server` only if the bot should be able to use existing invite links (e.g. `invite_link` is not configured)
 
 The final permissions integer should be `268437504`.
 

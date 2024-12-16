@@ -190,12 +190,8 @@ pub async fn route_default_og_image(state: State<RouterState>) -> impl IntoRespo
     let mut division_meta = Vec::with_capacity(state.divisions.len());
     for division in state.divisions.iter() {
         let mut places = Vec::with_capacity(3);
-        let leaderboard = state
-            .db
-            .get_leaderboard(&division.id, Some(0))
-            .await
-            .unwrap();
-        leaderboard.entries.iter().take(3).for_each(|entry| {
+        let leaderboard = state.db.get_leaderboard(&division.id).await.unwrap();
+        leaderboard.iter().take(3).for_each(|entry| {
             places.push(TeamMeta {
                 name: entry.team_name.clone(),
                 score: entry.score as u64,

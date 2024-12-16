@@ -1004,7 +1004,7 @@ impl Builder {
                 .route("/signin/discord", get(route_signin_discord))
                 .route("/signin", get(route_signin))
                 .route(
-                    "/scoreboard/:id/ctftime",
+                    "/scoreboard/:id/ctftime.json",
                     get(route_scoreboard_division_ctftime),
                 )
                 .route("/scoreboard/:id", get(route_scoreboard_division))
