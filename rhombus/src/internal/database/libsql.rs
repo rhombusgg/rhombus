@@ -693,17 +693,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             };
         }
 
-        let challenge_rows = tx
-            .query(
-                "
-                SELECT rhombus_challenge.*
-                FROM rhombus_challenge
-                LEFT JOIN rhombus_solve ON rhombus_challenge.id = rhombus_solve.challenge_id
-                GROUP BY rhombus_challenge.id
-            ",
-                (),
-            )
-            .await?;
+        let challenge_rows = tx.query("SELECT * FROM rhombus_challenge ", ()).await?;
+
         #[derive(Debug, Deserialize)]
         struct DbChallenge {
             id: String,
@@ -1326,6 +1317,15 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         tx.execute(
             "INSERT INTO rhombus_solve (challenge_id, user_id, team_id, solved_at) VALUES (?1, ?2, ?3, ?4)",
             params!(challenge.id.as_str(), user_id, team_id, now.timestamp()),
+        )
+        .await?;
+
+        tx.execute(
+            "
+            INSERT INTO rhombus_challenge_division_solves (challenge_id, division_id, solves) VALUES (?1, ?2, 1)
+            ON CONFLICT (challenge_id, division_id) DO UPDATE SET solves = solves + 1
+        ",
+            params!(challenge.id.as_str(), division_id),
         )
         .await?;
 

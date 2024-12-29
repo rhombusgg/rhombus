@@ -193,9 +193,8 @@ impl ChallengePoints for DynamicPoints {
             .as_f64()
             .unwrap_or(100.);
 
-        let total_solves = challenge.division_solves.values().sum::<u64>() as f64;
+        let solves = challenge.division_solves.values().sum::<u64>() as f64;
 
-        let solves = total_solves + 1.;
         let points = max(
             (((minimum - initial) / (decay * decay) * (solves * solves)) + initial).ceil() as i64,
             minimum as i64,
