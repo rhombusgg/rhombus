@@ -171,6 +171,9 @@ pub struct Settings {
     pub ctftime: Option<CTFtimeSettings>,
     pub openai_api_key: Option<String>,
 
+    /// A pre-shared key for rhombus-cli with admin access.
+    pub grpc_psk: Option<String>,
+
     /// `false` will disable the in memory cache.
     ///
     /// `true` will enable the in memory cache with default 360 second interval.

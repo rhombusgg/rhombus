@@ -12,13 +12,16 @@ use std::{
 };
 
 use axum::{
-    http::{Extensions, HeaderMap, StatusCode},
-    middleware,
+    extract::{Request, State},
+    http::{self, Extensions, HeaderMap, StatusCode},
+    middleware::{self, Next},
     response::{Html, IntoResponse},
     routing::{delete, get, post},
     Extension,
 };
 use tokio::sync::{Mutex, RwLock};
+use tonic::service::RoutesBuilder;
+use tower::ServiceExt as _;
 use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::compression::CompressionLayer;
 use tracing::info;
@@ -45,6 +48,7 @@ use crate::{
             MaxDivisionPlayers, OpenDivisionEligibilityProvider,
         },
         email::{mailgun::MailgunProvider, outbound_mailer::OutboundMailer},
+        grpc::init_grpc,
         health::{healthcheck_catch_up, healthcheck_runner},
         ip::{
             default_ip_extractor, ip_insert_blank_middleware, ip_insert_middleware,
@@ -85,7 +89,7 @@ use crate::{
         static_serve::route_static_serve,
         templates::Templates,
     },
-    plugin::{DatabaseProviderContext, RunContext, UploadProviderContext},
+    plugin::{DatabaseProviderContext, GrpcBuilder, RunContext, UploadProviderContext},
     upload_provider::ErasedUploadProvider,
     LocalUploadProvider, Plugin, Result, UploadProvider,
 };
@@ -101,6 +105,24 @@ pub enum RawDb {
     LibSQL(Arc<crate::internal::database::libsql::LibSQL>),
 
     Plugin(Box<dyn Any + Send + Sync>),
+}
+
+#[derive(Clone)]
+struct GrpcMiddlewareState {
+    grpc_router: axum::Router<()>,
+}
+
+async fn grpc_middleware(
+    State(s): State<GrpcMiddlewareState>,
+    req: Request<axum::body::Body>,
+    next: Next,
+) -> impl IntoResponse {
+    if let Some(h) = req.headers().get(http::header::CONTENT_TYPE) {
+        if h == "application/grpc" {
+            return s.grpc_router.oneshot(req).await.into_response();
+        }
+    }
+    next.run(req).await.into_response()
 }
 
 pub fn builder() -> Builder {
@@ -742,6 +764,12 @@ impl Builder {
 
             let upload_router = upload_provider.routes()?;
 
+            let mut grpc_builder = GrpcBuilder {
+                routes: RoutesBuilder::default(),
+                file_descriptor_sets: vec![],
+                encoded_file_descriptor_sets: vec![],
+            };
+
             let mut plugin_builder = RunContext {
                 upload_provider,
                 templates: &mut templates,
@@ -752,11 +780,14 @@ impl Builder {
                 db: cached_db.clone(),
                 score_type_map: &score_type_map,
                 flag_fn_map: &flag_fn_map,
+                grpc_builder: &mut grpc_builder,
             };
+            init_grpc(&mut plugin_builder);
             let mut plugin_router = axum::Router::new();
             for plugin in self_rc.plugins.iter() {
                 plugin_router = plugin_router.merge(plugin.run(&mut plugin_builder).await?);
             }
+            let plugin_router = plugin_router;
 
             let divisions = Arc::new(divisions);
             cached_db.insert_divisions(&divisions).await?;
@@ -1087,6 +1118,21 @@ impl Builder {
             };
 
             let router = router.layer(CompressionLayer::new());
+
+            let mut meme = tonic_reflection::server::Builder::configure();
+            for doge in grpc_builder.encoded_file_descriptor_sets {
+                meme = meme.register_encoded_file_descriptor_set(doge);
+            }
+            for doge in grpc_builder.file_descriptor_sets {
+                meme = meme.register_file_descriptor_set(doge);
+            }
+            grpc_builder.routes.add_service(meme.build_v1().unwrap());
+            let grpc_router = grpc_builder.routes.routes().into_axum_router();
+
+            let router = router.layer(axum::middleware::from_fn_with_state(
+                GrpcMiddlewareState { grpc_router },
+                grpc_middleware,
+            ));
 
             (self_rc, router)
         };
