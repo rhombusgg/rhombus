@@ -74,7 +74,6 @@ impl proto::my_plugin_server::MyPlugin for GrpcImpl {
         &self,
         request: tonic::Request<proto::ReverseUserNameRequest>,
     ) -> std::result::Result<tonic::Response<proto::ReverseUserNameReply>, tonic::Status> {
-        // return Err(tonic::Status::internal("TEST INTERNAL ERROR"));
         let user_id = request.into_inner().user_id;
         let user = self
             .db

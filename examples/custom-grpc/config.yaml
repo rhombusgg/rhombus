@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/rhombusgg/rhombus/main/schema.json
-title: Rhombus Demo
+title: Custom GRPC example
 location_url: http://localhost:3000
 database_url: file://rhombus.db
 contact_email: admin@rhombus.gg
