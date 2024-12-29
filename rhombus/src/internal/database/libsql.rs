@@ -1846,61 +1846,63 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             )
             .await?;
 
-        #[derive(Debug, Deserialize)]
-        struct DbScoreboard {
-            team_id: i64,
-            at: i64,
-            points: i64,
-        }
-
-        let mut db_scoreboard = tx
-            .query(
-                "
-                SELECT team_id, at, points
-                FROM rhombus_points_snapshot
-                WHERE team_id in (
-                    SELECT id
-                    FROM rhombus_team
-                    WHERE division_id = ?1 AND points > 0
-                    ORDER BY points DESC, last_solved_at ASC
-                    LIMIT 10
-                )
-                ORDER BY at ASC
-            ",
-                params!(division_id),
-            )
-            .await?;
-
-        tx.commit().await?;
-
-        let mut teams: BTreeMap<i64, ScoreboardTeam> = BTreeMap::new();
-        let now = chrono::Utc::now().timestamp();
+        let mut teams = BTreeMap::new();
         while let Some(row) = db_teams.next().await? {
             let team = de::from_row::<DbTeam>(&row).unwrap();
             teams.insert(
                 team.id,
-                ScoreboardTeam {
-                    team_name: team.name,
-                    series: vec![ScoreboardSeriesPoint {
-                        timestamp: now + 1,
-                        total_score: team.points,
-                    }],
-                },
+                (
+                    ScoreboardTeam {
+                        team_name: team.name,
+                        series: vec![],
+                    },
+                    team.points,
+                ),
             );
         }
 
-        while let Some(row) = db_scoreboard.next().await? {
-            let scoreboard = de::from_row::<DbScoreboard>(&row).unwrap();
-            let series_point = ScoreboardSeriesPoint {
-                timestamp: scoreboard.at,
-                total_score: scoreboard.points,
-            };
-            teams
-                .get_mut(&scoreboard.team_id)
-                .unwrap()
-                .series
-                .push(series_point);
+        #[derive(Debug, Deserialize)]
+        struct DbScoreboard {
+            at: i64,
+            points: i64,
         }
+
+        for (team_id, (team, _)) in teams.iter_mut() {
+            let mut db_scoreboard = tx
+                .query(
+                    "
+                    SELECT at, points
+                    FROM rhombus_points_snapshot
+                    WHERE team_id = ?
+                    ORDER BY at ASC
+                ",
+                    params!(team_id),
+                )
+                .await?;
+
+            while let Some(row) = db_scoreboard.next().await? {
+                let scoreboard = de::from_row::<DbScoreboard>(&row).unwrap();
+                let series_point = ScoreboardSeriesPoint {
+                    timestamp: scoreboard.at,
+                    total_score: scoreboard.points,
+                };
+                team.series.push(series_point);
+            }
+        }
+
+        tx.commit().await?;
+
+        let now = chrono::Utc::now().timestamp();
+        let teams = teams
+            .into_iter()
+            .map(|(team_id, (mut team, current_points))| {
+                team.series.push(ScoreboardSeriesPoint {
+                    timestamp: now,
+                    total_score: current_points,
+                });
+                (team_id, team)
+            })
+            .collect();
 
         Ok(Arc::new(ScoreboardInner::new(teams)))
     }

@@ -118,11 +118,9 @@
 
     const series = Object.values(scoreboard_data).map((team) => ({
       name: team.team_name,
-      data: team.series
-        .sort((a, b) => a.timestamp - b.timestamp)
-        .map((d) => ({
-          value: [d.timestamp * 1000 + timestampOffset, d.total_score],
-        })),
+      data: team.series.map((d) => ({
+        value: [d.timestamp * 1000 + timestampOffset, d.total_score],
+      })),
       ...seriesCommon,
     }));
 

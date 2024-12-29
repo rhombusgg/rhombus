@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS rhombus_points_snapshot (
     team_id INTEGER NOT NULL,
     at INTEGER NOT NULL DEFAULT(strftime('%s', 'now')),
     points INTEGER NOT NULL,
-    PRIMARY KEY (team_id, at),
+    PRIMARY KEY (team_id, at ASC),
     FOREIGN KEY (team_id) REFERENCES rhombus_team(id)
 );
 
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS rhombus_user (
     FOREIGN KEY (owner_team_id) REFERENCES rhombus_team(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS rhombus_user_idx ON rhombus_user(team_id, owner_team_id);
+CREATE INDEX IF NOT EXISTS team_id_idx ON rhombus_user(team_id);
 
 CREATE TABLE IF NOT EXISTS rhombus_user_historical_names (
     user_id INTEGER NOT NULL,
@@ -145,7 +145,9 @@ CREATE TABLE IF NOT EXISTS rhombus_team (
     FOREIGN KEY (division_id) REFERENCES rhombus_division(id)
 );
 
-CREATE INDEX IF NOT EXISTS rhombus_team_idx ON rhombus_team(division_id, invite_token, ctftime_id, points);
+CREATE INDEX IF NOT EXISTS invite_token_idx ON rhombus_team(invite_token);
+CREATE INDEX IF NOT EXISTS ctftime_id_idx ON rhombus_team(ctftime_id);
+CREATE INDEX IF NOT EXISTS leaderboard_idx ON rhombus_team(division_id, points DESC, last_solved_at ASC);
 
 CREATE TABLE IF NOT EXISTS rhombus_team_historical_names (
     team_id INTEGER NOT NULL,
