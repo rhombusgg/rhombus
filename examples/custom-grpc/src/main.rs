@@ -5,11 +5,10 @@ use rhombus::{
     Plugin, Result,
 };
 use tonic::async_trait;
-use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 pub mod proto {
-    use tonic::{include_file_descriptor_set, include_proto};
+    use tonic::include_proto;
 
     pub const FILE_DESCRIPTOR_SET: &[u8] =
         tonic::include_file_descriptor_set!("myplugin_descriptor");

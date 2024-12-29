@@ -1,12 +1,11 @@
 use std::{
-    any::Any, borrow::Cow, collections::BTreeMap, convert::Infallible, error::Error, sync::Arc,
+    any::Any, borrow::Cow, collections::BTreeMap, convert::Infallible, sync::Arc,
 };
 
 use axum::Router;
 use prost_types::FileDescriptorSet;
 use tokio::sync::{Mutex, RwLock};
-use tonic::{body::BoxBody, server::NamedService, service::RoutesBuilder};
-use tower::Service;
+use tonic::{body::BoxBody, service::RoutesBuilder};
 
 use crate::{
     builder::RawDb,
