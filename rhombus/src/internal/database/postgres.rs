@@ -225,6 +225,7 @@ impl Database for Postgres {
         _division_id: &str,
         _challenge: &Challenge,
         _next_points: i64,
+        _now: DateTime<Utc>,
     ) -> Result<()> {
         todo!()
     }
@@ -322,7 +323,7 @@ impl Database for Postgres {
         todo!()
     }
 
-    async fn get_leaderboard(&self, _division_id: &str, _page: Option<u64>) -> Result<Leaderboard> {
+    async fn get_leaderboard(&self, _division_id: &str) -> Result<Leaderboard> {
         todo!()
     }
 

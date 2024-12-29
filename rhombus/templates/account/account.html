@@ -76,7 +76,7 @@
 
                   {% if discord.in_server %}
                     {{ t("account-discord-integration-join-server") }}
-                  {% else %}
+                  {% elif discord.invite_url %}
                     <a
                       class="flex items-center gap-2"
                       href="{{ discord.invite_url }}"
@@ -87,6 +87,8 @@
                       >
                       {{ icons.external_link(class="size-6") }}
                     </a>
+                  {% else %}
+                    {{ t("account-discord-integration-join-server") }}
                   {% endif %}
                 </h3>
                 <p class="mt-2">
