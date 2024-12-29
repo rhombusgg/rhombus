@@ -1285,6 +1285,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "custom-grpc"
+version = "0.1.0"
+dependencies = [
+ "dotenvy",
+ "prost 0.13.4",
+ "rhombus",
+ "rhombus-build",
+ "tokio",
+ "tonic 0.12.3",
+ "tonic-build",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "darling"
 version = "0.20.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1642,6 +1657,7 @@ dependencies = [
  "dotenvy",
  "plugin",
  "rhombus",
+ "rhombus-build",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -4028,8 +4044,11 @@ dependencies = [
  "axum 0.7.7",
  "fluent",
  "minijinja",
+ "prost 0.13.4",
  "rhombus",
  "sqlx",
+ "tonic 0.12.3",
+ "tonic-build",
  "tracing",
 ]
 
