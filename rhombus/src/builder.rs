@@ -1145,15 +1145,10 @@ impl Builder {
     }
 
     pub async fn build(self) -> Result<Arc<crate::internal::router::Router>> {
-        println!("XXXXXXXXXXXX");
         let rr = Arc::new(crate::internal::router::Router::new());
-
-        println!("YYYYYYYYYYY");
         let router = self.build_axum_router(rr.clone()).await?;
-        println!("ZZZZZZZZZZZZZZZZZ");
 
         rr.update(router);
-        println!("WWWWWWWWWWWWWWWWWW");
 
         Ok(rr)
     }

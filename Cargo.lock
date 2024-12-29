@@ -1657,7 +1657,6 @@ dependencies = [
  "dotenvy",
  "plugin",
  "rhombus",
- "rhombus-build",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -4044,11 +4043,8 @@ dependencies = [
  "axum 0.7.7",
  "fluent",
  "minijinja",
- "prost 0.13.4",
  "rhombus",
  "sqlx",
- "tonic 0.12.3",
- "tonic-build",
  "tracing",
 ]
 

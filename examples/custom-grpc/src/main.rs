@@ -37,7 +37,6 @@ async fn main() {
 
     let addr = "0.0.0.0:3000";
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    println!("Listening on {}", addr);
     app.serve(listener).await;
 }
 
@@ -54,7 +53,6 @@ impl Plugin for MyPlugin {
     }
 
     async fn run(&self, context: &mut RunContext<'_>) -> Result<Router<RouterState>> {
-        println!("ADDING THE THING");
         context
             .grpc_builder
             .add_service(proto::my_plugin_server::MyPluginServer::new(GrpcImpl {
