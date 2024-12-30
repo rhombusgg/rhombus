@@ -215,6 +215,10 @@ impl Database for DbCache {
         self.inner.get_user_from_discord_id(discord_id).await
     }
 
+    async fn get_user_from_api_token(&self, api_token: &str) -> Result<User> {
+        get_user_from_api_token(&self.inner, api_token).await
+    }
+
     async fn kick_user(&self, user_id: i64, team_id: i64) -> Result<i64> {
         let result = self.inner.kick_user(user_id, team_id).await;
         if let Ok(new_team_id) = result {
@@ -231,6 +235,12 @@ impl Database for DbCache {
             TEAM_CACHE.remove(&team_id);
         }
         new_invite_token
+    }
+
+    async fn roll_api_token(&self, user_id: i64) -> Result<String> {
+        let user = self.get_user_from_id(user_id).await?;
+        USER_CACHE_BY_API_TOKEN.remove(&user.api_token);
+        self.inner.roll_api_token(user_id).await
     }
 
     async fn set_team_name(
@@ -641,6 +651,8 @@ impl<T> TimedCache<T> {
 }
 
 pub static USER_CACHE: LazyLock<DashMap<i64, TimedCache<User>>> = LazyLock::new(DashMap::new);
+pub static USER_CACHE_BY_API_TOKEN: LazyLock<DashMap<String, TimedCache<User>>> =
+    LazyLock::new(DashMap::new);
 
 pub async fn get_user_from_id(db: &Connection, user_id: i64) -> Result<User> {
     if let Some(user) = USER_CACHE.get(&user_id) {
@@ -652,6 +664,20 @@ pub async fn get_user_from_id(db: &Connection, user_id: i64) -> Result<User> {
 
     if let Ok(user) = &user {
         USER_CACHE.insert(user_id, TimedCache::new(user.clone()));
+    }
+    user
+}
+
+pub async fn get_user_from_api_token(db: &Connection, api_token: &str) -> Result<User> {
+    if let Some(user) = USER_CACHE_BY_API_TOKEN.get(api_token) {
+        return Ok(user.value.clone());
+    }
+    tracing::trace!(api_token, "cache miss: get_user_from_api_token");
+
+    let user = db.get_user_from_api_token(api_token).await;
+
+    if let Ok(user) = &user {
+        USER_CACHE_BY_API_TOKEN.insert(api_token.to_owned(), TimedCache::new(user.clone()));
     }
     user
 }

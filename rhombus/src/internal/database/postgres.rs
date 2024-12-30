@@ -191,11 +191,19 @@ impl Database for Postgres {
         todo!()
     }
 
+    async fn get_user_from_api_token(&self, _api_token: &str) -> Result<User> {
+        todo!()
+    }
+
     async fn kick_user(&self, _user_id: i64, _team_id: i64) -> Result<i64> {
         todo!()
     }
 
     async fn roll_invite_token(&self, _team_id: i64) -> Result<String> {
+        todo!()
+    }
+
+    async fn roll_api_token(&self, _user_id: i64) -> Result<String> {
         todo!()
     }
 

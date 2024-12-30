@@ -14,6 +14,7 @@ use tonic::{
     Status,
 };
 mod admin;
+mod auth;
 
 mod grpc {
     pub mod proto {
@@ -28,9 +29,9 @@ struct Args {
     #[command(subcommand)]
     command: Command,
 }
-
 #[derive(Subcommand, Debug)]
 enum Command {
+    Auth(auth::AuthCommand),
     Admin {
         #[command(subcommand)]
         admin_command: AdminCommand,
@@ -65,6 +66,7 @@ async fn main() -> Result<()> {
         Command::Admin { admin_command } => {
             admin_command.run().await?;
         }
+        Command::Auth(auth_command) => auth_command.run().await?,
     }
 
     Ok(())

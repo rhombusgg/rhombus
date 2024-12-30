@@ -17,6 +17,10 @@ use axum_extra::extract::{
 };
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use minijinja::context;
+use rand::{
+    distributions::{Alphanumeric, DistString as _},
+    thread_rng,
+};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -32,6 +36,10 @@ use crate::internal::{
 
 use super::database::provider::Database;
 
+pub fn create_user_api_token() -> String {
+    Alphanumeric.sample_string(&mut thread_rng(), 16)
+}
+
 #[derive(Debug, Serialize, Clone)]
 pub struct UserInner {
     pub id: i64,
@@ -42,6 +50,7 @@ pub struct UserInner {
     pub is_team_owner: bool,
     pub disabled: bool,
     pub is_admin: bool,
+    pub api_token: String,
 }
 pub type User = Arc<UserInner>;
 

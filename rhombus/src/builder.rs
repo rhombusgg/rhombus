@@ -66,7 +66,8 @@ use crate::{
             account::{
                 discord_cache_evictor, route_account, route_account_add_email,
                 route_account_delete_email, route_account_email_verify_callback,
-                route_account_email_verify_confirm, route_account_set_name,
+                route_account_email_verify_confirm, route_account_roll_token,
+                route_account_set_name,
             },
             challenges::{
                 route_challenge_submit, route_challenge_view, route_challenges,
@@ -782,7 +783,7 @@ impl Builder {
                 flag_fn_map: &flag_fn_map,
                 grpc_builder: &mut grpc_builder,
             };
-            init_grpc(&mut plugin_builder);
+            init_grpc(&mut plugin_builder).await;
             let mut plugin_router = axum::Router::new();
             for plugin in self_rc.plugins.iter() {
                 plugin_router = plugin_router.merge(plugin.run(&mut plugin_builder).await?);
@@ -986,6 +987,7 @@ impl Builder {
                     "/account/email",
                     post(route_account_add_email).delete(route_account_delete_email),
                 )
+                .route("/account/roll-token", post(route_account_roll_token))
                 .route("/account/name", post(route_account_set_name))
                 .route("/account", get(route_account))
                 .route("/team/division/:id", post(route_team_set_division))
