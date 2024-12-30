@@ -30,6 +30,8 @@ fn main() {
             .args(["run", "-A", "build.ts"])
             .spawn()
             .expect("Failed to run js build");
+    } else {
+        println!("cargo::warning=deno cli not found, not building static assets like CSS and JS");
     }
 }
 

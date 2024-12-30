@@ -6,6 +6,7 @@
     "npm:@kobalte/core@~0.13.2": "0.13.7_solid-js@1.9.3__seroval@1.1.1",
     "npm:@tailwindcss/cli@*": "0.1.2_postcss@8.4.49_autoprefixer@10.4.20__postcss@8.4.49",
     "npm:@tailwindcss/cli@^4.0.0-beta.6": "4.0.0-beta.6",
+    "npm:@tailwindcss/typography@~0.5.15": "0.5.15_tailwindcss@4.0.0-beta.6",
     "npm:@types/node@*": "22.5.4",
     "npm:clsx@^2.1.1": "2.1.1",
     "npm:cmdk-solid@^1.1.0": "1.1.0_solid-js@1.9.3__seroval@1.1.1",
@@ -689,6 +690,16 @@
         "@tailwindcss/oxide-win32-x64-msvc"
       ]
     },
+    "@tailwindcss/typography@0.5.15_tailwindcss@4.0.0-beta.6": {
+      "integrity": "sha512-AqhlCXl+8grUz8uqExv5OTtgpjuVIwFTSXTrh8y9/pw6q2ek7fJ+Y8ZEVw7EB2DCcuCOtEjf9w3+J3rzts01uA==",
+      "dependencies": [
+        "lodash.castarray",
+        "lodash.isplainobject",
+        "lodash.merge",
+        "postcss-selector-parser@6.0.10",
+        "tailwindcss@4.0.0-beta.6"
+      ]
+    },
     "@types/node@22.5.4": {
       "integrity": "sha512-FDuKUJQm/ju9fT/SeX/6+gBzoPzlVCzfzmGkwKvRHQVxi4BntVbyIwf6a4Xn62mrvndLiml6z/UBXIdEVjQLXg==",
       "dependencies": [
@@ -1206,6 +1217,15 @@
     "lines-and-columns@1.2.4": {
       "integrity": "sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg=="
     },
+    "lodash.castarray@4.4.0": {
+      "integrity": "sha512-aVx8ztPv7/2ULbArGJ2Y42bG1mEQ5mGjpdvrbJcJFU3TbYybe+QlLS4pst9zV52ymy2in1KpFPiZnAOATxD4+Q=="
+    },
+    "lodash.isplainobject@4.0.6": {
+      "integrity": "sha512-oSXzaWypCMHkPC3NvBEaPHf0KsA5mvPrOPgQWDsbg8n7orZ290M0BmC/jgRZ4vcJ6DTAhjrsSYgdsW/F+MFOBA=="
+    },
+    "lodash.merge@4.6.2": {
+      "integrity": "sha512-0KpjqXRVvrYyCsX1swR/XTK0va6VQkQM6MNo7PqW77ByjAhoARA8EfrP1N4+KlKj8YS0ZUCtRT/YUuhyYDujIQ=="
+    },
     "lodash.topath@4.5.2": {
       "integrity": "sha512-1/W4dM+35DwvE/iEd1M9ekewOSTlpFekhw9mhAtrwjVqUr83/ilQiyAvmg4tVX7Unkcfl1KC+i9WdaT4B6aQcg=="
     },
@@ -1337,7 +1357,14 @@
       "integrity": "sha512-rKqm2Fk0KbA8Vt3AdGN0FB9OBOMDVajMG6ZCf/GoHgdxUJ4sBFp0A/uMIRm+MJUdo33YXEtjqIz8u7DAp8B7DA==",
       "dependencies": [
         "postcss",
-        "postcss-selector-parser"
+        "postcss-selector-parser@6.1.2"
+      ]
+    },
+    "postcss-selector-parser@6.0.10": {
+      "integrity": "sha512-IQ7TZdoaqbT+LCpShg46jnZVlhWD2w6iQYAcYXfHARZ7X1t/UGhhceQDs5X0cGqKvYlHNOuv7Oa1xmb0oQuA3w==",
+      "dependencies": [
+        "cssesc",
+        "util-deprecate"
       ]
     },
     "postcss-selector-parser@6.1.2": {
@@ -1370,7 +1397,7 @@
         "commander",
         "glob",
         "postcss",
-        "postcss-selector-parser"
+        "postcss-selector-parser@6.1.2"
       ]
     },
     "queue-microtask@1.2.3": {
@@ -1512,7 +1539,7 @@
         "postcss-js",
         "postcss-load-config",
         "postcss-nested",
-        "postcss-selector-parser",
+        "postcss-selector-parser@6.1.2",
         "postcss-value-parser@4.2.0",
         "pretty-hrtime",
         "purgecss",
@@ -1579,6 +1606,7 @@
       "npm:@fluent/langneg@0.7",
       "npm:@kobalte/core@~0.13.2",
       "npm:@tailwindcss/cli@^4.0.0-beta.6",
+      "npm:@tailwindcss/typography@~0.5.15",
       "npm:clsx@^2.1.1",
       "npm:cmdk-solid@^1.1.0",
       "npm:esbuild-plugin-solid@0.6",

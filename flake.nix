@@ -56,6 +56,7 @@
             tailwindcss-language-server
             vscode-langservers-extracted
             alejandra
+            flyctl
 
             deno
 
