@@ -42,6 +42,10 @@
       {% endif %}
     {% endwith %}
 
+    <meta
+      name="htmx-config"
+      content='{"responseHandling": [{"code":"...", "swap": true}]}'
+    />
     <script src="https://unpkg.com/htmx.org@2.0.2"></script>
     <script
       src="https://unpkg.com/monaco-editor@0.52.0/min/vs/loader.js"

@@ -1,12 +1,21 @@
 use axum::{
-    extract::{Path, State},
-    response::{Html, IntoResponse},
+    body::Body,
+    extract::{Path, Request, State},
+    response::{Html, IntoResponse, Response},
     Extension, Json,
 };
 use minijinja::context;
+use reqwest::StatusCode;
 use serde_json::json;
 
-use crate::internal::{auth::MaybeUser, router::RouterState, routes::meta::PageMeta};
+use crate::internal::{
+    auth::MaybeUser,
+    router::RouterState,
+    routes::{
+        errors::{error_page, IntoErrorResponse},
+        meta::PageMeta,
+    },
+};
 
 pub async fn route_public_user(
     state: State<RouterState>,
@@ -50,29 +59,33 @@ pub async fn route_public_user(
 }
 
 pub async fn route_public_team(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<MaybeUser>,
     Extension(page): Extension<PageMeta>,
     Path(team_id): Path<i64>,
-) -> impl IntoResponse {
+    req: Request<Body>,
+) -> std::result::Result<Response, Response> {
     let Ok(team) = state.db.get_team_from_id(team_id).await else {
-        return Json(json!({
-            "error": "Team not found",
-        }))
-        .into_response();
+        return Err(error_page(
+            StatusCode::NOT_FOUND,
+            "Team not found",
+            &state,
+            &user,
+            &page,
+        ));
     };
 
     let challenge_data = state.db.get_challenges();
     let standing = state.db.get_team_standing(team_id, &team.division_id);
     let (challenge_data, standing) = tokio::join!(challenge_data, standing);
-    let challenge_data = challenge_data.unwrap();
-    let standing = standing.unwrap();
+    let challenge_data = challenge_data.map_err_page(&req, "Failed to get challenge data")?;
+    let standing = standing.map_err_page(&req, "Failed to get team standing")?;
 
-    Html(
+    Ok(Html(
         state
             .jinja
             .get_template("team/public-team.html")
-            .unwrap()
+            .map_err_page(&req, "Failed to get template")?
             .render(context! {
                 global => state.global_page_meta,
                 og_image => format!("{}/team/{}/og-image.png", state.global_page_meta.location_url, team.id),
@@ -86,7 +99,7 @@ pub async fn route_public_team(
                 divisions => state.divisions,
                 standing,
             })
-            .unwrap(),
+            .map_err_page(&req, "Failed to render template")?,
     )
-    .into_response()
+    .into_response())
 }
