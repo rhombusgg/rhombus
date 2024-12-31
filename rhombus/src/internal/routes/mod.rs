@@ -1,5 +1,6 @@
 pub mod account;
 pub mod challenges;
+pub mod errors;
 pub mod home;
 pub mod meta;
 pub mod public;

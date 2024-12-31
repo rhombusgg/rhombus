@@ -14,13 +14,13 @@ use std::{
 use axum::{
     http::{Extensions, HeaderMap, StatusCode},
     middleware,
-    response::{Html, IntoResponse},
+    response::Html,
     routing::{delete, get, post},
     Extension,
 };
 use tokio::sync::{Mutex, RwLock};
 use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
-use tower_http::compression::CompressionLayer;
+use tower_http::{catch_panic::CatchPanicLayer, compression::CompressionLayer};
 use tracing::info;
 
 use crate::{
@@ -69,6 +69,7 @@ use crate::{
                 route_ticket_submit, route_ticket_view, route_writeup_delete, route_writeup_submit,
                 ChallengePoints, DynamicPoints, StaticPoints, TEAM_BURSTED_POINTS,
             },
+            errors::{handle_panic, route_not_found},
             home::route_home,
             meta::{page_meta_middleware, route_robots_txt, GlobalPageMeta},
             public::{route_public_team, route_public_user},
@@ -942,7 +943,7 @@ impl Builder {
             });
 
             let rhombus_router = axum::Router::new()
-                .fallback(handler_404)
+                .fallback(route_not_found)
                 .route("/admin", get(|| async { (StatusCode::OK, Html("Admin")) }))
                 .route("/reload", get(route_reload))
                 .route_layer(middleware::from_fn(enforce_admin_middleware))
@@ -1086,6 +1087,12 @@ impl Builder {
                 router
             };
 
+            let router = router.route(
+                "/panic",
+                get(|| async { panic!("something went wrong...") }),
+            );
+            let router = router.layer(CatchPanicLayer::custom(handle_panic));
+
             let router = router.layer(CompressionLayer::new());
 
             (self_rc, router)
@@ -1111,10 +1118,6 @@ impl Builder {
 
 fn not_htmx_predicate<T>(req: &axum::http::Request<T>) -> bool {
     !req.headers().contains_key("hx-request")
-}
-
-async fn handler_404() -> impl IntoResponse {
-    (StatusCode::NOT_FOUND, Html("404"))
 }
 
 pub fn hash(s: impl AsRef<str>) -> i64 {
