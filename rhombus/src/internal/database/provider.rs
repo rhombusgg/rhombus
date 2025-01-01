@@ -233,18 +233,21 @@ pub trait Database {
         avatar: &str,
         discord_id: NonZeroU64,
         user_id: Option<i64>,
+        settings: &Settings,
     ) -> Result<std::result::Result<(i64, i64), DiscordUpsertError>>;
     async fn upsert_user_by_email(
         &self,
         name: &str,
         email: &str,
         avatar: &str,
+        settings: &Settings,
     ) -> Result<(i64, i64)>;
     async fn upsert_user_by_credentials(
         &self,
         username: &str,
         avatar: &str,
         password: &str,
+        settings: &Settings,
     ) -> Result<Option<(i64, i64)>>;
     async fn upsert_user_by_ctftime(
         &self,
@@ -254,6 +257,7 @@ pub trait Database {
         ctftime_user_id: i64,
         ctftime_team_id: i64,
         team_name: &str,
+        settings: &Settings,
     ) -> Result<(i64, i64, Option<String>)>;
     async fn insert_track(
         &self,
@@ -284,7 +288,7 @@ pub trait Database {
     async fn get_user_from_api_token(&self, discord_id: &str) -> Result<User>;
     async fn kick_user(&self, user_id: i64, team_id: i64) -> Result<i64>;
     async fn roll_invite_token(&self, team_id: i64) -> Result<String>;
-    async fn roll_api_token(&self, user_id: i64) -> Result<String>;
+    async fn roll_api_token(&self, user_id: i64, settings: &Settings) -> Result<String>;
     async fn set_team_name(
         &self,
         team_id: i64,

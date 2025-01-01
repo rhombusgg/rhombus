@@ -454,7 +454,11 @@ pub async fn route_account_roll_token(
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let new_api_token = state.db.roll_api_token(user.id).await.unwrap();
+    let new_api_token = state
+        .db
+        .roll_api_token(user.id, &*state.settings.read().await)
+        .await
+        .unwrap();
 
     Ok(Html(
         state

@@ -144,7 +144,7 @@ impl Plugin for DemoPlugin {
             context.db.clone(),
             context.score_type_map.clone(),
         );
-        team_creator(libsql.clone(), context.db.clone());
+        team_creator(libsql.clone(), context.db.clone(), context.settings.clone());
 
         let plugin_state = DemoState::new(libsql.clone());
         let router = Router::new()
@@ -195,7 +195,7 @@ async fn set_user_to_bot(libsql: Arc<LibSQL>, user_id: i64) -> Result<()> {
     Ok(())
 }
 
-async fn create_team(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
+async fn create_team(libsql: Arc<LibSQL>, db: Connection, settings: &Settings) -> Result<()> {
     let dummy_user = create_dummy_user();
 
     let division_ids = db
@@ -216,6 +216,7 @@ async fn create_team(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
             &dummy_user.username,
             &dummy_user.avatar,
             &dummy_user.password,
+            settings,
         )
         .await?
     else {
@@ -237,6 +238,7 @@ async fn create_team(libsql: Arc<LibSQL>, db: Connection) -> Result<()> {
                 &dummy_user.username,
                 &dummy_user.avatar,
                 &dummy_user.password,
+                settings,
             )
             .await?
         else {
@@ -320,11 +322,11 @@ fn solver(
     });
 }
 
-fn team_creator(libsql: Arc<LibSQL>, db: Connection) {
+fn team_creator(libsql: Arc<LibSQL>, db: Connection, settings: Arc<RwLock<Settings>>) {
     tokio::task::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(30)).await;
-            _ = create_team(libsql.clone(), db.clone()).await;
+            _ = create_team(libsql.clone(), db.clone(), &*settings.read().await).await;
         }
     });
 }

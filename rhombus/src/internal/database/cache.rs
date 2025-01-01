@@ -56,10 +56,11 @@ impl Database for DbCache {
         avatar: &str,
         discord_id: NonZeroU64,
         user_id: Option<i64>,
+        settings: &Settings,
     ) -> Result<std::result::Result<(i64, i64), DiscordUpsertError>> {
         let result = self
             .inner
-            .upsert_user_by_discord_id(name, email, avatar, discord_id, user_id)
+            .upsert_user_by_discord_id(name, email, avatar, discord_id, user_id, settings)
             .await;
         if let Ok(Ok(result)) = result {
             USER_CACHE.remove(&result.0);
@@ -74,8 +75,12 @@ impl Database for DbCache {
         name: &str,
         email: &str,
         avatar: &str,
+        settings: &Settings,
     ) -> Result<(i64, i64)> {
-        let result = self.inner.upsert_user_by_email(name, email, avatar).await;
+        let result = self
+            .inner
+            .upsert_user_by_email(name, email, avatar, settings)
+            .await;
         if let Ok(result) = result {
             USER_CACHE.remove(&result.0);
             TEAM_CACHE.remove(&result.1);
@@ -88,10 +93,11 @@ impl Database for DbCache {
         username: &str,
         avatar: &str,
         password: &str,
+        settings: &Settings,
     ) -> Result<Option<(i64, i64)>> {
         let result = self
             .inner
-            .upsert_user_by_credentials(username, avatar, password)
+            .upsert_user_by_credentials(username, avatar, password, settings)
             .await;
 
         if let Ok(Some(result)) = result {
@@ -109,6 +115,7 @@ impl Database for DbCache {
         ctftime_user_id: i64,
         ctftime_team_id: i64,
         team_name: &str,
+        settings: &Settings,
     ) -> Result<(i64, i64, Option<String>)> {
         let result = self
             .inner
@@ -119,6 +126,7 @@ impl Database for DbCache {
                 ctftime_user_id,
                 ctftime_team_id,
                 team_name,
+                settings,
             )
             .await;
         if let Ok(ref result) = result {
@@ -237,10 +245,10 @@ impl Database for DbCache {
         new_invite_token
     }
 
-    async fn roll_api_token(&self, user_id: i64) -> Result<String> {
+    async fn roll_api_token(&self, user_id: i64, settings: &Settings) -> Result<String> {
         let user = self.get_user_from_id(user_id).await?;
         USER_CACHE_BY_API_TOKEN.remove(&user.api_token);
-        self.inner.roll_api_token(user_id).await
+        self.inner.roll_api_token(user_id, settings).await
     }
 
     async fn set_team_name(

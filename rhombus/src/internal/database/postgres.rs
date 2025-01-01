@@ -52,6 +52,7 @@ impl Database for Postgres {
         avatar: &str,
         discord_id: NonZeroU64,
         _user_id: Option<i64>,
+        _settings: &Settings,
     ) -> Result<std::result::Result<(i64, i64), DiscordUpsertError>> {
         #[derive(FromRow)]
         struct InsertUserResult {
@@ -81,6 +82,7 @@ impl Database for Postgres {
         _name: &str,
         _email: &str,
         _avatar: &str,
+        _settings: &Settings,
     ) -> Result<(i64, i64)> {
         todo!()
     }
@@ -90,6 +92,7 @@ impl Database for Postgres {
         _username: &str,
         _avatar: &str,
         _password: &str,
+        _settings: &Settings,
     ) -> Result<Option<(i64, i64)>> {
         todo!()
     }
@@ -102,6 +105,7 @@ impl Database for Postgres {
         _ctftime_user_id: i64,
         _ctftime_team_id: i64,
         _team_name: &str,
+        _settings: &Settings,
     ) -> Result<(i64, i64, Option<String>)> {
         todo!()
     }
@@ -203,7 +207,7 @@ impl Database for Postgres {
         todo!()
     }
 
-    async fn roll_api_token(&self, _user_id: i64) -> Result<String> {
+    async fn roll_api_token(&self, _user_id: i64, _settings: &Settings) -> Result<String> {
         todo!()
     }
 

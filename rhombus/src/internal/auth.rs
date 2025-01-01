@@ -34,10 +34,11 @@ use crate::internal::{
     templates::{toast_header, ToastKind},
 };
 
-use super::database::provider::Database;
+use super::{database::provider::Database, settings::Settings};
 
-pub fn create_user_api_token() -> String {
-    Alphanumeric.sample_string(&mut thread_rng(), 16)
+pub fn create_user_api_token(settings: &Settings) -> String {
+    let a = Alphanumeric.sample_string(&mut thread_rng(), 16);
+    format!("{}{}", settings.location_url, a)
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -573,6 +574,7 @@ pub async fn route_signin_discord_callback(
             &avatar,
             discord_id,
             user.as_ref().map(|u| u.id),
+            &*state.settings.read().await,
         )
         .await
     else {
@@ -815,6 +817,7 @@ pub async fn route_signin_ctftime_callback(
             user_data.id,
             user_data.team.id,
             &user_data.team.name,
+            &*state.settings.read().await,
         )
         .await
     else {
@@ -1024,7 +1027,12 @@ pub async fn route_signin_credentials(
 
     let Some((user_id, team_id)) = state
         .db
-        .upsert_user_by_credentials(&form.username, &avatar, &form.password)
+        .upsert_user_by_credentials(
+            &form.username,
+            &avatar,
+            &form.password,
+            &*state.settings.read().await,
+        )
         .await
         .unwrap()
     else {
@@ -1134,7 +1142,11 @@ pub async fn route_signin_email_confirm_callback(
 
     let avatar = avatar_from_email(&email);
 
-    let (user_id, team_id) = match state.db.upsert_user_by_email(name, &email, &avatar).await {
+    let (user_id, team_id) = match state
+        .db
+        .upsert_user_by_email(name, &email, &avatar, &*state.settings.read().await)
+        .await
+    {
         Ok((user_id, team_id)) => (user_id, team_id),
         Err(err) => {
             tracing::info!("Failed to upsert user by email {} {}", email, err);
