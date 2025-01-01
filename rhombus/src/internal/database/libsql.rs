@@ -878,7 +878,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await?
             .next()
             .await?
-            .ok_or(libsql::Error::QueryReturnedNoRows)?;
+            .ok_or(RhombusError::DatabaseReturnedNoRows)?;
         let query_team = de::from_row::<QueryTeam>(&query_team_row).unwrap();
 
         #[derive(Debug, Deserialize)]
@@ -1050,7 +1050,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await?
             .next()
             .await?
-            .ok_or(libsql::Error::QueryReturnedNoRows)?;
+            .ok_or(RhombusError::DatabaseReturnedNoRows)?;
 
         let user = de::from_row::<DbUser>(&row).unwrap();
         Ok(Arc::new(UserInner {
@@ -2096,7 +2096,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await?
             .next()
             .await?
-            .ok_or(libsql::Error::QueryReturnedNoRows)?
+            .ok_or(RhombusError::DatabaseReturnedNoRows)?
             .get::<String>(0)
             .unwrap();
 

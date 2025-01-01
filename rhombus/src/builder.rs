@@ -45,6 +45,7 @@ use crate::{
             MaxDivisionPlayers, OpenDivisionEligibilityProvider,
         },
         email::{mailgun::MailgunProvider, outbound_mailer::OutboundMailer},
+        errors::{error_handler_middleware, handle_panic, route_not_found},
         health::{healthcheck_catch_up, healthcheck_runner},
         ip::{
             default_ip_extractor, ip_insert_blank_middleware, ip_insert_middleware,
@@ -69,7 +70,6 @@ use crate::{
                 route_ticket_submit, route_ticket_view, route_writeup_delete, route_writeup_submit,
                 ChallengePoints, DynamicPoints, StaticPoints, TEAM_BURSTED_POINTS,
             },
-            errors::{error_handler_middleware, handle_panic, route_not_found},
             home::route_home,
             meta::{page_meta_middleware, route_robots_txt, GlobalPageMeta},
             public::{route_public_team, route_public_user},

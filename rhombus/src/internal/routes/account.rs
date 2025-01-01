@@ -1,7 +1,8 @@
 use std::{net::IpAddr, num::NonZeroU64, sync::LazyLock, time::Duration};
 
 use axum::{
-    extract::{Query, State},
+    body::Body,
+    extract::{Query, Request, State},
     response::{Html, IntoResponse, Redirect, Response},
     Extension, Form,
 };
@@ -15,15 +16,19 @@ use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::internal::{
-    auth::User,
-    database::{
-        cache::TimedCache,
-        provider::{Email, SetAccountNameError},
+use crate::{
+    errors::RhombusError,
+    internal::{
+        auth::User,
+        database::{
+            cache::TimedCache,
+            provider::{Email, SetAccountNameError},
+        },
+        errors::{htmx_error_status_code, IntoErrorResponse},
+        router::RouterState,
+        routes::meta::PageMeta,
+        templates::{toast_header, ToastKind},
     },
-    router::RouterState,
-    routes::meta::PageMeta,
-    templates::{toast_header, ToastKind},
 };
 
 pub fn generate_email_callback_code() -> String {
@@ -44,7 +49,7 @@ async fn is_in_server(
     tracing::trace!(discord_id, "cache miss: is_in_server");
 
     let client = Client::new();
-    let res = client
+    let res = match client
         .get(format!(
             "https://discord.com/api/guilds/{}/members/{}",
             discord_guild_id, discord_id
@@ -52,7 +57,17 @@ async fn is_in_server(
         .header("Authorization", format!("Bot {}", discord_bot_token))
         .send()
         .await
-        .unwrap();
+    {
+        Ok(res) => res,
+        Err(err) => {
+            tracing::error!(
+                discord_id,
+                "Failed to check if user is in server: {:?}",
+                err
+            );
+            return false;
+        }
+    };
 
     let is_in = res.status().is_success();
     IS_IN_SERVER_CACHE.insert(discord_id.to_owned(), TimedCache::new(is_in));
@@ -60,10 +75,11 @@ async fn is_in_server(
 }
 
 pub async fn route_account(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
-) -> impl IntoResponse {
+    req: Request<Body>,
+) -> Result<impl IntoResponse, Response> {
     struct DiscordSettings {
         guild_id: NonZeroU64,
         bot_token: String,
@@ -114,14 +130,14 @@ pub async fn route_account(
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
     let emails = state.db.get_emails_for_user_id(user.id);
-    let (challenge_data, team, emails) = tokio::join!(challenge_data, team, emails);
-    let (challenge_data, team, emails) = (challenge_data.unwrap(), team.unwrap(), emails.unwrap());
+    let (challenge_data, team, emails) =
+        tokio::try_join!(challenge_data, team, emails).map_err_page(&req, "Failed to get data")?;
 
-    Html(
+    Ok(Html(
         state
             .jinja
             .get_template("account/account.html")
-            .unwrap()
+            .map_err_page(&req, "Failed to get template")?
             .render(context! {
                 global => state.global_page_meta,
                 page,
@@ -135,8 +151,8 @@ pub async fn route_account(
                 categories => challenge_data.categories,
                 emails,
             })
-            .unwrap(),
-    )
+            .map_err_page(&req, "Failed to render template")?
+    ))
 }
 
 #[derive(Deserialize)]
@@ -145,16 +161,16 @@ pub struct EmailSubmit {
 }
 
 pub async fn route_account_add_email(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Extension(ip): Extension<Option<IpAddr>>,
     Extension(page): Extension<PageMeta>,
     Form(form): Form<EmailSubmit>,
-) -> impl IntoResponse {
+) -> std::result::Result<impl IntoResponse, Response> {
     if form.email.is_empty() || form.email.len() > 255 {
-        return Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .header(
+        return Err((
+            StatusCode::BAD_REQUEST,
+            [(
                 "HX-Trigger",
                 toast_header(
                     ToastKind::Error,
@@ -163,16 +179,16 @@ pub async fn route_account_add_email(
                         .localize(&page.lang, "account-error-email-length", None)
                         .unwrap(),
                 ),
-            )
-            .body("".to_owned())
-            .unwrap();
+            )],
+        )
+            .into_response());
     }
 
     let mut emails = state.db.get_emails_for_user_id(user.id).await.unwrap();
     if emails.iter().any(|email| email.address == form.email) {
-        return Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .header(
+        return Err((
+            StatusCode::BAD_REQUEST,
+            [(
                 "HX-Trigger",
                 toast_header(
                     ToastKind::Error,
@@ -181,34 +197,38 @@ pub async fn route_account_add_email(
                         .localize(&page.lang, "account-error-email-already-added", None)
                         .unwrap(),
                 ),
-            )
-            .body("".to_owned())
-            .unwrap();
+            )],
+        )
+            .into_response());
     }
 
     if let Some(ref mailer) = state.outbound_mailer {
-        let Ok(code) = state
+        let code = match state
             .db
             .create_email_verification_callback_code(user.id, &form.email)
             .await
-        else {
-            return Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .header(
-                    "HX-Trigger",
-                    toast_header(
-                        ToastKind::Error,
-                        &state
-                            .localizer
-                            .localize(&page.lang, "account-error-verification-email", None)
-                            .unwrap(),
-                    ),
+        {
+            Ok(code) => code,
+            Err(e) => {
+                tracing::error!(user_id = user.id, email = form.email, error = ?e, "Failed to create email verification callback code");
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    [(
+                        "HX-Trigger",
+                        toast_header(
+                            ToastKind::Error,
+                            &state
+                                .localizer
+                                .localize(&page.lang, "account-error-verification-email", None)
+                                .unwrap(),
+                        ),
+                    )],
                 )
-                .body("".to_owned())
-                .unwrap();
+                    .into_response());
+            }
         };
 
-        if mailer
+        if let Err(e) = mailer
             .send_email_confirmation(
                 &user.name,
                 ip.map(|ip| ip.to_string()).as_deref(),
@@ -216,13 +236,16 @@ pub async fn route_account_add_email(
                 &code,
             )
             .await
-            .is_err()
         {
-            state.db.delete_email(user.id, &form.email).await.unwrap();
+            tracing::error!(user_id = user.id, email = form.email, error = ?e, "Failed to send verification email");
 
-            return Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .header(
+            if let Err(e) = state.db.delete_email(user.id, &form.email).await {
+                tracing::error!(user_id = user.id, email = form.email, error = ?e, "Failed to delete email after failed verification email");
+            }
+
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                [(
                     "HX-Trigger",
                     toast_header(
                         ToastKind::Error,
@@ -231,9 +254,9 @@ pub async fn route_account_add_email(
                             .localize(&page.lang, "account-error-verification-email", None)
                             .unwrap(),
                     ),
-                )
-                .body("".to_owned())
-                .unwrap();
+                )],
+            )
+                .into_response());
         }
 
         tracing::trace!(
@@ -248,8 +271,18 @@ pub async fn route_account_add_email(
         verified: false,
     });
 
-    Response::builder()
-        .header(
+    let html = state
+        .jinja
+        .get_template("account/account-emails.html")
+        .unwrap()
+        .render(context! {
+            page,
+            emails,
+        })
+        .unwrap();
+
+    Ok((
+        [(
             "HX-Trigger",
             toast_header(
                 ToastKind::Success,
@@ -258,20 +291,9 @@ pub async fn route_account_add_email(
                     .localize(&page.lang, "account-check-email", None)
                     .unwrap(),
             ),
-        )
-        .body(
-            state
-                .jinja
-                .get_template("account/account-emails.html")
-                .unwrap()
-                .render(context! {
-                    page,
-                    emails,
-                    oob => true,
-                })
-                .unwrap(),
-        )
-        .unwrap()
+        )],
+        Html(html),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -280,24 +302,28 @@ pub struct EmailVerifyParams {
 }
 
 pub async fn route_account_email_verify_callback(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
-    params: Query<EmailVerifyParams>,
-) -> impl IntoResponse {
-    let Ok(email) = state
+    Query(params): Query<EmailVerifyParams>,
+    req: Request<Body>,
+) -> std::result::Result<impl IntoResponse, Response> {
+    let email = match state
         .db
         .get_email_verification_by_callback_code(&params.code)
         .await
-    else {
-        tracing::info!(
-            code = params.code,
-            "invalid email verification callback code"
-        );
-        return Redirect::temporary("/account").into_response();
+    {
+        Err(RhombusError::DatabaseReturnedNoRows) => {
+            tracing::info!(
+                code = params.code,
+                "invalid email verification callback code"
+            );
+            return Err(Redirect::temporary("/account").into_response());
+        }
+        result => result.map_err_page(&req, "Failed to get verification")?,
     };
 
-    Html(
+    Ok(Html(
         state
             .jinja
             .get_template("account/email-verify.html")
@@ -310,20 +336,21 @@ pub async fn route_account_email_verify_callback(
                 email,
                 code => params.code,
             })
-            .unwrap(),
-    )
-    .into_response()
+            .map_err_page(&req, "Failed to render template")?,
+    ))
 }
 
 pub async fn route_account_email_verify_confirm(
-    state: State<RouterState>,
-    params: Query<EmailVerifyParams>,
+    State(state): State<RouterState>,
+    Query(params): Query<EmailVerifyParams>,
 ) -> impl IntoResponse {
-    state
+    if let Err(e) = state
         .db
         .verify_email_verification_callback_code(&params.code)
         .await
-        .unwrap();
+    {
+        tracing::error!(error = ?e, "Failed to verify email verification callback code");
+    }
 
     Redirect::to("/account")
 }
@@ -334,38 +361,52 @@ pub struct EmailRemove {
 }
 
 pub async fn route_account_delete_email(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
     Query(query): Query<EmailRemove>,
 ) -> impl IntoResponse {
-    let mut emails = state.db.get_emails_for_user_id(user.id).await.unwrap();
+    let mut emails = match state.db.get_emails_for_user_id(user.id).await {
+        Ok(emails) => emails,
+        Err(e) => {
+            tracing::error!(
+                user_id = user.id,
+                email = query.email,
+                error = ?e,
+                "Failed to get emails for user while deleting email"
+            );
+            return htmx_error_status_code().into_response();
+        }
+    };
 
-    if emails.len() == 1 {
-        return Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .body("".to_owned())
-            .unwrap();
+    if emails.len() <= 1 {
+        return StatusCode::BAD_REQUEST.into_response();
     }
 
-    state.db.delete_email(user.id, &query.email).await.unwrap();
+    if let Err(e) = state.db.delete_email(user.id, &query.email).await {
+        tracing::error!(
+            user_id = user.id,
+            email = query.email,
+            error = ?e,
+            "Failed to delete email"
+        );
+        return htmx_error_status_code().into_response();
+    }
 
     emails.retain(|email| email.address != query.email);
 
-    Response::builder()
-        .body(
-            state
-                .jinja
-                .get_template("account/account-emails.html")
-                .unwrap()
-                .render(context! {
-                    page,
-                    emails,
-                    oob => true,
-                })
-                .unwrap(),
-        )
-        .unwrap()
+    Html(
+        state
+            .jinja
+            .get_template("account/account-emails.html")
+            .unwrap()
+            .render(context! {
+                page,
+                emails,
+            })
+            .unwrap(),
+    )
+    .into_response()
 }
 
 pub fn discord_cache_evictor() {
@@ -386,7 +427,7 @@ pub struct SetAccountName {
 }
 
 pub async fn route_account_set_name(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
     Form(form): Form<SetAccountName>,
@@ -407,7 +448,10 @@ pub async fn route_account_set_name(
         .db
         .set_account_name(user.id, user.team_id, &form.name, 60 * 30)
         .await
-        .unwrap()
+        .map_err(|e| {
+            tracing::error!(error = ?e, "Failed to set account name");
+            StatusCode::from_u16(502).unwrap()
+        })?
     {
         match e {
             SetAccountNameError::Taken => {
@@ -432,28 +476,19 @@ pub async fn route_account_set_name(
         .get_template("account/account-set-name.html")
         .unwrap();
 
-    if errors.is_empty() {
-        let html = account_name_template
-            .render(context! {
-                page,
-                new_account_name => &form.name,
-            })
-            .unwrap();
-
-        Ok(Response::builder()
-            .header("Content-Type", "text/html")
-            .body(html)
-            .unwrap())
+    let ctx = if errors.is_empty() {
+        context! {
+            page,
+            new_account_name => &form.name,
+        }
     } else {
-        let html = account_name_template
-            .render(context! {
-                page,
-                errors,
-            })
-            .unwrap();
-        Ok(Response::builder()
-            .header("Content-Type", "text/html")
-            .body(html)
-            .unwrap())
-    }
+        context! {
+            page,
+            errors,
+        }
+    };
+
+    let html = account_name_template.render(ctx).unwrap();
+
+    Ok(Html(html))
 }

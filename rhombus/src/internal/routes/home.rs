@@ -1,17 +1,21 @@
 use axum::{
-    extract::State,
-    response::{Html, IntoResponse},
+    body::Body,
+    extract::{Request, State},
+    response::{Html, IntoResponse, Response},
     Extension,
 };
 use minijinja::context;
 
-use crate::internal::{auth::MaybeUser, router::RouterState, routes::meta::PageMeta};
+use crate::internal::{
+    auth::MaybeUser, errors::IntoErrorResponse, router::RouterState, routes::meta::PageMeta,
+};
 
 pub async fn route_home(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<MaybeUser>,
     Extension(page): Extension<PageMeta>,
-) -> impl IntoResponse {
+    req: Request<Body>,
+) -> std::result::Result<impl IntoResponse, Response> {
     let home = state.settings.read().await.home.clone();
 
     let content = home.and_then(|home| {
@@ -31,17 +35,17 @@ pub async fn route_home(
         })
     });
 
-    Html(
+    Ok(Html(
         state
             .jinja
             .get_template("home.html")
-            .unwrap()
+            .map_err_page(&req, "Failed to get template")?
             .render(context! {
                 global => state.global_page_meta,
                 page,
                 user,
                 content,
             })
-            .unwrap(),
-    )
+            .map_err_page(&req, "Failed to render template")?,
+    ))
 }

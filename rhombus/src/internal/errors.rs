@@ -17,6 +17,11 @@ use crate::internal::{
     routes::meta::PageMeta,
 };
 
+#[inline]
+pub fn htmx_error_status_code() -> StatusCode {
+    StatusCode::from_u16(502).unwrap()
+}
+
 pub fn handle_panic(err: Box<dyn Any + Send + 'static>) -> Response<String> {
     let details = if let Some(s) = err.downcast_ref::<String>() {
         s.clone()
@@ -126,16 +131,60 @@ impl<T, E: std::error::Error + 'static> IntoErrorResponse<T> for Result<T, E> {
         let caller = std::panic::Location::caller();
 
         self.map_err(|e| {
-            if let (Some(state), Some(user), Some(page)) = (
+            let user = match req.extensions().get::<MaybeUser>() {
+                Some(user) => user,
+                None => &None,
+            };
+            let user_id = user.as_ref().map(|user| user.id);
+            let location = format!("{}:{}:{}", caller.file(), caller.line(), caller.column());
+            tracing::error!(location, user_id, error = ?e, description, "Error");
+
+            if let (Some(state), Some(page)) = (
                 req.extensions().get::<RouterState>(),
-                req.extensions().get::<MaybeUser>(),
                 req.extensions().get::<PageMeta>(),
             ) {
-                let user_id = user.as_ref().map(|user| user.id);
-                let location = format!("{}:{}:{}", caller.file(), caller.line(), caller.column());
-                tracing::error!(location, user_id, error = ?e, description, "Error");
+                error_page(status_code, description, state, user, page).into_response()
+            } else {
+                (
+                    status_code,
+                    Json(serde_json::json!({
+                        "error": {
+                            "kind": "caught",
+                            "details": description,
+                        }
+                    })),
+                )
+                    .into_response()
+            }
+        })
+    }
+}
 
-                error_page(status_code, description, &state, &user, &page).into_response()
+impl<T> IntoErrorResponse<T> for Option<T> {
+    #[track_caller]
+    #[inline]
+    fn map_err_page_code(
+        self,
+        req: &Request<Body>,
+        status_code: StatusCode,
+        description: &'static str,
+    ) -> Result<T, axum::response::Response> {
+        let caller = std::panic::Location::caller();
+
+        self.ok_or_else(|| {
+            let user = match req.extensions().get::<MaybeUser>() {
+                Some(user) => user,
+                None => &None,
+            };
+            let user_id = user.as_ref().map(|user| user.id);
+            let location = format!("{}:{}:{}", caller.file(), caller.line(), caller.column());
+            tracing::error!(location, user_id, description, "Error unwrapping Option");
+
+            if let (Some(state), Some(page)) = (
+                req.extensions().get::<RouterState>(),
+                req.extensions().get::<PageMeta>(),
+            ) {
+                error_page(status_code, description, state, user, page).into_response()
             } else {
                 (
                     status_code,
