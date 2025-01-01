@@ -37,8 +37,14 @@ use crate::internal::{
 use super::{database::provider::Database, settings::Settings};
 
 pub fn create_user_api_token(settings: &Settings) -> String {
-    let a = Alphanumeric.sample_string(&mut thread_rng(), 16);
-    format!("{}{}", settings.location_url, a)
+    format!(
+        "{}_{}",
+        base32::encode(
+            base32::Alphabet::Rfc4648Lower { padding: false },
+            settings.location_url.as_bytes()
+        ),
+        Alphanumeric.sample_string(&mut thread_rng(), 32)
+    )
 }
 
 #[derive(Debug, Serialize, Clone)]
