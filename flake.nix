@@ -57,6 +57,7 @@
             vscode-langservers-extracted
             alejandra
             grpcurl
+            flyctl
 
             deno
 

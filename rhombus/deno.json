@@ -6,6 +6,7 @@
     "lib": ["DOM", "DOM.Iterable", "ESNext"]
   },
   "imports": {
+    "@tailwindcss/typography": "npm:@tailwindcss/typography@^0.5.15",
     "@tailwindcss/cli": "npm:@tailwindcss/cli@^4.0.0-beta.6",
     "@fluent/bundle": "npm:@fluent/bundle@^0.18.0",
     "@fluent/langneg": "npm:@fluent/langneg@^0.7.0",

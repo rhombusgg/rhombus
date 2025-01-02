@@ -1,5 +1,5 @@
 use std::{
-    collections::{btree_map::Entry, BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet},
     future::Future,
     net::IpAddr,
     num::NonZeroU64,
@@ -28,10 +28,10 @@ use crate::{
             provider::{
                 Author, Category, Challenge, ChallengeAttachment, ChallengeData, ChallengeDivision,
                 ChallengeSolve, Challenges, Database, DiscordUpsertError, Email, Leaderboard,
-                LeaderboardEntry, Scoreboard, ScoreboardSeriesPoint, ScoreboardTeam,
-                SetAccountNameError, SetTeamNameError, SiteStatistics, StatisticsCategory, Team,
-                TeamInner, TeamMeta, TeamMetaInner, TeamStanding, TeamUser, Ticket,
-                ToBeClosedTicket, UserTrack, Writeup,
+                LeaderboardEntry, Scoreboard, ScoreboardInner, ScoreboardSeriesPoint,
+                ScoreboardTeam, SetAccountNameError, SetTeamNameError, SiteStatistics,
+                StatisticsCategory, Team, TeamInner, TeamMeta, TeamMetaInner, TeamStanding,
+                TeamUser, Ticket, ToBeClosedTicket, UserTrack, Writeup,
             },
         },
         division::Division,
@@ -703,17 +703,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             };
         }
 
-        let challenge_rows = tx
-            .query(
-                "
-                SELECT rhombus_challenge.*
-                FROM rhombus_challenge
-                LEFT JOIN rhombus_solve ON rhombus_challenge.id = rhombus_solve.challenge_id
-                GROUP BY rhombus_challenge.id
-            ",
-                (),
-            )
-            .await?;
+        let challenge_rows = tx.query("SELECT * FROM rhombus_challenge ", ()).await?;
+
         #[derive(Debug, Deserialize)]
         struct DbChallenge {
             id: String,
@@ -1349,14 +1340,67 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         division_id: &str,
         challenge: &Challenge,
         next_points: i64,
+        now: DateTime<Utc>,
     ) -> Result<()> {
         let tx = self.transaction().await?;
 
-        let now = chrono::Utc::now().timestamp();
+        let top_10 = tx
+            .query(
+                "
+                SELECT id
+                FROM rhombus_team
+                WHERE division_id = ?1 AND points > 0
+                ORDER BY points DESC, last_solved_at ASC
+                LIMIT 10
+            ",
+                [division_id],
+            )
+            .await?
+            .into_stream()
+            .map(|row| row.unwrap().get::<i64>(0).unwrap())
+            .collect::<Vec<_>>()
+            .await;
+
+        let point_difference = challenge.points - next_points;
+
+        if point_difference != 0 {
+            tx.execute(
+                "
+                UPDATE rhombus_team
+                SET points = points - ?1
+                WHERE id in (
+                    SELECT team_id
+                    FROM rhombus_solve
+                    WHERE challenge_id = ?2 and points IS NULL
+                )
+            ",
+                params!(point_difference, challenge.id.as_str()),
+            )
+            .await?;
+        }
 
         tx.execute(
             "INSERT INTO rhombus_solve (challenge_id, user_id, team_id, solved_at) VALUES (?1, ?2, ?3, ?4)",
-            params!(challenge.id.as_str(), user_id, team_id, now),
+            params!(challenge.id.as_str(), user_id, team_id, now.timestamp()),
+        )
+        .await?;
+
+        tx.execute(
+            "
+            INSERT INTO rhombus_challenge_division_solves (challenge_id, division_id, solves) VALUES (?1, ?2, 1)
+            ON CONFLICT (challenge_id, division_id) DO UPDATE SET solves = solves + 1
+        ",
+            params!(challenge.id.as_str(), division_id),
+        )
+        .await?;
+
+        tx.execute(
+            "
+            UPDATE rhombus_team
+            SET points = points + ?1, last_solved_at = ?2
+            WHERE id = ?3
+        ",
+            params!(next_points, now.timestamp(), team_id),
         )
         .await?;
 
@@ -1370,20 +1414,37 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         )
         .await?;
 
-        tx.execute(
-            "
-            INSERT INTO rhombus_points_snapshot
-            SELECT team_id, ?1, ?2, points
-            FROM rhombus_team_points
-            JOIN rhombus_team ON
-                rhombus_team.id = rhombus_team_points.team_id AND
-                rhombus_team.division_id = ?1
-            ORDER BY points DESC
-            LIMIT 20
-        ",
-            params!(division_id, now),
-        )
-        .await?;
+        let new_top_10 = tx
+            .query(
+                "
+                SELECT id
+                FROM rhombus_team
+                WHERE division_id = ?1 AND points > 0
+                ORDER BY points DESC, last_solved_at ASC
+                LIMIT 10
+            ",
+                [division_id],
+            )
+            .await?
+            .into_stream()
+            .map(|row| row.unwrap().get::<i64>(0).unwrap())
+            .collect::<Vec<_>>()
+            .await;
+
+        if top_10 != new_top_10 {
+            tx.execute(
+                "
+                INSERT INTO rhombus_points_snapshot
+                SELECT id, ?2, points
+                FROM rhombus_team
+                WHERE division_id = ?1 AND points > 0
+                ORDER BY points DESC, last_solved_at ASC
+                LIMIT 20
+            ",
+                params!(division_id, now.timestamp()),
+            )
+            .await?;
+        }
 
         tx.commit().await?;
 
@@ -1834,111 +1895,84 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         struct DbTeam {
             id: i64,
             name: String,
+            points: i64,
         }
 
-        let mut db_teams = tx.query("SELECT id, name FROM rhombus_team", ()).await?;
-        let mut all_teams = BTreeMap::new();
-        while let Some(row) = db_teams.next().await? {
-            let team = de::from_row::<DbTeam>(&row).unwrap();
-            all_teams.insert(team.id, team.name);
-        }
-
-        let top_team_ids = tx
+        let mut db_teams = tx
             .query(
                 "
-                SELECT rhombus_team_points.team_id
-                FROM rhombus_team_points
-                JOIN rhombus_team ON
-                    rhombus_team_points.team_id = rhombus_team.id AND
-                    rhombus_team.division_id = ?1
+                SELECT id, name, points
+                FROM rhombus_team
+                WHERE division_id = ?1 AND points > 0
                 ORDER BY points DESC, last_solved_at ASC
                 LIMIT 10
             ",
-                [division_id],
+                params!(division_id),
             )
-            .await?
-            .into_stream()
-            .map(|row| row.unwrap().get::<i64>(0).unwrap())
-            .collect::<Vec<_>>()
-            .await;
+            .await?;
 
-        if top_team_ids.is_empty() {
-            return Ok(Scoreboard {
-                teams: Default::default(),
-            });
+        let mut teams = BTreeMap::new();
+        while let Some(row) = db_teams.next().await? {
+            let team = de::from_row::<DbTeam>(&row).unwrap();
+            teams.insert(
+                team.id,
+                (
+                    ScoreboardTeam {
+                        team_name: team.name,
+                        series: vec![],
+                    },
+                    team.points,
+                ),
+            );
         }
 
         #[derive(Debug, Deserialize)]
         struct DbScoreboard {
-            team_id: i64,
             at: i64,
             points: i64,
         }
 
-        let mut db_scoreboard = tx
-            .query(
-                "
-                SELECT team_id, at, points
-                FROM rhombus_points_snapshot
-                WHERE division_id = ?1 AND team_id in (?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
-                ORDER BY at ASC
-            ",
-                params!(
-                    division_id,
-                    top_team_ids[0],
-                    top_team_ids.get(1).unwrap_or(&top_team_ids[0]),
-                    top_team_ids.get(2).unwrap_or(&top_team_ids[0]),
-                    top_team_ids.get(3).unwrap_or(&top_team_ids[0]),
-                    top_team_ids.get(4).unwrap_or(&top_team_ids[0]),
-                    top_team_ids.get(5).unwrap_or(&top_team_ids[0]),
-                    top_team_ids.get(6).unwrap_or(&top_team_ids[0]),
-                    top_team_ids.get(7).unwrap_or(&top_team_ids[0]),
-                    top_team_ids.get(8).unwrap_or(&top_team_ids[0]),
-                    top_team_ids.get(9).unwrap_or(&top_team_ids[0]),
-                ),
-            )
-            .await?;
+        for (team_id, (team, _)) in teams.iter_mut() {
+            let mut db_scoreboard = tx
+                .query(
+                    "
+                    SELECT at, points
+                    FROM rhombus_points_snapshot
+                    WHERE team_id = ?
+                    ORDER BY at ASC
+                ",
+                    params!(team_id),
+                )
+                .await?;
 
-        let mut teams: BTreeMap<i64, ScoreboardTeam> = BTreeMap::new();
-        let mut current_timestamp = 0;
-        let mut current_hash: i64 = 0;
-        let mut old_hash = 0;
-        while let Some(row) = db_scoreboard.next().await? {
-            let scoreboard = de::from_row::<DbScoreboard>(&row).unwrap();
-            let series_point = ScoreboardSeriesPoint {
-                timestamp: scoreboard.at,
-                total_score: scoreboard.points,
-            };
-
-            if current_timestamp != scoreboard.at {
-                current_timestamp = scoreboard.at;
-                if current_hash == old_hash {
-                    for team in teams.values_mut() {
-                        team.series.pop();
-                    }
-                }
-                old_hash = current_hash;
-                current_hash = 0;
-            }
-            current_hash = current_hash.wrapping_add(scoreboard.points * scoreboard.team_id * 31);
-
-            match teams.entry(scoreboard.team_id) {
-                Entry::Vacant(entry) => {
-                    entry.insert(ScoreboardTeam {
-                        team_name: all_teams[&scoreboard.team_id].clone(),
-                        series: vec![series_point],
-                    });
-                }
-                Entry::Occupied(mut entry) => {
-                    entry.get_mut().series.push(series_point);
-                }
+            while let Some(row) = db_scoreboard.next().await? {
+                let scoreboard = de::from_row::<DbScoreboard>(&row).unwrap();
+                let series_point = ScoreboardSeriesPoint {
+                    timestamp: scoreboard.at,
+                    total_score: scoreboard.points,
+                };
+                team.series.push(series_point);
             }
         }
 
-        Ok(Scoreboard { teams })
+        tx.commit().await?;
+
+        let now = chrono::Utc::now().timestamp();
+        let teams = teams
+            .into_iter()
+            .map(|(team_id, (mut team, current_points))| {
+                team.series.push(ScoreboardSeriesPoint {
+                    timestamp: now,
+                    total_score: current_points,
+                });
+                (team_id, team)
+            })
+            .collect();
+
+        Ok(Arc::new(ScoreboardInner::new(teams)))
     }
 
-    async fn get_leaderboard(&self, division_id: &str, page: Option<u64>) -> Result<Leaderboard> {
+    async fn get_leaderboard(&self, division_id: &str) -> Result<Leaderboard> {
         #[derive(Debug, Deserialize)]
         struct DbLeaderboard {
             team_id: i64,
@@ -1946,106 +1980,36 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             points: f64,
         }
 
-        if let Some(page) = page {
-            let tx = self.transaction().await?;
+        let mut rank = 0;
 
-            let num_teams = tx
-                .query(
-                    "
-                    SELECT COUNT(*)
-                    FROM rhombus_team_points
-                    JOIN rhombus_team ON
-                        rhombus_team_points.team_id = rhombus_team.id AND
-                        rhombus_team.division_id = ?1
-                ",
-                    [division_id],
-                )
-                .await?
-                .next()
-                .await?
-                .unwrap()
-                .get::<u64>(0)
-                .unwrap();
-
-            const PAGE_SIZE: u64 = 25;
-
-            let num_pages = (num_teams + (PAGE_SIZE - 1)) / PAGE_SIZE;
-
-            let page = page.min(num_pages);
-
-            let mut rank = page * PAGE_SIZE;
-
-            let leaderboard_entries = tx
-                .query(
-                    "
-                    SELECT rhombus_team_points.team_id, name, points
-                    FROM rhombus_team_points
-                    JOIN rhombus_team ON
-                        rhombus_team_points.team_id = rhombus_team.id AND
-                        rhombus_team.division_id = ?1
-                    ORDER BY points DESC, last_solved_at ASC
-                    LIMIT ?3 OFFSET ?2
-                ",
-                    params!(division_id, page * PAGE_SIZE, PAGE_SIZE),
-                )
-                .await?
-                .into_stream()
-                .map(|row| {
-                    let db_leaderboard = de::from_row::<DbLeaderboard>(&row.unwrap()).unwrap();
-                    rank += 1;
-                    LeaderboardEntry {
-                        rank,
-                        team_id: db_leaderboard.team_id,
-                        team_name: db_leaderboard.name,
-                        score: db_leaderboard.points.round() as i64,
-                    }
-                })
-                .collect::<Vec<_>>()
-                .await;
-
-            tx.commit().await?;
-
-            Ok(Leaderboard {
-                entries: leaderboard_entries,
-                num_pages,
+        let leaderboard_entries = self
+            .connect()
+            .await?
+            .query(
+                "
+                SELECT id AS team_id, name, points
+                FROM rhombus_team
+                WHERE division_id = ?1
+                ORDER BY points DESC, last_solved_at ASC
+            ",
+                params!(division_id),
+            )
+            .await?
+            .into_stream()
+            .map(|row| {
+                let db_leaderboard = de::from_row::<DbLeaderboard>(&row.unwrap()).unwrap();
+                rank += 1;
+                LeaderboardEntry {
+                    rank,
+                    team_id: db_leaderboard.team_id,
+                    team_name: db_leaderboard.name,
+                    score: db_leaderboard.points.round() as i64,
+                }
             })
-        } else {
-            let mut rank = 0;
+            .collect::<Vec<_>>()
+            .await;
 
-            let leaderboard_entries = self
-                .connect()
-                .await?
-                .query(
-                    "
-                    SELECT rhombus_team_points.team_id, name, points
-                    FROM rhombus_team_points
-                    JOIN rhombus_team ON
-                        rhombus_team_points.team_id = rhombus_team.id AND
-                        division_id = ?1
-                    ORDER BY points DESC
-                ",
-                    params!(division_id),
-                )
-                .await?
-                .into_stream()
-                .map(|row| {
-                    let db_leaderboard = de::from_row::<DbLeaderboard>(&row.unwrap()).unwrap();
-                    rank += 1;
-                    LeaderboardEntry {
-                        rank,
-                        team_id: db_leaderboard.team_id,
-                        team_name: db_leaderboard.name,
-                        score: db_leaderboard.points.round() as i64,
-                    }
-                })
-                .collect::<Vec<_>>()
-                .await;
-
-            Ok(Leaderboard {
-                entries: leaderboard_entries,
-                num_pages: 1,
-            })
-        }
+        Ok(Arc::new(leaderboard_entries))
     }
 
     async fn get_top10_discord_ids(&self) -> Result<BTreeSet<NonZeroU64>> {
@@ -2054,20 +2018,14 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await?
             .query(
                 "
-                WITH ranked_teams AS (
-                    SELECT
-                        rhombus_team_points.team_id,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY rhombus_team.division_id
-                            ORDER BY rhombus_team_points.points DESC, rhombus_team_points.last_solved_at ASC
-                        ) as rank
-                    FROM rhombus_team_points
-                    JOIN rhombus_team ON rhombus_team.id = rhombus_team_points.team_id
+                SELECT discord_id
+                FROM rhombus_user
+                WHERE team_id IN (
+                    SELECT id
+                    FROM rhombus_team
+                    ORDER BY points DESC, last_solved_at ASC
+                    LIMIT 10
                 )
-                SELECT rhombus_user.discord_id
-                FROM ranked_teams
-                JOIN rhombus_user ON rhombus_user.team_id = ranked_teams.team_id
-                WHERE ranked_teams.rank <= 10 AND rhombus_user.discord_id IS NOT NULL
             ",
                 (),
             )
@@ -2348,17 +2306,15 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                 "
                 WITH ranked_teams AS (
                     SELECT
-                        rhombus_team_points.team_id,
+                        id,
                         points,
                         RANK() OVER (ORDER BY points DESC) AS rank
-                    FROM rhombus_team_points
-                    JOIN rhombus_team ON
-                        rhombus_team_points.team_id = rhombus_team.id
-                        AND rhombus_team.division_id = ?2
+                    FROM rhombus_team
+                    WHERE rhombus_team.division_id = ?2
                 )
                 SELECT points, rank
                 FROM ranked_teams
-                WHERE team_id = ?1
+                WHERE id = ?1
             ",
                 params!(team_id, division_id),
             )

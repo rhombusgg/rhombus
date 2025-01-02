@@ -132,9 +132,19 @@ pub struct ScoreboardTeam {
 }
 
 #[derive(Debug, Serialize, Clone)]
-pub struct Scoreboard {
+pub struct ScoreboardInner {
     pub teams: BTreeMap<i64, ScoreboardTeam>,
+    pub cached_json: String,
 }
+
+impl ScoreboardInner {
+    pub fn new(teams: BTreeMap<i64, ScoreboardTeam>) -> Self {
+        let cached_json = serde_json::to_string(&teams).unwrap();
+        Self { teams, cached_json }
+    }
+}
+
+pub type Scoreboard = Arc<ScoreboardInner>;
 
 #[derive(Debug, Serialize, Clone)]
 pub struct LeaderboardEntry {
@@ -144,11 +154,7 @@ pub struct LeaderboardEntry {
     pub rank: u64,
 }
 
-#[derive(Debug, Serialize, Clone)]
-pub struct Leaderboard {
-    pub num_pages: u64,
-    pub entries: Vec<LeaderboardEntry>,
-}
+pub type Leaderboard = Arc<Vec<LeaderboardEntry>>;
 
 #[derive(Debug, Serialize, Clone)]
 pub struct Email {
@@ -282,6 +288,7 @@ pub trait Database {
         division_id: &str,
         challenge: &Challenge,
         next_points: i64,
+        now: DateTime<Utc>,
     ) -> Result<()>;
     async fn get_user_from_id(&self, user_id: i64) -> Result<User>;
     async fn get_user_from_discord_id(&self, discord_id: NonZeroU64) -> Result<User>;
@@ -348,7 +355,7 @@ pub trait Database {
     async fn save_settings(&self, settings: &Settings) -> Result<()>;
     async fn load_settings(&self, settings: &mut Settings) -> Result<()>;
     async fn get_scoreboard(&self, division_id: &str) -> Result<Scoreboard>;
-    async fn get_leaderboard(&self, division_id: &str, page: Option<u64>) -> Result<Leaderboard>;
+    async fn get_leaderboard(&self, division_id: &str) -> Result<Leaderboard>;
     async fn get_top10_discord_ids(&self) -> Result<BTreeSet<NonZeroU64>>;
     async fn get_emails_for_user_id(&self, user_id: i64) -> Result<Vec<Email>>;
     async fn get_team_tracks(&self, team_id: i64) -> Result<BTreeMap<i64, UserTrack>>;

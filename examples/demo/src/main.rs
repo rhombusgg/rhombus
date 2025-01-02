@@ -300,7 +300,8 @@ async fn solve_challenge(
                 .await
                 .unwrap();
 
-            db.solve_challenge(user_id, team_id, &division_id, challenge, next_points)
+            let now = Utc::now();
+            db.solve_challenge(user_id, team_id, &division_id, challenge, next_points, now)
                 .await?;
             tracing::info!(user_id, challenge_id = challenge.id, "Solved challenge");
         }

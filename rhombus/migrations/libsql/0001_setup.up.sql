@@ -52,12 +52,10 @@ CREATE TABLE IF NOT EXISTS rhombus_author (
 
 CREATE TABLE IF NOT EXISTS rhombus_points_snapshot (
     team_id INTEGER NOT NULL,
-    division_id TEXT NOT NULL,
     at INTEGER NOT NULL DEFAULT(strftime('%s', 'now')),
     points INTEGER NOT NULL,
-    PRIMARY KEY (team_id, division_id, at),
-    FOREIGN KEY (team_id) REFERENCES rhombus_team(id),
-    FOREIGN KEY (division_id) REFERENCES rhombus_division(id)
+    PRIMARY KEY (team_id, at ASC),
+    FOREIGN KEY (team_id) REFERENCES rhombus_team(id)
 );
 
 CREATE TABLE IF NOT EXISTS rhombus_category (
@@ -73,11 +71,13 @@ CREATE TABLE IF NOT EXISTS rhombus_solve (
     team_id INTEGER NOT NULL,
     solved_at INTEGER NOT NULL DEFAULT(strftime('%s', 'now')),
     points INTEGER,
-    PRIMARY KEY (challenge_id, team_id),
+    PRIMARY KEY (team_id, challenge_id),
     FOREIGN KEY (challenge_id) REFERENCES rhombus_challenge(id),
     FOREIGN KEY (user_id) REFERENCES rhombus_user(id),
     FOREIGN KEY (team_id) REFERENCES rhombus_team(id)
 );
+
+CREATE INDEX IF NOT EXISTS challenge_id_idx ON rhombus_solve(challenge_id, team_id, points);
 
 CREATE TABLE IF NOT EXISTS rhombus_user (
     id INTEGER PRIMARY KEY NOT NULL,
@@ -95,8 +95,8 @@ CREATE TABLE IF NOT EXISTS rhombus_user (
     FOREIGN KEY (owner_team_id) REFERENCES rhombus_team(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS rhombus_user_team_id ON rhombus_user(team_id);
-CREATE INDEX IF NOT EXISTS rhombus_user_owner_team_id ON rhombus_user(owner_team_id);
+CREATE INDEX IF NOT EXISTS team_id_idx ON rhombus_user(team_id);
+CREATE INDEX IF NOT EXISTS api_key_idx ON rhombus_user(api_key);
 
 CREATE TABLE IF NOT EXISTS rhombus_user_historical_names (
     user_id INTEGER NOT NULL,
@@ -144,12 +144,14 @@ CREATE TABLE IF NOT EXISTS rhombus_team (
     ctftime_id INTEGER UNIQUE,
     division_id TEXT NOT NULL,
     last_division_change INTEGER,
+    points INTEGER NOT NULL DEFAULT(0),
+    last_solved_at INTEGER NOT NULL DEFAULT(0),
     FOREIGN KEY (division_id) REFERENCES rhombus_division(id)
 );
 
-CREATE INDEX IF NOT EXISTS rhombus_team_division_id ON rhombus_team(division_id);
-CREATE INDEX IF NOT EXISTS rhombus_team_invite_token ON rhombus_team(invite_token);
-CREATE INDEX IF NOT EXISTS rhombus_team_ctftime_id ON rhombus_team(ctftime_id);
+CREATE INDEX IF NOT EXISTS invite_token_idx ON rhombus_team(invite_token);
+CREATE INDEX IF NOT EXISTS ctftime_id_idx ON rhombus_team(ctftime_id);
+CREATE INDEX IF NOT EXISTS leaderboard_idx ON rhombus_team(division_id, points DESC, last_solved_at ASC);
 
 CREATE TABLE IF NOT EXISTS rhombus_team_historical_names (
     team_id INTEGER NOT NULL,
@@ -192,17 +194,31 @@ CREATE TABLE IF NOT EXISTS rhombus_config (
     config TEXT
 );
 
-CREATE VIEW IF NOT EXISTS rhombus_challenge_division_solves AS
-SELECT rhombus_solve.challenge_id, rhombus_team.division_id, COUNT(*) AS solves
-FROM rhombus_solve
-JOIN rhombus_team ON rhombus_solve.team_id = rhombus_team.id
-GROUP BY rhombus_solve.challenge_id, rhombus_team.division_id;
+CREATE TABLE IF NOT EXISTS rhombus_challenge_division_solves (
+    challenge_id TEXT NOT NULL,
+    division_id TEXT NOT NULL,
+    solves INTEGER NOT NULL,
+    PRIMARY KEY (challenge_id, division_id),
+    FOREIGN KEY (challenge_id) REFERENCES rhombus_challenge(id),
+    FOREIGN KEY (division_id) REFERENCES rhombus_division(id)
+);
 
-CREATE VIEW IF NOT EXISTS rhombus_team_points AS
-SELECT rhombus_solve.team_id, SUM(COALESCE(rhombus_solve.points, rhombus_challenge.points)) AS points, MAX(rhombus_solve.solved_at) AS last_solved_at
-FROM rhombus_solve
-JOIN rhombus_challenge ON rhombus_solve.challenge_id = rhombus_challenge.id
-GROUP BY rhombus_solve.team_id;
+CREATE TRIGGER IF NOT EXISTS update_challenge_division_solves_division_change
+AFTER UPDATE OF division_id ON rhombus_team
+WHEN OLD.division_id != NEW.division_id
+BEGIN
+    INSERT OR IGNORE INTO rhombus_challenge_division_solves (challenge_id, division_id, solves)
+    SELECT id, NEW.division_id, 0
+    FROM rhombus_challenge;
+
+    UPDATE rhombus_challenge_division_solves
+    SET solves = CASE WHEN division_id = OLD.division_id THEN solves - 1 ELSE solves + 1 END
+    WHERE division_id in (OLD.division_id, NEW.division_id) AND challenge_id IN (
+        SELECT challenge_id
+        FROM rhombus_solve
+        WHERE team_id = NEW.id
+    );
+END;
 
 CREATE TABLE IF NOT EXISTS rhombus_track (
     id INTEGER PRIMARY KEY NOT NULL,

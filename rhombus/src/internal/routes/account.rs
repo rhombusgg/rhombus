@@ -83,7 +83,7 @@ pub async fn route_account(
     #[derive(Serialize)]
     struct DiscordData {
         in_server: bool,
-        invite_url: String,
+        invite_url: Option<String>,
     }
 
     let discord = if let Some(discord) = discord {
@@ -93,9 +93,19 @@ pub async fn route_account(
             false
         };
 
+        let invite_url = if !in_server {
+            let invite_url = state.bot.as_ref().unwrap().get_invite_url().await;
+            if let Err(ref err) = invite_url {
+                tracing::error!("Failed to get invite URL: {:?}", err);
+            }
+            invite_url.ok()
+        } else {
+            None
+        };
+
         Some(DiscordData {
             in_server,
-            invite_url: state.bot.as_ref().unwrap().get_invite_url().await.unwrap(),
+            invite_url,
         })
     } else {
         None
