@@ -50,13 +50,13 @@ impl Rhombus for RhombusImpl {
 }
 
 pub async fn init_grpc<'a>(run_context: &mut RunContext<'a>) {
-    let greeter = RhombusImpl {
+    let service = RhombusImpl {
         db: run_context.db.clone(),
         root_key: run_context.settings.read().await.root_api_key.clone(),
     };
     run_context
         .grpc_builder
-        .add_service(RhombusServer::new(greeter));
+        .add_service(RhombusServer::new(service));
     run_context
         .grpc_builder
         .register_encoded_file_descriptor_set(FILE_DESCRIPTOR_SET);
