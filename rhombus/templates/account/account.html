@@ -171,7 +171,11 @@
               API Key
             {% endcall %}
             {% call card.description() %}
-              To authenticate in <a href="https://crates.io/crates/rhombus-cli" class="underline">rhombus-cli</a>, run <code class="font-mono">rhombus-cli auth</code> and paste this.
+              To authenticate in
+              <a href="https://crates.io/crates/rhombus-cli" class="underline"
+                >rhombus-cli</a
+              >, run <code class="font-mono">rhombus-cli auth</code> and paste
+              this.
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
@@ -199,9 +203,7 @@
                     .writeText(document.querySelector("#api-key").value)
                     .then(
                       () => {
-                        rhombus.toast.success(
-                          "Copied API token to clipboard",
-                        );
+                        rhombus.toast.success("Copied API token to clipboard");
                       },
                       () => {
                         rhombus.toast.error(
@@ -212,8 +214,8 @@
                 }
               </script>
             </div>
-            {% endcall %}
           {% endcall %}
+        {% endcall %}
         {% include "account/account-cards.html" %}
       </div>
       <div>
