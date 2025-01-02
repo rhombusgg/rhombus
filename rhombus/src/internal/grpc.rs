@@ -4,13 +4,13 @@ use crate::grpc::proto::{self, User, WhoamiReply, FILE_DESCRIPTOR_SET};
 use crate::internal::database::provider::Connection;
 use crate::plugin::RunContext;
 
-struct MyGreeter {
+struct RhombusImpl {
     db: Connection,
     root_key: Option<String>,
 }
 
 #[tonic::async_trait]
-impl Rhombus for MyGreeter {
+impl Rhombus for RhombusImpl {
     async fn whoami(
         &self,
         request: tonic::Request<proto::WhoamiRequest>,
@@ -50,7 +50,7 @@ impl Rhombus for MyGreeter {
 }
 
 pub async fn init_grpc<'a>(run_context: &mut RunContext<'a>) {
-    let greeter = MyGreeter {
+    let greeter = RhombusImpl {
         db: run_context.db.clone(),
         root_key: run_context.settings.read().await.root_api_key.clone(),
     };
