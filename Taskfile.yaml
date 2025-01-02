@@ -23,9 +23,3 @@ tasks:
     desc: Start cargo watch using systemfd to not drop connections on restart
     cmds:
       - systemfd --no-pid -s http::3000 -- mold -run cargo watch -x 'run -p standalone'
- 
-  josh-temp-compile-protos:
-    dir: rhombus-cli
-    cmds:
-      - cp $(cargo out-dir)/rhombus.rs src/rhombus.rs
-      - cp src/rhombus.rs ../rhombus/src/rhombus.rs

@@ -20,8 +20,7 @@ mod auth;
 
 mod grpc {
     pub mod proto {
-        // tonic::include_proto!("rhombus");
-        include!("./rhombus.rs");
+        tonic::include_proto!("rhombus");
     }
 }
 
