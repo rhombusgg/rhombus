@@ -22,7 +22,7 @@ use tokio_util::bytes::Bytes;
 use crate::{
     errors::RhombusError,
     internal::{
-        auth::{create_user_api_token, User, UserInner},
+        auth::{create_user_api_key, User, UserInner},
         database::{
             cache::Writeups,
             provider::{
@@ -281,7 +281,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
         let team_id = create_team(&tx).await?;
 
-        let api_token = create_user_api_token(settings);
+        let api_token = create_user_api_key(settings);
         let user_id = tx
             .query(
                 "INSERT INTO rhombus_user (name, avatar, discord_id, team_id, owner_team_id, api_token) VALUES (?1, ?2, ?3, ?4, ?4, ?5) RETURNING id",
@@ -335,7 +335,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         }
 
         let team_id = create_team(&tx).await?;
-        let api_token = create_user_api_token(settings);
+        let api_token = create_user_api_key(settings);
         let user_id = tx
             .query(
                 "INSERT INTO rhombus_user (name, avatar, team_id, owner_team_id, api_token) VALUES (?1, ?2, ?3, ?3, ?4) RETURNING id",
@@ -411,7 +411,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                 .hash_password(password.as_bytes(), &salt)?
                 .to_string();
 
-            let api_token = create_user_api_token(settings);
+            let api_token = create_user_api_key(settings);
 
             let user_id = tx
                 .query(
@@ -503,7 +503,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
             let scratch_team_id = create_team(&tx).await?;
 
-            let api_token = create_user_api_token(settings);
+            let api_token = create_user_api_key(settings);
 
             let user_id = tx
                 .query(
@@ -542,7 +542,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .unwrap()
             .get::<i64>(0)?;
 
-        let api_token = create_user_api_token(settings);
+        let api_token = create_user_api_key(settings);
         let user_id = tx
             .query(
                 "INSERT INTO rhombus_user (name, avatar, ctftime_id, team_id, owner_team_id, api_token) VALUES (?1, ?2, ?3, ?4, ?4, ?5) RETURNING id",
@@ -1082,7 +1082,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             is_admin: user.is_admin,
             team_id: user.team_id,
             is_team_owner: user.team_id == user.owner_team_id,
-            api_token: user.api_token,
+            api_key: user.api_token,
         }))
     }
 
@@ -1122,11 +1122,11 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             is_admin: user.is_admin,
             team_id: user.team_id,
             is_team_owner: user.team_id == user.owner_team_id,
-            api_token: user.api_token,
+            api_key: user.api_token,
         }))
     }
 
-    async fn get_user_from_api_token(&self, api_token: &str) -> Result<User> {
+    async fn get_user_from_api_key(&self, api_token: &str) -> Result<User> {
         #[derive(Debug, Deserialize)]
         struct DbUser {
             id: i64,
@@ -1162,7 +1162,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             is_admin: user.is_admin,
             team_id: user.team_id,
             is_team_owner: user.team_id == user.owner_team_id,
-            api_token: user.api_token,
+            api_key: user.api_token,
         }))
     }
 
@@ -1214,8 +1214,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         Ok(new_invite_token)
     }
 
-    async fn roll_api_token(&self, user_id: i64, settings: &Settings) -> Result<String> {
-        let new_api_token = create_user_api_token(settings);
+    async fn roll_api_key(&self, user_id: i64, settings: &Settings) -> Result<String> {
+        let new_api_token = create_user_api_key(settings);
 
         self.connect()
             .await?

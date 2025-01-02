@@ -5,6 +5,7 @@ database_url: file://rhombus.db
 contact_email: admin@rhombus.gg
 in_memory_cache: 20
 start_time: 2024-09-04T03:14:00Z
+root_api_key: nb2hi4b2f4xwy33dmfwgq33toq5dgmbqga_QirtMNomQOgNx3DrjcNVl4ifJWpSjDLO
 # end_time: 2024-09-04T03:16:00Z
 auth:
   - discord

@@ -223,8 +223,8 @@ impl Database for DbCache {
         self.inner.get_user_from_discord_id(discord_id).await
     }
 
-    async fn get_user_from_api_token(&self, api_token: &str) -> Result<User> {
-        get_user_from_api_token(&self.inner, api_token).await
+    async fn get_user_from_api_key(&self, api_key: &str) -> Result<User> {
+        get_user_from_api_key(&self.inner, api_key).await
     }
 
     async fn kick_user(&self, user_id: i64, team_id: i64) -> Result<i64> {
@@ -245,10 +245,10 @@ impl Database for DbCache {
         new_invite_token
     }
 
-    async fn roll_api_token(&self, user_id: i64, settings: &Settings) -> Result<String> {
+    async fn roll_api_key(&self, user_id: i64, settings: &Settings) -> Result<String> {
         let user = self.get_user_from_id(user_id).await?;
-        USER_CACHE_BY_API_TOKEN.remove(&user.api_token);
-        self.inner.roll_api_token(user_id, settings).await
+        USER_CACHE_BY_API_KEY.remove(&user.api_key);
+        self.inner.roll_api_key(user_id, settings).await
     }
 
     async fn set_team_name(
@@ -659,7 +659,7 @@ impl<T> TimedCache<T> {
 }
 
 pub static USER_CACHE: LazyLock<DashMap<i64, TimedCache<User>>> = LazyLock::new(DashMap::new);
-pub static USER_CACHE_BY_API_TOKEN: LazyLock<DashMap<String, TimedCache<User>>> =
+pub static USER_CACHE_BY_API_KEY: LazyLock<DashMap<String, TimedCache<User>>> =
     LazyLock::new(DashMap::new);
 
 pub async fn get_user_from_id(db: &Connection, user_id: i64) -> Result<User> {
@@ -676,16 +676,16 @@ pub async fn get_user_from_id(db: &Connection, user_id: i64) -> Result<User> {
     user
 }
 
-pub async fn get_user_from_api_token(db: &Connection, api_token: &str) -> Result<User> {
-    if let Some(user) = USER_CACHE_BY_API_TOKEN.get(api_token) {
+pub async fn get_user_from_api_key(db: &Connection, api_key: &str) -> Result<User> {
+    if let Some(user) = USER_CACHE_BY_API_KEY.get(api_key) {
         return Ok(user.value.clone());
     }
-    tracing::trace!(api_token, "cache miss: get_user_from_api_token");
+    tracing::trace!(api_key, "cache miss: get_user_from_api_key");
 
-    let user = db.get_user_from_api_token(api_token).await;
+    let user = db.get_user_from_api_key(api_key).await;
 
     if let Ok(user) = &user {
-        USER_CACHE_BY_API_TOKEN.insert(api_token.to_owned(), TimedCache::new(user.clone()));
+        USER_CACHE_BY_API_KEY.insert(api_key.to_owned(), TimedCache::new(user.clone()));
     }
     user
 }

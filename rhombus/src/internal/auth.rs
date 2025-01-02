@@ -36,7 +36,7 @@ use crate::internal::{
 
 use super::{database::provider::Database, settings::Settings};
 
-pub fn create_user_api_token(settings: &Settings) -> String {
+pub fn create_user_api_key(settings: &Settings) -> String {
     format!(
         "{}_{}",
         base32::encode(
@@ -57,7 +57,7 @@ pub struct UserInner {
     pub is_team_owner: bool,
     pub disabled: bool,
     pub is_admin: bool,
-    pub api_token: String,
+    pub api_key: String,
 }
 pub type User = Arc<UserInner>;
 

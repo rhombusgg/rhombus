@@ -285,10 +285,10 @@ pub trait Database {
     ) -> Result<()>;
     async fn get_user_from_id(&self, user_id: i64) -> Result<User>;
     async fn get_user_from_discord_id(&self, discord_id: NonZeroU64) -> Result<User>;
-    async fn get_user_from_api_token(&self, discord_id: &str) -> Result<User>;
+    async fn get_user_from_api_key(&self, api_key: &str) -> Result<User>;
     async fn kick_user(&self, user_id: i64, team_id: i64) -> Result<i64>;
     async fn roll_invite_token(&self, team_id: i64) -> Result<String>;
-    async fn roll_api_token(&self, user_id: i64, settings: &Settings) -> Result<String>;
+    async fn roll_api_key(&self, user_id: i64, settings: &Settings) -> Result<String>;
     async fn set_team_name(
         &self,
         team_id: i64,

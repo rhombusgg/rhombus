@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS rhombus_user (
     owner_team_id INTEGER NOT NULL,
     disabled INTEGER NOT NULL DEFAULT(FALSE), -- 0 or 1
     is_admin INTEGER NOT NULL DEFAULT(FALSE), -- 0 or 1
-    api_token TEXT NOT NULL,
+    api_key TEXT NOT NULL,
     FOREIGN KEY (team_id) REFERENCES rhombus_team(id),
     FOREIGN KEY (owner_team_id) REFERENCES rhombus_team(id) ON DELETE CASCADE
 );

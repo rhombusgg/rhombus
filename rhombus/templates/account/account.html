@@ -166,35 +166,35 @@
         {% call card.root() %}
           {% call card.header() %}
             {% call card.title() %}
-              API Token
+              API Key
             {% endcall %}
             {% call card.description() %}
-              Use this to authenticate in <a href="https://crates.io/crates/rhombus-cli">rhombus-cli</a>
+              To authenticate in <a href="https://crates.io/crates/rhombus-cli" class="underline">rhombus-cli</a>, run <code class="font-mono">rhombus-cli auth</code> and paste this.
             {% endcall %}
           {% endcall %}
           {% call card.content() %}
             <div class="mb-4 flex gap-2">
-              {% include "account/api-token.html" %}
+              {% include "account/api-key.html" %}
               <button
                 class="border-input bg-background hover:bg-accent hover:text-accent-foreground ring-offset-background focus-visible:ring-ring inline-flex items-center justify-center whitespace-nowrap rounded-md border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
                 onclick="copyInviteTokenToClipboard()"
-                title="Copy invite token to clipboard"
+                title="Copy API key to clipboard"
               >
                 {{ icons.copy() }}
               </button>
               <button
                 hx-post="/account/roll-token"
-                hx-target="#api-token"
+                hx-target="#api-key"
                 hx-swap="outerHTML"
                 class="border-input bg-background hover:bg-accent hover:text-accent-foreground ring-offset-background focus-visible:ring-ring inline-flex items-center justify-center whitespace-nowrap rounded-md border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
-                title="Roll a new API token"
+                title="Roll a new API key"
               >
                 {{ icons.roll() }}
               </button>
               <script>
                 function copyInviteTokenToClipboard() {
                   navigator.clipboard
-                    .writeText(document.querySelector("#api-token").value)
+                    .writeText(document.querySelector("#api-key").value)
                     .then(
                       () => {
                         rhombus.toast.success(

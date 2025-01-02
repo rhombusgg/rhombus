@@ -195,7 +195,7 @@ impl Database for Postgres {
         todo!()
     }
 
-    async fn get_user_from_api_token(&self, _api_token: &str) -> Result<User> {
+    async fn get_user_from_api_key(&self, _api_key: &str) -> Result<User> {
         todo!()
     }
 
@@ -207,7 +207,7 @@ impl Database for Postgres {
         todo!()
     }
 
-    async fn roll_api_token(&self, _user_id: i64, _settings: &Settings) -> Result<String> {
+    async fn roll_api_key(&self, _user_id: i64, _settings: &Settings) -> Result<String> {
         todo!()
     }
 

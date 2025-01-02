@@ -1,12 +1,13 @@
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
+use colored::Colorize;
 use figment::{
     providers::{Format, Yaml},
     Figment,
 };
 use grpc::proto::rhombus_client::RhombusClient;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::{path::PathBuf, process::exit, result};
 use tonic::{
     metadata::MetadataValue,
     service::{interceptor::InterceptedService, Interceptor},
@@ -54,22 +55,30 @@ impl AdminCommand {
 
 #[derive(Serialize, Deserialize)]
 struct Config {
-    grpc_url: String,
-    auth_token: String,
+    url: String,
+    api_key: String,
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() {
     let args = Args::parse();
 
-    match args.command {
-        Command::Admin { admin_command } => {
-            admin_command.run().await?;
-        }
-        Command::Auth(auth_command) => auth_command.run().await?,
-    }
+    let result = match args.command {
+        Command::Admin { admin_command } => admin_command.run().await,
+        Command::Auth(auth_command) => auth_command.run().await,
+    };
 
-    Ok(())
+    match result {
+        Ok(()) => {}
+        Err(err) => {
+            match err.source() {
+                Some(source) => println!("{}", format!("Error: {}: {}", err, source).red()),
+                None => println!("{}{}", "Error: ".red(), err.to_string().red()),
+            }
+
+            exit(1);
+        }
+    }
 }
 
 struct MyInterceptor {
@@ -94,12 +103,16 @@ async fn get_client() -> Result<Client> {
         .merge(Yaml::file_exact(&config_file))
         .extract()
         .with_context(|| format!("failed to load config file ({})", config_file.display()))?;
-    let auth_token: MetadataValue<_> = config.auth_token.parse()?;
-    let channel = Channel::from_shared(config.grpc_url.clone())
-        .with_context(|| format!("failed to parse grpc url '{}'", &config.grpc_url))?
+    get_client_from_config(&config).await
+}
+
+async fn get_client_from_config(config: &Config) -> Result<Client> {
+    let auth_token: MetadataValue<_> = config.api_key.parse()?;
+    let channel = Channel::from_shared(config.url.clone())
+        .with_context(|| format!("failed to parse grpc url '{}'", &config.url))?
         .connect()
         .await
-        .with_context(|| format!("failed to connect to grpc server '{}'", &config.grpc_url))?;
+        .with_context(|| format!("failed to connect to grpc server '{}'", &config.url))?;
     let client = RhombusClient::with_interceptor(channel, MyInterceptor { auth_token });
     Ok(client)
 }
