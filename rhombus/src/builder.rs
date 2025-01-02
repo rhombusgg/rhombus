@@ -66,8 +66,7 @@ use crate::{
             account::{
                 discord_cache_evictor, route_account, route_account_add_email,
                 route_account_delete_email, route_account_email_verify_callback,
-                route_account_email_verify_confirm, route_account_roll_token,
-                route_account_set_name,
+                route_account_email_verify_confirm, route_account_roll_key, route_account_set_name,
             },
             challenges::{
                 route_challenge_submit, route_challenge_view, route_challenges,
@@ -987,7 +986,7 @@ impl Builder {
                     "/account/email",
                     post(route_account_add_email).delete(route_account_delete_email),
                 )
-                .route("/account/roll-token", post(route_account_roll_token))
+                .route("/account/roll-key", post(route_account_roll_key))
                 .route("/account/name", post(route_account_set_name))
                 .route("/account", get(route_account))
                 .route("/team/division/:id", post(route_team_set_division))
@@ -1121,14 +1120,17 @@ impl Builder {
 
             let router = router.layer(CompressionLayer::new());
 
-            let mut meme = tonic_reflection::server::Builder::configure();
-            for doge in grpc_builder.encoded_file_descriptor_sets {
-                meme = meme.register_encoded_file_descriptor_set(doge);
+            let mut reflection_builder = tonic_reflection::server::Builder::configure();
+            for encoded_file_set in grpc_builder.encoded_file_descriptor_sets {
+                reflection_builder =
+                    reflection_builder.register_encoded_file_descriptor_set(encoded_file_set);
             }
-            for doge in grpc_builder.file_descriptor_sets {
-                meme = meme.register_file_descriptor_set(doge);
+            for file_set in grpc_builder.file_descriptor_sets {
+                reflection_builder = reflection_builder.register_file_descriptor_set(file_set);
             }
-            grpc_builder.routes.add_service(meme.build_v1().unwrap());
+            grpc_builder
+                .routes
+                .add_service(reflection_builder.build_v1().unwrap());
             let grpc_router = grpc_builder.routes.routes().into_axum_router();
 
             let router = router.layer(axum::middleware::from_fn_with_state(
@@ -1148,6 +1150,7 @@ impl Builder {
 
     pub async fn build(self) -> Result<Arc<crate::internal::router::Router>> {
         let rr = Arc::new(crate::internal::router::Router::new());
+
         let router = self.build_axum_router(rr.clone()).await?;
 
         rr.update(router);

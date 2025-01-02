@@ -449,7 +449,7 @@ pub async fn route_account_set_name(
     }
 }
 
-pub async fn route_account_roll_token(
+pub async fn route_account_roll_key(
     state: State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
