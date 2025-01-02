@@ -1,5 +1,3 @@
-use std::io::Write;
-
 use anyhow::{anyhow, Context, Result};
 
 use crate::{
@@ -33,10 +31,10 @@ impl AuthCommand {
 
         let url = match url {
             Some(url) => {
-                println!("✓ Url: {}", url);
+                println!("✓ URL: {}", url);
                 url
             }
-            None => inquire::prompt_text("Url?")?,
+            None => inquire::prompt_text("URL?")?,
         };
 
         let config = Config { url, api_key };

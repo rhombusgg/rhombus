@@ -1,3 +1,4 @@
+use admin::AdminCommand;
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
@@ -7,7 +8,7 @@ use figment::{
 };
 use grpc::proto::rhombus_client::RhombusClient;
 use serde::{Deserialize, Serialize};
-use std::{path::PathBuf, process::exit, result};
+use std::{path::PathBuf, process::exit};
 use tonic::{
     metadata::MetadataValue,
     service::{interceptor::InterceptedService, Interceptor},
@@ -32,25 +33,13 @@ struct Args {
 }
 #[derive(Subcommand, Debug)]
 enum Command {
+    /// Authentiace rhombus-cli using an API token
     Auth(auth::AuthCommand),
+    /// Commands for CTF admins
     Admin {
         #[command(subcommand)]
         admin_command: AdminCommand,
     },
-}
-
-#[derive(Subcommand, Debug)]
-enum AdminCommand {
-    Apply(admin::ApplyCommand),
-}
-
-impl AdminCommand {
-    async fn run(&self) -> Result<()> {
-        let mut client = get_client().await?;
-        match self {
-            AdminCommand::Apply(apply_command) => apply_command.run(&mut client).await,
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize)]

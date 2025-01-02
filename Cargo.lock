@@ -4851,6 +4851,7 @@ dependencies = [
  "inquire",
  "markdown",
  "prost 0.13.4",
+ "rand",
  "ring",
  "serde",
  "serde_json",
