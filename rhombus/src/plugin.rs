@@ -1,6 +1,4 @@
-use std::{
-    any::Any, borrow::Cow, collections::BTreeMap, convert::Infallible, sync::Arc,
-};
+use std::{any::Any, borrow::Cow, collections::BTreeMap, convert::Infallible, sync::Arc};
 
 use axum::Router;
 use prost_types::FileDescriptorSet;
