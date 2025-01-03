@@ -85,6 +85,8 @@ impl Interceptor for MyInterceptor {
 
 type Client = RhombusClient<InterceptedService<Channel, MyInterceptor>>;
 
+#[allow(dead_code)]
+/// Load the rhombus-cli.yaml config file and connect to the grpc server to which it refers
 async fn get_client() -> Result<Client> {
     let config_file = find_config_file()?;
     let config: Config = Figment::new()
