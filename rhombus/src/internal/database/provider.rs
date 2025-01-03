@@ -372,11 +372,7 @@ pub trait Database {
         now: DateTime<Utc>,
     ) -> Result<()>;
     async fn insert_divisions(&self, divisions: &[Division]) -> Result<()>;
-    async fn get_team_standing(
-        &self,
-        team_id: i64,
-        division_id: &str,
-    ) -> Result<Option<TeamStanding>>;
+    async fn get_team_standing(&self, team_id: i64) -> Result<Option<TeamStanding>>;
     async fn upload_file(&self, hash: &str, filename: &str, bytes: &[u8]) -> Result<()>;
     async fn download_file(&self, hash: &str) -> Result<(Bytes, String)>;
     async fn get_site_statistics(&self) -> Result<SiteStatistics>;

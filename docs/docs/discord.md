@@ -78,6 +78,10 @@ discord:
 
 It is recommended that you set `bot_token` and `client_secret` with their environment variables `RHOMBUS__DISCORD__BOT_TOKEN` and `RHOMBUS__DISCORD__CLIENT_SECRET` respectively.
 
+## Top 10 Role
+
+The top 10 role is a Discord role that is given to the players in the top 10 teams in each division. For example, this role can be used to give access to channel where the top 10 teams can post high quality memes.
+
 ## Generative AI
 
 This feature exists not because it is useful, but because it is funny. For example, if an author does not feel like creating a response to a ticket, or if the person creating the ticket clearly used AI, then the author can use AI to generate a response.

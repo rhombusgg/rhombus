@@ -23,11 +23,14 @@ pub enum RhombusError {
     #[error("Required configuration: {0}")]
     MissingConfiguration(String),
 
+    #[error("Database error not found")]
+    DatabaseReturnedNoRows,
+
     #[error("Database error")]
-    UnknownDatabase(),
+    UnknownDatabase,
 
     #[error("Unknown")]
-    Unknown(),
+    Unknown,
 
     #[error("Configuration: {0}")]
     Configuration(#[from] ConfigError),

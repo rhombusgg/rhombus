@@ -1,0 +1,24 @@
+{% import "icons.html" as icons %}
+{% import "card.html" as card %}
+{% extends "layout.html" %}
+
+{% block content %}
+  <div class="container my-4 flex items-center justify-center">
+    <div class="w-prose">
+      {% call card.root() %}
+        {% call card.header() %}
+          {% call card.title() %}
+            Error
+            {{ icons.delete_x(class="text-destructive inline-block h-full align-text-top ml-1") }}
+          {% endcall %}
+          {% call card.description() %}
+            {{ error_code }}
+          {% endcall %}
+        {% endcall %}
+        {% call card.content() %}
+          {{ error_description }}
+        {% endcall %}
+      {% endcall %}
+    </div>
+  </div>
+{% endblock %}
