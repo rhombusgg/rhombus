@@ -255,6 +255,7 @@ pub trait Database {
         password: &str,
         settings: &Settings,
     ) -> Result<Option<(i64, i64)>>;
+    #[allow(clippy::too_many_arguments)]
     async fn upsert_user_by_ctftime(
         &self,
         name: &str,
