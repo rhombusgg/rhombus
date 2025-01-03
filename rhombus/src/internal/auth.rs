@@ -17,6 +17,10 @@ use axum_extra::extract::{
 };
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use minijinja::context;
+use rand::{
+    distributions::{Alphanumeric, DistString as _},
+    thread_rng,
+};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -30,7 +34,18 @@ use crate::internal::{
     templates::{toast_header, ToastKind},
 };
 
-use super::database::provider::Database;
+use super::{database::provider::Database, settings::Settings};
+
+pub fn create_user_api_key(settings: &Settings) -> String {
+    format!(
+        "{}_{}",
+        base32::encode(
+            base32::Alphabet::Rfc4648Lower { padding: false },
+            settings.location_url.as_bytes()
+        ),
+        Alphanumeric.sample_string(&mut thread_rng(), 32)
+    )
+}
 
 #[derive(Debug, Serialize, Clone)]
 pub struct UserInner {
@@ -42,6 +57,7 @@ pub struct UserInner {
     pub is_team_owner: bool,
     pub disabled: bool,
     pub is_admin: bool,
+    pub api_key: String,
 }
 pub type User = Arc<UserInner>;
 
@@ -564,6 +580,7 @@ pub async fn route_signin_discord_callback(
             &avatar,
             discord_id,
             user.as_ref().map(|u| u.id),
+            &*state.settings.read().await,
         )
         .await
     else {
@@ -806,6 +823,7 @@ pub async fn route_signin_ctftime_callback(
             user_data.id,
             user_data.team.id,
             &user_data.team.name,
+            &*state.settings.read().await,
         )
         .await
     else {
@@ -1015,7 +1033,12 @@ pub async fn route_signin_credentials(
 
     let Some((user_id, team_id)) = state
         .db
-        .upsert_user_by_credentials(&form.username, &avatar, &form.password)
+        .upsert_user_by_credentials(
+            &form.username,
+            &avatar,
+            &form.password,
+            &*state.settings.read().await,
+        )
         .await
         .unwrap()
     else {
@@ -1125,7 +1148,11 @@ pub async fn route_signin_email_confirm_callback(
 
     let avatar = avatar_from_email(&email);
 
-    let (user_id, team_id) = match state.db.upsert_user_by_email(name, &email, &avatar).await {
+    let (user_id, team_id) = match state
+        .db
+        .upsert_user_by_email(name, &email, &avatar, &*state.settings.read().await)
+        .await
+    {
         Ok((user_id, team_id)) => (user_id, team_id),
         Err(err) => {
             tracing::info!("Failed to upsert user by email {} {}", email, err);

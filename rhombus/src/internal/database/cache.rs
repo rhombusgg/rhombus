@@ -56,10 +56,11 @@ impl Database for DbCache {
         avatar: &str,
         discord_id: NonZeroU64,
         user_id: Option<i64>,
+        settings: &Settings,
     ) -> Result<std::result::Result<(i64, i64), DiscordUpsertError>> {
         let result = self
             .inner
-            .upsert_user_by_discord_id(name, email, avatar, discord_id, user_id)
+            .upsert_user_by_discord_id(name, email, avatar, discord_id, user_id, settings)
             .await;
         if let Ok(Ok(result)) = result {
             USER_CACHE.remove(&result.0);
@@ -74,8 +75,12 @@ impl Database for DbCache {
         name: &str,
         email: &str,
         avatar: &str,
+        settings: &Settings,
     ) -> Result<(i64, i64)> {
-        let result = self.inner.upsert_user_by_email(name, email, avatar).await;
+        let result = self
+            .inner
+            .upsert_user_by_email(name, email, avatar, settings)
+            .await;
         if let Ok(result) = result {
             USER_CACHE.remove(&result.0);
             TEAM_CACHE.remove(&result.1);
@@ -88,10 +93,11 @@ impl Database for DbCache {
         username: &str,
         avatar: &str,
         password: &str,
+        settings: &Settings,
     ) -> Result<Option<(i64, i64)>> {
         let result = self
             .inner
-            .upsert_user_by_credentials(username, avatar, password)
+            .upsert_user_by_credentials(username, avatar, password, settings)
             .await;
 
         if let Ok(Some(result)) = result {
@@ -109,6 +115,7 @@ impl Database for DbCache {
         ctftime_user_id: i64,
         ctftime_team_id: i64,
         team_name: &str,
+        settings: &Settings,
     ) -> Result<(i64, i64, Option<String>)> {
         let result = self
             .inner
@@ -119,6 +126,7 @@ impl Database for DbCache {
                 ctftime_user_id,
                 ctftime_team_id,
                 team_name,
+                settings,
             )
             .await;
         if let Ok(ref result) = result {
@@ -215,6 +223,10 @@ impl Database for DbCache {
         self.inner.get_user_from_discord_id(discord_id).await
     }
 
+    async fn get_user_from_api_key(&self, api_key: &str) -> Result<User> {
+        get_user_from_api_key(&self.inner, api_key).await
+    }
+
     async fn kick_user(&self, user_id: i64, team_id: i64) -> Result<i64> {
         let result = self.inner.kick_user(user_id, team_id).await;
         if let Ok(new_team_id) = result {
@@ -231,6 +243,12 @@ impl Database for DbCache {
             TEAM_CACHE.remove(&team_id);
         }
         new_invite_token
+    }
+
+    async fn roll_api_key(&self, user_id: i64, settings: &Settings) -> Result<String> {
+        let user = self.get_user_from_id(user_id).await?;
+        USER_CACHE_BY_API_KEY.remove(&user.api_key);
+        self.inner.roll_api_key(user_id, settings).await
     }
 
     async fn set_team_name(
@@ -649,6 +667,8 @@ impl<T> TimedCache<T> {
 }
 
 pub static USER_CACHE: LazyLock<DashMap<i64, TimedCache<User>>> = LazyLock::new(DashMap::new);
+pub static USER_CACHE_BY_API_KEY: LazyLock<DashMap<String, TimedCache<User>>> =
+    LazyLock::new(DashMap::new);
 
 pub async fn get_user_from_id(db: &Connection, user_id: i64) -> Result<User> {
     if let Some(user) = USER_CACHE.get(&user_id) {
@@ -660,6 +680,20 @@ pub async fn get_user_from_id(db: &Connection, user_id: i64) -> Result<User> {
 
     if let Ok(user) = &user {
         USER_CACHE.insert(user_id, TimedCache::new(user.clone()));
+    }
+    user
+}
+
+pub async fn get_user_from_api_key(db: &Connection, api_key: &str) -> Result<User> {
+    if let Some(user) = USER_CACHE_BY_API_KEY.get(api_key) {
+        return Ok(user.value.clone());
+    }
+    tracing::trace!(api_key, "cache miss: get_user_from_api_key");
+
+    let user = db.get_user_from_api_key(api_key).await;
+
+    if let Ok(user) = &user {
+        USER_CACHE_BY_API_KEY.insert(api_key.to_owned(), TimedCache::new(user.clone()));
     }
     user
 }

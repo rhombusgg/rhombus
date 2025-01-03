@@ -8,6 +8,7 @@ members = [
     "examples/plugin",
     "examples/external-plugin",
     "examples/demo",
+    "examples/custom-grpc",
 ]
 
 [profile.release]

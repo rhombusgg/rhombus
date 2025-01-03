@@ -1,0 +1,14 @@
+syntax = "proto3";
+package myplugin;
+
+service MyPlugin {
+    rpc ReverseUserName(ReverseUserNameRequest) returns (ReverseUserNameReply);
+}
+
+message ReverseUserNameRequest {
+    int64 user_id = 1;
+}
+
+message ReverseUserNameReply {
+    string new_user_name = 1;
+}

@@ -1,7 +1,9 @@
-use std::{any::Any, borrow::Cow, collections::BTreeMap, sync::Arc};
+use std::{any::Any, borrow::Cow, collections::BTreeMap, convert::Infallible, sync::Arc};
 
 use axum::Router;
+use prost_types::FileDescriptorSet;
 use tokio::sync::{Mutex, RwLock};
+use tonic::{body::BoxBody, service::RoutesBuilder};
 
 use crate::{
     builder::RawDb,
@@ -47,6 +49,54 @@ pub struct RunContext<'a> {
     pub score_type_map: &'a Arc<Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>>,
 
     pub flag_fn_map: &'a Arc<Mutex<BTreeMap<String, Box<dyn ChallengeFlag + Send + Sync>>>>,
+
+    pub grpc_builder: &'a mut GrpcBuilder,
+}
+
+pub struct GrpcBuilder {
+    pub(crate) routes: RoutesBuilder,
+    pub(crate) file_descriptor_sets: Vec<FileDescriptorSet>,
+    pub(crate) encoded_file_descriptor_sets: Vec<&'static [u8]>,
+}
+
+impl GrpcBuilder {
+    pub fn add_service<S>(&mut self, svc: S) -> &mut Self
+    where
+        S: tower::Service<
+                axum::http::Request<BoxBody>,
+                Response = axum::http::Response<BoxBody>,
+                Error = Infallible,
+            > + tonic::server::NamedService
+            + Clone
+            + Send
+            + 'static,
+        S::Future: Send + 'static,
+        S::Error: Into<Box<dyn std::error::Error + Send + Sync>> + Send,
+    {
+        self.routes.add_service(svc);
+        self
+    }
+
+    /// Registers an instance of `prost_types::FileDescriptorSet` with the gRPC Reflection
+    /// Service builder.
+    pub fn register_file_descriptor_set(
+        &mut self,
+        file_descriptor_set: FileDescriptorSet,
+    ) -> &mut Self {
+        self.file_descriptor_sets.push(file_descriptor_set);
+        self
+    }
+
+    /// Registers a byte slice containing an encoded `prost_types::FileDescriptorSet` with
+    /// the gRPC Reflection Service builder.
+    pub fn register_encoded_file_descriptor_set(
+        &mut self,
+        encoded_file_descriptor_set: &'static [u8],
+    ) -> &mut Self {
+        self.encoded_file_descriptor_sets
+            .push(encoded_file_descriptor_set);
+        self
+    }
 }
 
 pub struct UploadProviderContext<'a> {

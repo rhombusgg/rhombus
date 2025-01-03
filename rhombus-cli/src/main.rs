@@ -1,68 +1,119 @@
-use std::path::PathBuf;
-
+use admin::AdminCommand;
+use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
+use colored::Colorize;
+use figment::{
+    providers::{Format, Yaml},
+    Figment,
+};
+use grpc::proto::rhombus_client::RhombusClient;
+use serde::{Deserialize, Serialize};
+use std::{path::PathBuf, process::exit};
+use tonic::{
+    metadata::MetadataValue,
+    service::{interceptor::InterceptedService, Interceptor},
+    transport::Channel,
+    Status,
+};
+mod admin;
+mod auth;
 
-#[derive(Parser)]
-#[command(version, about, long_about = None)]
-struct Cli {
-    /// Optional name to operate on
-    name: Option<String>,
-
-    /// Sets a custom config file
-    #[arg(short, long, value_name = "FILE")]
-    config: Option<PathBuf>,
-
-    /// Turn debugging information on
-    #[arg(short, long, action = clap::ArgAction::Count)]
-    debug: u8,
-
-    #[command(subcommand)]
-    command: Option<Commands>,
+mod grpc {
+    pub mod proto {
+        tonic::include_proto!("rhombus");
+    }
 }
 
-#[derive(Subcommand)]
-enum Commands {
-    /// does testing things
-    Test {
-        /// lists test values
-        #[arg(short, long)]
-        list: bool,
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[command(subcommand)]
+    command: Command,
+}
+#[derive(Subcommand, Debug)]
+enum Command {
+    /// Authentiace rhombus-cli using an API token
+    Auth(auth::AuthCommand),
+    /// Commands for CTF admins
+    Admin {
+        #[command(subcommand)]
+        admin_command: AdminCommand,
     },
 }
 
-fn main() {
-    let cli = Cli::parse();
+#[derive(Serialize, Deserialize)]
+struct Config {
+    url: String,
+    api_key: String,
+}
 
-    // You can check the value provided by positional arguments, or option arguments
-    if let Some(name) = cli.name.as_deref() {
-        println!("Value for name: {name}");
-    }
+#[tokio::main]
+async fn main() {
+    let args = Args::parse();
 
-    if let Some(config_path) = cli.config.as_deref() {
-        println!("Value for config: {}", config_path.display());
-    }
+    let result = match args.command {
+        Command::Admin { admin_command } => admin_command.run().await,
+        Command::Auth(auth_command) => auth_command.run().await,
+    };
 
-    // You can see how many times a particular flag or argument occurred
-    // Note, only flags can have multiple occurrences
-    match cli.debug {
-        0 => println!("Debug mode is off"),
-        1 => println!("Debug mode is kind of on"),
-        2 => println!("Debug mode is on"),
-        _ => println!("Don't be crazy"),
-    }
-
-    // You can check for the existence of subcommands, and if found use their
-    // matches just as you would the top level cmd
-    match &cli.command {
-        Some(Commands::Test { list }) => {
-            if *list {
-                println!("Printing testing lists...");
-            } else {
-                println!("Not printing testing lists...");
+    match result {
+        Ok(()) => {}
+        Err(err) => {
+            match err.source() {
+                Some(source) => println!("{}", format!("Error: {}: {}", err, source).red()),
+                None => println!("{}{}", "Error: ".red(), err.to_string().red()),
             }
-        }
-        None => {}
-    }
 
-    // Continued program logic goes here...
+            exit(1);
+        }
+    }
+}
+
+struct MyInterceptor {
+    auth_token: MetadataValue<tonic::metadata::Ascii>,
+}
+
+impl Interceptor for MyInterceptor {
+    fn call(&mut self, mut request: tonic::Request<()>) -> Result<tonic::Request<()>, Status> {
+        request
+            .metadata_mut()
+            .insert("authorization", self.auth_token.clone());
+
+        Ok(request)
+    }
+}
+
+type Client = RhombusClient<InterceptedService<Channel, MyInterceptor>>;
+
+#[allow(dead_code)]
+/// Load the rhombus-cli.yaml config file and connect to the grpc server to which it refers
+async fn get_client() -> Result<Client> {
+    let config_file = find_config_file()?;
+    let config: Config = Figment::new()
+        .merge(Yaml::file_exact(&config_file))
+        .extract()
+        .with_context(|| format!("failed to load config file ({})", config_file.display()))?;
+    get_client_from_config(&config).await
+}
+
+async fn get_client_from_config(config: &Config) -> Result<Client> {
+    let auth_token: MetadataValue<_> = config.api_key.parse()?;
+    let channel = Channel::from_shared(config.url.clone())
+        .with_context(|| format!("failed to parse grpc url '{}'", &config.url))?
+        .connect()
+        .await
+        .with_context(|| format!("failed to connect to grpc server '{}'", &config.url))?;
+    let client = RhombusClient::with_interceptor(channel, MyInterceptor { auth_token });
+    Ok(client)
+}
+
+fn find_config_file() -> Result<PathBuf> {
+    for p in std::env::current_dir()?.ancestors() {
+        if p.join("rhombus-cli.yaml").is_file() {
+            return Ok(p.join("rhombus-cli.yaml").to_owned());
+        }
+    }
+    Err(anyhow!(
+        "failed to find rhombus-cli.yaml. Run rhombus-cli auth"
+    ))
 }

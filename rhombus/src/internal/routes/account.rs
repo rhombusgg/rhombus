@@ -128,6 +128,7 @@ pub async fn route_account(
                 title => format!("Account | {}", state.global_page_meta.title),
                 og_image => format!("{}/user/{}/og-image.png", state.global_page_meta.location_url, user.id),
                 user,
+                api_key => user.api_key,
                 discord,
                 now => chrono::Utc::now(),
                 team,
@@ -456,4 +457,28 @@ pub async fn route_account_set_name(
             .body(html)
             .unwrap())
     }
+}
+
+pub async fn route_account_roll_key(
+    state: State<RouterState>,
+    Extension(user): Extension<User>,
+    Extension(page): Extension<PageMeta>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let new_api_key = state
+        .db
+        .roll_api_key(user.id, &*state.settings.read().await)
+        .await
+        .unwrap();
+
+    Ok(Html(
+        state
+            .jinja
+            .get_template("account/api-key.html")
+            .unwrap()
+            .render(context! {
+                page,
+                api_key => new_api_key,
+            })
+            .unwrap(),
+    ))
 }
