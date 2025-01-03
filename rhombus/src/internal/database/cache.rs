@@ -574,12 +574,8 @@ impl Database for DbCache {
         result
     }
 
-    async fn get_team_standing(
-        &self,
-        team_id: i64,
-        division_id: &str,
-    ) -> Result<Option<TeamStanding>> {
-        get_team_standing(&self.inner, team_id, division_id).await
+    async fn get_team_standing(&self, team_id: i64) -> Result<Option<TeamStanding>> {
+        get_team_standing(&self.inner, team_id).await
     }
 
     async fn upload_file(&self, hash: &str, filename: &str, bytes: &[u8]) -> Result<()> {
@@ -735,17 +731,13 @@ pub async fn get_emails_for_user_id(db: &Connection, user_id: i64) -> Result<Vec
 pub static TEAM_STANDINGS: LazyLock<DashMap<i64, TimedCache<Option<TeamStanding>>>> =
     LazyLock::new(DashMap::new);
 
-pub async fn get_team_standing(
-    db: &Connection,
-    team_id: i64,
-    division_id: &str,
-) -> Result<Option<TeamStanding>> {
+pub async fn get_team_standing(db: &Connection, team_id: i64) -> Result<Option<TeamStanding>> {
     if let Some(standing) = TEAM_STANDINGS.get(&team_id) {
         return Ok(standing.value.clone());
     }
-    tracing::trace!(team_id, division_id, "cache miss: get_team_standing");
+    tracing::trace!(team_id, "cache miss: get_team_standing");
 
-    let standing = db.get_team_standing(team_id, division_id).await;
+    let standing = db.get_team_standing(team_id).await;
 
     if let Ok(standing) = &standing {
         TEAM_STANDINGS.insert(team_id, TimedCache::new(standing.clone()));

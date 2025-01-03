@@ -84,7 +84,7 @@ pub async fn route_public_team(
     };
 
     let challenge_data = state.db.get_challenges();
-    let standing = state.db.get_team_standing(team_id, &team.division_id);
+    let standing = state.db.get_team_standing(team_id);
     let (challenge_data, standing) =
         tokio::try_join!(challenge_data, standing).map_err_page(&req, "Failed to get data")?;
 

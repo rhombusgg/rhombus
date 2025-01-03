@@ -807,11 +807,7 @@ async fn event_handler(
                 .unwrap()
                 .top10_role_id
             {
-                let standing = data
-                    .db
-                    .get_team_standing(user.team_id, &team.division_id)
-                    .await
-                    .unwrap();
+                let standing = data.db.get_team_standing(user.team_id).await.unwrap();
 
                 if let Some(standing) = standing {
                     if standing.rank <= 10 {

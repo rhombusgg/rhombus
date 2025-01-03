@@ -253,14 +253,14 @@ pub async fn route_signin(
                         {
                             let old_team_top_10 = state
                                 .db
-                                .get_team_standing(old_team.id, &old_team.division_id)
+                                .get_team_standing(old_team.id)
                                 .await
                                 .unwrap()
                                 .map(|standing| standing.rank <= 10)
                                 .unwrap_or(false);
                             let new_team_top_10 = state
                                 .db
-                                .get_team_standing(new_team.id, &new_team.division_id)
+                                .get_team_standing(new_team.id)
                                 .await
                                 .unwrap()
                                 .map(|standing| standing.rank <= 10)

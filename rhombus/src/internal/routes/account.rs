@@ -449,8 +449,8 @@ pub async fn route_account_set_name(
         .set_account_name(user.id, user.team_id, &form.name, 60 * 30)
         .await
         .map_err(|e| {
-            tracing::error!(error = ?e, "Failed to set account name");
-            StatusCode::from_u16(502).unwrap()
+            tracing::error!(error = ?e, user_id=user.id, name=form.name, "Failed to set account name");
+            htmx_error_status_code()
         })?
     {
         match e {

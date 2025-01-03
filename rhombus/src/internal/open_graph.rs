@@ -262,7 +262,7 @@ pub async fn route_team_og_image(
     }
 
     let challenge_data = state.db.get_challenges();
-    let standing = state.db.get_team_standing(team_id.0, &team.division_id);
+    let standing = state.db.get_team_standing(team_id.0);
     let (challenge_data, standings) = tokio::join!(challenge_data, standing);
     let challenge_data = challenge_data.unwrap();
     let standing = standings.unwrap();
