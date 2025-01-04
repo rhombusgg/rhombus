@@ -448,7 +448,7 @@ pub async fn route_ticket_submit(
         .await
         .map_err_htmx(&extensions, "Failed to create ticket in Discord")?;
 
-    return Ok(([(
+    Ok(([(
         "HX-Trigger",
         json!({
             "closeModal": true,
@@ -459,7 +459,7 @@ pub async fn route_ticket_submit(
         })
         .to_string(),
     )])
-    .into_response());
+    .into_response())
 }
 
 pub static TEAM_BURSTED_POINTS: LazyLock<DashMap<i64, i64>> = LazyLock::new(DashMap::new);
