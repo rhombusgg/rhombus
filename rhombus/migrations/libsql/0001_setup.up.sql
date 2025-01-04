@@ -173,13 +173,14 @@ CREATE TABLE IF NOT EXISTS rhombus_ticket (
     FOREIGN KEY (challenge_id) REFERENCES rhombus_challenge(id)
 );
 
-CREATE INDEX IF NOT EXISTS user_challenge_idx ON rhombus_ticket (challenge_id, user_id, closed_at);
+CREATE INDEX IF NOT EXISTS challenge_idx ON rhombus_ticket (challenge_id, user_id, closed_at);
+CREATE INDEX IF NOT EXISTS user_idx ON rhombus_ticket (user_id, opened_at DESC);
 
 CREATE TABLE IF NOT EXISTS rhombus_ticket_email_message_id_reference (
-    message_id TEXT NOT NULL,
+    message_id TEXT NOT NULL UNIQUE,
     ticket_number INTEGER NOT NULL,
     user_sent INTEGER NOT NULL DEFAULT(FALSE), -- 0 or 1
-    PRIMARY KEY (message_id),
+    PRIMARY KEY (ticket_number, message_id, user_sent),
     FOREIGN KEY (ticket_number) REFERENCES rhombus_ticket(ticket_number)
 );
 
