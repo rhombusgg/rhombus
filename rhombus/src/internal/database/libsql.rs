@@ -1422,7 +1422,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                 },
             );
         }
-        Ok(writeups)
+        Ok(Arc::new(writeups))
     }
 
     async fn delete_writeup(&self, challenge_id: i64, user_id: i64, _team_id: i64) -> Result<()> {

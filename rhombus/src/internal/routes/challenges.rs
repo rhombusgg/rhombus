@@ -2,30 +2,33 @@ use std::{cmp::max, sync::LazyLock, time::Duration};
 
 use axum::{
     extract::{Path, State},
-    http::Uri,
+    http::{Extensions, Uri},
     response::{Html, IntoResponse, Response},
     Extension, Form, Json,
 };
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use minijinja::context;
+use reqwest::StatusCode;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::internal::{
     auth::User,
     database::provider::{Challenge, Team},
+    errors::IntoErrorResponse,
     router::RouterState,
     routes::meta::PageMeta,
     templates::{base64_encode, toast_header, ToastKind},
 };
 
 pub async fn route_challenges(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
     uri: Uri,
-) -> impl IntoResponse {
+    extensions: Extensions,
+) -> std::result::Result<impl IntoResponse, Response> {
     if let Some(start_time) = state.settings.read().await.start_time {
         if !user.is_admin && chrono::Utc::now() < start_time {
             let html = state
@@ -40,20 +43,14 @@ pub async fn route_challenges(
                 })
                 .unwrap();
 
-            return Response::builder()
-                .header("content-type", "text/html")
-                .status(200)
-                .body(html)
-                .unwrap()
-                .into_response();
+            return Ok(Html(html).into_response());
         }
     }
 
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
-    let (challenge_data, team) = tokio::join!(challenge_data, team);
-    let challenge_data = challenge_data.unwrap();
-    let team = team.unwrap();
+    let (challenge_data, team) =
+        tokio::try_join!(challenge_data, team).map_err_page(&extensions, "Failed to get data")?;
 
     let ticket_enabled = {
         let settings = state.settings.read().await;
@@ -125,7 +122,7 @@ pub async fn route_challenges(
     });
 
     if uri.path().ends_with(".json") {
-        return Json(challenge_json).into_response();
+        return Ok(Json(challenge_json).into_response());
     }
 
     let html = state
@@ -141,7 +138,7 @@ pub async fn route_challenges(
         })
         .unwrap();
 
-    Html(html).into_response()
+    Ok(Html(html).into_response())
 }
 
 #[async_trait::async_trait]
@@ -228,37 +225,36 @@ impl ChallengePoints for StaticPoints {
 }
 
 pub async fn route_challenge_view(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
     Path(challenge_id): Path<String>,
-) -> impl IntoResponse {
+    extensions: Extensions,
+) -> std::result::Result<impl IntoResponse, Response> {
     if let Some(start_time) = state.settings.read().await.start_time {
         if !user.is_admin && chrono::Utc::now() < start_time {
-            return Response::builder()
-                .header("content-type", "text/html")
-                .status(403)
-                .body("CTF not started yet".to_owned())
-                .unwrap()
-                .into_response();
+            return Err((StatusCode::FORBIDDEN, "CTF not started yet").into_response());
         }
     }
 
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
     let user_writeups = state.db.get_writeups_from_user_id(user.id);
-    let (challenge_data, team, user_writeups) = tokio::join!(challenge_data, team, user_writeups);
-    let challenge_data = challenge_data.unwrap();
-    let team = team.unwrap();
-    let user_writeups = user_writeups.unwrap();
+    let (challenge_data, team, user_writeups) =
+        tokio::try_join!(challenge_data, team, user_writeups)
+            .map_err_htmx(&extensions, "Failed to get data")?;
 
-    let challenge = challenge_data.challenges.get(&challenge_id).unwrap();
+    let challenge = challenge_data
+        .challenges
+        .get(&challenge_id)
+        .map_err_htmx(&extensions, "Challenge not found")?;
+
     let category = challenge_data
         .categories
         .get(&challenge.category_id)
         .unwrap();
 
-    Html(
+    Ok(Html(
         state
             .jinja
             .get_template("challenges/challenge.html")
@@ -275,23 +271,19 @@ pub async fn route_challenge_view(
             })
             .unwrap(),
     )
-    .into_response()
+    .into_response())
 }
 
 pub async fn route_ticket_view(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
     Path(challenge_id): Path<String>,
-) -> impl IntoResponse {
+    extensions: Extensions,
+) -> std::result::Result<impl IntoResponse, Response> {
     if let Some(start_time) = state.settings.read().await.start_time {
         if !user.is_admin && chrono::Utc::now() < start_time {
-            return Response::builder()
-                .header("content-type", "text/html")
-                .status(403)
-                .body("CTF not started yet".to_owned())
-                .unwrap()
-                .into_response();
+            return Err((StatusCode::FORBIDDEN, "CTF not started yet").into_response());
         }
     }
 
@@ -305,8 +297,9 @@ pub async fn route_ticket_view(
     let next_allowed_ticket_at = lasted_ticket_opened_at + Duration::from_secs(60 * 5);
     if Utc::now() < next_allowed_ticket_at {
         let minutes_until = (next_allowed_ticket_at - Utc::now()).num_minutes() + 1;
-        return Response::builder()
-            .header(
+        return Err((
+            StatusCode::TOO_MANY_REQUESTS,
+            ([(
                 "HX-Trigger",
                 toast_header(
                     ToastKind::Error,
@@ -316,31 +309,33 @@ pub async fn route_ticket_view(
                         if minutes_until == 1 { "" } else { "s" }
                     ),
                 ),
-            )
-            .body("".to_owned())
-            .unwrap()
-            .into_response();
+            )]),
+        )
+            .into_response());
     }
 
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
-    let (challenge_data, team) = tokio::join!(challenge_data, team);
-    let challenge_data = challenge_data.unwrap();
-    let team = team.unwrap();
+    let (challenge_data, team) =
+        tokio::try_join!(challenge_data, team).map_err_htmx(&extensions, "Failed to get data")?;
 
-    let challenge = challenge_data.challenges.get(&challenge_id).unwrap();
+    let challenge = challenge_data
+        .challenges
+        .get(&challenge_id)
+        .map_err_htmx(&extensions, "Challenge not found")?;
+
     let category = challenge_data
         .categories
         .get(&challenge.category_id)
         .unwrap();
 
     let ticket_template = if let Some(ticket_template) = &challenge.ticket_template {
-        ticket_template.clone()
+        ticket_template
     } else {
-        state.settings.read().await.default_ticket_template.clone()
+        &state.settings.read().await.default_ticket_template
     };
 
-    Html(
+    Ok(Html(
         state
             .jinja
             .get_template("challenges/ticket.html")
@@ -355,8 +350,7 @@ pub async fn route_ticket_view(
                 ticket_template,
             })
             .unwrap(),
-    )
-    .into_response()
+    ))
 }
 
 #[derive(Deserialize)]
@@ -365,20 +359,16 @@ pub struct TicketSubmit {
 }
 
 pub async fn route_ticket_submit(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
     Path(challenge_id): Path<String>,
+    extensions: Extensions,
     Form(form): Form<TicketSubmit>,
-) -> impl IntoResponse {
+) -> std::result::Result<impl IntoResponse, Response> {
     if let Some(start_time) = state.settings.read().await.start_time {
         if !user.is_admin && chrono::Utc::now() < start_time {
-            return Response::builder()
-                .header("content-type", "text/html")
-                .status(403)
-                .body("CTF not started yet".to_owned())
-                .unwrap()
-                .into_response();
+            return Err((StatusCode::FORBIDDEN, "CTF not started yet").into_response());
         }
     }
 
@@ -392,27 +382,33 @@ pub async fn route_ticket_submit(
     };
 
     if !ticket_enabled || state.bot.is_none() {
-        return Response::builder()
-            .header("Content-Type", "text/html")
-            .header("HX-Trigger", "closeModal")
-            .body("".to_owned())
-            .unwrap()
-            .into_response();
+        return Err(([("HX-Trigger", "closeModal")]).into_response());
     }
 
     let lasted_ticket_opened_at = state
         .db
         .get_last_created_ticket_time(user.id)
         .await
-        .unwrap()
+        .map_err_htmx(&extensions, "Failed to get last ticket time")?
         .unwrap_or(DateTime::<Utc>::from_timestamp(0, 0).unwrap());
 
     let next_allowed_ticket_at = lasted_ticket_opened_at + Duration::from_secs(60 * 5);
     if Utc::now() < next_allowed_ticket_at {
-        return Json(json!({
-            "error": "Too many tickets in a short period of time",
-        }))
-        .into_response();
+        return Err((
+            StatusCode::TOO_MANY_REQUESTS,
+            [(
+                "HX-Trigger",
+                json!({
+                    "closeModal": true,
+                    "toast": {
+                        "kind": "error",
+                        "message": base64_encode("Too many tickets in a short period of time"),
+                    }
+                })
+                .to_string(),
+            )],
+        )
+            .into_response());
     }
 
     let content = form.content;
@@ -429,20 +425,18 @@ pub async fn route_ticket_submit(
             })
             .unwrap();
 
-        return Response::builder()
-            .header("content-type", "text/html")
-            .body(html)
-            .unwrap()
-            .into_response();
+        return Ok(Html(html).into_response());
     }
 
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
-    let (challenge_data, team) = tokio::join!(challenge_data, team);
-    let challenge_data = challenge_data.unwrap();
-    let team = team.unwrap();
+    let (challenge_data, team) =
+        tokio::try_join!(challenge_data, team).map_err_htmx(&extensions, "Failed to get data")?;
 
-    let challenge = challenge_data.challenges.get(&challenge_id).unwrap();
+    let challenge = challenge_data
+        .challenges
+        .get(&challenge_id)
+        .map_err_htmx(&extensions, "Failed to get challenge")?;
 
     let author = challenge_data.authors.get(&challenge.author_id).unwrap();
 
@@ -452,24 +446,20 @@ pub async fn route_ticket_submit(
         .unwrap()
         .create_support_thread(&user, &team, challenge, author, content.as_str())
         .await
-        .unwrap();
+        .map_err_htmx(&extensions, "Failed to create ticket in Discord")?;
 
-    Response::builder()
-        .header("Content-Type", "text/html")
-        .header(
-            "HX-Trigger",
-            json!({
-                "closeModal": true,
-                "toast": {
-                    "kind": "success",
-                    "message": base64_encode(&state.localizer.localize(&page.lang, "challenges-ticket-submitted", None).unwrap())
-                }
-            })
-            .to_string(),
-        )
-        .body("".to_owned())
-        .unwrap()
-        .into_response()
+    return Ok(([(
+        "HX-Trigger",
+        json!({
+            "closeModal": true,
+            "toast": {
+                "kind": "success",
+                "message": base64_encode(&state.localizer.localize(&page.lang, "challenges-ticket-submitted", None).unwrap()),
+            }
+        })
+        .to_string(),
+    )])
+    .into_response());
 }
 
 pub static TEAM_BURSTED_POINTS: LazyLock<DashMap<i64, i64>> = LazyLock::new(DashMap::new);

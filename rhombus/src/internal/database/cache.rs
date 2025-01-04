@@ -660,7 +660,7 @@ pub async fn get_user_from_id(db: &Connection, user_id: i64) -> Result<User> {
     user
 }
 
-pub type Writeups = BTreeMap<i64, Writeup>;
+pub type Writeups = Arc<BTreeMap<i64, Writeup>>;
 
 pub static USER_WRITEUP_CACHE: LazyLock<DashMap<i64, TimedCache<Writeups>>> =
     LazyLock::new(DashMap::new);

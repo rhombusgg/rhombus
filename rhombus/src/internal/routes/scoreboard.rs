@@ -1,7 +1,6 @@
 use axum::{
-    body::Body,
-    extract::{Path, Query, Request, State},
-    http::Uri,
+    extract::{Path, Query, State},
+    http::{Extensions, Uri},
     response::{Html, IntoResponse, Redirect, Response},
     Extension, Json,
 };
@@ -20,18 +19,18 @@ pub async fn route_scoreboard(
     Extension(page): Extension<PageMeta>,
     Query(params): Query<PageParams>,
     uri: Uri,
-    req: Request<Body>,
+    extensions: Extensions,
 ) -> std::result::Result<Response, Response> {
     let challenge_data = state
         .db
         .get_challenges()
         .await
-        .map_err_page(&req, "Failed to get challenge data")?;
+        .map_err_page(&extensions, "Failed to get challenge data")?;
     let default_division = challenge_data
         .divisions
         .keys()
         .next()
-        .map_err_page(&req, "Failed to get default division")?;
+        .map_err_page(&extensions, "Failed to get default division")?;
 
     if challenge_data.divisions.len() == 1 {
         return route_scoreboard_division(
@@ -41,7 +40,7 @@ pub async fn route_scoreboard(
             Path(default_division.to_string()),
             Query(params),
             uri,
-            req,
+            extensions,
         )
         .await;
     }
@@ -73,7 +72,7 @@ pub async fn route_scoreboard_division(
     Path(division_id): Path<String>,
     Query(params): Query<PageParams>,
     uri: Uri,
-    req: Request<Body>,
+    extensions: Extensions,
 ) -> std::result::Result<Response, Response> {
     let page_num = params.page.unwrap_or(1).saturating_sub(1);
 
@@ -84,7 +83,7 @@ pub async fn route_scoreboard_division(
     let leaderboard = state.db.get_leaderboard(division_id);
     let (scoreboard, challenge_data, leaderboard) =
         tokio::try_join!(scoreboard, challenge_data, leaderboard)
-            .map_err_page(&req, "Failed to get data")?;
+            .map_err_page(&extensions, "Failed to get data")?;
 
     const PAGE_SIZE: usize = 25;
     let num_pages = (leaderboard.len() + (PAGE_SIZE - 1)) / PAGE_SIZE;

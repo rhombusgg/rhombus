@@ -1,8 +1,8 @@
 use std::{net::IpAddr, num::NonZeroU64, sync::LazyLock, time::Duration};
 
 use axum::{
-    body::Body,
-    extract::{Query, Request, State},
+    extract::{Query, State},
+    http::Extensions,
     response::{Html, IntoResponse, Redirect, Response},
     Extension, Form,
 };
@@ -78,7 +78,7 @@ pub async fn route_account(
     State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
-    req: Request<Body>,
+    extensions: Extensions,
 ) -> Result<impl IntoResponse, Response> {
     struct DiscordSettings {
         guild_id: NonZeroU64,
@@ -130,14 +130,14 @@ pub async fn route_account(
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
     let emails = state.db.get_emails_for_user_id(user.id);
-    let (challenge_data, team, emails) =
-        tokio::try_join!(challenge_data, team, emails).map_err_page(&req, "Failed to get data")?;
+    let (challenge_data, team, emails) = tokio::try_join!(challenge_data, team, emails)
+        .map_err_page(&extensions, "Failed to get data")?;
 
     Ok(Html(
         state
             .jinja
             .get_template("account/account.html")
-            .map_err_page(&req, "Failed to get template")?
+            .map_err_page(&extensions, "Failed to get template")?
             .render(context! {
                 global => state.global_page_meta,
                 page,
@@ -151,7 +151,7 @@ pub async fn route_account(
                 categories => challenge_data.categories,
                 emails,
             })
-            .map_err_page(&req, "Failed to render template")?
+            .map_err_page(&extensions, "Failed to render template")?
     ))
 }
 
@@ -306,7 +306,7 @@ pub async fn route_account_email_verify_callback(
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
     Query(params): Query<EmailVerifyParams>,
-    req: Request<Body>,
+    extensions: Extensions,
 ) -> std::result::Result<impl IntoResponse, Response> {
     let email = match state
         .db
@@ -320,7 +320,7 @@ pub async fn route_account_email_verify_callback(
             );
             return Err(Redirect::temporary("/account").into_response());
         }
-        result => result.map_err_page(&req, "Failed to get verification")?,
+        result => result.map_err_page(&extensions, "Failed to get verification")?,
     };
 
     Ok(Html(
@@ -336,7 +336,7 @@ pub async fn route_account_email_verify_callback(
                 email,
                 code => params.code,
             })
-            .map_err_page(&req, "Failed to render template")?,
+            .map_err_page(&extensions, "Failed to render template")?,
     ))
 }
 

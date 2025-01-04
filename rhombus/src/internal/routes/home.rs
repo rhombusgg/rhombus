@@ -1,6 +1,6 @@
 use axum::{
-    body::Body,
-    extract::{Request, State},
+    extract::State,
+    http::Extensions,
     response::{Html, IntoResponse, Response},
     Extension,
 };
@@ -14,7 +14,7 @@ pub async fn route_home(
     State(state): State<RouterState>,
     Extension(user): Extension<MaybeUser>,
     Extension(page): Extension<PageMeta>,
-    req: Request<Body>,
+    extensions: Extensions,
 ) -> std::result::Result<impl IntoResponse, Response> {
     let home = state.settings.read().await.home.clone();
 
@@ -39,13 +39,13 @@ pub async fn route_home(
         state
             .jinja
             .get_template("home.html")
-            .map_err_page(&req, "Failed to get template")?
+            .map_err_page(&extensions, "Failed to get template")?
             .render(context! {
                 global => state.global_page_meta,
                 page,
                 user,
                 content,
             })
-            .map_err_page(&req, "Failed to render template")?,
+            .map_err_page(&extensions, "Failed to render template")?,
     ))
 }

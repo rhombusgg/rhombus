@@ -1,6 +1,6 @@
 use axum::{
-    body::Body,
-    extract::{Path, Request, State},
+    extract::{Path, State},
+    http::Extensions,
     response::{Html, IntoResponse, Response},
     Extension, Form,
 };
@@ -20,6 +20,7 @@ use crate::internal::{
     errors::{htmx_error_status_code, IntoErrorResponse},
     router::RouterState,
     routes::meta::PageMeta,
+    templates::{toast_header, ToastKind},
 };
 
 pub fn create_team_invite_token() -> String {
@@ -41,18 +42,18 @@ pub async fn route_team(
     State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
-    req: Request<Body>,
+    extensions: Extensions,
 ) -> std::result::Result<impl IntoResponse, Response> {
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
-    let (challenge_data, team) =
-        tokio::try_join!(challenge_data, team).map_err_page(&req, "Failed to get team data")?;
+    let (challenge_data, team) = tokio::try_join!(challenge_data, team)
+        .map_err_page(&extensions, "Failed to get team data")?;
 
     let standing = state
         .db
         .get_team_standing(user.team_id)
         .await
-        .map_err_page(&req, "Failed to get team standing")?;
+        .map_err_page(&extensions, "Failed to get team standing")?;
 
     let location_url = state.settings.read().await.location_url.clone();
 
@@ -120,7 +121,7 @@ pub async fn route_team(
                 standing,
                 division_id => team.division_id,
             })
-            .map_err_page(&req, "Failed to render template team/team.html")?,
+            .map_err_page(&extensions, "Failed to render template team/team.html")?,
     ))
 }
 
@@ -422,23 +423,17 @@ pub async fn route_user_kick(
 }
 
 pub async fn route_team_set_division(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
     Path(division_id): Path<String>,
-) -> impl IntoResponse {
+) -> std::result::Result<impl IntoResponse, Response> {
     if !user.is_team_owner {
-        return Response::builder()
-            .status(StatusCode::UNAUTHORIZED)
-            .body("".to_owned())
-            .unwrap();
+        return Err(StatusCode::UNAUTHORIZED.into_response());
     }
 
     if user.disabled {
-        return Response::builder()
-            .status(StatusCode::FORBIDDEN)
-            .body("".to_owned())
-            .unwrap();
+        return Err(StatusCode::FORBIDDEN.into_response());
     }
 
     let team = state.db.get_team_from_id(user.team_id).await.unwrap();
@@ -450,34 +445,35 @@ pub async fn route_team_set_division(
     if next_allowed > now {
         let resets_in = next_allowed - now;
 
-        return Response::builder()
-            .header(
+        return Err(([
+            (
                 "HX-Trigger",
-                format!(r##"{{"toast":{{"kind":"error","message":"You can change this division status again in {} minutes"}}}}"##, resets_in.num_minutes() + 1)
-            )
-            .header(
+                toast_header(
+                    ToastKind::Error,
+                    &format!(
+                        "You can change this division status again in {} minutes",
+                        resets_in.num_minutes() + 1
+                    ),
+                ),
+            ),
+            (
                 "HX-Location",
-                r##"{"path":"/team","select":"#screen","target":"#screen","swap":"outerHTML"}"##,
-            )
-            .body("".to_owned())
-            .unwrap();
+                r##"{{"path":"/team","select":"#screen","target":"#screen","swap":"outerHTML"}}"##
+                    .to_string(),
+            ),
+        ])
+        .into_response());
     }
 
     let division = state.divisions.iter().find(|d| d.id == division_id);
     let Some(division) = division else {
-        return Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body("".to_owned())
-            .unwrap();
+        return Err(StatusCode::NOT_FOUND.into_response());
     };
 
     match division.max_players {
         MaxDivisionPlayers::Limited(max_players) => {
             if team.users.len() > max_players.get() as usize {
-                return Response::builder()
-                    .status(StatusCode::FORBIDDEN)
-                    .body("".to_owned())
-                    .unwrap();
+                return Err(StatusCode::FORBIDDEN.into_response());
             }
         }
         MaxDivisionPlayers::Unlimited => {}
@@ -490,10 +486,7 @@ pub async fn route_team_set_division(
         .is_ok();
 
     if !eligible {
-        return Response::builder()
-            .status(StatusCode::FORBIDDEN)
-            .body("".to_owned())
-            .unwrap();
+        return Err(StatusCode::FORBIDDEN.into_response());
     }
 
     state
@@ -589,5 +582,5 @@ pub async fn route_team_set_division(
         })
         .unwrap();
 
-    Response::builder().body(html).unwrap()
+    Ok(Html(html))
 }

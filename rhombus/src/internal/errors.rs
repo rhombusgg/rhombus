@@ -3,7 +3,7 @@ use std::any::Any;
 use axum::{
     body::Body,
     extract::{Request, State},
-    http::{Response, Uri},
+    http::{Extensions, Response, Uri},
     middleware::Next,
     response::{Html, IntoResponse},
     Extension, Json,
@@ -100,7 +100,7 @@ pub async fn error_handler_middleware(
 pub trait IntoErrorResponse<T> {
     fn map_err_page_code(
         self,
-        req: &Request<Body>,
+        extensions: &Extensions,
         status_code: StatusCode,
         description: &'static str,
     ) -> Result<T, axum::response::Response>;
@@ -109,14 +109,20 @@ pub trait IntoErrorResponse<T> {
     #[inline]
     fn map_err_page(
         self,
-        req: &Request<Body>,
+        extensions: &Extensions,
         description: &'static str,
     ) -> Result<T, axum::response::Response>
     where
         Self: Sized,
     {
-        self.map_err_page_code(req, StatusCode::INTERNAL_SERVER_ERROR, description)
+        self.map_err_page_code(extensions, StatusCode::INTERNAL_SERVER_ERROR, description)
     }
+
+    fn map_err_htmx(
+        self,
+        extensions: &Extensions,
+        description: &'static str,
+    ) -> Result<T, axum::response::Response>;
 }
 
 impl<T, E: std::error::Error + 'static> IntoErrorResponse<T> for Result<T, E> {
@@ -124,14 +130,14 @@ impl<T, E: std::error::Error + 'static> IntoErrorResponse<T> for Result<T, E> {
     #[inline]
     fn map_err_page_code(
         self,
-        req: &Request<Body>,
+        extensions: &Extensions,
         status_code: StatusCode,
         description: &'static str,
     ) -> Result<T, axum::response::Response> {
         let caller = std::panic::Location::caller();
 
         self.map_err(|e| {
-            let user = match req.extensions().get::<MaybeUser>() {
+            let user = match extensions.get::<MaybeUser>() {
                 Some(user) => user,
                 None => &None,
             };
@@ -140,8 +146,8 @@ impl<T, E: std::error::Error + 'static> IntoErrorResponse<T> for Result<T, E> {
             tracing::error!(location, user_id, error = ?e, description, "Error");
 
             if let (Some(state), Some(page)) = (
-                req.extensions().get::<RouterState>(),
-                req.extensions().get::<PageMeta>(),
+                extensions.get::<RouterState>(),
+                extensions.get::<PageMeta>(),
             ) {
                 error_page(status_code, description, state, user, page).into_response()
             } else {
@@ -158,6 +164,28 @@ impl<T, E: std::error::Error + 'static> IntoErrorResponse<T> for Result<T, E> {
             }
         })
     }
+
+    #[track_caller]
+    #[inline]
+    fn map_err_htmx(
+        self,
+        extensions: &Extensions,
+        description: &'static str,
+    ) -> Result<T, axum::response::Response> {
+        let caller = std::panic::Location::caller();
+
+        self.map_err(|e| {
+            let user = match extensions.get::<MaybeUser>() {
+                Some(user) => user,
+                None => &None,
+            };
+            let user_id = user.as_ref().map(|user| user.id);
+            let location = format!("{}:{}:{}", caller.file(), caller.line(), caller.column());
+            tracing::error!(location, user_id, error = ?e, description, "Error");
+
+            (htmx_error_status_code(), description).into_response()
+        })
+    }
 }
 
 impl<T> IntoErrorResponse<T> for Option<T> {
@@ -165,14 +193,14 @@ impl<T> IntoErrorResponse<T> for Option<T> {
     #[inline]
     fn map_err_page_code(
         self,
-        req: &Request<Body>,
+        extensions: &Extensions,
         status_code: StatusCode,
         description: &'static str,
     ) -> Result<T, axum::response::Response> {
         let caller = std::panic::Location::caller();
 
         self.ok_or_else(|| {
-            let user = match req.extensions().get::<MaybeUser>() {
+            let user = match extensions.get::<MaybeUser>() {
                 Some(user) => user,
                 None => &None,
             };
@@ -181,8 +209,8 @@ impl<T> IntoErrorResponse<T> for Option<T> {
             tracing::error!(location, user_id, description, "Error unwrapping Option");
 
             if let (Some(state), Some(page)) = (
-                req.extensions().get::<RouterState>(),
-                req.extensions().get::<PageMeta>(),
+                extensions.get::<RouterState>(),
+                extensions.get::<PageMeta>(),
             ) {
                 error_page(status_code, description, state, user, page).into_response()
             } else {
@@ -197,6 +225,28 @@ impl<T> IntoErrorResponse<T> for Option<T> {
                 )
                     .into_response()
             }
+        })
+    }
+
+    #[track_caller]
+    #[inline]
+    fn map_err_htmx(
+        self,
+        extensions: &Extensions,
+        description: &'static str,
+    ) -> Result<T, axum::response::Response> {
+        let caller = std::panic::Location::caller();
+
+        self.ok_or_else(|| {
+            let user = match extensions.get::<MaybeUser>() {
+                Some(user) => user,
+                None => &None,
+            };
+            let user_id = user.as_ref().map(|user| user.id);
+            let location = format!("{}:{}:{}", caller.file(), caller.line(), caller.column());
+            tracing::error!(location, user_id, description, "Error unwrapping Option");
+
+            (htmx_error_status_code(), description).into_response()
         })
     }
 }

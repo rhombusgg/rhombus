@@ -1,6 +1,6 @@
 use axum::{
-    body::Body,
-    extract::{Path, Request, State},
+    extract::{Path, State},
+    http::Extensions,
     response::{Html, IntoResponse, Response},
     Extension,
 };
@@ -22,7 +22,7 @@ pub async fn route_public_user(
     Extension(user): Extension<MaybeUser>,
     Extension(page): Extension<PageMeta>,
     Path(user_id): Path<i64>,
-    req: Request<Body>,
+    extensions: Extensions,
 ) -> std::result::Result<impl IntoResponse, Response> {
     let public_user = match state.db.get_user_from_id(user_id).await {
         Err(RhombusError::DatabaseReturnedNoRows) => {
@@ -34,13 +34,13 @@ pub async fn route_public_user(
                 &page,
             ));
         }
-        result => result.map_err_page(&req, "Failed to get user data")?,
+        result => result.map_err_page(&extensions, "Failed to get user data")?,
     };
 
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(public_user.team_id);
     let (challenge_data, team) =
-        tokio::try_join!(challenge_data, team).map_err_page(&req, "Failed to get data")?;
+        tokio::try_join!(challenge_data, team).map_err_page(&extensions, "Failed to get data")?;
 
     Ok(Html(
         state
@@ -59,7 +59,7 @@ pub async fn route_public_user(
                 challenges => challenge_data.challenges,
                 categories => challenge_data.categories,
             })
-            .map_err_page(&req, "Failed to render template")?,
+            .map_err_page(&extensions, "Failed to render template")?,
     ))
 }
 
@@ -68,7 +68,7 @@ pub async fn route_public_team(
     Extension(user): Extension<MaybeUser>,
     Extension(page): Extension<PageMeta>,
     Path(team_id): Path<i64>,
-    req: Request<Body>,
+    extensions: Extensions,
 ) -> std::result::Result<impl IntoResponse, Response> {
     let team = match state.db.get_team_from_id(team_id).await {
         Err(RhombusError::DatabaseReturnedNoRows) => {
@@ -80,13 +80,13 @@ pub async fn route_public_team(
                 &page,
             ));
         }
-        result => result.map_err_page(&req, "Failed to get team data")?,
+        result => result.map_err_page(&extensions, "Failed to get team data")?,
     };
 
     let challenge_data = state.db.get_challenges();
     let standing = state.db.get_team_standing(team_id);
-    let (challenge_data, standing) =
-        tokio::try_join!(challenge_data, standing).map_err_page(&req, "Failed to get data")?;
+    let (challenge_data, standing) = tokio::try_join!(challenge_data, standing)
+        .map_err_page(&extensions, "Failed to get data")?;
 
     Ok(Html(
         state
@@ -106,6 +106,6 @@ pub async fn route_public_team(
                 divisions => state.divisions,
                 standing,
             })
-            .map_err_page(&req, "Failed to render template")?,
+            .map_err_page(&extensions, "Failed to render template")?,
     ))
 }
