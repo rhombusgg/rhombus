@@ -2,14 +2,13 @@ use std::any::Any;
 
 use axum::{
     body::Body,
-    extract::{Request, State},
+    extract::State,
     http::{Extensions, Response, Uri},
-    middleware::Next,
     response::{Html, IntoResponse},
-    Extension, Json,
+    BoxError, Extension, Json,
 };
 use minijinja::context;
-use reqwest::{header, StatusCode};
+use reqwest::{Method, StatusCode};
 
 use crate::internal::{
     auth::{MaybeUser, User},
@@ -22,7 +21,7 @@ pub fn htmx_error_status_code() -> StatusCode {
     StatusCode::from_u16(502).unwrap()
 }
 
-pub fn handle_panic(err: Box<dyn Any + Send + 'static>) -> Response<String> {
+pub fn handle_panic(err: Box<dyn Any + Send + 'static>) -> Response<Body> {
     let details = if let Some(s) = err.downcast_ref::<String>() {
         s.clone()
     } else if let Some(s) = err.downcast_ref::<&str>() {
@@ -37,13 +36,10 @@ pub fn handle_panic(err: Box<dyn Any + Send + 'static>) -> Response<String> {
             "details": details,
         }
     });
-    let body = serde_json::to_string(&body).unwrap();
 
-    Response::builder()
-        .status(StatusCode::INTERNAL_SERVER_ERROR)
-        .header(header::CONTENT_TYPE, "application/json")
-        .body(body)
-        .unwrap()
+    tracing::error!(details, "Panic");
+
+    (StatusCode::INTERNAL_SERVER_ERROR, Json(body)).into_response()
 }
 
 pub async fn route_not_found(
@@ -61,6 +57,46 @@ pub async fn route_not_found(
         &user,
         &page,
     )
+}
+
+pub fn timeout_inner(
+    router_state: RouterState,
+    Extension(user): Extension<MaybeUser>,
+    Extension(page): Extension<PageMeta>,
+    method: Method,
+    uri: Uri,
+    err: BoxError,
+) -> impl IntoResponse {
+    let user_id = user.as_ref().map(|user| user.id);
+    tracing::error!(?method, ?uri, ?err, user_id, "Timeout");
+
+    let (status_code, description) = if err.is::<tower::timeout::error::Elapsed>() {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Request timed out. Try again later.",
+        )
+    } else {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Unhandled internal error",
+        )
+    };
+
+    let html = router_state
+        .jinja
+        .get_template("error.html")
+        .unwrap()
+        .render(context! {
+            global => router_state.global_page_meta,
+            page,
+            user,
+            title => format!("Error: {} | {}", description, router_state.global_page_meta.title),
+            error_code => status_code.to_string(),
+            error_description => description,
+        })
+        .unwrap();
+
+    (status_code, Html(html)).into_response()
 }
 
 #[inline]
@@ -86,15 +122,6 @@ pub fn error_page(
         .unwrap();
 
     (status_code, Html(html)).into_response()
-}
-
-pub async fn error_handler_middleware(
-    State(state): State<RouterState>,
-    mut req: Request<Body>,
-    next: Next,
-) -> axum::response::Response {
-    req.extensions_mut().insert(state);
-    next.run(req).await
 }
 
 pub trait IntoErrorResponse<T> {

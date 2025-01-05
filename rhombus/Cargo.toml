@@ -73,7 +73,7 @@ tokio-rustls = { version = "0.26.0", default-features = false, optional = true, 
   "tls12",
 ] }
 tokio-util = "0.7.12"
-tower = "0.5.1"
+tower = { version = "0.5.1", features = ["timeout"] }
 tower_governor = "0.4.2"
 tower-http = { version = "0.6.1", features = [
   "compression-full",

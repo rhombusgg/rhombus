@@ -12,13 +12,16 @@ use std::{
 };
 
 use axum::{
-    http::{Extensions, HeaderMap, StatusCode},
+    error_handling::HandleErrorLayer,
+    http::{Extensions, HeaderMap, StatusCode, Uri},
     middleware,
     response::Html,
     routing::{delete, get, post},
-    Extension,
+    BoxError, Extension,
 };
+use reqwest::Method;
 use tokio::sync::{Mutex, RwLock};
+use tower::ServiceBuilder;
 use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::{catch_panic::CatchPanicLayer, compression::CompressionLayer};
 use tracing::info;
@@ -32,7 +35,7 @@ use crate::{
             route_signin, route_signin_credentials, route_signin_ctftime,
             route_signin_ctftime_callback, route_signin_discord, route_signin_discord_callback,
             route_signin_email, route_signin_email_callback, route_signin_email_confirm_callback,
-            route_signout,
+            route_signout, MaybeUser,
         },
         command_palette::route_command_palette_items,
         database::{
@@ -45,7 +48,7 @@ use crate::{
             MaxDivisionPlayers, OpenDivisionEligibilityProvider,
         },
         email::{mailgun::MailgunProvider, outbound_mailer::OutboundMailer},
-        errors::{error_handler_middleware, handle_panic, route_not_found},
+        errors::{handle_panic, route_not_found, timeout_inner},
         health::{healthcheck_catch_up, healthcheck_runner},
         ip::{
             default_ip_extractor, ip_insert_blank_middleware, ip_insert_middleware,
@@ -71,7 +74,7 @@ use crate::{
                 ChallengePoints, DynamicPoints, StaticPoints, TEAM_BURSTED_POINTS,
             },
             home::route_home,
-            meta::{page_meta_middleware, route_robots_txt, GlobalPageMeta},
+            meta::{page_meta_middleware, route_robots_txt, GlobalPageMeta, PageMeta},
             public::{route_public_team, route_public_user},
             scoreboard::{
                 route_scoreboard, route_scoreboard_division, route_scoreboard_division_ctftime,
@@ -1033,6 +1036,23 @@ impl Builder {
 
             track_flusher(cached_db);
 
+            let router = {
+                let router_state_clone = router_state.clone();
+                router.layer(
+                    ServiceBuilder::new()
+                        .layer(HandleErrorLayer::new(
+                            |user: Extension<MaybeUser>,
+                             page: Extension<PageMeta>,
+                             method: Method,
+                             uri: Uri,
+                             err: BoxError| async move {
+                                timeout_inner(router_state_clone, user, page, method, uri, err)
+                            },
+                        ))
+                        .timeout(Duration::from_secs(30)),
+                )
+            };
+
             let router = router
                 .layer(middleware::from_fn(page_meta_middleware))
                 .layer(middleware::from_fn_with_state(
@@ -1091,12 +1111,7 @@ impl Builder {
                 "/panic",
                 get(|| async { panic!("something went wrong...") }),
             );
-            let router = router
-                .layer(axum::middleware::from_fn_with_state(
-                    router_state,
-                    error_handler_middleware,
-                ))
-                .layer(CatchPanicLayer::custom(handle_panic));
+            let router = router.layer(CatchPanicLayer::custom(handle_panic));
 
             let router = router.layer(CompressionLayer::new());
 
