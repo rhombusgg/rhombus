@@ -247,8 +247,13 @@ impl Database for DbCache {
 
     async fn roll_api_key(&self, user_id: i64, location_url: &str) -> Result<String> {
         let user = self.get_user_from_id(user_id).await?;
-        USER_CACHE_BY_API_KEY.remove(&user.api_key);
-        self.inner.roll_api_key(user_id, location_url).await
+        USER_ID_CACHE_BY_API_KEY.remove(&user.api_key);
+        USER_CACHE.remove(&user_id);
+        let result = self.inner.roll_api_key(user_id, location_url).await;
+        if let Ok(api_key) = &result {
+            USER_ID_CACHE_BY_API_KEY.insert(api_key.clone(), TimedCache::new(user.id));
+        }
+        result
     }
 
     async fn set_team_name(
@@ -667,7 +672,7 @@ impl<T> TimedCache<T> {
 }
 
 pub static USER_CACHE: LazyLock<DashMap<i64, TimedCache<User>>> = LazyLock::new(DashMap::new);
-pub static USER_CACHE_BY_API_KEY: LazyLock<DashMap<String, TimedCache<User>>> =
+pub static USER_ID_CACHE_BY_API_KEY: LazyLock<DashMap<String, TimedCache<i64>>> =
     LazyLock::new(DashMap::new);
 
 pub async fn get_user_from_id(db: &Connection, user_id: i64) -> Result<User> {
@@ -685,15 +690,15 @@ pub async fn get_user_from_id(db: &Connection, user_id: i64) -> Result<User> {
 }
 
 pub async fn get_user_from_api_key(db: &Connection, api_key: &str) -> Result<User> {
-    if let Some(user) = USER_CACHE_BY_API_KEY.get(api_key) {
-        return Ok(user.value.clone());
+    if let Some(id) = USER_ID_CACHE_BY_API_KEY.get(api_key) {
+        return db.get_user_from_id(id.value).await;
     }
     tracing::trace!(api_key, "cache miss: get_user_from_api_key");
 
     let user = db.get_user_from_api_key(api_key).await;
 
     if let Ok(user) = &user {
-        USER_CACHE_BY_API_KEY.insert(api_key.to_owned(), TimedCache::new(user.clone()));
+        USER_ID_CACHE_BY_API_KEY.insert(api_key.to_owned(), TimedCache::new(user.id));
     }
     user
 }
