@@ -34,7 +34,7 @@ impl AuthCommand {
                 println!("✓ URL: {}", url);
                 url
             }
-            None => inquire::prompt_text("URL?")?,
+            None => inquire::prompt_text("CTF URL?")?,
         };
 
         let config = Config { url, api_key };

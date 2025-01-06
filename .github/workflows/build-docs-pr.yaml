@@ -21,10 +21,6 @@ jobs:
         with:
           version: "28.x"
 
-      - uses: arduino/setup-protoc@v3
-        with:
-          version: "28.x"
-
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
