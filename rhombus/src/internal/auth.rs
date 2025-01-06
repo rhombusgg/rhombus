@@ -5,7 +5,7 @@ use axum::{
     extract::{Query, State},
     http::{
         header::{self, AUTHORIZATION},
-        Request, Response, StatusCode,
+        Extensions, Request, Response, StatusCode,
     },
     middleware::Next,
     response::{Html, IntoResponse, Redirect},
@@ -22,15 +22,18 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::internal::{
-    division::MaxDivisionPlayers,
-    locales::Languages,
-    router::RouterState,
-    routes::{meta::PageMeta, team::create_team_invite_token},
-    templates::{toast_header, ToastKind},
+use crate::{
+    error_page_code,
+    errors::RhombusError,
+    internal::{
+        division::MaxDivisionPlayers,
+        errors::{error_page, IntoErrorResponse},
+        locales::Languages,
+        router::RouterState,
+        routes::{meta::PageMeta, team::create_team_invite_token},
+        templates::{toast_header, ToastKind},
+    },
 };
-
-use super::database::provider::Database;
 
 #[derive(Debug, Serialize, Clone)]
 pub struct UserInner {
@@ -135,11 +138,12 @@ pub struct SignInParams {
 }
 
 pub async fn route_signin(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<MaybeUser>,
     Extension(page): Extension<PageMeta>,
-    params: Query<SignInParams>,
-) -> Response<Body> {
+    Query(params): Query<SignInParams>,
+    extensions: Extensions,
+) -> std::result::Result<impl IntoResponse, Response<Body>> {
     let mut invite_token_cookie = Cookie::build(("rhombus-invite-token", ""))
         .path("/")
         .removal()
@@ -155,14 +159,22 @@ pub async fn route_signin(
             .await
             .unwrap_or(None)
         {
-            let new_team = state.db.get_team_from_id(team_meta.id).await.unwrap();
+            let new_team = state
+                .db
+                .get_team_from_id(team_meta.id)
+                .await
+                .map_err_page(&extensions, "Failed to get new team id")?;
 
             // You cannot join a team in which the owner has left (and is on a different team themselves). This doesn't
             // need an error page, it should just count as an invalid invite token and not register.
             if !new_team.users.is_empty() {
                 if let Some(user) = &user {
                     // you cannot join a team if your current team has more than just you on it
-                    let old_team = state.db.get_team_from_id(user.team_id).await.unwrap();
+                    let old_team = state
+                        .db
+                        .get_team_from_id(user.team_id)
+                        .await
+                        .map_err_page(&extensions, "Failed to get current team id")?;
                     if old_team.users.len() > 1 {
                         let html = state
                             .jinja
@@ -176,7 +188,7 @@ pub async fn route_signin(
                                 team => old_team,
                             })
                             .unwrap();
-                        return Html(html).into_response();
+                        return Err(Html(html).into_response());
                     }
 
                     // you cannot join a team if the new team if, as a result of you joining it would
@@ -205,7 +217,7 @@ pub async fn route_signin(
                                         max_players,
                                     })
                                     .unwrap();
-                                return Html(html).into_response();
+                                return Err(Html(html).into_response());
                             }
                         }
                     }
@@ -214,7 +226,7 @@ pub async fn route_signin(
                         .db
                         .add_user_to_team(user.id, team_meta.id, Some(old_team.id))
                         .await
-                        .unwrap();
+                        .map_err_page(&extensions, "Failed to add user to team")?;
 
                     if let (Some(bot), Some(user_discord_id)) =
                         (state.bot.as_ref(), user.discord_id)
@@ -255,14 +267,14 @@ pub async fn route_signin(
                                 .db
                                 .get_team_standing(old_team.id)
                                 .await
-                                .unwrap()
+                                .map_err_page(&extensions, "Failed to get old team's standing")?
                                 .map(|standing| standing.rank <= 10)
                                 .unwrap_or(false);
                             let new_team_top_10 = state
                                 .db
                                 .get_team_standing(new_team.id)
                                 .await
-                                .unwrap()
+                                .map_err_page(&extensions, "Failed to get new team's standing")?
                                 .map(|standing| standing.rank <= 10)
                                 .unwrap_or(false);
                             if old_team_top_10 != new_team_top_10 {
@@ -277,7 +289,7 @@ pub async fn route_signin(
                         }
                     }
 
-                    return Redirect::to("/team").into_response();
+                    return Ok(Redirect::to("/team").into_response());
                 }
 
                 invite_token_cookie = Cookie::build(("rhombus-invite-token", url_invite_token))
@@ -305,11 +317,11 @@ pub async fn route_signin(
         })
         .unwrap();
 
-    Response::builder()
-        .header("content-type", "text/html")
-        .header("set-cookie", invite_token_cookie.to_string())
-        .body(html.into())
-        .unwrap()
+    Ok((
+        [("Set-Cookie", invite_token_cookie.to_string())],
+        Html(html),
+    )
+        .into_response())
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -319,7 +331,7 @@ pub struct DiscordOAuthStateClaims {
     exp: i64,
 }
 
-pub async fn route_signin_discord(state: State<RouterState>) -> impl IntoResponse {
+pub async fn route_signin_discord(State(state): State<RouterState>) -> impl IntoResponse {
     let (jwt_secret, location_url, client_id, autojoin) = {
         let settings = state.settings.read().await;
 
@@ -401,49 +413,45 @@ struct DiscordProfile {
 }
 
 pub async fn route_signin_discord_callback(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<MaybeUser>,
     Extension(page): Extension<PageMeta>,
-    params: Query<DiscordCallback>,
+    Query(params): Query<DiscordCallback>,
+    extensions: Extensions,
     cookie_jar: CookieJar,
-) -> impl IntoResponse {
-    let Some(discord_oauth_cookie) = cookie_jar
+) -> std::result::Result<impl IntoResponse, Response<Body>> {
+    let discord_oauth_cookie = cookie_jar
         .get("rhombus-oauth-discord")
         .map(|cookie| cookie.value())
-    else {
-        let json_error = ErrorResponse {
-            message: "State not set".to_string(),
-        };
-        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
-    };
+        .map_err_page_code(&extensions, StatusCode::BAD_REQUEST, "State not set")?;
 
     if let Some(error) = &params.error {
-        tracing::error!("Discord returned an error: {}", error);
-        let json_error = ErrorResponse {
-            message: format!("Discord returned an error: {}", error),
-        };
-        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+        return Err(error_page_code!(
+            &extensions,
+            StatusCode::BAD_REQUEST,
+            "Discord returned an error in a callback",
+            error,
+        ));
     }
 
-    let Some(code) = &params.code else {
-        let json_error = ErrorResponse {
-            message: "Discord did not return a code".to_string(),
-        };
-        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
-    };
+    let code = params.code.map_err_page_code(
+        &extensions,
+        StatusCode::BAD_REQUEST,
+        "Discord did not return a code",
+    )?;
 
-    let Some(discord_oauth_state) = &params.state else {
-        let json_error = ErrorResponse {
-            message: "Discord did not return a state".to_string(),
-        };
-        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
-    };
+    let discord_oauth_state = params.state.map_err_page_code(
+        &extensions,
+        StatusCode::BAD_REQUEST,
+        "Discord did not return a state",
+    )?;
 
     if discord_oauth_cookie != discord_oauth_state {
-        let json_error = ErrorResponse {
-            message: "State mismatch".to_string(),
-        };
-        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+        return Err(error_page_code!(
+            &extensions,
+            StatusCode::BAD_REQUEST,
+            "OAuth state mismatch",
+        ));
     }
 
     struct DiscordOAuthSettings {
@@ -467,25 +475,14 @@ pub async fn route_signin_discord_callback(
         )
     };
 
-    if decode::<DiscordOAuthStateClaims>(
+    decode::<DiscordOAuthStateClaims>(
         discord_oauth_cookie,
         &DecodingKey::from_secret(jwt_secret.as_ref()),
         &Validation::default(),
     )
-    .is_err()
-    {
-        let json_error = ErrorResponse {
-            message: "Invalid state".to_string(),
-        };
-        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
-    };
+    .map_err_page_code(&extensions, StatusCode::BAD_REQUEST, "Claims are invalid")?;
 
-    let Some(discord) = discord else {
-        let json_error = ErrorResponse {
-            message: "Discord is not configured".to_string(),
-        };
-        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
-    };
+    let discord = discord.map_err_page(&extensions, "Discord is not configured")?;
 
     let client = Client::new();
     let res = client
@@ -497,43 +494,52 @@ pub async fn route_signin_discord_callback(
         .basic_auth(discord.client_id, Some(&discord.client_secret))
         .form(&[
             ("grant_type", "authorization_code"),
-            ("code", code),
+            ("code", code.as_str()),
             (
                 "redirect_uri",
-                &format!("{}/signin/discord/callback", location_url),
+                format!("{}/signin/discord/callback", location_url).as_str(),
             ),
         ])
         .send()
         .await
-        .unwrap();
+        .map_err_page(&extensions, "Failed to get discord oauth token")?;
 
     if !res.status().is_success() {
-        let json_error = ErrorResponse {
-            message: format!("Discord returned an error: {:?}", res.text().await),
-        };
-        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+        let res = format!("{:?}", res.text().await);
+        return Err(error_page_code!(
+            &extensions,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Discord returned an error getting oauth token",
+            res,
+        ));
     }
 
-    let oauth_token = res.json::<DiscordOAuthToken>().await.unwrap();
+    let oauth_token = res
+        .json::<DiscordOAuthToken>()
+        .await
+        .map_err_page(&extensions, "Failed to parse discord oauth token")?;
 
     let res = client
         .get("https://discord.com/api/users/@me")
         .bearer_auth(&oauth_token.access_token)
         .send()
         .await
-        .unwrap();
+        .map_err_page(&extensions, "Failed to get discord profile")?;
+
     if !res.status().is_success() {
-        let json_error = ErrorResponse {
-            message: format!("Discord returned an error: {:?}", res.text().await),
-        };
-        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+        let res = format!("{:?}", res.text().await);
+        return Err(error_page_code!(
+            &extensions,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Discord returned an error getting discord profile",
+            res,
+        ));
     }
 
-    let res_text = res.text().await.unwrap();
-    let Ok(profile) = serde_json::from_str::<DiscordProfile>(&res_text) else {
-        tracing::warn!(json = res_text, "failed to get discord profile");
-        panic!();
-    };
+    let profile = res
+        .json::<DiscordProfile>()
+        .await
+        .map_err_page(&extensions, "Failed to parse discord profile")?;
 
     let discord_id = profile.id.parse::<NonZeroU64>().unwrap();
 
@@ -556,7 +562,7 @@ pub async fn route_signin_discord_callback(
         )
     };
 
-    let Ok(upsert_result) = state
+    let upsert_result = state
         .db
         .upsert_user_by_discord_id(
             &profile.global_name,
@@ -566,13 +572,7 @@ pub async fn route_signin_discord_callback(
             user.as_ref().map(|u| u.id),
         )
         .await
-    else {
-        tracing::error!(
-            discord_id = discord_id.get(),
-            "failed to upsert user by discord id"
-        );
-        return Redirect::temporary("/signin").into_response();
-    };
+        .map_err_page(&extensions, "Failed to upsert user by discord id")?;
 
     let (user_id, team_id) = match upsert_result {
         Ok(r) => r,
@@ -589,20 +589,22 @@ pub async fn route_signin_discord_callback(
                         user,
                     })
                     .unwrap();
-                return Html(html).into_response();
+                return Err(Html(html).into_response());
             }
         },
     };
 
     if let Some(bot) = state.bot.as_ref() {
-        if let Err(err) = bot.verify_user(discord_id).await {
-            let json_error = ErrorResponse {
-                message: format!("Discord returned an error: {:?}", err),
-            };
-            return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
-        }
+        bot.verify_user(discord_id)
+            .await
+            .map_err_page(&extensions, "Discord returned an error verifying user")?;
 
-        let team = state.db.get_team_from_id(team_id).await.unwrap();
+        let team = state
+            .db
+            .get_team_from_id(team_id)
+            .await
+            .map_err_page(&extensions, "Failed to get team from id")?;
+
         let division = state
             .divisions
             .iter()
@@ -626,12 +628,16 @@ pub async fn route_signin_discord_callback(
         }))
         .send()
         .await
-        .unwrap();
+        .map_err_page(&extensions, "Failed to join user to guild")?;
+
     if !res.status().is_success() {
-        let json_error = ErrorResponse {
-            message: format!("Discord returned an error: {:?}", res.text().await),
-        };
-        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+        let res = format!("{:?}", res.text().await);
+        return Err(error_page_code!(
+            &extensions,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to join user to guild",
+            res,
+        ));
     }
 
     let unset_oauth_state_cookie = Cookie::build(("rhombus-oauth-discord", ""))
@@ -640,7 +646,9 @@ pub async fn route_signin_discord_callback(
         .same_site(SameSite::Lax)
         .http_only(true);
 
-    let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar, &state.db).await;
+    let cookie = sign_in_cookie(&state, user_id, &cookie_jar)
+        .await
+        .map_err_page(&extensions, "Failed to add user to team")?;
     let mut response = Redirect::temporary("/team").into_response();
     let headers = response.headers_mut();
     headers.insert(header::SET_COOKIE, cookie.to_string().parse().unwrap());
@@ -648,7 +656,7 @@ pub async fn route_signin_discord_callback(
         header::SET_COOKIE,
         unset_oauth_state_cookie.to_string().parse().unwrap(),
     );
-    response
+    Ok(response)
 }
 
 #[derive(Deserialize)]
@@ -686,30 +694,31 @@ struct CTFtimeTeamData {
 }
 
 pub async fn route_signin_ctftime_callback(
-    state: State<RouterState>,
-    user: Extension<MaybeUser>,
-    params: Query<CTFtimeCallback>,
+    State(state): State<RouterState>,
+    Extension(user): Extension<MaybeUser>,
+    Query(params): Query<CTFtimeCallback>,
     cookie_jar: CookieJar,
-) -> impl IntoResponse {
+    extensions: Extensions,
+) -> std::result::Result<impl IntoResponse, Response<Body>> {
     if user.is_some() {
-        return Redirect::temporary("/signin").into_response();
+        return Err(error_page_code!(
+            &extensions,
+            StatusCode::BAD_REQUEST,
+            "You are already signed in, so CTFtime cannot be linked. Please sign out, and sign back in with CTFtime as a new account.",
+        ));
     }
 
-    let Some(ctftime_oauth_cookie) = cookie_jar
+    let ctftime_oauth_cookie = cookie_jar
         .get("rhombus-oauth-ctftime")
         .map(|cookie| cookie.value())
-    else {
-        let json_error = ErrorResponse {
-            message: "State not set".to_string(),
-        };
-        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
-    };
+        .map_err_page_code(&extensions, StatusCode::BAD_REQUEST, "State not set")?;
 
     if ctftime_oauth_cookie != params.state {
-        let json_error = ErrorResponse {
-            message: "State mismatch".to_string(),
-        };
-        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+        return Err(error_page_code!(
+            &extensions,
+            StatusCode::BAD_REQUEST,
+            "State mismatch",
+        ));
     }
 
     let (ctftime_settings, jwt_secret) = {
@@ -717,33 +726,29 @@ pub async fn route_signin_ctftime_callback(
         (settings.ctftime.clone(), settings.jwt_secret.clone())
     };
 
-    if decode::<DiscordOAuthStateClaims>(
+    decode::<DiscordOAuthStateClaims>(
         ctftime_oauth_cookie
             .replace("______________________________________", ".")
             .as_str(),
         &DecodingKey::from_secret(jwt_secret.as_ref()),
         &Validation::default(),
     )
-    .is_err()
-    {
-        let json_error = ErrorResponse {
-            message: "Invalid state".to_string(),
-        };
-        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
-    };
+    .map_err_page_code(&extensions, StatusCode::BAD_REQUEST, "Invalid state")?;
 
     let Some(ctftime_settings) = ctftime_settings else {
-        let json_error = ErrorResponse {
-            message: "CTFtime is not configured".to_string(),
-        };
-        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+        return Err(error_page_code!(
+            &extensions,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "CTFtime is not configured",
+        ));
     };
 
     let Some(ctftime_client_secret) = ctftime_settings.client_secret else {
-        let json_error = ErrorResponse {
-            message: "CTFtime client secret is not configured".to_string(),
-        };
-        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+        return Err(error_page_code!(
+            &extensions,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "CTFtime client secret is not configured",
+        ));
     };
 
     let client = Client::new();
@@ -762,38 +767,46 @@ pub async fn route_signin_ctftime_callback(
         ])
         .send()
         .await
-        .unwrap();
+        .map_err_page(&extensions, "Failed to get CTFtime oauth token")?;
 
     if res.status() != StatusCode::OK {
-        let json_error = ErrorResponse {
-            message: format!("Invalid CTFtime oauth token: {:?}", res.text().await),
-        };
-        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+        let res = format!("{:?}", res.text().await);
+        return Err(error_page_code!(
+            &extensions,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Invalid CTFtime oauth token",
+            res,
+        ));
     }
 
-    let Ok(oauth_token) = res.json::<CTFtimeOAuthToken>().await else {
-        let json_error = ErrorResponse {
-            message: "Invalid CTFtime oauth token".to_string(),
-        };
-        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
-    };
+    let oauth_token = res
+        .json::<CTFtimeOAuthToken>()
+        .await
+        .map_err_page(&extensions, "Failed to parse CTFtime oauth token")?;
 
     let res = client
         .get("https://oauth.ctftime.org/user")
         .bearer_auth(&oauth_token.access_token)
         .send()
         .await
-        .unwrap();
+        .map_err_page(&extensions, "Failed to get CTFtime user data")?;
+
     if !res.status().is_success() {
-        let json_error = ErrorResponse {
-            message: format!("Discord returned an error: {:?}", res.text().await),
-        };
-        return (StatusCode::BAD_REQUEST, Json(json_error)).into_response();
+        let res = format!("{:?}", res.text().await);
+        return Err(error_page_code!(
+            &extensions,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to get CTFtime user data",
+            res,
+        ));
     }
 
-    let user_data = res.json::<CTFtimeUserData>().await.unwrap();
+    let user_data = res
+        .json::<CTFtimeUserData>()
+        .await
+        .map_err_page(&extensions, "Failed to parse CTFtime user data")?;
 
-    let Ok((user_id, team_id, invite_token)) = state
+    let (user_id, _team_id, invite_token) = state
         .db
         .upsert_user_by_ctftime(
             &user_data.name,
@@ -808,16 +821,11 @@ pub async fn route_signin_ctftime_callback(
             &user_data.team.name,
         )
         .await
-    else {
-        tracing::info!(
-            ctftime_user_id = user_data.id,
-            ctftime_team_id = user_data.team.id,
-            "failed to upsert user by ctftime"
-        );
-        return Redirect::temporary("/signin").into_response();
-    };
+        .map_err_page(&extensions, "Failed to upsert user by ctftime")?;
 
-    let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar, &state.db).await;
+    let cookie = sign_in_cookie(&state, user_id, &cookie_jar)
+        .await
+        .map_err_page(&extensions, "Failed to add user to team")?;
     let mut response = if let Some(invite_token) = invite_token {
         Redirect::temporary(format!("/signin?token={}", invite_token).as_str()).into_response()
     } else {
@@ -825,7 +833,7 @@ pub async fn route_signin_ctftime_callback(
     };
     let headers = response.headers_mut();
     headers.insert(header::SET_COOKIE, cookie.to_string().parse().unwrap());
-    response
+    Ok(response)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -835,7 +843,10 @@ pub struct CTFtimeOAuthStateClaims {
     exp: i64,
 }
 
-pub async fn route_signin_ctftime(state: State<RouterState>) -> impl IntoResponse {
+pub async fn route_signin_ctftime(
+    State(state): State<RouterState>,
+    extensions: Extensions,
+) -> std::result::Result<impl IntoResponse, Response<Body>> {
     let (jwt_secret, location_url, client_id) = {
         let settings = state.settings.read().await;
 
@@ -846,7 +857,11 @@ pub async fn route_signin_ctftime(state: State<RouterState>) -> impl IntoRespons
                 ctftime.client_id,
             )
         } else {
-            return Redirect::temporary("/signin").into_response();
+            return Err(error_page_code!(
+                &extensions,
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "CTFtime is not configured",
+            ));
         }
     };
 
@@ -882,7 +897,6 @@ pub async fn route_signin_ctftime(state: State<RouterState>) -> impl IntoRespons
 
     let cookie = Cookie::build(("rhombus-oauth-ctftime", signed_oauth_state))
         .path("/")
-        .removal()
         .same_site(SameSite::Lax)
         .http_only(true)
         .build();
@@ -890,7 +904,7 @@ pub async fn route_signin_ctftime(state: State<RouterState>) -> impl IntoRespons
     let mut response = Redirect::temporary(&signin_url).into_response();
     let headers = response.headers_mut();
     headers.insert(header::SET_COOKIE, cookie.to_string().parse().unwrap());
-    response
+    Ok(response)
 }
 
 #[derive(Deserialize)]
@@ -899,42 +913,38 @@ pub struct EmailSubmit {
 }
 
 pub async fn route_signin_email(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
+    Extension(user): Extension<MaybeUser>,
     Extension(lang): Extension<Languages>,
     Extension(ip): Extension<Option<IpAddr>>,
     Form(form): Form<EmailSubmit>,
 ) -> impl IntoResponse {
     if form.email.is_empty() || form.email.len() > 255 {
-        return Response::builder()
-            .header(
-                "HX-Trigger",
-                toast_header(
-                    ToastKind::Error,
-                    &state
-                        .localizer
-                        .localize(&lang, "account-error-email-length", None)
-                        .unwrap(),
-                ),
-            )
-            .body("".to_owned())
-            .unwrap();
+        return ([(
+            "HX-Trigger",
+            toast_header(
+                ToastKind::Error,
+                &state
+                    .localizer
+                    .localize(&lang, "account-error-email-length", None)
+                    .unwrap(),
+            ),
+        )],)
+            .into_response();
     }
 
     let outbound_mailer = state.outbound_mailer.as_ref().unwrap();
 
-    let code = state
+    let code = match state
         .db
         .create_email_signin_callback_code(&form.email)
         .await
-        .unwrap();
-
-    if outbound_mailer
-        .send_email_signin(ip.map(|ip| ip.to_string()).as_deref(), &form.email, &code)
-        .await
-        .is_err()
     {
-        return Response::builder()
-            .header(
+        Ok(code) => code,
+        Err(e) => {
+            let user_id = user.as_ref().map(|u| u.id);
+            tracing::error!(error = ?e, user_id, "Failed to create email signin callback code");
+            return ([(
                 "HX-Trigger",
                 toast_header(
                     ToastKind::Error,
@@ -943,26 +953,43 @@ pub async fn route_signin_email(
                         .localize(&lang, "account-error-signin-email", None)
                         .unwrap(),
                 ),
-            )
-            .body("".to_owned())
-            .unwrap();
-    }
+            )],)
+                .into_response();
+        }
+    };
 
-    tracing::info!(email = form.email, "sent email signin");
-
-    Response::builder()
-        .header(
+    if let Err(e) = outbound_mailer
+        .send_email_signin(ip.map(|ip| ip.to_string()).as_deref(), &form.email, &code)
+        .await
+    {
+        let user_id = user.as_ref().map(|u| u.id);
+        tracing::error!(error = ?e, user_id, "Failed to create email signin callback code");
+        return ([(
             "HX-Trigger",
             toast_header(
-                ToastKind::Success,
+                ToastKind::Error,
                 &state
                     .localizer
-                    .localize(&lang, "account-check-email", None)
+                    .localize(&lang, "account-error-signin-email", None)
                     .unwrap(),
             ),
-        )
-        .body("".to_owned())
-        .unwrap()
+        )],)
+            .into_response();
+    }
+
+    tracing::info!(email = form.email, "Sent email signin");
+
+    ([(
+        "HX-Trigger",
+        toast_header(
+            ToastKind::Success,
+            &state
+                .localizer
+                .localize(&lang, "account-check-email", None)
+                .unwrap(),
+        ),
+    )],)
+        .into_response()
 }
 
 #[derive(Deserialize)]
@@ -972,75 +999,93 @@ pub struct CredentialsSubmit {
 }
 
 pub async fn route_signin_credentials(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
+    Extension(user): Extension<MaybeUser>,
     Extension(lang): Extension<Languages>,
     cookie_jar: CookieJar,
     Form(form): Form<CredentialsSubmit>,
 ) -> impl IntoResponse {
     let username_graphemes = form.username.graphemes(true).count();
     if !(3..=30).contains(&username_graphemes) || !(0..=256).contains(&form.username.len()) {
-        return Response::builder()
-            .header(
-                "HX-Trigger",
-                toast_header(
-                    ToastKind::Error,
-                    &state
-                        .localizer
-                        .localize(&lang, "account-error-name-length", None)
-                        .unwrap(),
-                ),
-            )
-            .body("".to_owned())
-            .unwrap();
+        return ([(
+            "HX-Trigger",
+            toast_header(
+                ToastKind::Error,
+                &state
+                    .localizer
+                    .localize(&lang, "account-error-name-length", None)
+                    .unwrap(),
+            ),
+        )],)
+            .into_response();
     }
 
     let password_graphemes = form.password.graphemes(true).count();
     if !(8..=256).contains(&password_graphemes) || !(0..=256).contains(&form.password.len()) {
-        return Response::builder()
-            .header(
-                "HX-Trigger",
-                toast_header(
-                    ToastKind::Error,
-                    &state
-                        .localizer
-                        .localize(&lang, "account-error-password-length", None)
-                        .unwrap(),
-                ),
-            )
-            .body("".to_owned())
-            .unwrap();
+        return ([(
+            "HX-Trigger",
+            toast_header(
+                ToastKind::Error,
+                &state
+                    .localizer
+                    .localize(&lang, "account-error-password-length", None)
+                    .unwrap(),
+            ),
+        )],)
+            .into_response();
     }
 
     let avatar = avatar_from_email(&form.username.trim().to_lowercase());
 
-    let Some((user_id, team_id)) = state
+    let maybe_user = match state
         .db
         .upsert_user_by_credentials(&form.username, &avatar, &form.password)
         .await
-        .unwrap()
-    else {
-        return Response::builder()
-            .header(
+    {
+        Ok(user) => user,
+        Err(e) => {
+            let user_id = user.as_ref().map(|u| u.id);
+            tracing::error!(error = ?e, user_id, "Failed to upsert user by credentials");
+            return ([(
                 "HX-Trigger",
-                toast_header(
-                    ToastKind::Error,
-                    &state
-                        .localizer
-                        .localize(&lang, "account-error-invalid-credentials", None)
-                        .unwrap(),
-                ),
-            )
-            .body("".to_owned())
-            .unwrap();
+                toast_header(ToastKind::Error, "Failed to upsert user by credentials"),
+            )],)
+                .into_response();
+        }
     };
 
-    let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar, &state.db).await;
+    let Some((user_id, _team_id)) = maybe_user else {
+        return ([(
+            "HX-Trigger",
+            toast_header(
+                ToastKind::Error,
+                &state
+                    .localizer
+                    .localize(&lang, "account-error-invalid-credentials", None)
+                    .unwrap(),
+            ),
+        )],)
+            .into_response();
+    };
 
-    Response::builder()
-        .header("HX-Redirect", "/team")
-        .header(header::SET_COOKIE, cookie.to_string())
-        .body("".to_owned())
-        .unwrap()
+    let cookie = match sign_in_cookie(&state, user_id, &cookie_jar).await {
+        Ok(cookie) => cookie,
+        Err(e) => {
+            let user_id = user.as_ref().map(|u| u.id);
+            tracing::error!(error = ?e, user_id, "Failed to add user to team");
+            return ([(
+                "HX-Trigger",
+                toast_header(ToastKind::Error, "Failed to add user to team"),
+            )],)
+                .into_response();
+        }
+    };
+
+    ([
+        ("HX-Redirect", "/team"),
+        ("Set-Cookie", cookie.to_string().as_str()),
+    ],)
+        .into_response()
 }
 
 #[derive(Deserialize)]
@@ -1066,30 +1111,30 @@ pub fn avatar_from_email(email: &str) -> String {
 }
 
 pub async fn route_signin_email_callback(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<MaybeUser>,
     Extension(page): Extension<PageMeta>,
-    params: Query<EmailSignInParams>,
-) -> impl IntoResponse {
-    let Ok(email) = state
+    Query(params): Query<EmailSignInParams>,
+    extensions: Extensions,
+) -> std::result::Result<impl IntoResponse, Response<Body>> {
+    let email = match state
         .db
         .get_email_signin_by_callback_code(&params.code)
         .await
-    else {
-        return Response::builder()
-            .status(404)
-            .header("Content-Type", "application/json")
-            .body(Body::from(
-                json!({
-                    "message": "Invalid email signin callback code. Please try again."
-                })
-                .to_string(),
-            ))
-            .unwrap()
-            .into_response();
+    {
+        Err(RhombusError::DatabaseReturnedNoRows) => {
+            return Err(error_page(
+                StatusCode::NOT_FOUND,
+                "Invalid email signin callback code",
+                &state,
+                &user,
+                &page,
+            ));
+        }
+        result => result.map_err_page(&extensions, "Failed to get email by callback code")?,
     };
 
-    Html(
+    Ok(Html(
         state
             .jinja
             .get_template("account/email-signin.html")
@@ -1103,50 +1148,58 @@ pub async fn route_signin_email_callback(
                 code => params.code,
             })
             .unwrap(),
-    )
-    .into_response()
+    ))
 }
 
 pub async fn route_signin_email_confirm_callback(
-    state: State<RouterState>,
-    params: Query<EmailSignInParams>,
+    State(state): State<RouterState>,
+    Query(params): Query<EmailSignInParams>,
+    Extension(user): Extension<MaybeUser>,
+    Extension(page): Extension<PageMeta>,
     cookie_jar: CookieJar,
+    extensions: Extensions,
 ) -> impl IntoResponse {
-    let Ok(email) = state
+    let email = match state
         .db
         .verify_email_signin_callback_code(&params.code)
         .await
-    else {
-        tracing::info!(code = params.code, "invalid email signin callback code");
-        return Redirect::temporary("/signin").into_response();
+    {
+        Err(RhombusError::DatabaseReturnedNoRows) => {
+            return Err(error_page(
+                StatusCode::NOT_FOUND,
+                "Invalid email signin callback code",
+                &state,
+                &user,
+                &page,
+            ));
+        }
+        result => result.map_err_page(&extensions, "Failed to get email by callback code")?,
     };
 
     let name = email.split('@').next().unwrap();
 
     let avatar = avatar_from_email(&email);
 
-    let (user_id, team_id) = match state.db.upsert_user_by_email(name, &email, &avatar).await {
-        Ok((user_id, team_id)) => (user_id, team_id),
-        Err(err) => {
-            tracing::info!("Failed to upsert user by email {} {}", email, err);
-            return Redirect::temporary("/signin").into_response();
-        }
-    };
+    let (user_id, _team_id) = state
+        .db
+        .upsert_user_by_email(name, &email, &avatar)
+        .await
+        .map_err_page(&extensions, "Failed to upsert user by email")?;
 
-    let cookie = sign_in_cookie(&state, user_id, team_id, &cookie_jar, &state.db).await;
+    let cookie = sign_in_cookie(&state, user_id, &cookie_jar)
+        .await
+        .map_err_page(&extensions, "Failed to add user to team")?;
     let mut response = Redirect::temporary("/team").into_response();
     let headers = response.headers_mut();
     headers.insert(header::SET_COOKIE, cookie.to_string().parse().unwrap());
-    response
+    Ok(response)
 }
 
 async fn sign_in_cookie<'a>(
-    state: &State<RouterState>,
+    state: &RouterState,
     user_id: i64,
-    _team_id: i64,
     cookie_jar: &CookieJar,
-    db: &Arc<dyn Database + Send + Sync>,
-) -> Cookie<'static> {
+) -> crate::Result<Cookie<'static>> {
     let jwt_secret = {
         let settings = state.settings.read().await;
         settings.jwt_secret.clone()
@@ -1162,13 +1215,13 @@ async fn sign_in_cookie<'a>(
     };
 
     if let Some(cookie_invite_token) = cookie_jar.get("rhombus-invite-token").map(|c| c.value()) {
-        if let Some(team) = db
+        if let Some(team) = state
+            .db
             .get_team_meta_from_invite_token(cookie_invite_token)
-            .await
-            .unwrap_or(None)
+            .await?
         {
-            db.add_user_to_team(user_id, team.id, None).await.unwrap();
-        }
+            state.db.add_user_to_team(user_id, team.id, None).await?;
+        };
     }
 
     let token = encode(
@@ -1178,11 +1231,11 @@ async fn sign_in_cookie<'a>(
     )
     .unwrap();
 
-    Cookie::build(("rhombus-token", token))
+    Ok(Cookie::build(("rhombus-token", token))
         .path("/")
         .same_site(SameSite::Lax)
         .http_only(true)
-        .build()
+        .build())
 }
 
 pub async fn route_signout() -> impl IntoResponse {

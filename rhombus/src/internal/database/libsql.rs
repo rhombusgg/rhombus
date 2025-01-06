@@ -522,7 +522,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
         let team_id = tx
             .query(
-                "INSERT INTO rhombus_team (name, invite_token, ctftime_id) VALUES (?1, ?2, ?3) RETURNING id",
+                "INSERT INTO rhombus_team (name, invite_token, ctftime_id, division_id) VALUES (?1, ?2, ?3, (SELECT id FROM rhombus_division WHERE is_default = TRUE LIMIT 1)) RETURNING id",
                 params!(team_name, team_invite_token.as_str(), ctftime_team_id),
             )
             .await?
@@ -2391,28 +2391,12 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 }
 
 pub async fn create_team(tx: &Transaction) -> Result<i64> {
-    let default_division_id = tx
-        .query(
-            "
-            SELECT id
-            FROM rhombus_division
-            WHERE is_default = TRUE
-            LIMIT 1
-        ",
-            (),
-        )
-        .await?
-        .next()
-        .await?
-        .ok_or(RhombusError::LibSQL(libsql::Error::QueryReturnedNoRows))?
-        .get::<String>(0)?;
-
     let team_invite_token = create_team_invite_token();
 
     let team_id = tx
         .query(
-            "INSERT INTO rhombus_team (name, invite_token, division_id) VALUES ('Team ' || (SELECT COALESCE(MAX(id) + 1, 1) FROM rhombus_team), ?1, ?2) RETURNING id",
-            params!(team_invite_token, default_division_id),
+            "INSERT INTO rhombus_team (name, invite_token, division_id) VALUES ('Team ' || (SELECT COALESCE(MAX(id) + 1, 1) FROM rhombus_team), ?1, (SELECT id FROM rhombus_division WHERE is_default = TRUE LIMIT 1)) RETURNING id",
+            params!(team_invite_token),
         )
         .await?
         .next()

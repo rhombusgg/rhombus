@@ -2,8 +2,9 @@ use std::any::Any;
 
 use axum::{
     body::Body,
-    extract::State,
+    extract::{Request, State},
     http::{Extensions, Response, Uri},
+    middleware::Next,
     response::{Html, IntoResponse},
     BoxError, Extension, Json,
 };
@@ -276,4 +277,61 @@ impl<T> IntoErrorResponse<T> for Option<T> {
             (htmx_error_status_code(), description).into_response()
         })
     }
+}
+
+pub async fn error_handler_middleware(
+    State(state): State<RouterState>,
+    mut req: Request<Body>,
+    next: Next,
+) -> axum::response::Response {
+    req.extensions_mut().insert(state);
+    next.run(req).await
+}
+
+#[macro_export]
+macro_rules! error_page_code {
+    ($extensions:expr, $status_code:expr, $description:expr) => {{
+        $crate::error_page_code!($extensions, $status_code, $description,)
+    }};
+
+    ($extensions:expr, $status_code:expr, $description:expr, $($key:ident = $value:expr),* $(,)?) => {{
+        let caller = std::panic::Location::caller();
+
+        let user = match $extensions.get::<MaybeUser>() {
+            Some(user) => user,
+            None => &None,
+        };
+        let user_id = user.as_ref().map(|user| user.id);
+        let location = std::format!("{}:{}:{}", caller.file(), caller.line(), caller.column());
+
+        tracing::error!(
+            location,
+            user_id,
+            description = $description,
+            $($key = $value,)*
+            "Error"
+        );
+
+        if let (Some(state), Some(page)) = (
+            $extensions.get::<RouterState>(),
+            $extensions.get::<PageMeta>(),
+        ) {
+            $crate::internal::errors::error_page($status_code, $description, state, user, page).into_response()
+        } else {
+            (
+                $status_code,
+                Json(serde_json::json!({
+                    "error": {
+                        "kind": "caught",
+                        "details": $description,
+                    }
+                })),
+            )
+                .into_response()
+        }
+    }};
+
+    ($extensions:expr, $status_code:expr, $description:expr, $($field:ident),* $(,)?) => {{
+        $crate::error_page_code!($extensions, $status_code, $description, $($field = $field),*)
+    }};
 }

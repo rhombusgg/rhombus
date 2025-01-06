@@ -48,7 +48,7 @@ use crate::{
             MaxDivisionPlayers, OpenDivisionEligibilityProvider,
         },
         email::{mailgun::MailgunProvider, outbound_mailer::OutboundMailer},
-        errors::{handle_panic, route_not_found, timeout_inner},
+        errors::{error_handler_middleware, handle_panic, route_not_found, timeout_inner},
         health::{healthcheck_catch_up, healthcheck_runner},
         ip::{
             default_ip_extractor, ip_insert_blank_middleware, ip_insert_middleware,
@@ -1111,7 +1111,9 @@ impl Builder {
                 "/panic",
                 get(|| async { panic!("something went wrong...") }),
             );
-            let router = router.layer(CatchPanicLayer::custom(handle_panic));
+            let router = router.layer(CatchPanicLayer::custom(handle_panic)).layer(
+                axum::middleware::from_fn_with_state(router_state, error_handler_middleware),
+            );
 
             let router = router.layer(CompressionLayer::new());
 
