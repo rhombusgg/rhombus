@@ -239,21 +239,21 @@ pub trait Database {
         avatar: &str,
         discord_id: NonZeroU64,
         user_id: Option<i64>,
-        settings: &Settings,
+        location_url: &str,
     ) -> Result<std::result::Result<(i64, i64), DiscordUpsertError>>;
     async fn upsert_user_by_email(
         &self,
         name: &str,
         email: &str,
         avatar: &str,
-        settings: &Settings,
+        location_url: &str,
     ) -> Result<(i64, i64)>;
     async fn upsert_user_by_credentials(
         &self,
         username: &str,
         avatar: &str,
         password: &str,
-        settings: &Settings,
+        location_url: &str,
     ) -> Result<Option<(i64, i64)>>;
     #[allow(clippy::too_many_arguments)]
     async fn upsert_user_by_ctftime(
@@ -264,7 +264,7 @@ pub trait Database {
         ctftime_user_id: i64,
         ctftime_team_id: i64,
         team_name: &str,
-        settings: &Settings,
+        location_url: &str,
     ) -> Result<(i64, i64, Option<String>)>;
     async fn insert_track(
         &self,
@@ -296,7 +296,7 @@ pub trait Database {
     async fn get_user_from_api_key(&self, api_key: &str) -> Result<User>;
     async fn kick_user(&self, user_id: i64, team_id: i64) -> Result<i64>;
     async fn roll_invite_token(&self, team_id: i64) -> Result<String>;
-    async fn roll_api_key(&self, user_id: i64, settings: &Settings) -> Result<String>;
+    async fn roll_api_key(&self, user_id: i64, location_url: &str) -> Result<String>;
     async fn set_team_name(
         &self,
         team_id: i64,

@@ -466,7 +466,7 @@ pub async fn route_account_roll_key(
 ) -> Result<impl IntoResponse, StatusCode> {
     let new_api_key = state
         .db
-        .roll_api_key(user.id, &*state.settings.read().await)
+        .roll_api_key(user.id, &state.settings.read().await.location_url)
         .await
         .unwrap();
 

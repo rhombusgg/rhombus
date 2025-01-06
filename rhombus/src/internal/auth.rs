@@ -34,14 +34,14 @@ use crate::internal::{
     templates::{toast_header, ToastKind},
 };
 
-use super::{database::provider::Database, settings::Settings};
+use super::database::provider::Database;
 
-pub fn create_user_api_key(settings: &Settings) -> String {
+pub fn create_user_api_key(location_url: &str) -> String {
     format!(
         "{}_{}",
         base32::encode(
             base32::Alphabet::Rfc4648Lower { padding: false },
-            settings.location_url.as_bytes()
+            location_url.as_bytes()
         ),
         Alphanumeric.sample_string(&mut thread_rng(), 32)
     )
@@ -572,6 +572,7 @@ pub async fn route_signin_discord_callback(
         )
     };
 
+    let location_url = state.settings.read().await.location_url.clone();
     let Ok(upsert_result) = state
         .db
         .upsert_user_by_discord_id(
@@ -580,7 +581,7 @@ pub async fn route_signin_discord_callback(
             &avatar,
             discord_id,
             user.as_ref().map(|u| u.id),
-            &*state.settings.read().await,
+            &location_url,
         )
         .await
     else {
@@ -810,6 +811,7 @@ pub async fn route_signin_ctftime_callback(
 
     let user_data = res.json::<CTFtimeUserData>().await.unwrap();
 
+    let location_url = state.settings.read().await.location_url.clone();
     let Ok((user_id, team_id, invite_token)) = state
         .db
         .upsert_user_by_ctftime(
@@ -823,7 +825,7 @@ pub async fn route_signin_ctftime_callback(
             user_data.id,
             user_data.team.id,
             &user_data.team.name,
-            &*state.settings.read().await,
+            &location_url,
         )
         .await
     else {
@@ -1031,14 +1033,10 @@ pub async fn route_signin_credentials(
 
     let avatar = avatar_from_email(&form.username.trim().to_lowercase());
 
+    let location_url = state.settings.read().await.location_url.clone();
     let Some((user_id, team_id)) = state
         .db
-        .upsert_user_by_credentials(
-            &form.username,
-            &avatar,
-            &form.password,
-            &*state.settings.read().await,
-        )
+        .upsert_user_by_credentials(&form.username, &avatar, &form.password, &location_url)
         .await
         .unwrap()
     else {
@@ -1148,9 +1146,11 @@ pub async fn route_signin_email_confirm_callback(
 
     let avatar = avatar_from_email(&email);
 
+    let location_url = state.settings.read().await.location_url.clone();
+
     let (user_id, team_id) = match state
         .db
-        .upsert_user_by_email(name, &email, &avatar, &*state.settings.read().await)
+        .upsert_user_by_email(name, &email, &avatar, &location_url)
         .await
     {
         Ok((user_id, team_id)) => (user_id, team_id),
