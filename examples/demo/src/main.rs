@@ -144,7 +144,8 @@ impl Plugin for DemoPlugin {
             context.db.clone(),
             context.score_type_map.clone(),
         );
-        team_creator(libsql.clone(), context.db.clone(), context.settings.clone());
+        let location_url = context.settings.read().await.location_url.clone();
+        team_creator(libsql.clone(), context.db.clone(), location_url);
 
         let plugin_state = DemoState::new(libsql.clone());
         let router = Router::new()
@@ -195,7 +196,7 @@ async fn set_user_to_bot(libsql: Arc<LibSQL>, user_id: i64) -> Result<()> {
     Ok(())
 }
 
-async fn create_team(libsql: Arc<LibSQL>, db: Connection, settings: &Settings) -> Result<()> {
+async fn create_team(libsql: Arc<LibSQL>, db: Connection, location_url: &str) -> Result<()> {
     let dummy_user = create_dummy_user();
 
     let division_ids = db
@@ -216,7 +217,7 @@ async fn create_team(libsql: Arc<LibSQL>, db: Connection, settings: &Settings) -
             &dummy_user.username,
             &dummy_user.avatar,
             &dummy_user.password,
-            settings,
+            location_url,
         )
         .await?
     else {
@@ -238,7 +239,7 @@ async fn create_team(libsql: Arc<LibSQL>, db: Connection, settings: &Settings) -
                 &dummy_user.username,
                 &dummy_user.avatar,
                 &dummy_user.password,
-                settings,
+                location_url,
             )
             .await?
         else {
@@ -323,11 +324,11 @@ fn solver(
     });
 }
 
-fn team_creator(libsql: Arc<LibSQL>, db: Connection, settings: Arc<RwLock<Settings>>) {
+fn team_creator(libsql: Arc<LibSQL>, db: Connection, location_url: String) {
     tokio::task::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(30)).await;
-            _ = create_team(libsql.clone(), db.clone(), &*settings.read().await).await;
+            _ = create_team(libsql.clone(), db.clone(), &location_url).await;
         }
     });
 }
