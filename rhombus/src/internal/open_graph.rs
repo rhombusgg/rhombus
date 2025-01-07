@@ -1,25 +1,21 @@
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
-use std::time::Duration;
 
+use axum::body::Bytes;
 use axum::extract::Path;
-use axum::Json;
-use axum::{body::Body, extract::State, http::Response, response::IntoResponse};
+use axum::{extract::State, response::IntoResponse};
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use minijinja::context;
 use resvg::{tiny_skia, usvg};
 use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use tokio::sync::RwLock;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::builder::find_image_file;
-use crate::internal::{
-    database::{cache::TimedCache, provider::StatisticsCategory},
-    router::RouterState,
-};
+use crate::errors::RhombusError;
+use crate::internal::{database::provider::StatisticsCategory, router::RouterState};
 
 #[derive(RustEmbed)]
 #[folder = "fonts"]
@@ -101,21 +97,13 @@ pub static DEFAULT_IMAGE_CACHE: LazyLock<RwLock<Option<CachedImage>>> =
 
 pub struct CachedImage {
     pub at: DateTime<Utc>,
-    pub data: Vec<u8>,
+    pub data: Bytes,
 }
 
-pub async fn route_default_og_image(state: State<RouterState>) -> impl IntoResponse {
-    {
-        let image_cache = DEFAULT_IMAGE_CACHE.read().await;
-        if image_cache
-            .as_ref()
-            .map(|cache| Utc::now() < cache.at + chrono::Duration::minutes(5))
-            .unwrap_or(false)
-        {
-            return Response::builder()
-                .header("Content-Type", "image/png")
-                .body(Body::from(image_cache.as_ref().unwrap().data.clone()))
-                .unwrap();
+pub async fn route_default_og_image(State(state): State<RouterState>) -> impl IntoResponse {
+    if let Some(image) = DEFAULT_IMAGE_CACHE.read().await.as_ref() {
+        if Utc::now() < image.at + chrono::Duration::minutes(5) {
+            return ([("Content-Type", "image/png")], image.data.clone()).into_response();
         }
     }
 
@@ -188,20 +176,22 @@ pub async fn route_default_og_image(state: State<RouterState>) -> impl IntoRespo
         .map(|end_time| end_time.format("%A, %B %-d, %Y at %H:%MZ").to_string());
 
     let mut division_meta = Vec::with_capacity(state.divisions.len());
-    for division in state.divisions.iter() {
-        let mut places = Vec::with_capacity(3);
-        let leaderboard = state.db.get_leaderboard(&division.id).await.unwrap();
-        leaderboard.iter().take(3).for_each(|entry| {
-            places.push(TeamMeta {
-                name: entry.team_name.clone(),
-                score: entry.score as u64,
+    if ctf_ended {
+        for division in state.divisions.iter() {
+            let mut places = Vec::with_capacity(3);
+            let leaderboard = state.db.get_leaderboard(&division.id).await.unwrap();
+            leaderboard.iter().take(3).for_each(|entry| {
+                places.push(TeamMeta {
+                    name: entry.team_name.clone(),
+                    score: entry.score as u64,
+                });
             });
-        });
 
-        division_meta.push(DivisionMeta {
-            name: division.name.clone(),
-            places,
-        });
+            division_meta.push(DivisionMeta {
+                name: division.name.clone(),
+                places,
+            });
+        }
     }
 
     let description = site.description.as_ref().map(|desc| wrap_text(desc, 74));
@@ -224,48 +214,123 @@ pub async fn route_default_og_image(state: State<RouterState>) -> impl IntoRespo
         })
         .unwrap();
 
-    let png = convert_svg_to_png(&svg);
+    let png = Bytes::from(convert_svg_to_png(&svg));
+
+    DEFAULT_IMAGE_CACHE.write().await.replace(CachedImage {
+        at: Utc::now(),
+        data: png.clone(),
+    });
+
+    ([("Content-Type", "image/png")], png).into_response()
+}
+
+pub static ERROR_IMAGE_CACHE: LazyLock<DashMap<String, CachedImage>> = LazyLock::new(DashMap::new);
+
+async fn og_error_image(state: &RouterState, error_message: String) -> Bytes {
+    if let Some(image) = ERROR_IMAGE_CACHE.get(&error_message) {
+        if Utc::now() < image.at + chrono::Duration::minutes(5) {
+            return image.data.clone();
+        }
+    }
+
+    let settings = state.settings.read().await;
+
+    let site = SiteOGImage {
+        title: settings.title.clone(),
+        description: settings.description.clone(),
+        start_time: settings.start_time,
+        end_time: settings.end_time,
+        location_url: settings.location_url.clone(),
+        organizer: settings.organizer.clone(),
+    };
+
+    let url = reqwest::Url::parse(&site.location_url).unwrap();
+    let location = url
+        .as_str()
+        .trim_start_matches(url.scheme())
+        .trim_start_matches("://")
+        .trim_end_matches("/");
+
+    let ctf_started = site
+        .start_time
+        .map(|start_time| chrono::Utc::now() > start_time)
+        .unwrap_or(true);
+
+    let ctf_ended = site
+        .end_time
+        .map(|end_time| chrono::Utc::now() > end_time)
+        .unwrap_or(false);
+
+    let ctf_start_time = site
+        .start_time
+        .map(|start_time| start_time.format("%A, %B %-d, %Y at %H:%MZ").to_string());
+
+    let ctf_end_time = site
+        .end_time
+        .map(|end_time| end_time.format("%A, %B %-d, %Y at %H:%MZ").to_string());
+
+    let description = site.description.as_ref().map(|desc| wrap_text(desc, 74));
+
+    let svg = state
+        .jinja
+        .get_template("og-error.svg")
+        .unwrap()
+        .render(context! {
+            site,
+            ctf_started,
+            ctf_ended,
+            location,
+            ctf_start_time,
+            ctf_end_time,
+            description,
+            error_message,
+        })
+        .unwrap();
+
+    let png = Bytes::from(convert_svg_to_png(&svg));
 
     let new_image = CachedImage {
         at: Utc::now(),
         data: png.clone(),
     };
-    {
-        DEFAULT_IMAGE_CACHE.write().await.replace(new_image);
-    }
 
-    Response::builder()
-        .header("Content-Type", "image/png")
-        .body(Body::from(png))
-        .unwrap()
+    ERROR_IMAGE_CACHE.insert(error_message, new_image);
+
+    png
 }
 
-pub static TEAM_OG_IMAGE_CACHE: LazyLock<DashMap<i64, TimedCache<Vec<u8>>>> =
-    LazyLock::new(DashMap::new);
+pub static TEAM_OG_IMAGE_CACHE: LazyLock<DashMap<i64, CachedImage>> = LazyLock::new(DashMap::new);
 
 pub async fn route_team_og_image(
-    state: State<RouterState>,
-    team_id: Path<i64>,
+    State(state): State<RouterState>,
+    Path(team_id): Path<i64>,
 ) -> impl IntoResponse {
-    let Ok(team) = state.db.get_team_from_id(team_id.0).await else {
-        return Json(json!({
-            "error": "Team not found",
-        }))
-        .into_response();
-    };
-
-    if let Some(png) = TEAM_OG_IMAGE_CACHE.get(&team_id) {
-        return Response::builder()
-            .header("Content-Type", "image/png")
-            .body(Body::from(png.value.clone()))
-            .unwrap();
+    if let Some(image) = TEAM_OG_IMAGE_CACHE.get(&team_id) {
+        if Utc::now() < image.at + chrono::Duration::minutes(5) {
+            return ([("Content-Type", "image/png")], image.data.clone()).into_response();
+        }
     }
 
+    let team = match state.db.get_team_from_id(team_id).await {
+        Err(RhombusError::DatabaseReturnedNoRows) => {
+            let png = og_error_image(&state, "Team not found".to_string()).await;
+            return ([("Content-Type", "image/png")], png).into_response();
+        }
+        Err(e) => {
+            tracing::error!(error = ?e, team_id, "Failed while looking up team information");
+            let png = og_error_image(
+                &state,
+                "Failed while looking up team information".to_string(),
+            )
+            .await;
+            return ([("Content-Type", "image/png")], png).into_response();
+        }
+        Ok(result) => result,
+    };
+
     let challenge_data = state.db.get_challenges();
-    let standing = state.db.get_team_standing(team_id.0);
-    let (challenge_data, standings) = tokio::join!(challenge_data, standing);
-    let challenge_data = challenge_data.unwrap();
-    let standing = standings.unwrap();
+    let standing = state.db.get_team_standing(team_id);
+    let (challenge_data, standing) = tokio::try_join!(challenge_data, standing).unwrap();
 
     let site = {
         let settings = state.settings.read().await;
@@ -352,39 +417,47 @@ pub async fn route_team_og_image(
         })
         .unwrap();
 
-    let png = convert_svg_to_png(&svg);
+    let png = Bytes::from(convert_svg_to_png(&svg));
 
-    let cache = TimedCache::new(png.clone());
-    {
-        TEAM_OG_IMAGE_CACHE.insert(team_id.0, cache);
-    }
+    TEAM_OG_IMAGE_CACHE.insert(
+        team_id,
+        CachedImage {
+            at: Utc::now(),
+            data: png.clone(),
+        },
+    );
 
-    Response::builder()
-        .header("Content-Type", "image/png")
-        .body(Body::from(png))
-        .unwrap()
+    ([("Content-Type", "image/png")], png).into_response()
 }
 
-pub static USER_OG_IMAGE_CACHE: LazyLock<DashMap<i64, TimedCache<Vec<u8>>>> =
-    LazyLock::new(DashMap::new);
+pub static USER_OG_IMAGE_CACHE: LazyLock<DashMap<i64, CachedImage>> = LazyLock::new(DashMap::new);
 
 pub async fn route_user_og_image(
-    state: State<RouterState>,
-    user_id: Path<i64>,
+    State(state): State<RouterState>,
+    Path(user_id): Path<i64>,
 ) -> impl IntoResponse {
-    let Ok(user) = state.db.get_user_from_id(user_id.0).await else {
-        return Json(json!({
-            "error": "User not found",
-        }))
-        .into_response();
-    };
-
-    if let Some(png) = USER_OG_IMAGE_CACHE.get(&user_id) {
-        return Response::builder()
-            .header("Content-Type", "image/png")
-            .body(Body::from(png.value.clone()))
-            .unwrap();
+    if let Some(image) = USER_OG_IMAGE_CACHE.get(&user_id) {
+        if Utc::now() < image.at + chrono::Duration::minutes(5) {
+            return ([("Content-Type", "image/png")], image.data.clone()).into_response();
+        }
     }
+
+    let user = match state.db.get_user_from_id(user_id).await {
+        Err(RhombusError::DatabaseReturnedNoRows) => {
+            let png = og_error_image(&state, "User not found".to_string()).await;
+            return ([("Content-Type", "image/png")], png).into_response();
+        }
+        Err(e) => {
+            tracing::error!(error = ?e, user_id, "Failed while looking up user information");
+            let png = og_error_image(
+                &state,
+                "Failed while looking up user information".to_string(),
+            )
+            .await;
+            return ([("Content-Type", "image/png")], png).into_response();
+        }
+        Ok(result) => result,
+    };
 
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
@@ -477,53 +550,17 @@ pub async fn route_user_og_image(
         })
         .unwrap();
 
-    let png = convert_svg_to_png(&svg);
+    let png = Bytes::from(convert_svg_to_png(&svg));
 
-    let cache = TimedCache::new(png.clone());
-    {
-        USER_OG_IMAGE_CACHE.insert(user_id.0, cache);
-    }
+    USER_OG_IMAGE_CACHE.insert(
+        user_id,
+        CachedImage {
+            at: Utc::now(),
+            data: png.clone(),
+        },
+    );
 
-    Response::builder()
-        .header("Content-Type", "image/png")
-        .body(Body::from(png))
-        .unwrap()
-}
-
-pub fn open_graph_cache_evictor(seconds: u64) {
-    tokio::task::spawn(async move {
-        let duration = Duration::from_secs(seconds);
-        loop {
-            tokio::time::sleep(duration).await;
-            let evict_threshold = (chrono::Utc::now() - duration).timestamp();
-
-            let mut count: i64 = 0;
-            TEAM_OG_IMAGE_CACHE.retain(|_, v| {
-                if v.insert_timestamp > evict_threshold {
-                    true
-                } else {
-                    count += 1;
-                    false
-                }
-            });
-            if count > 0 {
-                tracing::trace!(count, "Evicted team og image cache");
-            }
-
-            let mut count: i64 = 0;
-            USER_OG_IMAGE_CACHE.retain(|_, v| {
-                if v.insert_timestamp > evict_threshold {
-                    true
-                } else {
-                    count += 1;
-                    false
-                }
-            });
-            if count > 0 {
-                tracing::trace!(count, "Evicted user og image cache");
-            }
-        }
-    });
+    ([("Content-Type", "image/png")], png).into_response()
 }
 
 fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
