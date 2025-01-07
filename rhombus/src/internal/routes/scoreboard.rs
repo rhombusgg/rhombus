@@ -49,11 +49,10 @@ pub async fn route_scoreboard(
         format!(
             "/scoreboard/{}{}",
             default_division,
-            if uri.path().ends_with(".json") {
-                ".json"
-            } else {
-                ""
-            }
+            uri.path()
+                .ends_with(".json")
+                .then_some(".json")
+                .unwrap_or_default()
         )
         .as_str(),
     )

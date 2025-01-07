@@ -1102,10 +1102,6 @@ impl Builder {
                 router
             };
 
-            let router = router.route(
-                "/panic",
-                get(|| async { panic!("something went wrong...") }),
-            );
             let router = router.layer(CatchPanicLayer::custom(handle_panic)).layer(
                 axum::middleware::from_fn_with_state(router_state, error_handler_middleware),
             );

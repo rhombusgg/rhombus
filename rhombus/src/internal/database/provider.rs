@@ -134,12 +134,12 @@ pub struct ScoreboardTeam {
 #[derive(Debug, Serialize, Clone)]
 pub struct ScoreboardInner {
     pub teams: BTreeMap<i64, ScoreboardTeam>,
-    pub cached_json: String,
+    pub cached_json: Bytes,
 }
 
 impl ScoreboardInner {
     pub fn new(teams: BTreeMap<i64, ScoreboardTeam>) -> Self {
-        let cached_json = serde_json::to_string(&teams).unwrap();
+        let cached_json = serde_json::to_string(&teams).unwrap().into();
         Self { teams, cached_json }
     }
 }
