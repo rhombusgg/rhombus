@@ -69,11 +69,11 @@ async fn main() {
     }
 }
 
-struct MyInterceptor {
+struct AuthInterceptor {
     auth_token: MetadataValue<tonic::metadata::Ascii>,
 }
 
-impl Interceptor for MyInterceptor {
+impl Interceptor for AuthInterceptor {
     fn call(&mut self, mut request: tonic::Request<()>) -> Result<tonic::Request<()>, Status> {
         request
             .metadata_mut()
@@ -83,7 +83,7 @@ impl Interceptor for MyInterceptor {
     }
 }
 
-type Client = RhombusClient<InterceptedService<Channel, MyInterceptor>>;
+type Client = RhombusClient<InterceptedService<Channel, AuthInterceptor>>;
 
 #[allow(dead_code)]
 /// Load the rhombus-cli.yaml config file and connect to the grpc server to which it refers
@@ -103,7 +103,7 @@ async fn get_client_from_config(config: &Config) -> Result<Client> {
         .connect()
         .await
         .with_context(|| format!("failed to connect to grpc server '{}'", &config.url))?;
-    let client = RhombusClient::with_interceptor(channel, MyInterceptor { auth_token });
+    let client = RhombusClient::with_interceptor(channel, AuthInterceptor { auth_token });
     Ok(client)
 }
 
