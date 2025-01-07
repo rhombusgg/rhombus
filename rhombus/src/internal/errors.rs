@@ -91,7 +91,7 @@ pub fn timeout_inner(
             global => router_state.global_page_meta,
             page,
             user,
-            title => format!("Error: {} | {}", description, router_state.global_page_meta.title),
+            title => format!("{} | {}", description, router_state.global_page_meta.title),
             error_code => status_code.to_string(),
             error_description => description,
         })
@@ -116,7 +116,7 @@ pub fn error_page(
             global => state.global_page_meta,
             page,
             user,
-            title => format!("Error: {} | {}", description, state.global_page_meta.title),
+            title => format!("{} | {}", description, state.global_page_meta.title),
             error_code => status_code.to_string(),
             error_description => description,
         })
