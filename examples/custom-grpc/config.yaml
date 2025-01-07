@@ -1,8 +1,6 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/rhombusgg/rhombus/main/schema.json
 title: Custom GRPC example
 location_url: http://localhost:3000
-database_url: file://rhombus.db
-in_memory_cache: 20
 auth:
   - credentials
 
