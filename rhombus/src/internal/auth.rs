@@ -120,9 +120,10 @@ pub async fn auth_injector_middleware(
             &DecodingKey::from_secret(state.settings.read().await.jwt_secret.as_ref()),
             &Validation::default(),
         ) {
+            let sub = token_data.claims.sub;
             req.extensions_mut().insert(Some(token_data.claims.clone()));
-            req.extensions_mut().insert(token_data.claims.clone());
-            if let Ok(user) = state.db.get_user_from_id(token_data.claims.sub).await {
+            req.extensions_mut().insert(token_data.claims);
+            if let Ok(user) = state.db.get_user_from_id(sub).await {
                 req.extensions_mut().insert(Some(user.clone()));
                 req.extensions_mut().insert(user);
             }

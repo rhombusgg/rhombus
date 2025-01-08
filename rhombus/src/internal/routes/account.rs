@@ -62,8 +62,8 @@ async fn is_in_server(
         Err(err) => {
             tracing::error!(
                 discord_id,
-                "Failed to check if user is in server: {:?}",
-                err
+                error = ?err,
+                "Failed to check if user is in server",
             );
             return false;
         }
@@ -110,11 +110,13 @@ pub async fn route_account(
         };
 
         let invite_url = if !in_server {
-            let invite_url = state.bot.as_ref().unwrap().get_invite_url().await;
-            if let Err(ref err) = invite_url {
-                tracing::error!("Failed to get invite URL: {:?}", err);
+            match state.bot.as_ref().unwrap().get_invite_url().await {
+                Ok(invite_url) => Some(invite_url),
+                Err(e) => {
+                    tracing::error!(error = ?e, "Failed to get discord invite URL");
+                    None
+                }
             }
-            invite_url.ok()
         } else {
             None
         };

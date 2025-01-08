@@ -8,7 +8,7 @@ use minijinja::context;
 use crate::internal::{auth::MaybeUser, router::RouterState, routes::meta::PageMeta};
 
 pub async fn route_terms(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<MaybeUser>,
     Extension(page): Extension<PageMeta>,
 ) -> impl IntoResponse {

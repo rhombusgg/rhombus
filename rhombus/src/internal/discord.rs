@@ -1486,7 +1486,7 @@ impl Bot {
                 tracing::error!(
                     ?discord_user_id,
                     ?role_id,
-                    ?e,
+                    error=?e,
                     "Failed to give role to user",
                 );
             }
@@ -1507,7 +1507,13 @@ impl Bot {
             return;
         };
 
-        let discord_ids = self.db.get_top10_discord_ids().await.unwrap();
+        let discord_ids = match self.db.get_top10_discord_ids().await {
+            Ok(discord_ids) => discord_ids,
+            Err(error) => {
+                tracing::error!(?error, "Failed to get top 10 discord ids");
+                return;
+            }
+        };
 
         let mut members = guild_id.members_iter(&self.http).boxed();
         while let Some(member_result) = members.next().await {

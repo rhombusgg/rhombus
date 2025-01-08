@@ -126,7 +126,7 @@ pub async fn route_team(
 }
 
 pub async fn route_team_roll_token(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
 ) -> Result<impl IntoResponse, StatusCode> {
