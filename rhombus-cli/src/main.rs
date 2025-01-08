@@ -56,12 +56,28 @@ async fn main() {
         Command::Auth(auth_command) => auth_command.run().await,
     };
 
+    // Macro because https://github.com/rust-lang/rust/issues/112838
+    macro_rules! render_error {
+        ($error:expr) => {
+            $error
+                .downcast_ref::<tonic::Status>()
+                .map(|status| format!("{}: {}", status.code().description(), status.message()))
+                .unwrap_or_else(|| $error.to_string())
+        };
+    }
+
     match result {
         Ok(()) => {}
         Err(err) => {
             match err.source() {
-                Some(source) => println!("{}", format!("Error: {}: {}", err, source).red()),
-                None => println!("{}{}", "Error: ".red(), err.to_string().red()),
+                Some(source) => println!(
+                    "{}{}{}{}",
+                    "Error: ".red(),
+                    err.to_string().red(),
+                    ": ".red(),
+                    render_error!(source).red()
+                ),
+                None => println!("{}{}", "Error: ".red(), render_error!(err).red()),
             }
 
             exit(1);
