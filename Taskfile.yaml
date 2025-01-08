@@ -7,12 +7,6 @@ tasks:
     cmds:
       - mold -run cargo watch -x 'run -p standalone'
 
-  apply:
-    desc: Run rhombus-cli admin apply from examples/standalone/challenges
-    dir: examples/standalone/challenges
-    cmds:
-      - mold -run cargo run --manifest-path ../../../Cargo.toml --bin rhombus-cli -- admin apply
-
   demo:
     desc: Watch the demo
     dir: examples/demo
