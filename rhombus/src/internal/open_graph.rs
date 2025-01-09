@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
+use std::time::Duration;
 
 use axum::body::Bytes;
 use axum::extract::Path;
@@ -599,4 +600,53 @@ fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
     }
 
     lines
+}
+
+pub fn open_graph_cache_evictor(seconds: u64) {
+    tokio::task::spawn(async move {
+        let duration = Duration::from_secs(seconds);
+        loop {
+            tokio::time::sleep(duration).await;
+            let evict_threshold = chrono::Utc::now() - duration;
+
+            let mut count: i64 = 0;
+            TEAM_OG_IMAGE_CACHE.retain(|_, v| {
+                if v.at > evict_threshold {
+                    true
+                } else {
+                    count += 1;
+                    false
+                }
+            });
+            if count > 0 {
+                tracing::trace!(count, "Evicted team og image cache");
+            }
+
+            let mut count: i64 = 0;
+            USER_OG_IMAGE_CACHE.retain(|_, v| {
+                if v.at > evict_threshold {
+                    true
+                } else {
+                    count += 1;
+                    false
+                }
+            });
+            if count > 0 {
+                tracing::trace!(count, "Evicted user og image cache");
+            }
+
+            let mut count: i64 = 0;
+            ERROR_IMAGE_CACHE.retain(|_, v| {
+                if v.at > evict_threshold {
+                    true
+                } else {
+                    count += 1;
+                    false
+                }
+            });
+            if count > 0 {
+                tracing::trace!(count, "Evicted error og image cache");
+            }
+        }
+    });
 }

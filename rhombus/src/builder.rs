@@ -57,7 +57,10 @@ use crate::{
             track_middleware, IpExtractorFn, KeyExtractorShim,
         },
         locales::{self, jinja_timediff, jinja_translate, locale_middleware},
-        open_graph::{route_default_og_image, route_team_og_image, route_user_og_image},
+        open_graph::{
+            open_graph_cache_evictor, route_default_og_image, route_team_og_image,
+            route_user_og_image,
+        },
         router::{route_reload, RouterState, RouterStateInner},
         routes::{
             account::{
@@ -549,6 +552,8 @@ impl Builder {
                     }
                 }
             };
+
+            open_graph_cache_evictor(60 * 10);
 
             let mut localizer = locales::Localizations::new();
 
