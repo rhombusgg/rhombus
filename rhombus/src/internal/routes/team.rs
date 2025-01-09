@@ -129,18 +129,17 @@ pub async fn route_team_roll_token(
     State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
-) -> Result<impl IntoResponse, StatusCode> {
+    extensions: Extensions,
+) -> Result<impl IntoResponse, Response> {
     if !user.is_team_owner {
-        return Err(StatusCode::UNAUTHORIZED);
+        return Err(StatusCode::UNAUTHORIZED.into_response());
     }
 
-    let new_invite_token = match state.db.roll_invite_token(user.team_id).await {
-        Ok(token) => token,
-        Err(e) => {
-            tracing::error!(error=?e, user_id=user.id, "Failed to roll invite token");
-            return Err(htmx_error_status_code());
-        }
-    };
+    let new_invite_token = state
+        .db
+        .roll_invite_token(user.team_id)
+        .await
+        .map_err_htmx(&extensions, "Failed to roll invite token")?;
 
     let location_url = { state.settings.read().await.location_url.clone() };
     let team_invite_url = format!("{}/signin?token={}", location_url, new_invite_token);
@@ -154,10 +153,7 @@ pub async fn route_team_roll_token(
                 page,
                 team_invite_url => team_invite_url,
             })
-            .map_err(|e| {
-                tracing::error!(error=?e, user_id=user.id, "Failed to render template team/team-token.html");
-                htmx_error_status_code()
-            })?,
+            .unwrap(),
     ))
 }
 

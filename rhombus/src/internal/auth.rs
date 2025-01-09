@@ -264,20 +264,21 @@ pub async fn route_signin(
                             .as_ref()
                             .and_then(|discord| discord.top10_role_id)
                         {
-                            let old_team_top_10 = state
-                                .db
-                                .get_team_standing(old_team.id)
-                                .await
-                                .map_err_page(&extensions, "Failed to get old team's standing")?
+                            let old_team_standing = state.db.get_team_standing(old_team.id);
+                            let new_team_standing = state.db.get_team_standing(new_team.id);
+
+                            let (old_team_standing, new_team_standing) =
+                                tokio::try_join!(old_team_standing, new_team_standing)
+                                    .map_err_page(&extensions, "Failed to get team standings")?;
+
+                            let old_team_top_10 = old_team_standing
                                 .map(|standing| standing.rank <= 10)
                                 .unwrap_or(false);
-                            let new_team_top_10 = state
-                                .db
-                                .get_team_standing(new_team.id)
-                                .await
-                                .map_err_page(&extensions, "Failed to get new team's standing")?
+
+                            let new_team_top_10 = new_team_standing
                                 .map(|standing| standing.rank <= 10)
                                 .unwrap_or(false);
+
                             if old_team_top_10 != new_team_top_10 {
                                 if new_team_top_10 {
                                     bot.give_role_to_users(&[user_discord_id], top10_role_id)

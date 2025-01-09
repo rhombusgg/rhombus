@@ -139,7 +139,7 @@ pub async fn route_account(
         state
             .jinja
             .get_template("account/account.html")
-            .map_err_page(&extensions, "Failed to get template")?
+            .unwrap()
             .render(context! {
                 global => state.global_page_meta,
                 page,
@@ -153,7 +153,7 @@ pub async fn route_account(
                 categories => challenge_data.categories,
                 emails,
             })
-            .map_err_page(&extensions, "Failed to render template")?
+            .unwrap()
     ))
 }
 
@@ -338,23 +338,25 @@ pub async fn route_account_email_verify_callback(
                 email,
                 code => params.code,
             })
-            .map_err_page(&extensions, "Failed to render template")?,
+            .unwrap(),
     ))
 }
 
 pub async fn route_account_email_verify_confirm(
     State(state): State<RouterState>,
     Query(params): Query<EmailVerifyParams>,
-) -> impl IntoResponse {
-    if let Err(e) = state
+    extensions: Extensions,
+) -> std::result::Result<impl IntoResponse, Response> {
+    state
         .db
         .verify_email_verification_callback_code(&params.code)
         .await
-    {
-        tracing::error!(error = ?e, "Failed to verify email verification callback code");
-    }
+        .map_err_page(
+            &extensions,
+            "Failed to verify email verification callback code",
+        )?;
 
-    Redirect::to("/account")
+    Ok(Redirect::to("/account"))
 }
 
 #[derive(Deserialize)]

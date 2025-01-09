@@ -330,7 +330,15 @@ pub async fn route_team_og_image(
 
     let challenge_data = state.db.get_challenges();
     let standing = state.db.get_team_standing(team_id);
-    let (challenge_data, standing) = tokio::try_join!(challenge_data, standing).unwrap();
+    let (challenge_data, standing) = match tokio::try_join!(challenge_data, standing) {
+        Ok(data) => data,
+        Err(e) => {
+            tracing::error!(error = ?e, team_id, "Failed while looking up team standing");
+            let png =
+                og_error_image(&state, "Failed while looking up team standing".to_string()).await;
+            return ([("Content-Type", "image/png")], png).into_response();
+        }
+    };
 
     let site = {
         let settings = state.settings.read().await;
