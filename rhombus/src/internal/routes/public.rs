@@ -1,33 +1,48 @@
 use axum::{
     extract::{Path, State},
-    response::{Html, IntoResponse},
-    Extension, Json,
+    http::Extensions,
+    response::{Html, IntoResponse, Response},
+    Extension,
 };
 use minijinja::context;
-use serde_json::json;
+use reqwest::StatusCode;
 
-use crate::internal::{auth::MaybeUser, router::RouterState, routes::meta::PageMeta};
+use crate::{
+    errors::RhombusError,
+    internal::{
+        auth::MaybeUser,
+        errors::{error_page, IntoErrorResponse},
+        router::RouterState,
+        routes::meta::PageMeta,
+    },
+};
 
 pub async fn route_public_user(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<MaybeUser>,
     Extension(page): Extension<PageMeta>,
-    user_id: Path<i64>,
-) -> impl IntoResponse {
-    let Ok(public_user) = state.db.get_user_from_id(user_id.0).await else {
-        return Json(json!({
-            "error": "User not found",
-        }))
-        .into_response();
+    Path(user_id): Path<i64>,
+    extensions: Extensions,
+) -> std::result::Result<impl IntoResponse, Response> {
+    let public_user = match state.db.get_user_from_id(user_id).await {
+        Err(RhombusError::DatabaseReturnedNoRows) => {
+            return Err(error_page(
+                StatusCode::NOT_FOUND,
+                "User not found",
+                &state,
+                &user,
+                &page,
+            ));
+        }
+        result => result.map_err_page(&extensions, "Failed to get user data")?,
     };
 
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(public_user.team_id);
-    let (challenge_data, team) = tokio::join!(challenge_data, team);
-    let challenge_data = challenge_data.unwrap();
-    let team = team.unwrap();
+    let (challenge_data, team) =
+        tokio::try_join!(challenge_data, team).map_err_page(&extensions, "Failed to get data")?;
 
-    Html(
+    Ok(Html(
         state
             .jinja
             .get_template("account/public-user.html")
@@ -44,31 +59,36 @@ pub async fn route_public_user(
                 challenges => challenge_data.challenges,
                 categories => challenge_data.categories,
             })
-            .unwrap(),
-    )
-    .into_response()
+            .map_err_page(&extensions, "Failed to render template")?,
+    ))
 }
 
 pub async fn route_public_team(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<MaybeUser>,
     Extension(page): Extension<PageMeta>,
     Path(team_id): Path<i64>,
-) -> impl IntoResponse {
-    let Ok(team) = state.db.get_team_from_id(team_id).await else {
-        return Json(json!({
-            "error": "Team not found",
-        }))
-        .into_response();
+    extensions: Extensions,
+) -> std::result::Result<impl IntoResponse, Response> {
+    let team = match state.db.get_team_from_id(team_id).await {
+        Err(RhombusError::DatabaseReturnedNoRows) => {
+            return Err(error_page(
+                StatusCode::NOT_FOUND,
+                "Team not found",
+                &state,
+                &user,
+                &page,
+            ));
+        }
+        result => result.map_err_page(&extensions, "Failed to get team data")?,
     };
 
     let challenge_data = state.db.get_challenges();
-    let standing = state.db.get_team_standing(team_id, &team.division_id);
-    let (challenge_data, standing) = tokio::join!(challenge_data, standing);
-    let challenge_data = challenge_data.unwrap();
-    let standing = standing.unwrap();
+    let standing = state.db.get_team_standing(team_id);
+    let (challenge_data, standing) = tokio::try_join!(challenge_data, standing)
+        .map_err_page(&extensions, "Failed to get data")?;
 
-    Html(
+    Ok(Html(
         state
             .jinja
             .get_template("team/public-team.html")
@@ -86,7 +106,6 @@ pub async fn route_public_team(
                 divisions => state.divisions,
                 standing,
             })
-            .unwrap(),
-    )
-    .into_response()
+            .map_err_page(&extensions, "Failed to render template")?,
+    ))
 }

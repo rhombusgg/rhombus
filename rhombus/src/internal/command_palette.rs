@@ -4,10 +4,17 @@ use serde_json::{json, Value};
 use crate::internal::{auth::MaybeUser, router::RouterState};
 
 pub async fn route_command_palette_items(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<MaybeUser>,
 ) -> impl IntoResponse {
-    let challenge_data = state.db.get_challenges().await.unwrap();
+    let challenge_data = match state.db.get_challenges().await {
+        Ok(challenge_data) => challenge_data,
+        Err(e) => {
+            let user_id = user.as_ref().map(|u| u.id);
+            tracing::error!(error = ?e, user_id, "Failed to get challenges");
+            return Json(json!({}));
+        }
+    };
 
     let divisions = state
         .divisions

@@ -1,5 +1,6 @@
 use axum::{
     extract::{Path, State},
+    http::Extensions,
     response::{Html, IntoResponse, Response},
     Extension, Form,
 };
@@ -13,8 +14,13 @@ use serde::{Deserialize, Serialize};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::internal::{
-    auth::User, database::provider::SetTeamNameError, division::MaxDivisionPlayers,
-    router::RouterState, routes::meta::PageMeta,
+    auth::User,
+    database::provider::SetTeamNameError,
+    division::MaxDivisionPlayers,
+    errors::{htmx_error_status_code, IntoErrorResponse},
+    router::RouterState,
+    routes::meta::PageMeta,
+    templates::{toast_header, ToastKind},
 };
 
 pub fn create_team_invite_token() -> String {
@@ -33,21 +39,21 @@ pub struct TeamDivision<'a> {
 }
 
 pub async fn route_team(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
-) -> impl IntoResponse {
+    extensions: Extensions,
+) -> std::result::Result<impl IntoResponse, Response> {
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
-    let (challenge_data, team) = tokio::join!(challenge_data, team);
-    let challenge_data = challenge_data.unwrap();
-    let team = team.unwrap();
+    let (challenge_data, team) = tokio::try_join!(challenge_data, team)
+        .map_err_page(&extensions, "Failed to get team data")?;
 
     let standing = state
         .db
-        .get_team_standing(user.team_id, &team.division_id)
+        .get_team_standing(user.team_id)
         .await
-        .unwrap();
+        .map_err_page(&extensions, "Failed to get team standing")?;
 
     let location_url = state.settings.read().await.location_url.clone();
 
@@ -93,7 +99,7 @@ pub async fn route_team(
 
     let now = chrono::Utc::now();
 
-    Html(
+    Ok(Html(
         state
             .jinja
             .get_template("team/team.html")
@@ -115,20 +121,25 @@ pub async fn route_team(
                 standing,
                 division_id => team.division_id,
             })
-            .unwrap(),
-    )
+            .map_err_page(&extensions, "Failed to render template team/team.html")?,
+    ))
 }
 
 pub async fn route_team_roll_token(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
-) -> Result<impl IntoResponse, StatusCode> {
+    extensions: Extensions,
+) -> Result<impl IntoResponse, Response> {
     if !user.is_team_owner {
-        return Err(StatusCode::UNAUTHORIZED);
+        return Err(StatusCode::UNAUTHORIZED.into_response());
     }
 
-    let new_invite_token = state.db.roll_invite_token(user.team_id).await.unwrap();
+    let new_invite_token = state
+        .db
+        .roll_invite_token(user.team_id)
+        .await
+        .map_err_htmx(&extensions, "Failed to roll invite token")?;
 
     let location_url = { state.settings.read().await.location_url.clone() };
     let team_invite_url = format!("{}/signin?token={}", location_url, new_invite_token);
@@ -152,7 +163,7 @@ pub struct SetTeamName {
 }
 
 pub async fn route_team_set_name(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
     Form(form): Form<SetTeamName>,
@@ -177,7 +188,10 @@ pub async fn route_team_set_name(
         .db
         .set_team_name(user.team_id, &form.name, 60 * 30)
         .await
-        .unwrap()
+        .map_err(|e| {
+            tracing::error!(error = ?e, team_id=user.team_id, name=form.name, "Failed to set team name");
+            htmx_error_status_code()
+        })?
     {
         match e {
             SetTeamNameError::Taken => {
@@ -199,49 +213,60 @@ pub async fn route_team_set_name(
 
     let team_name_template = state.jinja.get_template("team/team-set-name.html").unwrap();
 
-    if errors.is_empty() {
-        let html = team_name_template
-            .render(context! {
-                page,
-                new_team_name => &form.name,
-            })
-            .unwrap();
-
-        Ok(Response::builder()
-            .header("Content-Type", "text/html")
-            .body(html)
-            .unwrap())
+    let ctx = if errors.is_empty() {
+        context! {
+            page,
+            new_team_name => &form.name,
+        }
     } else {
-        let html = team_name_template
-            .render(context! {
-                page,
-                errors,
-            })
-            .unwrap();
-        Ok(Response::builder()
-            .header("Content-Type", "text/html")
-            .body(html)
-            .unwrap())
-    }
+        context! {
+            page,
+            errors,
+        }
+    };
+
+    let html = team_name_template.render(&ctx).unwrap();
+
+    Ok(Html(html))
 }
 
 pub async fn route_user_kick(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Path(user_id): Path<i64>,
-) -> impl IntoResponse {
+) -> std::result::Result<impl IntoResponse, StatusCode> {
     if user_id == user.id && !user.is_team_owner {
-        let new_team_id = state.db.kick_user(user.id, user.team_id).await.unwrap();
+        let new_team_id = match state.db.kick_user(user.id, user.team_id).await {
+            Ok(new_team_id) => new_team_id,
+            Err(e) => {
+                tracing::error!(error = ?e, who_user_id = user.id, team_id = user.team_id, to_kick_user_id=user_id, "Failed to kick user");
+                return Err(htmx_error_status_code());
+            }
+        };
 
         if let (Some(bot), Some(user_discord_id)) = (state.bot.as_ref(), user.discord_id) {
-            let old_team = state.db.get_team_from_id(user.team_id).await.unwrap();
+            let old_team = match state.db.get_team_from_id(user.team_id).await {
+                Ok(team) => team,
+                Err(e) => {
+                    tracing::error!(error = ?e, who_user_id = user.id, team_id = user.team_id, to_kick_user_id=user_id, "Failed to get old team");
+                    return Err(htmx_error_status_code());
+                }
+            };
+
             let old_division = state
                 .divisions
                 .iter()
                 .find(|d| d.id == old_team.division_id)
                 .unwrap();
 
-            let new_team = state.db.get_team_from_id(new_team_id).await.unwrap();
+            let new_team = match state.db.get_team_from_id(new_team_id).await {
+                Ok(team) => team,
+                Err(e) => {
+                    tracing::error!(error = ?e, who_user_id = user.id, team_id = user.team_id, to_kick_user_id=user_id, "Failed to get new team");
+                    return Err(htmx_error_status_code());
+                }
+            };
+
             let new_division = state
                 .divisions
                 .iter()
@@ -268,20 +293,24 @@ pub async fn route_user_kick(
                 .as_ref()
                 .and_then(|discord| discord.top10_role_id)
             {
-                let old_team_top_10 = state
-                    .db
-                    .get_team_standing(old_team.id, &old_team.division_id)
-                    .await
-                    .unwrap()
+                let old_team_standing = state.db.get_team_standing(old_team.id);
+                let new_team_standing = state.db.get_team_standing(new_team.id);
+
+                let (old_team_standing, new_team_standing) =
+                    tokio::try_join!(old_team_standing, new_team_standing)
+                        .map_err(|e| {
+                            tracing::error!(error = ?e, who_user_id = user.id, team_id = user.team_id, to_kick_user_id=user_id, "Failed to get team standings");
+                            htmx_error_status_code()
+                        })?;
+
+                let old_team_top_10 = old_team_standing
                     .map(|standing| standing.rank <= 10)
                     .unwrap_or(false);
-                let new_team_top_10 = state
-                    .db
-                    .get_team_standing(new_team.id, &new_team.division_id)
-                    .await
-                    .unwrap()
+
+                let new_team_top_10 = new_team_standing
                     .map(|standing| standing.rank <= 10)
                     .unwrap_or(false);
+
                 if old_team_top_10 != new_team_top_10 {
                     if new_team_top_10 {
                         bot.give_role_to_users(&[user_discord_id], top10_role_id)
@@ -294,29 +323,31 @@ pub async fn route_user_kick(
             }
         }
 
-        return Response::builder()
-            .header("Content-Type", "text/html")
-            .header("HX-Trigger", "pageRefresh")
-            .body("".to_owned())
-            .unwrap();
+        return Ok(([("HX-Trigger", "pageRefresh")]).into_response());
     }
 
     if !user.is_team_owner {
-        return Response::builder()
-            .status(StatusCode::UNAUTHORIZED)
-            .body("".to_owned())
-            .unwrap();
+        return Err(htmx_error_status_code());
     }
 
-    let team = state.db.get_team_from_id(user.team_id).await.unwrap();
+    let team = match state.db.get_team_from_id(user.team_id).await {
+        Ok(team) => team,
+        Err(e) => {
+            tracing::error!(error = ?e, who_user_id = user.id, team_id = user.team_id, to_kick_user_id=user_id, "Failed to get team");
+            return Err(htmx_error_status_code());
+        }
+    };
     let Some(user_in_team) = team.users.get(&user_id) else {
-        return Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body("".to_owned())
-            .unwrap();
+        return Err(htmx_error_status_code());
     };
 
-    let new_team_id = state.db.kick_user(user_id, user.team_id).await.unwrap();
+    let new_team_id = match state.db.kick_user(user_id, user.team_id).await {
+        Ok(new_team_id) => new_team_id,
+        Err(e) => {
+            tracing::error!(error = ?e, who_user_id = user.id, team_id = user.team_id, to_kick_user_id=user_id, "Failed to kick user");
+            return Err(htmx_error_status_code());
+        }
+    };
 
     if let (Some(bot), Some(user_discord_id)) = (state.bot.as_ref(), user_in_team.discord_id) {
         let old_division = state
@@ -325,7 +356,13 @@ pub async fn route_user_kick(
             .find(|d| d.id == team.division_id)
             .unwrap();
 
-        let new_team = state.db.get_team_from_id(new_team_id).await.unwrap();
+        let new_team = match state.db.get_team_from_id(new_team_id).await {
+            Ok(team) => team,
+            Err(e) => {
+                tracing::error!(error = ?e, who_user_id = user.id, team_id = user.team_id, to_kick_user_id=user_id, "Failed to get new team");
+                return Err(htmx_error_status_code());
+            }
+        };
         let new_division = state
             .divisions
             .iter()
@@ -352,18 +389,18 @@ pub async fn route_user_kick(
             .as_ref()
             .and_then(|discord| discord.top10_role_id)
         {
-            let old_team_top_10 = state
-                .db
-                .get_team_standing(team.id, &team.division_id)
-                .await
-                .unwrap()
+            let old_team_standing = state.db.get_team_standing(team.id);
+            let new_team_standing = state.db.get_team_standing(new_team.id);
+            let (old_team_standing, new_team_standing) =
+                tokio::try_join!(old_team_standing, new_team_standing)
+                    .map_err(|e| {
+                        tracing::error!(error = ?e, who_user_id = user.id, team_id = user.team_id, to_kick_user_id=user_id, "Failed to get team standings");
+                        htmx_error_status_code()
+                    })?;
+            let old_team_top_10 = old_team_standing
                 .map(|standing| standing.rank <= 10)
                 .unwrap_or(false);
-            let new_team_top_10 = state
-                .db
-                .get_team_standing(new_team.id, &new_team.division_id)
-                .await
-                .unwrap()
+            let new_team_top_10 = new_team_standing
                 .map(|standing| standing.rank <= 10)
                 .unwrap_or(false);
             if old_team_top_10 != new_team_top_10 {
@@ -378,31 +415,21 @@ pub async fn route_user_kick(
         }
     }
 
-    Response::builder()
-        .header("Content-Type", "text/html")
-        .header("HX-Trigger", "pageRefresh")
-        .body("".to_owned())
-        .unwrap()
+    Ok(([("HX-Trigger", "pageRefresh")]).into_response())
 }
 
 pub async fn route_team_set_division(
-    state: State<RouterState>,
+    State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
     Path(division_id): Path<String>,
-) -> impl IntoResponse {
+) -> std::result::Result<impl IntoResponse, Response> {
     if !user.is_team_owner {
-        return Response::builder()
-            .status(StatusCode::UNAUTHORIZED)
-            .body("".to_owned())
-            .unwrap();
+        return Err(StatusCode::UNAUTHORIZED.into_response());
     }
 
     if user.disabled {
-        return Response::builder()
-            .status(StatusCode::FORBIDDEN)
-            .body("".to_owned())
-            .unwrap();
+        return Err(StatusCode::FORBIDDEN.into_response());
     }
 
     let team = state.db.get_team_from_id(user.team_id).await.unwrap();
@@ -414,34 +441,35 @@ pub async fn route_team_set_division(
     if next_allowed > now {
         let resets_in = next_allowed - now;
 
-        return Response::builder()
-            .header(
+        return Err(([
+            (
                 "HX-Trigger",
-                format!(r##"{{"toast":{{"kind":"error","message":"You can change this division status again in {} minutes"}}}}"##, resets_in.num_minutes() + 1)
-            )
-            .header(
+                toast_header(
+                    ToastKind::Error,
+                    &format!(
+                        "You can change this division status again in {} minutes",
+                        resets_in.num_minutes() + 1
+                    ),
+                ),
+            ),
+            (
                 "HX-Location",
-                r##"{"path":"/team","select":"#screen","target":"#screen","swap":"outerHTML"}"##,
-            )
-            .body("".to_owned())
-            .unwrap();
+                r##"{{"path":"/team","select":"#screen","target":"#screen","swap":"outerHTML"}}"##
+                    .to_string(),
+            ),
+        ])
+        .into_response());
     }
 
     let division = state.divisions.iter().find(|d| d.id == division_id);
     let Some(division) = division else {
-        return Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body("".to_owned())
-            .unwrap();
+        return Err(StatusCode::NOT_FOUND.into_response());
     };
 
     match division.max_players {
         MaxDivisionPlayers::Limited(max_players) => {
             if team.users.len() > max_players.get() as usize {
-                return Response::builder()
-                    .status(StatusCode::FORBIDDEN)
-                    .body("".to_owned())
-                    .unwrap();
+                return Err(StatusCode::FORBIDDEN.into_response());
             }
         }
         MaxDivisionPlayers::Unlimited => {}
@@ -454,10 +482,7 @@ pub async fn route_team_set_division(
         .is_ok();
 
     if !eligible {
-        return Response::builder()
-            .status(StatusCode::FORBIDDEN)
-            .body("".to_owned())
-            .unwrap();
+        return Err(StatusCode::FORBIDDEN.into_response());
     }
 
     state
@@ -496,11 +521,7 @@ pub async fn route_team_set_division(
 
     tracing::trace!(team_id = team.id, division_id, "Set division");
 
-    let standing = state
-        .db
-        .get_team_standing(user.team_id, &division_id)
-        .await
-        .unwrap();
+    let standing = state.db.get_team_standing(user.team_id).await.unwrap();
 
     let mut divisions = vec![];
     for division in state.divisions.iter() {
@@ -557,5 +578,5 @@ pub async fn route_team_set_division(
         })
         .unwrap();
 
-    Response::builder().body(html).unwrap()
+    Ok(Html(html))
 }

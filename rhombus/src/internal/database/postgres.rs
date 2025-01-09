@@ -385,11 +385,7 @@ impl Database for Postgres {
         todo!()
     }
 
-    async fn get_team_standing(
-        &self,
-        _team_id: i64,
-        _division_id: &str,
-    ) -> Result<Option<TeamStanding>> {
+    async fn get_team_standing(&self, _team_id: i64) -> Result<Option<TeamStanding>> {
         todo!()
     }
 

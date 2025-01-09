@@ -1,6 +1,6 @@
 {% import "icons.html" as icons %}
 
-<div id="emails" {% if oob %}hx-swap-oob="true"{% endif %}>
+<div id="emails" hx-swap-oob="true">
   {% if emails | length > 0 %}
     <ul class="mb-4">
       {% for email in emails %}
