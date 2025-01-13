@@ -3,10 +3,12 @@ use std::{fs::create_dir_all, path::Path};
 use anyhow::{anyhow, Context, Result};
 
 use crate::{
+    config::read_project_config,
+    config::read_secret_config,
+    config::ProjectConfigYaml,
+    config::SecretConfigYaml,
     connect,
     grpc::proto::{whoami_reply::Whoami, WhoamiRequest},
-    read_project_config, read_secret_config, ProjectConfig, ProjectConfigYaml, SecretConfig,
-    SecretConfigYaml,
 };
 
 #[derive(clap::Parser, Debug)]

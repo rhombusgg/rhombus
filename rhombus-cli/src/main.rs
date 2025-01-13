@@ -2,21 +2,19 @@ use admin::AdminCommand;
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use figment::{
-    providers::{Format, Yaml},
-    Figment,
-};
+use config::{read_project_config, read_secret_config};
 use grpc::proto::rhombus_client::RhombusClient;
-use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, path::PathBuf, process::exit};
+use std::process::exit;
 use tonic::{
     metadata::MetadataValue,
     service::{interceptor::InterceptedService, Interceptor},
     transport::Channel,
     Status,
 };
+
 mod admin;
 mod auth;
+mod config;
 
 mod grpc {
     pub mod proto {
@@ -39,50 +37,6 @@ enum Command {
         #[command(subcommand)]
         admin_command: AdminCommand,
     },
-}
-
-#[derive(Serialize, Deserialize)]
-struct ProjectConfigYaml {
-    url: String,
-}
-
-struct ProjectConfig {
-    path: PathBuf,
-    url: String,
-}
-
-impl Into<ProjectConfigYaml> for ProjectConfig {
-    fn into(self) -> ProjectConfigYaml {
-        ProjectConfigYaml { url: self.url }
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct SecretConfigYaml {
-    keys: Vec<UrlKeyPairYaml>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct UrlKeyPairYaml {
-    url: String,
-    key: String,
-}
-
-struct SecretConfig {
-    path: PathBuf,
-    keys: BTreeMap<String, String>,
-}
-
-impl Into<SecretConfigYaml> for SecretConfig {
-    fn into(self) -> SecretConfigYaml {
-        SecretConfigYaml {
-            keys: self
-                .keys
-                .into_iter()
-                .map(|(url, key)| UrlKeyPairYaml { url, key })
-                .collect(),
-        }
-    }
 }
 
 #[tokio::main]
@@ -162,60 +116,4 @@ async fn connect(url: &str, key: &str) -> Result<Client> {
         .with_context(|| format!("failed to connect to grpc server '{}'", url))?;
     let client = RhombusClient::with_interceptor(channel, AuthInterceptor { auth_token });
     Ok(client)
-}
-
-fn find_project_config_file() -> Result<PathBuf> {
-    for path in std::env::current_dir()?.ancestors() {
-        if path.join("rhombus-cli.yaml").is_file() {
-            return Ok(path.join("rhombus-cli.yaml").to_owned());
-        }
-    }
-    Err(anyhow!(
-        "failed to find rhombus-cli.yaml. Run rhombus-cli auth"
-    ))
-}
-
-fn read_project_config() -> Result<ProjectConfig> {
-    let path = find_project_config_file()?;
-    let config: ProjectConfigYaml = Figment::new()
-        .merge(Yaml::file_exact(&path))
-        .extract()
-        .with_context(|| format!("failed to load project config file ({})", path.display()))?;
-    Ok(ProjectConfig {
-        url: config.url,
-        path,
-    })
-}
-
-fn find_secret_config_file() -> Result<PathBuf> {
-    Ok(
-        directories::ProjectDirs::from("gg", "rhombus", "rhombus-cli")
-            .ok_or(anyhow!("failed to find config directory"))?
-            .config_dir()
-            .join("config.yaml")
-            .to_owned(),
-    )
-}
-
-fn read_secret_config() -> Result<SecretConfig> {
-    let path = find_secret_config_file()?;
-    if !path.exists() {
-        return Ok(SecretConfig {
-            path,
-            keys: BTreeMap::new(),
-        });
-    }
-    let config: SecretConfigYaml = Figment::new()
-        .merge(Yaml::file_exact(&path))
-        .extract()
-        .with_context(|| format!("failed to load config file ({})", path.display()))?;
-
-    Ok(SecretConfig {
-        keys: config
-            .keys
-            .into_iter()
-            .map(|pair| (pair.url, pair.key))
-            .collect(),
-        path,
-    })
 }
