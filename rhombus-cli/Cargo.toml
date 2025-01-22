@@ -11,3 +11,18 @@ keywords = ["ctf", "cli"]
 
 [dependencies]
 clap = { version = "4.5.17", features = ["derive"] }
+tonic = "0.12.3"
+prost = "0.13.4"
+tokio = { version = "1.40.0", features = ["full"] }
+anyhow = "1.0.94"
+figment = { version = "0.10.19", features = ["yaml"] }
+serde = { version = "1.0.210", features = ["derive"] }
+serde_yml = "0.0.12"
+inquire = "0.7.5"
+base32 = "0.5.1"
+colored = "2.2.0"
+rand = "0.8.5"
+directories = "5.0.1"
+
+[build-dependencies]
+tonic-build = "0.12.3"

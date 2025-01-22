@@ -63,5 +63,6 @@ Run `task dev` to start the `standalone` example. This will build the project an
     ├── standalone/      # minimal example
     ├── demo/            # demo running https://demo.rhombus.gg
     ├── plugin/          # example plugin library
-    └── external-plugin/ # uses `plugin` as a dependency
+    ├── external-plugin/ # uses `plugin` as a dependency
+    └── custom-grpc/     # a plugin that adds custom GRPC methods
 ```

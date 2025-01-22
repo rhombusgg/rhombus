@@ -109,6 +109,11 @@
         "peer-ip"
       ]
     },
+    "root_api_key": {
+      "title": "Root API Key",
+      "description": "A pre-shared key for rhombus-cli with admin access.",
+      "type": "string"
+    },
     "auth": {
       "title": "Authentication Providers",
       "description": "Enable different authentication providers on the signin page. Each option must be further configured in their respective sections.",

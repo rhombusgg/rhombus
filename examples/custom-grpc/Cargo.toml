@@ -1,0 +1,17 @@
+[package]
+name = "custom-grpc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+dotenvy = "0.15.7"
+rhombus = { path = "../../rhombus", features = ["libsql", "internal"] }
+tokio = { version = "1.40.0", features = ["full"] }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tonic = "0.12.3"
+prost = "0.13.4"
+
+[build-dependencies]
+rhombus-build = { path = "../../rhombus-build" }
+tonic-build = "0.12.3"

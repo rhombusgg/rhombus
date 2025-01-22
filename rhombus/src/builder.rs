@@ -13,15 +13,18 @@ use std::{
 
 use axum::{
     error_handling::HandleErrorLayer,
-    http::{Extensions, HeaderMap, StatusCode, Uri},
-    middleware,
-    response::Html,
+    extract::{Request, State},
+    http::{self, Extensions, HeaderMap, StatusCode, Uri},
+    middleware::{self, Next},
+    response::{Html, IntoResponse},
     routing::{delete, get, post},
     BoxError, Extension,
 };
 use reqwest::Method;
 use tokio::sync::{Mutex, RwLock};
+use tonic::service::RoutesBuilder;
 use tower::ServiceBuilder;
+use tower::ServiceExt as _;
 use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::{catch_panic::CatchPanicLayer, compression::CompressionLayer};
 use tracing::info;
@@ -49,6 +52,7 @@ use crate::{
         },
         email::{mailgun::MailgunProvider, outbound_mailer::OutboundMailer},
         errors::{error_handler_middleware, handle_panic, route_not_found, timeout_inner},
+        grpc::init_grpc,
         health::{healthcheck_catch_up, healthcheck_runner},
         ip::{
             default_ip_extractor, ip_insert_blank_middleware, ip_insert_middleware,
@@ -66,7 +70,7 @@ use crate::{
             account::{
                 discord_cache_evictor, route_account, route_account_add_email,
                 route_account_delete_email, route_account_email_verify_callback,
-                route_account_email_verify_confirm, route_account_set_name,
+                route_account_email_verify_confirm, route_account_roll_key, route_account_set_name,
             },
             challenges::{
                 route_challenge_submit, route_challenge_view, route_challenges,
@@ -89,7 +93,7 @@ use crate::{
         static_serve::route_static_serve,
         templates::Templates,
     },
-    plugin::{DatabaseProviderContext, RunContext, UploadProviderContext},
+    plugin::{DatabaseProviderContext, GrpcBuilder, RunContext, UploadProviderContext},
     upload_provider::ErasedUploadProvider,
     LocalUploadProvider, Plugin, Result, UploadProvider,
 };
@@ -105,6 +109,24 @@ pub enum RawDb {
     LibSQL(Arc<crate::internal::database::libsql::LibSQL>),
 
     Plugin(Box<dyn Any + Send + Sync>),
+}
+
+#[derive(Clone)]
+struct GrpcMiddlewareState {
+    grpc_router: axum::Router<()>,
+}
+
+async fn grpc_middleware(
+    State(s): State<GrpcMiddlewareState>,
+    req: Request<axum::body::Body>,
+    next: Next,
+) -> impl IntoResponse {
+    if let Some(h) = req.headers().get(http::header::CONTENT_TYPE) {
+        if h == "application/grpc" {
+            return s.grpc_router.oneshot(req).await.into_response();
+        }
+    }
+    next.run(req).await.into_response()
 }
 
 pub fn builder() -> Builder {
@@ -746,6 +768,12 @@ impl Builder {
 
             let upload_router = upload_provider.routes()?;
 
+            let mut grpc_builder = GrpcBuilder {
+                routes: RoutesBuilder::default(),
+                file_descriptor_sets: vec![],
+                encoded_file_descriptor_sets: vec![],
+            };
+
             let mut plugin_builder = RunContext {
                 upload_provider,
                 templates: &mut templates,
@@ -756,11 +784,14 @@ impl Builder {
                 db: cached_db.clone(),
                 score_type_map: &score_type_map,
                 flag_fn_map: &flag_fn_map,
+                grpc_builder: &mut grpc_builder,
             };
+            init_grpc(&mut plugin_builder).await;
             let mut plugin_router = axum::Router::new();
             for plugin in self_rc.plugins.iter() {
                 plugin_router = plugin_router.merge(plugin.run(&mut plugin_builder).await?);
             }
+            let plugin_router = plugin_router;
 
             let divisions = Arc::new(divisions);
             cached_db.insert_divisions(&divisions).await?;
@@ -959,6 +990,7 @@ impl Builder {
                     "/account/email",
                     post(route_account_add_email).delete(route_account_delete_email),
                 )
+                .route("/account/roll-key", post(route_account_roll_key))
                 .route("/account/name", post(route_account_set_name))
                 .route("/account", get(route_account))
                 .route("/team/division/:id", post(route_team_set_division))
@@ -1112,6 +1144,24 @@ impl Builder {
             );
 
             let router = router.layer(CompressionLayer::new());
+
+            let mut reflection_builder = tonic_reflection::server::Builder::configure();
+            for encoded_file_set in grpc_builder.encoded_file_descriptor_sets {
+                reflection_builder =
+                    reflection_builder.register_encoded_file_descriptor_set(encoded_file_set);
+            }
+            for file_set in grpc_builder.file_descriptor_sets {
+                reflection_builder = reflection_builder.register_file_descriptor_set(file_set);
+            }
+            grpc_builder
+                .routes
+                .add_service(reflection_builder.build_v1().unwrap());
+            let grpc_router = grpc_builder.routes.routes().into_axum_router();
+
+            let router = router.layer(axum::middleware::from_fn_with_state(
+                GrpcMiddlewareState { grpc_router },
+                grpc_middleware,
+            ));
 
             (self_rc, router)
         };

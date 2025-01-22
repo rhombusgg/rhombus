@@ -1,68 +1,119 @@
-use std::path::PathBuf;
-
+use admin::AdminCommand;
+use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
+use colored::Colorize;
+use config::{read_project_config, read_secret_config};
+use grpc::proto::rhombus_client::RhombusClient;
+use std::process::exit;
+use tonic::{
+    metadata::MetadataValue,
+    service::{interceptor::InterceptedService, Interceptor},
+    transport::Channel,
+    Status,
+};
 
-#[derive(Parser)]
-#[command(version, about, long_about = None)]
-struct Cli {
-    /// Optional name to operate on
-    name: Option<String>,
+mod admin;
+mod auth;
+mod config;
 
-    /// Sets a custom config file
-    #[arg(short, long, value_name = "FILE")]
-    config: Option<PathBuf>,
-
-    /// Turn debugging information on
-    #[arg(short, long, action = clap::ArgAction::Count)]
-    debug: u8,
-
-    #[command(subcommand)]
-    command: Option<Commands>,
+mod grpc {
+    pub mod proto {
+        tonic::include_proto!("rhombus");
+    }
 }
 
-#[derive(Subcommand)]
-enum Commands {
-    /// does testing things
-    Test {
-        /// lists test values
-        #[arg(short, long)]
-        list: bool,
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[command(subcommand)]
+    command: Command,
+}
+#[derive(Subcommand, Debug)]
+enum Command {
+    /// Authentiace rhombus-cli using an API token
+    Auth(auth::AuthCommand),
+    /// Commands for CTF admins
+    Admin {
+        #[command(subcommand)]
+        admin_command: AdminCommand,
     },
 }
 
-fn main() {
-    let cli = Cli::parse();
+#[tokio::main]
+async fn main() {
+    let args = Args::parse();
 
-    // You can check the value provided by positional arguments, or option arguments
-    if let Some(name) = cli.name.as_deref() {
-        println!("Value for name: {name}");
+    let result = match args.command {
+        Command::Admin { admin_command } => admin_command.run().await,
+        Command::Auth(auth_command) => auth_command.run().await,
+    };
+
+    // Macro because https://github.com/rust-lang/rust/issues/112838
+    macro_rules! render_error {
+        ($error:expr) => {
+            $error
+                .downcast_ref::<tonic::Status>()
+                .map(|status| format!("{}: {}", status.code().description(), status.message()))
+                .unwrap_or_else(|| $error.to_string())
+        };
     }
 
-    if let Some(config_path) = cli.config.as_deref() {
-        println!("Value for config: {}", config_path.display());
-    }
-
-    // You can see how many times a particular flag or argument occurred
-    // Note, only flags can have multiple occurrences
-    match cli.debug {
-        0 => println!("Debug mode is off"),
-        1 => println!("Debug mode is kind of on"),
-        2 => println!("Debug mode is on"),
-        _ => println!("Don't be crazy"),
-    }
-
-    // You can check for the existence of subcommands, and if found use their
-    // matches just as you would the top level cmd
-    match &cli.command {
-        Some(Commands::Test { list }) => {
-            if *list {
-                println!("Printing testing lists...");
-            } else {
-                println!("Not printing testing lists...");
+    match result {
+        Ok(()) => {}
+        Err(err) => {
+            match err.source() {
+                Some(source) => println!(
+                    "{}{}{}{}",
+                    "Error: ".red(),
+                    err.to_string().red(),
+                    ": ".red(),
+                    render_error!(source).red()
+                ),
+                None => println!("{}{}", "Error: ".red(), render_error!(err).red()),
             }
-        }
-        None => {}
-    }
 
-    // Continued program logic goes here...
+            exit(1);
+        }
+    }
+}
+
+struct AuthInterceptor {
+    auth_token: MetadataValue<tonic::metadata::Ascii>,
+}
+
+impl Interceptor for AuthInterceptor {
+    fn call(&mut self, mut request: tonic::Request<()>) -> Result<tonic::Request<()>, Status> {
+        request
+            .metadata_mut()
+            .insert("authorization", self.auth_token.clone());
+
+        Ok(request)
+    }
+}
+
+type Client = RhombusClient<InterceptedService<Channel, AuthInterceptor>>;
+
+#[allow(dead_code)]
+/// Load the rhombus-cli.yaml config file and connect to the grpc server to which it refers
+async fn get_client() -> Result<Client> {
+    let secret_config = read_secret_config()?;
+    let project_config = read_project_config()?;
+    let key = secret_config.keys.get(&project_config.url).ok_or_else(|| {
+        anyhow!(
+            "no key found for url {}. Run rhombus-cli auth",
+            &project_config.url
+        )
+    })?;
+    connect(&project_config.url, key).await
+}
+
+async fn connect(url: &str, key: &str) -> Result<Client> {
+    let auth_token: MetadataValue<_> = key.parse()?;
+    let channel = Channel::from_shared(url.to_owned())
+        .with_context(|| format!("failed to parse grpc url '{}'", url))?
+        .connect()
+        .await
+        .with_context(|| format!("failed to connect to grpc server '{}'", url))?;
+    let client = RhombusClient::with_interceptor(channel, AuthInterceptor { auth_token });
+    Ok(client)
 }

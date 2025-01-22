@@ -1,0 +1,26 @@
+syntax = "proto3";
+import "google/protobuf/empty.proto";
+package rhombus;
+
+service Rhombus {
+    // Get information about the user making the request
+    // Gives an authentication error if the request has an invalid or missing `authorization` header
+    rpc Whoami (WhoamiRequest) returns (WhoamiReply);
+}
+
+message WhoamiRequest {}
+
+message WhoamiReply {
+    oneof whoami {
+        // Has the api token of a user
+        User user = 1;
+        // Has the admin api token (defined in the rhombus server conifg)
+        google.protobuf.Empty root = 2;
+    }
+}
+
+message User {
+    int64 id = 1;
+    string name = 2;
+    bool is_admin = 3;
+}

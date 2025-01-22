@@ -22,7 +22,7 @@ use tokio_util::bytes::Bytes;
 use crate::{
     errors::RhombusError,
     internal::{
-        auth::{User, UserInner},
+        auth::{create_user_api_key, User, UserInner},
         database::{
             cache::Writeups,
             provider::{
@@ -225,6 +225,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         avatar: &str,
         discord_id: NonZeroU64,
         user_id: Option<i64>,
+        location_url: &str,
     ) -> Result<std::result::Result<(i64, i64), DiscordUpsertError>> {
         let tx = self.transaction().await?;
 
@@ -280,10 +281,11 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
         let team_id = create_team(&tx).await?;
 
+        let api_key = create_user_api_key(location_url);
         let user_id = tx
             .query(
-                "INSERT INTO rhombus_user (name, avatar, discord_id, team_id, owner_team_id) VALUES (?1, ?2, ?3, ?4, ?4) RETURNING id",
-                params!(name, avatar, discord_id.get(), team_id),
+                "INSERT INTO rhombus_user (name, avatar, discord_id, team_id, owner_team_id, api_key) VALUES (?1, ?2, ?3, ?4, ?4, ?5) RETURNING id",
+                params!(name, avatar, discord_id.get(), team_id, api_key.as_str()),
             )
             .await?
             .next()
@@ -308,6 +310,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         name: &str,
         email: &str,
         avatar: &str,
+        location_url: &str,
     ) -> Result<(i64, i64)> {
         let tx = self.transaction().await?;
 
@@ -330,11 +333,11 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         }
 
         let team_id = create_team(&tx).await?;
-
+        let api_key = create_user_api_key(location_url);
         let user_id = tx
             .query(
-                "INSERT INTO rhombus_user (name, avatar, team_id, owner_team_id) VALUES (?1, ?2, ?3, ?3) RETURNING id",
-                params!(name, avatar, team_id),
+                "INSERT INTO rhombus_user (name, avatar, team_id, owner_team_id, api_key) VALUES (?1, ?2, ?3, ?3, ?4) RETURNING id",
+                params!(name, avatar, team_id, api_key.as_str()),
             )
             .await?
             .next()
@@ -359,6 +362,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         username: &str,
         avatar: &str,
         password: &str,
+        location_url: &str,
     ) -> Result<Option<(i64, i64)>> {
         let tx = self.transaction().await?;
 
@@ -405,10 +409,12 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                 .hash_password(password.as_bytes(), &salt)?
                 .to_string();
 
+            let api_key = create_user_api_key(location_url);
+
             let user_id = tx
                 .query(
-                    "INSERT INTO rhombus_user (name, password, avatar, team_id, owner_team_id) VALUES (?1, ?2, ?3, ?4, ?4) RETURNING id",
-                    params!(username, hashed_password, avatar, team_id),
+                    "INSERT INTO rhombus_user (name, password, avatar, team_id, owner_team_id, api_key) VALUES (?1, ?2, ?3, ?4, ?4, ?5) RETURNING id",
+                    params!(username, hashed_password, avatar, team_id, api_key.as_str()),
                 )
                 .await?
                 .next()
@@ -430,6 +436,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         ctftime_user_id: i64,
         ctftime_team_id: i64,
         team_name: &str,
+        location_url: &str,
     ) -> Result<(i64, i64, Option<String>)> {
         let tx = self.transaction().await?;
 
@@ -494,10 +501,12 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
             let scratch_team_id = create_team(&tx).await?;
 
+            let api_key = create_user_api_key(location_url);
+
             let user_id = tx
                 .query(
-                    "INSERT INTO rhombus_user (name, avatar, ctftime_id, team_id, owner_team_id) VALUES (?1, ?2, ?3, ?4, ?4) RETURNING id",
-                    params!(name, avatar, ctftime_user_id, scratch_team_id),
+                    "INSERT INTO rhombus_user (name, avatar, ctftime_id, team_id, owner_team_id, api_key) VALUES (?1, ?2, ?3, ?4, ?4, ?5) RETURNING id",
+                    params!(name, avatar, ctftime_user_id, scratch_team_id, api_key.as_str()),
                 )
                 .await?
                 .next()
@@ -531,10 +540,11 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .unwrap()
             .get::<i64>(0)?;
 
+        let api_key = create_user_api_key(location_url);
         let user_id = tx
             .query(
-                "INSERT INTO rhombus_user (name, avatar, ctftime_id, team_id, owner_team_id) VALUES (?1, ?2, ?3, ?4, ?4) RETURNING id",
-                params!(name, avatar, ctftime_user_id, team_id),
+                "INSERT INTO rhombus_user (name, avatar, ctftime_id, team_id, owner_team_id, api_key) VALUES (?1, ?2, ?3, ?4, ?4, ?5) RETURNING id",
+                params!(name, avatar, ctftime_user_id, team_id, api_key.as_str()),
             )
             .await?
             .next()
@@ -1027,6 +1037,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             owner_team_id: i64,
             disabled: bool,
             is_admin: bool,
+            api_key: String,
         }
 
         let row = self
@@ -1048,6 +1059,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             is_admin: user.is_admin,
             team_id: user.team_id,
             is_team_owner: user.team_id == user.owner_team_id,
+            api_key: user.api_key,
         }))
     }
 
@@ -1062,6 +1074,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             owner_team_id: i64,
             disabled: bool,
             is_admin: bool,
+            api_key: String,
         }
 
         let row = self
@@ -1086,6 +1099,44 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             is_admin: user.is_admin,
             team_id: user.team_id,
             is_team_owner: user.team_id == user.owner_team_id,
+            api_key: user.api_key,
+        }))
+    }
+
+    async fn get_user_from_api_key(&self, api_key: &str) -> Result<User> {
+        #[derive(Debug, Deserialize)]
+        struct DbUser {
+            id: i64,
+            name: String,
+            avatar: String,
+            discord_id: Option<NonZeroU64>,
+            team_id: i64,
+            owner_team_id: i64,
+            disabled: bool,
+            is_admin: bool,
+            api_key: String,
+        }
+
+        let row = self
+            .connect()
+            .await?
+            .query("SELECT * FROM rhombus_user WHERE api_key = ?1", [api_key])
+            .await?
+            .next()
+            .await?
+            .ok_or(libsql::Error::QueryReturnedNoRows)?;
+
+        let user = de::from_row::<DbUser>(&row).unwrap();
+        Ok(Arc::new(UserInner {
+            id: user.id,
+            name: user.name,
+            avatar: user.avatar,
+            discord_id: user.discord_id,
+            disabled: user.disabled,
+            is_admin: user.is_admin,
+            team_id: user.team_id,
+            is_team_owner: user.team_id == user.owner_team_id,
+            api_key: user.api_key,
         }))
     }
 
@@ -1135,6 +1186,20 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await?;
 
         Ok(new_invite_token)
+    }
+
+    async fn roll_api_key(&self, user_id: i64, location_url: &str) -> Result<String> {
+        let new_api_key = create_user_api_key(location_url);
+
+        self.connect()
+            .await?
+            .execute(
+                "UPDATE rhombus_user SET api_key = ?2 WHERE id = ?1",
+                params!(user_id, new_api_key.as_str()),
+            )
+            .await?;
+
+        Ok(new_api_key)
     }
 
     async fn set_team_name(

@@ -1,10 +1,17 @@
 use std::process::Command;
+use std::{env, path::PathBuf};
 
 fn main() {
     println!("cargo:rerun-if-changed=fonts");
     println!("cargo:rerun-if-changed=locales");
     println!("cargo:rerun-if-changed=migrations");
     println!("cargo:rerun-if-changed=static");
+
+    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    tonic_build::configure()
+        .file_descriptor_set_path(out_dir.join("rhombus_descriptor.bin"))
+        .compile_protos(&["../proto/rhombus.proto"], &["../proto"])
+        .unwrap();
 
     if is_in_path("deno") {
         Command::new("deno")

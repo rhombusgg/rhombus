@@ -17,6 +17,10 @@ use axum_extra::extract::{
 };
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use minijinja::context;
+use rand::{
+    distributions::{Alphanumeric, DistString as _},
+    thread_rng,
+};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -35,6 +39,17 @@ use crate::{
     },
 };
 
+pub fn create_user_api_key(location_url: &str) -> String {
+    format!(
+        "{}_{}",
+        base32::encode(
+            base32::Alphabet::Rfc4648Lower { padding: false },
+            location_url.as_bytes()
+        ),
+        Alphanumeric.sample_string(&mut thread_rng(), 32)
+    )
+}
+
 #[derive(Debug, Serialize, Clone)]
 pub struct UserInner {
     pub id: i64,
@@ -45,6 +60,7 @@ pub struct UserInner {
     pub is_team_owner: bool,
     pub disabled: bool,
     pub is_admin: bool,
+    pub api_key: String,
 }
 pub type User = Arc<UserInner>;
 
@@ -564,6 +580,7 @@ pub async fn route_signin_discord_callback(
         )
     };
 
+    let location_url = state.settings.read().await.location_url.clone();
     let upsert_result = state
         .db
         .upsert_user_by_discord_id(
@@ -572,6 +589,7 @@ pub async fn route_signin_discord_callback(
             &avatar,
             discord_id,
             user.as_ref().map(|u| u.id),
+            &location_url,
         )
         .await
         .map_err_page(&extensions, "Failed to upsert user by discord id")?;
@@ -808,6 +826,7 @@ pub async fn route_signin_ctftime_callback(
         .await
         .map_err_page(&extensions, "Failed to parse CTFtime user data")?;
 
+    let location_url = state.settings.read().await.location_url.clone();
     let (user_id, _team_id, invite_token) = state
         .db
         .upsert_user_by_ctftime(
@@ -821,6 +840,7 @@ pub async fn route_signin_ctftime_callback(
             user_data.id,
             user_data.team.id,
             &user_data.team.name,
+            &location_url,
         )
         .await
         .map_err_page(&extensions, "Failed to upsert user by ctftime")?;
@@ -1039,9 +1059,10 @@ pub async fn route_signin_credentials(
 
     let avatar = avatar_from_email(&form.username.trim().to_lowercase());
 
+    let location_url = state.settings.read().await.location_url.clone();
     let maybe_user = match state
         .db
-        .upsert_user_by_credentials(&form.username, &avatar, &form.password)
+        .upsert_user_by_credentials(&form.username, &avatar, &form.password, &location_url)
         .await
     {
         Ok(user) => user,
@@ -1182,9 +1203,10 @@ pub async fn route_signin_email_confirm_callback(
 
     let avatar = avatar_from_email(&email);
 
+    let location_url = state.settings.read().await.location_url.clone();
     let (user_id, _team_id) = state
         .db
-        .upsert_user_by_email(name, &email, &avatar)
+        .upsert_user_by_email(name, &email, &avatar, &location_url)
         .await
         .map_err_page(&extensions, "Failed to upsert user by email")?;
 

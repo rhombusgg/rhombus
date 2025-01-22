@@ -56,6 +56,7 @@
             tailwindcss-language-server
             vscode-langservers-extracted
             alejandra
+            grpcurl
             flyctl
 
             deno
@@ -66,6 +67,7 @@
             cargo-watch
             systemfd
             rust-toolchain
+            protobuf
           ];
           LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
         };
