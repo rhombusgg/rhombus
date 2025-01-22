@@ -39,8 +39,6 @@ use crate::{
     },
 };
 
-use super::database::provider::Database;
-
 pub fn create_user_api_key(location_url: &str) -> String {
     format!(
         "{}_{}",
