@@ -1,0 +1,61 @@
+<svg viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <title>{{ site.title }}</title>
+
+  <rect x="0" y="0" width="800" height="400" fill="white" />
+
+  <image x="600" y="20" width="180" xlink:href="logo" />
+
+  {% set line_y=60 %}
+  <text x="50" y="{{ line_y }}" font-family="Inter" font-weight="bold" font-size="32" fill="black">
+    {{ site.title }}
+  </text>
+  <text text-anchor="end" x="550" y="{{ line_y }}" font-family="Inter" font-weight="bold" font-size="18" fill="#8af">
+    {{ location }}
+  </text>
+  {% set line_y = line_y + 24 %}
+
+  {% if site.organizer %}
+  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="18" fill="#333">
+    Hosted by {{ site.organizer }}
+  </text>
+  {% set line_y = line_y + 20 %}
+  {% endif %}
+
+  {% if ctf_start_time %}
+  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="14" fill="#333">
+    {% if ctf_started %}
+    Started
+    {% else %}
+    Starts
+    {% endif %}
+    {{ ctf_start_time }}
+  </text>
+  {% set line_y = line_y + 18 %}
+  {% endif %}
+
+  {% if ctf_end_time %}
+  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="14" fill="#333">
+    {% if ctf_ended %}
+    Ended
+    {% else %}
+    Ends
+    {% endif %}
+    {{ ctf_end_time }}
+  </text>
+  {% set line_y = line_y + 18 %}
+  {% endif %}
+
+  {% if description %}
+  {% set line_y = line_y + 6 %}
+  {% for line in description %}
+  <text x="50" y="{{ line_y }}" font-family="Inter" font-size="14" fill="#333">
+    {{ line }}
+  </text>
+  {% set line_y = line_y + 18 %}
+  {% endfor %}
+  {% endif %}
+
+  <text x="50" y="93%" font-family="Inter" font-size="18" font-weight="bold" fill="#e33">
+    {{ error_message }}
+  </text>
+</svg>

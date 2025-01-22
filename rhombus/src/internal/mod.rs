@@ -4,6 +4,7 @@ pub mod database;
 pub mod discord;
 pub mod division;
 pub mod email;
+pub mod errors;
 pub mod grpc;
 pub mod health;
 pub mod ip;

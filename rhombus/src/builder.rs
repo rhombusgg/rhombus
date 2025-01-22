@@ -12,18 +12,21 @@ use std::{
 };
 
 use axum::{
+    error_handling::HandleErrorLayer,
     extract::{Request, State},
-    http::{self, Extensions, HeaderMap, StatusCode},
+    http::{self, Extensions, HeaderMap, StatusCode, Uri},
     middleware::{self, Next},
     response::{Html, IntoResponse},
     routing::{delete, get, post},
-    Extension,
+    BoxError, Extension,
 };
+use reqwest::Method;
 use tokio::sync::{Mutex, RwLock};
 use tonic::service::RoutesBuilder;
+use tower::ServiceBuilder;
 use tower::ServiceExt as _;
 use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
-use tower_http::compression::CompressionLayer;
+use tower_http::{catch_panic::CatchPanicLayer, compression::CompressionLayer};
 use tracing::info;
 
 use crate::{
@@ -35,7 +38,7 @@ use crate::{
             route_signin, route_signin_credentials, route_signin_ctftime,
             route_signin_ctftime_callback, route_signin_discord, route_signin_discord_callback,
             route_signin_email, route_signin_email_callback, route_signin_email_confirm_callback,
-            route_signout,
+            route_signout, MaybeUser,
         },
         command_palette::route_command_palette_items,
         database::{
@@ -48,6 +51,7 @@ use crate::{
             MaxDivisionPlayers, OpenDivisionEligibilityProvider,
         },
         email::{mailgun::MailgunProvider, outbound_mailer::OutboundMailer},
+        errors::{error_handler_middleware, handle_panic, route_not_found, timeout_inner},
         grpc::init_grpc,
         health::{healthcheck_catch_up, healthcheck_runner},
         ip::{
@@ -74,7 +78,7 @@ use crate::{
                 ChallengePoints, DynamicPoints, StaticPoints, TEAM_BURSTED_POINTS,
             },
             home::route_home,
-            meta::{page_meta_middleware, route_robots_txt, GlobalPageMeta},
+            meta::{page_meta_middleware, route_robots_txt, GlobalPageMeta, PageMeta},
             public::{route_public_team, route_public_user},
             scoreboard::{
                 route_scoreboard, route_scoreboard_division, route_scoreboard_division_ctftime,
@@ -571,7 +575,7 @@ impl Builder {
                 }
             };
 
-            open_graph_cache_evictor(20);
+            open_graph_cache_evictor(60 * 10);
 
             let mut localizer = locales::Localizations::new();
 
@@ -973,7 +977,7 @@ impl Builder {
             });
 
             let rhombus_router = axum::Router::new()
-                .fallback(handler_404)
+                .fallback(route_not_found)
                 .route("/admin", get(|| async { (StatusCode::OK, Html("Admin")) }))
                 .route("/reload", get(route_reload))
                 .route_layer(middleware::from_fn(enforce_admin_middleware))
@@ -1064,6 +1068,23 @@ impl Builder {
 
             track_flusher(cached_db);
 
+            let router = {
+                let router_state_clone = router_state.clone();
+                router.layer(
+                    ServiceBuilder::new()
+                        .layer(HandleErrorLayer::new(
+                            |user: Extension<MaybeUser>,
+                             page: Extension<PageMeta>,
+                             method: Method,
+                             uri: Uri,
+                             err: BoxError| async move {
+                                timeout_inner(router_state_clone, user, page, method, uri, err)
+                            },
+                        ))
+                        .timeout(Duration::from_secs(30)),
+                )
+            };
+
             let router = router
                 .layer(middleware::from_fn(page_meta_middleware))
                 .layer(middleware::from_fn_with_state(
@@ -1118,6 +1139,10 @@ impl Builder {
                 router
             };
 
+            let router = router.layer(CatchPanicLayer::custom(handle_panic)).layer(
+                axum::middleware::from_fn_with_state(router_state, error_handler_middleware),
+            );
+
             let router = router.layer(CompressionLayer::new());
 
             let mut reflection_builder = tonic_reflection::server::Builder::configure();
@@ -1161,10 +1186,6 @@ impl Builder {
 
 fn not_htmx_predicate<T>(req: &axum::http::Request<T>) -> bool {
     !req.headers().contains_key("hx-request")
-}
-
-async fn handler_404() -> impl IntoResponse {
-    (StatusCode::NOT_FOUND, Html("404"))
 }
 
 pub fn hash(s: impl AsRef<str>) -> i64 {

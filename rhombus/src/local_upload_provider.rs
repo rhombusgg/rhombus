@@ -77,6 +77,6 @@ impl UploadProvider for LocalUploadProvider {
             Ok::<_, io::Error>(format!("/uploads/{}", &new_filename))
         }
         .await
-        .map_err(|_| RhombusError::Unknown())
+        .map_err(|_| RhombusError::Unknown)
     }
 }

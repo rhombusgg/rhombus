@@ -319,10 +319,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                 "
                 SELECT user_id, team_id
                 FROM rhombus_email JOIN rhombus_user ON rhombus_user.id = rhombus_email.user_id
-                WHERE
-                    email = ?1 AND
-                    code IS NULL
-                ",
+                WHERE email = ?1 AND code IS NULL
+            ",
                 [email],
             )
             .await?
@@ -479,10 +477,10 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         let existing_team = tx
             .query(
                 "
-                    SELECT invite_token
-                    FROM rhombus_team
-                    WHERE ctftime_id = ?1
-                ",
+                SELECT invite_token
+                FROM rhombus_team
+                WHERE ctftime_id = ?1
+            ",
                 [ctftime_team_id],
             )
             .await?
@@ -533,7 +531,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
         let team_id = tx
             .query(
-                "INSERT INTO rhombus_team (name, invite_token, ctftime_id) VALUES (?1, ?2, ?3) RETURNING id",
+                "INSERT INTO rhombus_team (name, invite_token, ctftime_id, division_id) VALUES (?1, ?2, ?3, (SELECT id FROM rhombus_division WHERE is_default = TRUE LIMIT 1)) RETURNING id",
                 params!(team_name, team_invite_token.as_str(), ctftime_team_id),
             )
             .await?
@@ -583,12 +581,12 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await?
             .query(
                 "
-            INSERT INTO rhombus_track (ip, user_agent, requests) VALUES (?1, ?2, ?3)
-            ON CONFLICT (ip, user_agent) DO
-                UPDATE SET
-                    last_seen_at = strftime('%s', 'now'),
-                    requests = rhombus_track.requests + ?3
-            RETURNING id
+                INSERT INTO rhombus_track (ip, user_agent, requests) VALUES (?1, ?2, ?3)
+                ON CONFLICT (ip, user_agent) DO
+                    UPDATE SET
+                        last_seen_at = strftime('%s', 'now'),
+                        requests = rhombus_track.requests + ?3
+                RETURNING id
             ",
                 params!(ip, user_agent.unwrap_or(""), requests),
             )
@@ -640,13 +638,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         }
 
         let challenge_division_solves_rows = tx
-            .query(
-                "
-                SELECT *
-                FROM rhombus_challenge_division_solves
-            ",
-                (),
-            )
+            .query("SELECT * FROM rhombus_challenge_division_solves", ())
             .await?
             .into_stream()
             .map(|row| de::from_row::<DbChallengeDivisionSolves>(&row.unwrap()).unwrap())
@@ -673,13 +665,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         }
 
         let mut query_challenges = tx
-            .query(
-                "
-                SELECT *
-                FROM rhombus_file_attachment
-            ",
-                (),
-            )
+            .query("SELECT * FROM rhombus_file_attachment", ())
             .await?;
         #[derive(Debug, Deserialize)]
         struct QueryChallengeFileAttachment {
@@ -888,7 +874,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await?
             .next()
             .await?
-            .ok_or(libsql::Error::QueryReturnedNoRows)?;
+            .ok_or(RhombusError::DatabaseReturnedNoRows)?;
         let query_team = de::from_row::<QueryTeam>(&query_team_row).unwrap();
 
         #[derive(Debug, Deserialize)]
@@ -1018,20 +1004,20 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
         tx.execute(
             "
-                UPDATE rhombus_user
-                SET team_id = ?2
-                WHERE id = ?1
-            ",
+            UPDATE rhombus_user
+            SET team_id = ?2
+            WHERE id = ?1
+        ",
             [user_id, team_id],
         )
         .await?;
 
         tx.execute(
             "
-                UPDATE rhombus_solve
-                SET team_id = ?2
-                WHERE user_id = ?1
-            ",
+            UPDATE rhombus_solve
+            SET team_id = ?2
+            WHERE user_id = ?1
+        ",
             [user_id, team_id],
         )
         .await?;
@@ -1061,7 +1047,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await?
             .next()
             .await?
-            .ok_or(libsql::Error::QueryReturnedNoRows)?;
+            .ok_or(RhombusError::DatabaseReturnedNoRows)?;
 
         let user = de::from_row::<DbUser>(&row).unwrap();
         Ok(Arc::new(UserInner {
@@ -1501,7 +1487,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                 },
             );
         }
-        Ok(writeups)
+        Ok(Arc::new(writeups))
     }
 
     async fn delete_writeup(&self, challenge_id: i64, user_id: i64, _team_id: i64) -> Result<()> {
@@ -2018,14 +2004,17 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await?
             .query(
                 "
-                SELECT discord_id
-                FROM rhombus_user
-                WHERE team_id IN (
+                SELECT rhombus_user.discord_id
+                FROM rhombus_division
+                JOIN rhombus_user
+                WHERE rhombus_user.team_id IN (
                     SELECT id
                     FROM rhombus_team
+                    WHERE division_id = rhombus_division.id AND points > 0
                     ORDER BY points DESC, last_solved_at ASC
                     LIMIT 10
                 )
+                AND rhombus_user.discord_id IS NOT NULL
             ",
                 (),
             )
@@ -2161,7 +2150,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await?
             .next()
             .await?
-            .ok_or(libsql::Error::QueryReturnedNoRows)?
+            .ok_or(RhombusError::DatabaseReturnedNoRows)?
             .get::<String>(0)
             .unwrap();
 
@@ -2288,11 +2277,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         Ok(())
     }
 
-    async fn get_team_standing(
-        &self,
-        team_id: i64,
-        division_id: &str,
-    ) -> Result<Option<TeamStanding>> {
+    async fn get_team_standing(&self, team_id: i64) -> Result<Option<TeamStanding>> {
         #[derive(Debug, Deserialize)]
         struct DbPointsRank {
             points: f64,
@@ -2304,19 +2289,15 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await?
             .query(
                 "
-                WITH ranked_teams AS (
-                    SELECT
-                        id,
-                        points,
-                        RANK() OVER (ORDER BY points DESC) AS rank
-                    FROM rhombus_team
-                    WHERE rhombus_team.division_id = ?2
-                )
-                SELECT points, rank
-                FROM ranked_teams
-                WHERE id = ?1
+                SELECT
+                    points,
+                    (SELECT COUNT(*) + 1 FROM rhombus_team t2 WHERE t2.division_id = t1.division_id
+                        AND (t2.points > t1.points OR (t2.points = t1.points AND t2.last_solved_at < t1.last_solved_at))
+                    ) as rank
+                FROM rhombus_team t1
+                WHERE t1.id = ?1
             ",
-                params!(team_id, division_id),
+                params!(team_id),
             )
             .await?
             .next()
@@ -2475,28 +2456,12 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 }
 
 pub async fn create_team(tx: &Transaction) -> Result<i64> {
-    let default_division_id = tx
-        .query(
-            "
-            SELECT id
-            FROM rhombus_division
-            WHERE is_default = TRUE
-            LIMIT 1
-        ",
-            (),
-        )
-        .await?
-        .next()
-        .await?
-        .ok_or(RhombusError::LibSQL(libsql::Error::QueryReturnedNoRows))?
-        .get::<String>(0)?;
-
     let team_invite_token = create_team_invite_token();
 
     let team_id = tx
         .query(
-            "INSERT INTO rhombus_team (name, invite_token, division_id) VALUES ('Team ' || (SELECT COALESCE(MAX(id) + 1, 1) FROM rhombus_team), ?1, ?2) RETURNING id",
-            params!(team_invite_token, default_division_id),
+            "INSERT INTO rhombus_team (name, invite_token, division_id) VALUES ('Team ' || (SELECT COALESCE(MAX(id) + 1, 1) FROM rhombus_team), ?1, (SELECT id FROM rhombus_division WHERE is_default = TRUE LIMIT 1)) RETURNING id",
+            params!(team_invite_token),
         )
         .await?
         .next()

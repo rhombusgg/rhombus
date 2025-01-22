@@ -95,14 +95,14 @@ CREATE TABLE IF NOT EXISTS rhombus_user (
     FOREIGN KEY (owner_team_id) REFERENCES rhombus_team(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS team_id_idx ON rhombus_user(team_id);
+CREATE INDEX IF NOT EXISTS team_id_idx ON rhombus_user(team_id, discord_id);
 CREATE INDEX IF NOT EXISTS api_key_idx ON rhombus_user(api_key);
 
 CREATE TABLE IF NOT EXISTS rhombus_user_historical_names (
     user_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     at INTEGER NOT NULL DEFAULT(strftime('%s', 'now')),
-    PRIMARY KEY (user_id, name, at),
+    PRIMARY KEY (user_id, at DESC, name),
     FOREIGN KEY (user_id) REFERENCES rhombus_user(id)
 );
 
@@ -157,7 +157,7 @@ CREATE TABLE IF NOT EXISTS rhombus_team_historical_names (
     team_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     at INTEGER NOT NULL DEFAULT(strftime('%s', 'now')),
-    PRIMARY KEY (team_id, name, at),
+    PRIMARY KEY (team_id, at DESC, name),
     FOREIGN KEY (team_id) REFERENCES rhombus_team(id)
 );
 
@@ -175,11 +175,14 @@ CREATE TABLE IF NOT EXISTS rhombus_ticket (
     FOREIGN KEY (challenge_id) REFERENCES rhombus_challenge(id)
 );
 
+CREATE INDEX IF NOT EXISTS challenge_idx ON rhombus_ticket (challenge_id, user_id, closed_at);
+CREATE INDEX IF NOT EXISTS user_idx ON rhombus_ticket (user_id, opened_at DESC);
+
 CREATE TABLE IF NOT EXISTS rhombus_ticket_email_message_id_reference (
-    message_id TEXT NOT NULL,
+    message_id TEXT NOT NULL UNIQUE,
     ticket_number INTEGER NOT NULL,
     user_sent INTEGER NOT NULL DEFAULT(FALSE), -- 0 or 1
-    PRIMARY KEY (message_id),
+    PRIMARY KEY (ticket_number, message_id, user_sent),
     FOREIGN KEY (ticket_number) REFERENCES rhombus_ticket(ticket_number)
 );
 

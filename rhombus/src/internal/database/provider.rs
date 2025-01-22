@@ -134,12 +134,12 @@ pub struct ScoreboardTeam {
 #[derive(Debug, Serialize, Clone)]
 pub struct ScoreboardInner {
     pub teams: BTreeMap<i64, ScoreboardTeam>,
-    pub cached_json: String,
+    pub cached_json: Bytes,
 }
 
 impl ScoreboardInner {
     pub fn new(teams: BTreeMap<i64, ScoreboardTeam>) -> Self {
-        let cached_json = serde_json::to_string(&teams).unwrap();
+        let cached_json = serde_json::to_string(&teams).unwrap().into();
         Self { teams, cached_json }
     }
 }
@@ -379,11 +379,7 @@ pub trait Database {
         now: DateTime<Utc>,
     ) -> Result<()>;
     async fn insert_divisions(&self, divisions: &[Division]) -> Result<()>;
-    async fn get_team_standing(
-        &self,
-        team_id: i64,
-        division_id: &str,
-    ) -> Result<Option<TeamStanding>>;
+    async fn get_team_standing(&self, team_id: i64) -> Result<Option<TeamStanding>>;
     async fn upload_file(&self, hash: &str, filename: &str, bytes: &[u8]) -> Result<()>;
     async fn download_file(&self, hash: &str) -> Result<(Bytes, String)>;
     async fn get_site_statistics(&self) -> Result<SiteStatistics>;
