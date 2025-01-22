@@ -16,9 +16,9 @@ pub struct ProjectConfig {
     pub url: String,
 }
 
-impl Into<ProjectConfigYaml> for ProjectConfig {
-    fn into(self) -> ProjectConfigYaml {
-        ProjectConfigYaml { url: self.url }
+impl From<ProjectConfig> for ProjectConfigYaml {
+    fn from(val: ProjectConfig) -> Self {
+        ProjectConfigYaml { url: val.url }
     }
 }
 
@@ -38,10 +38,10 @@ pub struct SecretConfig {
     pub keys: BTreeMap<String, String>,
 }
 
-impl Into<SecretConfigYaml> for SecretConfig {
-    fn into(self) -> SecretConfigYaml {
+impl From<SecretConfig> for SecretConfigYaml {
+    fn from(val: SecretConfig) -> Self {
         SecretConfigYaml {
-            keys: self
+            keys: val
                 .keys
                 .into_iter()
                 .map(|(url, key)| UrlKeyPairYaml { url, key })

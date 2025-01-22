@@ -46,7 +46,7 @@ impl AuthCommand {
         };
 
         if let Some(ref project_config) = project_config {
-            if &project_config.url != &url {
+            if project_config.url != url {
                 return Err(anyhow!(
                     "API key url ('{}') does not match project config url ('{}')",
                     &url,
