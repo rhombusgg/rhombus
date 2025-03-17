@@ -2,9 +2,9 @@ use std::{cmp::max, sync::LazyLock, time::Duration};
 
 use axum::{
     extract::{Path, State},
-    http::{Extensions, Uri},
+    http::Extensions,
     response::{Html, IntoResponse, Response},
-    Extension, Form, Json,
+    Extension, Form,
 };
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
@@ -26,7 +26,6 @@ pub async fn route_challenges(
     State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
-    uri: Uri,
     extensions: Extensions,
 ) -> std::result::Result<impl IntoResponse, Response> {
     if let Some(start_time) = state.settings.read().await.start_time {
@@ -61,70 +60,6 @@ pub async fn route_challenges(
             .is_some()
     };
 
-    let challenge_json = json!({
-        "division_id": team.division_id,
-        "ticket_enabled": ticket_enabled,
-        "challenges": challenge_data.challenges.values().map(|challenge| json!({
-            "id": challenge.id,
-            "name": challenge.name,
-            "description": challenge.description,
-            "health": if let (Some(healthy), Some(last_checked)) = (challenge.healthy, challenge.last_healthcheck) {
-                Some(json!({
-                    "last_checked": last_checked,
-                    "healthy": healthy,
-                }))
-            } else {
-                None
-            },
-            "points": challenge.points,
-            "category_id": challenge.category_id,
-            "author_id": challenge.author_id,
-            "division_solves": challenge.division_solves.iter().map(|(division_id, solves)| json!({
-                "division_id": division_id,
-                "solves": solves,
-            })).collect::<serde_json::Value>(),
-            "attachments": challenge.attachments.iter().map(|attachment| json!({
-                "name": attachment.name,
-                "url": attachment.url,
-            })).collect::<serde_json::Value>(),
-        })).collect::<serde_json::Value>(),
-        "categories": challenge_data.categories.values().map(|category| json!({
-            "id": category.id,
-            "name": category.name,
-            "color": category.color,
-        })).collect::<serde_json::Value>(),
-        "authors": challenge_data.authors.values().map(|author|
-            (author.id.clone(), json!({
-                "name": author.name,
-                "avatar_url": author.avatar_url,
-            }))
-        ).collect::<serde_json::Value>(),
-        "divisions": challenge_data.divisions.values().map(|division|
-            (division.id.clone(), json!({
-                "name": division.name,
-            }))
-        ).collect::<serde_json::Value>(),
-        "team": json!({
-            "users": team.users.iter().map(|user|
-                (user.0.to_string(), json!({
-                    "name": user.1.name,
-                    "avatar_url": user.1.avatar_url,
-                }))
-            ).collect::<serde_json::Value>(),
-            "solves": team.solves.iter().map(|(challenge_id, solve)|
-                (challenge_id.to_string(), json!({
-                    "solved_at": solve.solved_at,
-                    "user_id": solve.user_id,
-                    "points": solve.points,
-                }))
-            ).collect::<serde_json::Value>(),
-        })
-    });
-
-    if uri.path().ends_with(".json") {
-        return Ok(Json(challenge_json).into_response());
-    }
-
     let html = state
         .jinja
         .get_template("challenges/challenges.html")
@@ -134,7 +69,9 @@ pub async fn route_challenges(
             page,
             title => format!("Challenges | {}", state.global_page_meta.title),
             user,
-            challenge_json,
+            team,
+            ticket_enabled,
+            challenge_data,
         })
         .unwrap();
 

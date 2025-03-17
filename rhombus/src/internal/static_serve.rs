@@ -21,9 +21,7 @@ pub async fn route_static_serve(uri: Uri, req: Request<Body>) -> impl IntoRespon
     }
 
     let service = ServeDir::new("static");
-    let Ok(response) = service.oneshot(req).await else {
-        unreachable!()
-    };
+    let Ok(response) = service.oneshot(req).await;
 
     if response.status().is_informational()
         || response.status().is_success()
