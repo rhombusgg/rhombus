@@ -19,6 +19,8 @@ The core of Rhombus is configured in `yaml` and with environment variables. Ther
 title: Rhombus Demo
 location_url: http://localhost:3000
 contact_email: demo@rhombus.gg
+# Generate with rhombus-cli admin generate-api-key
+root_api_key: nb2hi4b2f4xwy33dmfwgq33toq5dgmbqga_T59hPTa7PNXzIsaiPFBB8JO3jyWcL1yW
 auth:
   - credentials
 divisions:
