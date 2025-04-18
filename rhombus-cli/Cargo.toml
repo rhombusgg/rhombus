@@ -24,6 +24,7 @@ colored = "2.2.0"
 rand = "0.8.5"
 ring = "0.17.8"
 directories = "5.0.1"
+markdown = "1.0.0-alpha.21"
 
 [build-dependencies]
 tonic-build = "0.12.3"

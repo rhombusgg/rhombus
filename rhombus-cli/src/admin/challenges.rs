@@ -2,7 +2,7 @@ use crate::{
     get_client,
     grpc::proto::{Attachment, GetChallengesAdminRequest},
 };
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use figment::{
@@ -89,7 +89,7 @@ struct ChallengeYaml {
     pub ticket_template: Option<String>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 enum AttachmentIntermediate {
     Literal(Attachment),
     Upload {
@@ -99,7 +99,7 @@ enum AttachmentIntermediate {
     },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct ChallengeIntermediate {
     stable_id: String,
     author: String,
@@ -114,9 +114,14 @@ struct ChallengeIntermediate {
 
 #[derive(Clone, Debug)]
 enum ChallengeUpdateIntermediate {
-    Edit(ChallengeIntermediate),
+    Edit {
+        old: ChallengeIntermediate,
+        new: ChallengeIntermediate,
+    },
     Create(ChallengeIntermediate),
-    Delete { stable_id: String },
+    Delete {
+        stable_id: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -141,7 +146,8 @@ pub async fn apply_challenges(loader_path: &Path) -> Result<()> {
         .merge(Yaml::file_exact("loader.yaml"))
         .extract()?;
 
-    let new_challenges = ChallengeYamlWalker::new(&PathBuf::from("."))
+    let search_path = absolutize(&PathBuf::from("."), loader_path.parent().unwrap());
+    let new_challenges = ChallengeYamlWalker::new(&search_path)
         .into_iter()
         .map(|p| {
             let base_path = p.parent().unwrap_or(&p);
@@ -150,6 +156,42 @@ pub async fn apply_challenges(loader_path: &Path) -> Result<()> {
                 .extract::<ChallengeYaml>()
                 .with_context(|| format!("failed to load {}", p.display()))
                 .and_then(|challenge_yaml| {
+                    // TODO: Ask Mark if this should be done differently
+                    let description = markdown::to_html_with_options(
+                        &challenge_yaml.description,
+                        &markdown::Options {
+                            compile: markdown::CompileOptions {
+                                allow_dangerous_html: true,
+                                allow_dangerous_protocol: true,
+                                ..markdown::CompileOptions::default()
+                            },
+                            ..markdown::Options::default()
+                        },
+                    )
+                    .map_err(|err| anyhow!("Failed to convert markdown: {}", err))?;
+                    let files = challenge_yaml
+                        .files
+                        .into_iter()
+                        .map(|file| {
+                            Ok::<_, anyhow::Error>(match file {
+                                ChallengeAttachmentYaml::Url { url, dst } => {
+                                    AttachmentIntermediate::Literal(Attachment {
+                                        name: dst,
+                                        url,
+                                        hash: None,
+                                    })
+                                }
+                                ChallengeAttachmentYaml::File { src, dst } => {
+                                    let path = absolutize(base_path, &PathBuf::from(&src));
+                                    AttachmentIntermediate::Upload {
+                                        name: dst,
+                                        hash: hash_file(&path)?,
+                                        path,
+                                    }
+                                }
+                            })
+                        })
+                        .collect::<Result<Vec<_>>>()?;
                     Ok((
                         challenge_yaml.stable_id.clone(),
                         ChallengeIntermediate {
@@ -159,30 +201,8 @@ pub async fn apply_challenges(loader_path: &Path) -> Result<()> {
                             stable_id: challenge_yaml.stable_id,
                             author: challenge_yaml.author,
                             category: challenge_yaml.category,
-                            description: challenge_yaml.description,
-                            files: challenge_yaml
-                                .files
-                                .into_iter()
-                                .map(|file| {
-                                    Ok::<_, anyhow::Error>(match file {
-                                        ChallengeAttachmentYaml::Url { url, dst } => {
-                                            AttachmentIntermediate::Literal(Attachment {
-                                                name: dst,
-                                                url,
-                                                hash: None,
-                                            })
-                                        }
-                                        ChallengeAttachmentYaml::File { src, dst } => {
-                                            let path = absolutize(base_path, &PathBuf::from(&src));
-                                            AttachmentIntermediate::Upload {
-                                                name: dst,
-                                                hash: hash_file(&path)?,
-                                                path,
-                                            }
-                                        }
-                                    })
-                                })
-                                .collect::<Result<Vec<_>>>()?,
+                            description,
+                            files,
                             flag: challenge_yaml.flag,
                             healthscript: challenge_yaml.healthscript,
                             ticket_template: challenge_yaml.ticket_template,
@@ -222,10 +242,67 @@ pub async fn apply_challenges(loader_path: &Path) -> Result<()> {
         })
         .collect::<BTreeMap<_, _>>();
 
-    println!("New {:#?}", new_challenges);
-    println!("Old {:#?}", old_challenges);
+    let difference = diff_challenges(&old_challenges, &new_challenges);
+
+    println!("=== New {:#?}\n\n\n", new_challenges);
+    println!("=== Old {:#?}\n\n\n", old_challenges);
+    println!("=== Dif {:#?}\n\n\n", difference);
 
     Ok(())
+}
+
+fn diff_challenges(
+    old_challenges: &BTreeMap<String, ChallengeIntermediate>,
+    new_challenges: &BTreeMap<String, ChallengeIntermediate>,
+) -> Vec<ChallengeUpdateIntermediate> {
+    let mut updates = vec![];
+    for (id, new_challenge) in new_challenges.iter() {
+        match old_challenges.get(id) {
+            Some(old_challenge) => {
+                let mut new_challenge = new_challenge.clone();
+                for file in new_challenge.files.iter_mut() {
+                    if let AttachmentIntermediate::Upload {
+                        name,
+                        path: _,
+                        hash,
+                    } = file
+                    {
+                        if let Some(existing_file) =
+                            old_challenge.files.iter().find_map(|file| match file {
+                                AttachmentIntermediate::Literal(attachment) => {
+                                    (attachment.hash.as_ref() == Some(hash)).then_some(attachment)
+                                }
+                                AttachmentIntermediate::Upload { .. } => None,
+                            })
+                        {
+                            *file = AttachmentIntermediate::Literal(Attachment {
+                                name: name.to_string(),
+                                url: existing_file.url.clone(),
+                                hash: Some(hash.clone()),
+                            })
+                        }
+                    }
+                }
+                if new_challenge != *old_challenge {
+                    updates.push(ChallengeUpdateIntermediate::Edit {
+                        old: old_challenge.clone(),
+                        new: new_challenge,
+                    });
+                }
+            }
+            None => updates.push(ChallengeUpdateIntermediate::Create(new_challenge.clone())),
+        }
+    }
+    for id in old_challenges
+        .keys()
+        .filter(|id| !new_challenges.contains_key(*id))
+    {
+        updates.push(ChallengeUpdateIntermediate::Delete {
+            stable_id: id.clone(),
+        });
+    }
+
+    updates
 }
 
 fn hash_file(path: &Path) -> Result<String> {
