@@ -1,4 +1,9 @@
+pub mod challenges;
+
+use std::path::PathBuf;
+
 use anyhow::{anyhow, Result};
+use challenges::apply_challenges;
 use clap::Subcommand;
 use rand::{
     distributions::{Alphanumeric, DistString},
@@ -53,6 +58,7 @@ pub struct ApplyCommand {}
 
 impl ApplyCommand {
     pub async fn run(&self) -> Result<()> {
-        Err(anyhow!("todo"))
+        apply_challenges(&PathBuf::from("loader.yaml")).await?;
+        Ok(())
     }
 }

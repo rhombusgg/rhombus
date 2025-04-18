@@ -4873,6 +4873,7 @@ dependencies = [
  "inquire",
  "prost 0.13.4",
  "rand",
+ "ring",
  "serde",
  "serde_yml",
  "tokio",

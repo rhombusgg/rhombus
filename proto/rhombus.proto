@@ -6,6 +6,9 @@ service Rhombus {
     // Get information about the user making the request
     // Gives an authentication error if the request has an invalid or missing `authorization` header
     rpc Whoami (WhoamiRequest) returns (WhoamiReply);
+
+    // Get the current challenges with all information
+    rpc GetChallengesAdmin (GetChallengesAdminRequest) returns (GetChallengesAdminResponse);
 }
 
 message WhoamiRequest {}
@@ -23,4 +26,33 @@ message User {
     int64 id = 1;
     string name = 2;
     bool is_admin = 3;
+}
+
+message GetChallengesAdminRequest {}
+
+message GetChallengesAdminResponse {
+    repeated ChallengeAdmin challenges = 1;
+}
+
+message ChallengeAdmin {
+    string id = 1;
+    string name = 2;
+    string description = 3;
+    string flag = 4;
+    string category = 5;
+    string author = 6;
+    optional string ticket_template = 7;
+    optional string healthscript = 8;
+    string score_type = 9;
+    // A string containing the json representation of challenge.yaml
+    string metadata = 10;
+    // The current point value of the challenge
+    int64 points = 11;
+    repeated Attachment attachments = 12;
+}
+
+message Attachment {
+    string name = 1;
+    string url = 2;
+    optional string hash = 3;
 }

@@ -26,7 +26,7 @@ async fn main() {
     let app = rhombus::Builder::default()
         .load_env()
         .config_source(rhombus::config::File::with_name("config"))
-        .plugin(ChallengeLoaderPlugin::new(PathBuf::from("challenges")))
+        // .plugin(ChallengeLoaderPlugin::new(PathBuf::from("challenges")))
         .extractor(move |_, _| Some(ip))
         .build()
         .await

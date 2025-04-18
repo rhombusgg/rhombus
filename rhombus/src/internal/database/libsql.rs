@@ -664,21 +664,26 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             }
         }
 
-        let mut query_challenges = tx
-            .query("SELECT * FROM rhombus_file_attachment", ())
+        let mut query_attachments = tx
+            .query(
+                "SELECT challenge_id, name, url, hash FROM rhombus_file_attachment",
+                (),
+            )
             .await?;
         #[derive(Debug, Deserialize)]
         struct QueryChallengeFileAttachment {
             challenge_id: String,
             name: String,
             url: String,
+            hash: Option<String>,
         }
         let mut challenge_attachments = BTreeMap::new();
-        while let Some(row) = query_challenges.next().await? {
+        while let Some(row) = query_attachments.next().await? {
             let query_attachment = de::from_row::<QueryChallengeFileAttachment>(&row).unwrap();
             let attachment = ChallengeAttachment {
                 name: query_attachment.name,
                 url: query_attachment.url,
+                hash: query_attachment.hash,
             };
             match challenge_attachments.get_mut(&query_attachment.challenge_id) {
                 None => {

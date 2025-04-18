@@ -17,3 +17,16 @@ tasks:
     desc: Start cargo watch using systemfd to not drop connections on restart
     cmds:
       - systemfd --no-pid -s http::3000 -- mold -run cargo watch -x 'run -p standalone'
+
+  run-stanadlone:
+    desc: Run the standalone example
+    dir: examples/standalone
+    cmds:
+      - mold -run cargo run -p standalone
+
+  apply-standalone:
+    desc: Run rhombus-cli admin apply from examples/standalone/challenges
+    dir: examples/standalone/challenges
+    cmds:
+      - mold -run cargo run --manifest-path ../../../Cargo.toml --bin rhombus-cli -- admin apply
+

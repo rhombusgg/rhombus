@@ -1,16 +1,16 @@
 categories:
-  - name: pwn
+  - stable_id: pwn
     color: "#ef4444"
-  - name: web
+  - stable_id: web
     color: "#22c55e"
-  - name: crypto
+  - stable_id: crypto
     color: "#f59e0b"
-  - name: misc
+  - stable_id: misc
     color: "#a855f7"
 authors:
-  - name: mbund
+  - stable_id: mbund
     avatar: https://www.gravatar.com/avatar
     discord_id: 1014305712312172595
-  - name: mbunk
+  - stable_id: mbunk
     avatar: https://www.gravatar.com/avatar
     discord_id: 290276083687882753
