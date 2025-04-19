@@ -3,13 +3,10 @@ use std::{fs::create_dir_all, path::Path};
 use anyhow::{anyhow, Context, Result};
 
 use crate::{
-    config::read_project_config,
-    config::read_secret_config,
-    config::ProjectConfigYaml,
-    config::SecretConfigYaml,
-    connect,
-    grpc::proto::{whoami_reply::Whoami, WhoamiRequest},
+    config::read_project_config, config::read_secret_config, config::ProjectConfigYaml,
+    config::SecretConfigYaml, connect,
 };
+use rhombus_shared::proto::{whoami_reply::Whoami, WhoamiRequest};
 
 #[derive(clap::Parser, Debug)]
 pub struct AuthCommand;

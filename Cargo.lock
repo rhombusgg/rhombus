@@ -4874,6 +4874,7 @@ dependencies = [
  "markdown",
  "prost 0.13.4",
  "rand",
+ "rhombus-shared",
  "ring",
  "serde",
  "serde_yml",

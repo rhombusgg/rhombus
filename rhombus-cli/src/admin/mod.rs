@@ -1,14 +1,15 @@
-pub mod challenges;
-
-use std::path::PathBuf;
-
+use crate::get_client;
 use anyhow::{anyhow, Result};
-use challenges::apply_challenges;
 use clap::Subcommand;
 use rand::{
     distributions::{Alphanumeric, DistString},
     thread_rng,
 };
+use rhombus_shared::challenges::{
+    diff_challenges, load_challenges, AttachmentIntermediate, ChallengeIntermediate,
+};
+use rhombus_shared::proto::GetChallengesAdminRequest;
+use std::{collections::BTreeMap, path::PathBuf};
 
 #[derive(Subcommand, Debug)]
 pub enum AdminCommand {
@@ -58,7 +59,45 @@ pub struct ApplyCommand {}
 
 impl ApplyCommand {
     pub async fn run(&self) -> Result<()> {
-        apply_challenges(&PathBuf::from("loader.yaml")).await?;
+        let mut client = get_client().await?;
+        let new_challenges = load_challenges(&PathBuf::from("loader.yaml")).await?;
+
+        let response = client
+            .get_challenges_admin(GetChallengesAdminRequest {})
+            .await?
+            .into_inner();
+
+        let old_challenges = response
+            .challenges
+            .into_iter()
+            .map(|challenge| {
+                (
+                    challenge.id.clone(),
+                    ChallengeIntermediate {
+                        stable_id: challenge.id,
+                        author: challenge.author,
+                        category: challenge.category,
+                        description: challenge.description,
+                        files: challenge
+                            .attachments
+                            .into_iter()
+                            .map(|file| AttachmentIntermediate::Literal(file))
+                            .collect(),
+                        flag: challenge.flag,
+                        healthscript: challenge.healthscript,
+                        name: challenge.name,
+                        ticket_template: challenge.ticket_template,
+                    },
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+
+        println!("== NEW\n{:#?}\n\n", new_challenges);
+        println!("== OLD\n{:#?}\n\n", old_challenges);
+
+        let difference = diff_challenges(&old_challenges, &new_challenges);
+        println!("== DIFFERENCE\n{:#?}\n\n", difference);
+
         Ok(())
     }
 }

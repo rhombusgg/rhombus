@@ -3,7 +3,7 @@ use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use config::{read_project_config, read_secret_config};
-use grpc::proto::rhombus_client::RhombusClient;
+use rhombus_shared::proto::rhombus_client::RhombusClient;
 use std::process::exit;
 use tonic::{
     metadata::MetadataValue,
@@ -15,12 +15,6 @@ use tonic::{
 mod admin;
 mod auth;
 mod config;
-
-mod grpc {
-    pub mod proto {
-        tonic::include_proto!("rhombus");
-    }
-}
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
