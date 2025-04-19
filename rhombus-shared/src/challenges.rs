@@ -5,6 +5,7 @@ use figment::{
     Figment,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt::Write;
 use std::{
     collections::BTreeMap,
@@ -213,6 +214,19 @@ pub fn diff_challenges(
     old_challenges: &BTreeMap<String, ChallengeIntermediate>,
     new_challenges: &BTreeMap<String, ChallengeIntermediate>,
 ) -> Vec<ChallengeUpdateIntermediate> {
+    let hash_to_url: HashMap<String, String> = old_challenges
+        .iter()
+        .flat_map(|(id, old_challenge)| {
+            old_challenge.files.iter().filter_map(|file| match file {
+                AttachmentIntermediate::Literal(attachment) => attachment
+                    .hash
+                    .as_ref()
+                    .map(|hash| (hash.clone(), attachment.url.clone())),
+                AttachmentIntermediate::Upload { .. } => None,
+            })
+        })
+        .collect();
+
     let mut updates = vec![];
     for (id, new_challenge) in new_challenges.iter() {
         match old_challenges.get(id) {
@@ -225,17 +239,10 @@ pub fn diff_challenges(
                         hash,
                     } = file
                     {
-                        if let Some(existing_file) =
-                            old_challenge.files.iter().find_map(|file| match file {
-                                AttachmentIntermediate::Literal(attachment) => {
-                                    (attachment.hash.as_ref() == Some(hash)).then_some(attachment)
-                                }
-                                AttachmentIntermediate::Upload { .. } => None,
-                            })
-                        {
+                        if let Some(url) = hash_to_url.get(hash.as_str()) {
                             *file = AttachmentIntermediate::Literal(Attachment {
                                 name: name.to_string(),
-                                url: existing_file.url.clone(),
+                                url: url.clone(),
                                 hash: Some(hash.clone()),
                             })
                         }
