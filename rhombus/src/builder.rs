@@ -974,6 +974,7 @@ impl Builder {
                 global_page_meta,
                 score_type_map,
                 flag_fn_map,
+                root_api_key: settings.read().await.root_api_key.clone(),
             });
 
             let rhombus_router = axum::Router::new()

@@ -1,3 +1,4 @@
+use super::auth::KeyHolder;
 use crate::grpc::proto::rhombus_server::{Rhombus, RhombusServer};
 use crate::grpc::proto::whoami_reply::Whoami;
 use crate::grpc::proto::{
@@ -10,20 +11,6 @@ use crate::plugin::RunContext;
 struct RhombusImpl {
     db: Connection,
     root_key: Option<String>,
-}
-
-enum KeyHolder {
-    Root,
-    User(super::auth::User),
-}
-
-impl KeyHolder {
-    fn is_admin(&self) -> bool {
-        match self {
-            KeyHolder::Root => true,
-            KeyHolder::User(user) => user.is_admin,
-        }
-    }
 }
 
 impl RhombusImpl {

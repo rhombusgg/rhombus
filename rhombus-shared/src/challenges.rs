@@ -143,7 +143,6 @@ pub async fn load_challenges(
         .into_iter()
         .map(|p| {
             let base_path = p.parent().unwrap_or(&p);
-            // TODO: look into serde_transcode
             let metadata = serde_yml::from_reader(std::fs::File::open(&p)?)?;
             Figment::new()
                 .merge(Yaml::file_exact(&p))

@@ -7,19 +7,21 @@ use axum::{
 };
 use reqwest::StatusCode;
 
-use crate::{internal::auth::MaybeUser, UploadProvider};
+use crate::UploadProvider;
+
+use super::auth::MaybeKeyHolder;
 
 pub async fn route_upload_file<U: UploadProvider>(
     State(upload_provider): State<Arc<U>>,
-    Extension(user): Extension<MaybeUser>,
+    Extension(key_holder): Extension<MaybeKeyHolder>,
     Path(file_name): Path<String>,
     request: Request,
 ) -> impl IntoResponse {
-    let Some(user) = user else {
+    let Some(key_holder) = key_holder else {
         return (StatusCode::UNAUTHORIZED, "Unauthorized".to_owned()).into_response();
     };
 
-    if !user.is_admin {
+    if !key_holder.is_admin() {
         return (StatusCode::FORBIDDEN, "Forbidden".to_owned()).into_response();
     }
 
