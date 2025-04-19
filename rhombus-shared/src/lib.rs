@@ -1,3 +1,4 @@
+#![deny(unused_crate_dependencies)]
 pub mod challenges;
 pub mod errors;
 

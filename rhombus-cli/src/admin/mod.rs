@@ -87,6 +87,7 @@ impl ApplyCommand {
                         healthscript: challenge.healthscript,
                         name: challenge.name,
                         ticket_template: challenge.ticket_template,
+                        metadata: serde_json::from_str(&challenge.metadata).unwrap_or_default(),
                     },
                 )
             })

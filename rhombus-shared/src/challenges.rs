@@ -105,6 +105,7 @@ pub struct ChallengeIntermediate {
     pub name: String,
     pub healthscript: Option<String>,
     pub ticket_template: Option<String>,
+    pub metadata: serde_json::Value,
 }
 
 #[derive(Clone, Debug)]
@@ -142,6 +143,8 @@ pub async fn load_challenges(
         .into_iter()
         .map(|p| {
             let base_path = p.parent().unwrap_or(&p);
+            // TODO: look into serde_transcode
+            let metadata = serde_yml::from_reader(std::fs::File::open(&p)?)?;
             Figment::new()
                 .merge(Yaml::file_exact(&p))
                 .extract::<ChallengeYaml>()
@@ -197,6 +200,7 @@ pub async fn load_challenges(
                             flag: challenge_yaml.flag,
                             healthscript: challenge_yaml.healthscript,
                             ticket_template: challenge_yaml.ticket_template,
+                            metadata,
                         },
                     ))
                 })

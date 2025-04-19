@@ -12,16 +12,14 @@ keywords = ["ctf", "cli"]
 [dependencies]
 tonic = "0.12.3"
 prost = "0.13.4"
-tokio = { version = "1.40.0", features = ["full"] }
 figment = { version = "0.10.19", features = ["yaml"] }
 serde = { version = "1.0.210", features = ["derive"] }
 serde_yml = "0.0.12"
-base32 = "0.5.1"
-colored = "2.2.0"
-rand = "0.8.5"
+serde_json = "1.0.128"
 ring = "0.17.8"
 markdown = "1.0.0-alpha.21"
 thiserror = "2.0.6"
+
 
 [build-dependencies]
 tonic-build = "0.12.3"

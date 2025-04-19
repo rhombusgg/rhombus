@@ -12,4 +12,10 @@ pub enum RhombusSharedError {
 
     #[error("IO error: {0}")]
     IO(#[from] std::io::Error),
+
+    #[error("YAML error: {0}")]
+    Yaml(#[from] serde_yml::Error),
+
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
 }

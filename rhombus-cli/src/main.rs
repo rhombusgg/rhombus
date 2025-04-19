@@ -1,3 +1,4 @@
+#![deny(unused_crate_dependencies)]
 use admin::AdminCommand;
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
