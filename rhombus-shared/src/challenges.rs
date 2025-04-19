@@ -86,13 +86,16 @@ pub struct ChallengeYaml {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct AttachmentUpload {
+    pub name: String,
+    pub path: PathBuf,
+    pub hash: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum AttachmentIntermediate {
     Literal(Attachment),
-    Upload {
-        name: String,
-        path: PathBuf,
-        hash: String,
-    },
+    Upload(AttachmentUpload),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -177,11 +180,11 @@ pub async fn load_challenges(
                                 }
                                 ChallengeAttachmentYaml::File { src, dst } => {
                                     let path = absolutize(base_path, &PathBuf::from(&src));
-                                    AttachmentIntermediate::Upload {
+                                    AttachmentIntermediate::Upload(AttachmentUpload {
                                         name: dst,
                                         hash: hash_file(&path)?,
                                         path,
-                                    }
+                                    })
                                 }
                             })
                         })
@@ -215,8 +218,8 @@ pub fn diff_challenges(
     new_challenges: &BTreeMap<String, ChallengeIntermediate>,
 ) -> Vec<ChallengeUpdateIntermediate> {
     let hash_to_url: HashMap<String, String> = old_challenges
-        .iter()
-        .flat_map(|(id, old_challenge)| {
+        .values()
+        .flat_map(|old_challenge| {
             old_challenge.files.iter().filter_map(|file| match file {
                 AttachmentIntermediate::Literal(attachment) => attachment
                     .hash
@@ -233,11 +236,11 @@ pub fn diff_challenges(
             Some(old_challenge) => {
                 let mut new_challenge = new_challenge.clone();
                 for file in new_challenge.files.iter_mut() {
-                    if let AttachmentIntermediate::Upload {
+                    if let AttachmentIntermediate::Upload(AttachmentUpload {
                         name,
                         path: _,
                         hash,
-                    } = file
+                    }) = file
                     {
                         if let Some(url) = hash_to_url.get(hash.as_str()) {
                             *file = AttachmentIntermediate::Literal(Attachment {

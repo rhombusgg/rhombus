@@ -54,7 +54,7 @@ impl AuthCommand {
 
         let mut client = connect(&url, &api_key).await?;
 
-        let response = client.whoami(WhoamiRequest {}).await?;
+        let response = client.client.whoami(WhoamiRequest {}).await?;
         match response.into_inner().whoami {
             Some(Whoami::Root(())) => println!("✓ Authenticated as root"),
             Some(Whoami::User(user)) => println!(
