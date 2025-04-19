@@ -1,8 +1,5 @@
-use crate::{
-    get_client,
-    grpc::proto::{Attachment, GetChallengesAdminRequest},
-};
-use anyhow::{anyhow, Context, Result};
+use crate::errors::{Result, RhombusSharedError};
+use crate::grpc::proto::{Attachment, GetChallengesAdminRequest};
 use figment::{
     providers::{Format, Yaml},
     Figment,
@@ -55,12 +52,12 @@ impl Iterator for ChallengeYamlWalker {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-struct LoaderYaml {
+pub struct LoaderYaml {
     pub authors: Vec<AuthorYaml>,
     pub categories: Vec<CategoryYaml>,
 }
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-struct AuthorYaml {
+pub struct AuthorYaml {
     pub stable_id: String,
     pub name: Option<String>,
     pub avatar: String,
@@ -68,14 +65,14 @@ struct AuthorYaml {
 }
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-struct CategoryYaml {
+pub struct CategoryYaml {
     pub stable_id: String,
     pub name: Option<String>,
     pub color: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-struct ChallengeYaml {
+pub struct ChallengeYaml {
     pub stable_id: String,
     pub author: String,
     pub category: String,
@@ -88,7 +85,7 @@ struct ChallengeYaml {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum AttachmentIntermediate {
+pub enum AttachmentIntermediate {
     Literal(Attachment),
     Upload {
         name: String,
@@ -98,7 +95,7 @@ enum AttachmentIntermediate {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct ChallengeIntermediate {
+pub struct ChallengeIntermediate {
     stable_id: String,
     author: String,
     category: String,
@@ -111,7 +108,7 @@ struct ChallengeIntermediate {
 }
 
 #[derive(Clone, Debug)]
-enum ChallengeUpdateIntermediate {
+pub enum ChallengeUpdateIntermediate {
     Edit {
         old: ChallengeIntermediate,
         new: ChallengeIntermediate,
@@ -124,7 +121,7 @@ enum ChallengeUpdateIntermediate {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
-enum ChallengeAttachmentYaml {
+pub enum ChallengeAttachmentYaml {
     Url { url: String, dst: String },
     File { src: String, dst: String },
 }
@@ -138,8 +135,6 @@ fn absolutize(base: &Path, p: &Path) -> PathBuf {
 }
 
 pub async fn apply_challenges(loader_path: &Path) -> Result<()> {
-    let mut client = get_client().await?;
-
     let config: LoaderYaml = Figment::new()
         .merge(Yaml::file_exact("loader.yaml"))
         .extract()?;
@@ -152,7 +147,7 @@ pub async fn apply_challenges(loader_path: &Path) -> Result<()> {
             Figment::new()
                 .merge(Yaml::file_exact(&p))
                 .extract::<ChallengeYaml>()
-                .with_context(|| format!("failed to load {}", p.display()))
+                .map_err(|err| RhombusSharedError::Figment(err))
                 .and_then(|challenge_yaml| {
                     // TODO: Ask Mark if this should be done differently
                     let description = markdown::to_html_with_options(
@@ -166,12 +161,12 @@ pub async fn apply_challenges(loader_path: &Path) -> Result<()> {
                             ..markdown::Options::default()
                         },
                     )
-                    .map_err(|err| anyhow!("Failed to convert markdown: {}", err))?;
+                    .map_err(|message| RhombusSharedError::Markdown(message))?;
                     let files = challenge_yaml
                         .files
                         .into_iter()
                         .map(|file| {
-                            Ok::<_, anyhow::Error>(match file {
+                            Ok::<_, RhombusSharedError>(match file {
                                 ChallengeAttachmentYaml::Url { url, dst } => {
                                     AttachmentIntermediate::Literal(Attachment {
                                         name: dst,
@@ -210,46 +205,46 @@ pub async fn apply_challenges(loader_path: &Path) -> Result<()> {
         })
         .collect::<Result<BTreeMap<_, _>>>()?;
 
-    let response = client
-        .get_challenges_admin(GetChallengesAdminRequest {})
-        .await?
-        .into_inner();
+    // let response = client
+    //     .get_challenges_admin(GetChallengesAdminRequest {})
+    //     .await?
+    //     .into_inner();
 
-    let old_challenges = response
-        .challenges
-        .into_iter()
-        .map(|challenge| {
-            (
-                challenge.id.clone(),
-                ChallengeIntermediate {
-                    stable_id: challenge.id,
-                    author: challenge.author,
-                    category: challenge.category,
-                    description: challenge.description,
-                    files: challenge
-                        .attachments
-                        .into_iter()
-                        .map(|file| AttachmentIntermediate::Literal(file))
-                        .collect(),
-                    flag: challenge.flag,
-                    healthscript: challenge.healthscript,
-                    name: challenge.name,
-                    ticket_template: challenge.ticket_template,
-                },
-            )
-        })
-        .collect::<BTreeMap<_, _>>();
+    // let old_challenges = response
+    //     .challenges
+    //     .into_iter()
+    //     .map(|challenge| {
+    //         (
+    //             challenge.id.clone(),
+    //             ChallengeIntermediate {
+    //                 stable_id: challenge.id,
+    //                 author: challenge.author,
+    //                 category: challenge.category,
+    //                 description: challenge.description,
+    //                 files: challenge
+    //                     .attachments
+    //                     .into_iter()
+    //                     .map(|file| AttachmentIntermediate::Literal(file))
+    //                     .collect(),
+    //                 flag: challenge.flag,
+    //                 healthscript: challenge.healthscript,
+    //                 name: challenge.name,
+    //                 ticket_template: challenge.ticket_template,
+    //             },
+    //         )
+    //     })
+    //     .collect::<BTreeMap<_, _>>();
 
-    let difference = diff_challenges(&old_challenges, &new_challenges);
+    // let difference = diff_challenges(&old_challenges, &new_challenges);
 
     println!("=== New {:#?}\n\n\n", new_challenges);
-    println!("=== Old {:#?}\n\n\n", old_challenges);
-    println!("=== Dif {:#?}\n\n\n", difference);
+    // println!("=== Old {:#?}\n\n\n", old_challenges);
+    // println!("=== Dif {:#?}\n\n\n", difference);
 
     Ok(())
 }
 
-fn diff_challenges(
+pub fn diff_challenges(
     old_challenges: &BTreeMap<String, ChallengeIntermediate>,
     new_challenges: &BTreeMap<String, ChallengeIntermediate>,
 ) -> Vec<ChallengeUpdateIntermediate> {
