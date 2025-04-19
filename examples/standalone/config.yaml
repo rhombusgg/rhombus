@@ -12,6 +12,11 @@ auth:
   - email
   - ctftime
   - credentials
+uploads:
+  s3:
+    path_style: true
+    endpoint: http://localhost:4566
+    bucket_name: sample-bucket
 divisions:
   - name: Open
     description: Open division for everyone
