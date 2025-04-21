@@ -9,6 +9,9 @@ service Rhombus {
 
     // Get the current challenges with all information
     rpc GetChallengesAdmin (GetChallengesAdminRequest) returns (GetChallengesAdminResponse);
+
+    // Apply changes to the challenges
+    rpc UpdateChallenges (UpdateChallengesRequest) returns (UpdateChallengesResponse);
 }
 
 message WhoamiRequest {}
@@ -56,3 +59,25 @@ message Attachment {
     string url = 2;
     optional string hash = 3;
 }
+
+message UpdateChallengesRequest {
+    repeated UpsertChallenge upsert_challenges = 1;
+}
+
+message UpdateChallengesResponse {}
+
+message UpsertChallenge {
+    string id = 1;
+    string name = 2;
+    string description = 3;
+    string flag = 4;
+    string category = 5;
+    string author = 6;
+    optional string ticket_template = 7;
+    optional string healthscript = 8;
+    string score_type = 9;
+    // A string containing the json representation of challenge.yaml
+    string metadata = 10;
+    repeated Attachment attachments = 11;
+}
+

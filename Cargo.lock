@@ -4894,6 +4894,7 @@ name = "rhombus-shared"
 version = "0.1.0"
 dependencies = [
  "figment",
+ "futures",
  "markdown",
  "prost 0.13.4",
  "ring",

@@ -2,8 +2,8 @@ use super::auth::KeyHolder;
 use crate::grpc::proto::rhombus_server::{Rhombus, RhombusServer};
 use crate::grpc::proto::whoami_reply::Whoami;
 use crate::grpc::proto::{
-    self, Attachment, ChallengeAdmin, GetChallengesAdminResponse, User, WhoamiReply,
-    FILE_DESCRIPTOR_SET,
+    self, Attachment, ChallengeAdmin, GetChallengesAdminResponse, UpdateChallengesResponse, User,
+    WhoamiReply, FILE_DESCRIPTOR_SET,
 };
 use crate::internal::database::provider::Connection;
 use crate::plugin::RunContext;
@@ -122,6 +122,21 @@ impl Rhombus for RhombusImpl {
                 })
                 .collect(),
         }))
+    }
+
+    async fn update_challenges(
+        &self,
+        request: tonic::Request<proto::UpdateChallengesRequest>,
+    ) -> std::result::Result<tonic::Response<UpdateChallengesResponse>, tonic::Status> {
+        let _ = self.get_admin_key_holder(request.metadata());
+        let update = request.into_inner();
+
+        self.db
+            .update_challenges(&update)
+            .await
+            .map_err(|err| tonic::Status::invalid_argument(err.to_string()))?;
+
+        Ok(tonic::Response::new(UpdateChallengesResponse {}))
     }
 }
 

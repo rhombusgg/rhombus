@@ -1,15 +1,15 @@
 use crate::{get_client, ClientInfo};
 use anyhow::{anyhow, Result};
 use clap::Subcommand;
-use futures::{stream::FuturesUnordered, StreamExt};
+use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
 use rand::{
     distributions::{Alphanumeric, DistString},
     thread_rng,
 };
 use reqwest::Body;
 use rhombus_shared::challenges::{
-    diff_challenges, load_challenges, AttachmentIntermediate, AttachmentUpload,
-    ChallengeIntermediate, ChallengeUpdateIntermediate,
+    diff_challenges, load_challenges, update_challenges_request, upload_files,
+    AttachmentIntermediate, AttachmentUpload, ChallengeIntermediate, ChallengeUpdateIntermediate,
 };
 use rhombus_shared::proto::GetChallengesAdminRequest;
 use std::{
@@ -112,38 +112,50 @@ impl ApplyCommand {
         let difference = diff_challenges(&old_challenges, &new_challenges);
         println!("== DIFFERENCE\n{:#?}\n\n", difference);
 
-        let files_to_upload: BTreeMap<String, AttachmentUpload> = difference
-            .iter()
-            .filter_map(|update| match update {
-                ChallengeUpdateIntermediate::Edit { old: _, new } => Some(new),
-                ChallengeUpdateIntermediate::Create(chal) => Some(chal),
-                ChallengeUpdateIntermediate::Delete { .. } => None,
-            })
-            .flat_map(|chal| chal.files.iter())
-            .filter_map(|file| match file {
-                AttachmentIntermediate::Literal(_) => None,
-                AttachmentIntermediate::Upload(upload) => Some(upload),
-            })
-            .map(|upload| (upload.name.clone(), upload.clone()))
-            .collect();
+        // let files_to_upload: BTreeMap<String, AttachmentUpload> = difference
+        //     .iter()
+        //     .filter_map(|update| match update {
+        //         ChallengeUpdateIntermediate::Edit { old: _, new } => Some(new),
+        //         ChallengeUpdateIntermediate::Create(chal) => Some(chal),
+        //         ChallengeUpdateIntermediate::Delete { .. } => None,
+        //     })
+        //     .flat_map(|chal| chal.files.iter())
+        //     .filter_map(|file| match file {
+        //         AttachmentIntermediate::Literal(_) => None,
+        //         AttachmentIntermediate::Upload(upload) => Some(upload),
+        //     })
+        //     .map(|upload| (upload.name.clone(), upload.clone()))
+        //     .collect();
 
-        let mut futures = FuturesUnordered::new();
+        // let mut futures = FuturesUnordered::new();
 
-        for (hash, upload) in files_to_upload {
-            let url = &client.url;
-            let key = &client.key;
-            futures.push(async move {
-                let url = upload_file(&upload.name, &upload.path, url, key).await;
-                (hash, url)
-            });
-        }
+        // for (hash, upload) in files_to_upload {
+        //     let url = &client.url;
+        //     let key = &client.key;
+        //     futures.push(async move {
+        //         let url = upload_file(&upload.name, &upload.path, url, key).await;
+        //         (hash, url)
+        //     });
+        // }
 
-        let mut result = BTreeMap::new();
-        while let Some((k, v)) = futures.next().await {
-            result.insert(k, v?);
-        }
+        // let mut result = BTreeMap::new();
+        // while let Some((k, v)) = futures.next().await {
+        //     result.insert(k, v?);
+        // }
 
-        println!("{:#?}", result);
+        // println!("{:#?}", result);
+
+        let uploaded_files = upload_files(&difference, |upload| {
+            let upload = upload.clone();
+            let client = &client;
+            async move { upload_file(&upload.name, &upload.path, &client.url, &client.key).await }
+        })
+        .await?;
+
+        println!("YEEE {:?}", uploaded_files);
+
+        let ree = update_challenges_request(&difference, &uploaded_files);
+        println!("REEE {:?}", ree);
 
         Ok(())
     }

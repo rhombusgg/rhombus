@@ -227,6 +227,10 @@ pub struct ToBeClosedTicket {
 pub trait Database {
     async fn migrate(&self) -> Result<()>;
     async fn get_challenges(&self) -> Result<Challenges>;
+    async fn update_challenges(
+        &self,
+        update: &crate::grpc::proto::UpdateChallengesRequest,
+    ) -> Result<()>;
     async fn set_challenge_health(
         &self,
         challenge_id: &str,

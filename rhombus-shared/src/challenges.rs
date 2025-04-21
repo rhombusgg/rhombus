@@ -1,12 +1,15 @@
 use crate::errors::{Result, RhombusSharedError};
-use crate::proto::Attachment;
+use crate::proto::{self, Attachment, UpdateChallengesRequest, UpsertChallenge};
 use figment::{
     providers::{Format, Yaml},
     Figment,
 };
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Write;
+use std::future::Future;
 use std::{
     collections::BTreeMap,
     fs::{self, ReadDir},
@@ -113,6 +116,7 @@ pub struct ChallengeIntermediate {
 }
 
 #[derive(Clone, Debug)]
+/// A challenge update that can include uploading files
 pub enum ChallengeUpdateIntermediate {
     Edit {
         old: ChallengeIntermediate,
@@ -273,14 +277,102 @@ pub fn diff_challenges(
     updates
 }
 
-fn hash_file(path: &Path) -> Result<String> {
+/// Takes a function used to upload a file, and runs it for all the files which need to be uploaded,
+/// replacing the AttachmentIntermediate::Upload with an AttachmentIntermediate::Literal
+/// `f` should take the file to upload and return its uploaded url
+pub async fn upload_files<Fut: Future<Output = std::result::Result<String, Err>>, Err>(
+    difference: &[ChallengeUpdateIntermediate],
+    f: impl Clone + Fn(&AttachmentUpload) -> Fut,
+) -> std::result::Result<BTreeMap<String, String>, Err> {
+    let files_to_upload: BTreeMap<String, AttachmentUpload> = difference
+        .iter()
+        .filter_map(|update| match update {
+            ChallengeUpdateIntermediate::Edit { old: _, new } => Some(new),
+            ChallengeUpdateIntermediate::Create(chal) => Some(chal),
+            ChallengeUpdateIntermediate::Delete { .. } => None,
+        })
+        .flat_map(|chal| chal.files.iter())
+        .filter_map(|file| match file {
+            AttachmentIntermediate::Literal(_) => None,
+            AttachmentIntermediate::Upload(upload) => Some(upload),
+        })
+        .map(|upload| (upload.hash.clone(), upload.clone()))
+        .collect();
+
+    let mut futures = FuturesUnordered::new();
+
+    for (hash, upload) in files_to_upload {
+        let f_clone = f.clone();
+        futures.push(async move {
+            let url = f_clone(&upload).await;
+            (hash, url)
+        });
+    }
+
+    let mut result = BTreeMap::new();
+    while let Some((k, v)) = futures.next().await {
+        result.insert(k, v?);
+    }
+
+    Ok(result)
+}
+
+/// Takes the difference in challenges and the uploaded files map (hash to url) returned by [upload_files]
+/// Panics if `uploaded_files` is missing any hash
+pub fn update_challenges_request(
+    difference: &[ChallengeUpdateIntermediate],
+    uploaded_files: &BTreeMap<String, String>,
+) -> UpdateChallengesRequest {
+    UpdateChallengesRequest {
+        upsert_challenges: difference
+            .iter()
+            .filter_map(|update| match update {
+                ChallengeUpdateIntermediate::Edit { old: _, new } => Some(new),
+                ChallengeUpdateIntermediate::Create(new) => Some(new),
+                _ => None,
+            })
+            .map(|new| UpsertChallenge {
+                id: new.stable_id.clone(),
+                name: new.name.clone(),
+                description: new.description.clone(),
+                flag: new.flag.clone(),
+                category: new.category.clone(),
+                author: new.author.clone(),
+                ticket_template: new.ticket_template.clone(),
+                healthscript: new.healthscript.clone(),
+                score_type: "static".to_string(),
+                metadata: serde_json::to_string(&new.metadata)
+                    .expect("failed to convert json to json"),
+                attachments: new
+                    .files
+                    .iter()
+                    .map(|file| match file {
+                        AttachmentIntermediate::Literal(attachment) => attachment.clone(),
+                        AttachmentIntermediate::Upload(upload) => Attachment {
+                            name: upload.name.clone(),
+                            url: uploaded_files
+                                .get(&upload.hash)
+                                .unwrap_or_else(|| {
+                                    panic!("uploaded_files map is missing the hash {}", upload.hash)
+                                })
+                                .clone(),
+                            hash: Some(upload.hash.clone()),
+                        },
+                    })
+                    .collect(),
+            })
+            .collect(),
+    }
+}
+
+pub fn hash_file(path: &Path) -> Result<String> {
     let data = std::fs::read(&path)?;
     let digest = ring::digest::digest(&ring::digest::SHA256, &data);
     let hash = slice_to_hex_string(digest.as_ref());
     Ok(hash)
 }
 
-fn slice_to_hex_string(slice: &[u8]) -> String {
+pub fn slice_to_hex_string(slice: &[u8]) -> String {
     slice.iter().fold(String::new(), |mut output, b| {
         let _ = write!(output, "{b:02x}");
         output

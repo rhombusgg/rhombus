@@ -813,6 +813,13 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         }))
     }
 
+    async fn update_challenges(
+        &self,
+        update: &crate::grpc::proto::UpdateChallengesRequest,
+    ) -> Result<()> {
+        todo!()
+    }
+
     async fn set_challenge_health(
         &self,
         challenge_id: &str,
