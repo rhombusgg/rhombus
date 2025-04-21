@@ -2,7 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     net::IpAddr,
     num::NonZeroU64,
-    sync::{Arc, Weak},
+    sync::{Arc, Mutex, Weak},
 };
 
 use async_trait::async_trait;
@@ -12,7 +12,10 @@ use serde_json::Value;
 use tokio_util::bytes::Bytes;
 
 use crate::{
-    internal::{auth::User, database::cache::Writeups, division::Division, settings::Settings},
+    internal::{
+        auth::User, database::cache::Writeups, division::Division,
+        routes::challenges::ChallengePoints, settings::Settings,
+    },
     Result,
 };
 
@@ -230,6 +233,9 @@ pub trait Database {
     async fn update_challenges(
         &self,
         update: &crate::grpc::proto::UpdateChallengesRequest,
+        score_type_map: Arc<
+            tokio::sync::Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>,
+        >,
     ) -> Result<()>;
     async fn set_challenge_health(
         &self,

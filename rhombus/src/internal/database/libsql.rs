@@ -20,7 +20,7 @@ use serde::Deserialize;
 use tokio_util::bytes::Bytes;
 
 use crate::{
-    errors::RhombusError,
+    errors::{ChallengeDefinitionError, RhombusError},
     internal::{
         auth::{create_user_api_key, User, UserInner},
         database::{
@@ -35,7 +35,10 @@ use crate::{
             },
         },
         division::Division,
-        routes::{account::generate_email_callback_code, team::create_team_invite_token},
+        routes::{
+            account::generate_email_callback_code, challenges::ChallengePoints,
+            team::create_team_invite_token,
+        },
         settings::Settings,
     },
     Result,
@@ -816,8 +819,77 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     async fn update_challenges(
         &self,
         update: &crate::grpc::proto::UpdateChallengesRequest,
+        score_type_map: Arc<
+            tokio::sync::Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>,
+        >,
     ) -> Result<()> {
-        todo!()
+        let tx = self.transaction().await?;
+
+        for challenge in update.upsert_challenges.iter() {
+            let points = score_type_map
+                .lock()
+                .await
+                .get(challenge.score_type.as_str())
+                .ok_or_else(|| {
+                    ChallengeDefinitionError::UnknownScoreType(challenge.score_type.clone())
+                })?
+                .initial(&serde_json::from_str(&challenge.metadata).unwrap())
+                .await?;
+
+            tx.execute(
+                "DELETE FROM rhombus_file_attachment WHERE challenge_id = ?1",
+                [challenge.id.as_str()],
+            )
+            .await?;
+
+            _ = tx
+                .execute(
+                    "
+                    INSERT INTO rhombus_challenge (id, name, description, flag, category_id, author_id, ticket_template, healthscript, score_type, points, metadata)
+                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+                    ON CONFLICT(id) DO UPDATE SET
+                        name = excluded.name,
+                        description = excluded.description,
+                        flag = excluded.flag,
+                        category_id = excluded.category_id,
+                        author_id = excluded.author_id,
+                        ticket_template = excluded.ticket_template,
+                        healthscript = excluded.healthscript,
+                        score_type = excluded.score_type,
+                        metadata = excluded.metadata
+                ",
+                    params!(
+                        challenge.id.as_str(),
+                        challenge.name.as_str(),
+                        challenge.description.as_str(),
+                        challenge.flag.as_str(),
+                        challenge.category.as_str(),
+                        challenge.author.as_str(),
+                        challenge.ticket_template.as_ref().map(|x| x.as_str()),
+                        challenge.healthscript.as_deref(),
+                        challenge.score_type.as_str(),
+                        points,
+                        challenge.metadata.as_str(),
+                    ),
+                )
+                .await?;
+
+            for attachment in challenge.attachments.iter() {
+                _ = tx
+                    .execute(
+                        "
+                            INSERT OR REPLACE INTO rhombus_file_attachment (challenge_id, name, url, hash)
+                            VALUES (?1, ?2, ?3, ?4)
+                        ",
+                        params!(challenge.id.as_str(), attachment.name.as_str(), attachment.url.as_str(), attachment.hash.as_ref().map(|x| x.as_str())),
+                    )
+                    .await?;
+            }
+        }
+
+        tx.commit().await?;
+
+        Ok(())
     }
 
     async fn set_challenge_health(

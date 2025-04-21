@@ -1,8 +1,8 @@
 stable_id: my-first-pwn
 name: my-first-pwn
 description: |
-  asjdlfhljasdfhjls
-  
+  At the foothills of the Himalayas
+
   `nc abc 123`
 flag: flag{this_is_a_fake_flag}
 category: pwn

@@ -1,4 +1,8 @@
+use std::collections::BTreeMap;
+use std::sync::Arc;
+
 use super::auth::KeyHolder;
+use super::routes::challenges::ChallengePoints;
 use crate::grpc::proto::rhombus_server::{Rhombus, RhombusServer};
 use crate::grpc::proto::whoami_reply::Whoami;
 use crate::grpc::proto::{
@@ -11,6 +15,8 @@ use crate::plugin::RunContext;
 struct RhombusImpl {
     db: Connection,
     root_key: Option<String>,
+    score_type_map:
+        Arc<tokio::sync::Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>>,
 }
 
 impl RhombusImpl {
@@ -132,7 +138,7 @@ impl Rhombus for RhombusImpl {
         let update = request.into_inner();
 
         self.db
-            .update_challenges(&update)
+            .update_challenges(&update, self.score_type_map.clone())
             .await
             .map_err(|err| tonic::Status::invalid_argument(err.to_string()))?;
 
@@ -144,6 +150,7 @@ pub async fn init_grpc<'a>(run_context: &mut RunContext<'a>) {
     let service = RhombusImpl {
         db: run_context.db.clone(),
         root_key: run_context.settings.read().await.root_api_key.clone(),
+        score_type_map: run_context.score_type_map.clone(),
     };
     run_context
         .grpc_builder

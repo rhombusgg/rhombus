@@ -101,49 +101,25 @@ impl ApplyCommand {
                         name: challenge.name,
                         ticket_template: challenge.ticket_template,
                         metadata: serde_json::from_str(&challenge.metadata).unwrap_or_default(),
+                        score_type: challenge.score_type,
                     },
                 )
             })
             .collect::<BTreeMap<_, _>>();
 
-        println!("== NEW\n{:#?}\n\n", new_challenges);
-        println!("== OLD\n{:#?}\n\n", old_challenges);
-
         let difference = diff_challenges(&old_challenges, &new_challenges);
-        println!("== DIFFERENCE\n{:#?}\n\n", difference);
 
-        // let files_to_upload: BTreeMap<String, AttachmentUpload> = difference
-        //     .iter()
-        //     .filter_map(|update| match update {
-        //         ChallengeUpdateIntermediate::Edit { old: _, new } => Some(new),
-        //         ChallengeUpdateIntermediate::Create(chal) => Some(chal),
-        //         ChallengeUpdateIntermediate::Delete { .. } => None,
-        //     })
-        //     .flat_map(|chal| chal.files.iter())
-        //     .filter_map(|file| match file {
-        //         AttachmentIntermediate::Literal(_) => None,
-        //         AttachmentIntermediate::Upload(upload) => Some(upload),
-        //     })
-        //     .map(|upload| (upload.name.clone(), upload.clone()))
-        //     .collect();
+        if difference.is_empty() {
+            println!("Already up to date");
+            return Ok(());
+        }
 
-        // let mut futures = FuturesUnordered::new();
+        println!("{:#?}", difference);
 
-        // for (hash, upload) in files_to_upload {
-        //     let url = &client.url;
-        //     let key = &client.key;
-        //     futures.push(async move {
-        //         let url = upload_file(&upload.name, &upload.path, url, key).await;
-        //         (hash, url)
-        //     });
-        // }
-
-        // let mut result = BTreeMap::new();
-        // while let Some((k, v)) = futures.next().await {
-        //     result.insert(k, v?);
-        // }
-
-        // println!("{:#?}", result);
+        if !inquire::prompt_confirmation("Apply changes?")? {
+            println!("✗ Aborted");
+            return Ok(());
+        }
 
         let uploaded_files = upload_files(&difference, |upload| {
             let upload = upload.clone();
@@ -152,10 +128,10 @@ impl ApplyCommand {
         })
         .await?;
 
-        println!("YEEE {:?}", uploaded_files);
+        let request = update_challenges_request(&difference, &uploaded_files);
 
-        let ree = update_challenges_request(&difference, &uploaded_files);
-        println!("REEE {:?}", ree);
+        client.client.update_challenges(request).await?;
+        println!("✓ Changes applied");
 
         Ok(())
     }

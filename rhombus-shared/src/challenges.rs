@@ -86,6 +86,7 @@ pub struct ChallengeYaml {
     pub healthscript: Option<String>,
     pub name: Option<String>,
     pub ticket_template: Option<String>,
+    pub score_type: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -113,6 +114,7 @@ pub struct ChallengeIntermediate {
     pub healthscript: Option<String>,
     pub ticket_template: Option<String>,
     pub metadata: serde_json::Value,
+    pub score_type: String,
 }
 
 #[derive(Clone, Debug)]
@@ -208,6 +210,9 @@ pub async fn load_challenges(
                             healthscript: challenge_yaml.healthscript,
                             ticket_template: challenge_yaml.ticket_template,
                             metadata,
+                            score_type: challenge_yaml
+                                .score_type
+                                .unwrap_or_else(|| "dynamic".to_string()),
                         },
                     ))
                 })
@@ -340,7 +345,7 @@ pub fn update_challenges_request(
                 author: new.author.clone(),
                 ticket_template: new.ticket_template.clone(),
                 healthscript: new.healthscript.clone(),
-                score_type: "static".to_string(),
+                score_type: new.score_type.clone(),
                 metadata: serde_json::to_string(&new.metadata)
                     .expect("failed to convert json to json"),
                 attachments: new

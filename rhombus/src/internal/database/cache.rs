@@ -2,7 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     net::IpAddr,
     num::NonZeroU64,
-    sync::{Arc, LazyLock},
+    sync::{Arc, LazyLock, Mutex},
     time::Duration,
 };
 
@@ -21,6 +21,7 @@ use crate::{
             TeamInner, TeamMeta, TeamStanding, Ticket, ToBeClosedTicket, UserTrack, Writeup,
         },
         division::Division,
+        routes::challenges::ChallengePoints,
         settings::Settings,
     },
     Result,
@@ -155,8 +156,11 @@ impl Database for DbCache {
     async fn update_challenges(
         &self,
         update: &crate::grpc::proto::UpdateChallengesRequest,
+        score_type_map: Arc<
+            tokio::sync::Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>,
+        >,
     ) -> Result<()> {
-        self.inner.update_challenges(update).await?;
+        self.inner.update_challenges(update, score_type_map).await?;
         Ok(())
     }
 
