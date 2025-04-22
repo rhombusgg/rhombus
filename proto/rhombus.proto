@@ -35,6 +35,8 @@ message GetChallengesAdminRequest {}
 
 message GetChallengesAdminResponse {
     repeated ChallengeAdmin challenges = 1;
+    repeated Author authors = 2;
+    repeated Category categories = 3;
 }
 
 message ChallengeAdmin {
@@ -62,6 +64,8 @@ message Attachment {
 
 message UpdateChallengesRequest {
     repeated UpsertChallenge upsert_challenges = 1;
+    repeated Author upsert_authors = 2;
+    repeated Category upsert_categories = 3;
 }
 
 message UpdateChallengesResponse {}
@@ -79,5 +83,19 @@ message UpsertChallenge {
     // A string containing the json representation of challenge.yaml
     string metadata = 10;
     repeated Attachment attachments = 11;
+}
+
+message Author {
+    string id = 1;
+    string name = 2;
+    string avatar = 3;
+    uint64 discord_id = 4;
+}
+
+message Category {
+    string id = 1;
+    string name = 2;
+    string color = 3;
+    uint64 sequence = 4;
 }
 

@@ -10,6 +10,7 @@ use reqwest::Body;
 use rhombus_shared::challenges::{
     diff_challenges, load_challenges, update_challenges_request, upload_files,
     AttachmentIntermediate, AttachmentUpload, ChallengeIntermediate, ChallengeUpdateIntermediate,
+    ChallengesIntermediate,
 };
 use rhombus_shared::proto::GetChallengesAdminRequest;
 use std::{
@@ -80,32 +81,44 @@ impl ApplyCommand {
             .await?
             .into_inner();
 
-        let old_challenges = response
-            .challenges
-            .into_iter()
-            .map(|challenge| {
-                (
-                    challenge.id.clone(),
-                    ChallengeIntermediate {
-                        stable_id: challenge.id,
-                        author: challenge.author,
-                        category: challenge.category,
-                        description: challenge.description,
-                        files: challenge
-                            .attachments
-                            .into_iter()
-                            .map(|file| AttachmentIntermediate::Literal(file))
-                            .collect(),
-                        flag: challenge.flag,
-                        healthscript: challenge.healthscript,
-                        name: challenge.name,
-                        ticket_template: challenge.ticket_template,
-                        metadata: serde_json::from_str(&challenge.metadata).unwrap_or_default(),
-                        score_type: challenge.score_type,
-                    },
-                )
-            })
-            .collect::<BTreeMap<_, _>>();
+        let old_challenges = ChallengesIntermediate {
+            challenges: response
+                .challenges
+                .into_iter()
+                .map(|challenge| {
+                    (
+                        challenge.id.clone(),
+                        ChallengeIntermediate {
+                            stable_id: challenge.id,
+                            author: challenge.author,
+                            category: challenge.category,
+                            description: challenge.description,
+                            files: challenge
+                                .attachments
+                                .into_iter()
+                                .map(|file| AttachmentIntermediate::Literal(file))
+                                .collect(),
+                            flag: challenge.flag,
+                            healthscript: challenge.healthscript,
+                            name: challenge.name,
+                            ticket_template: challenge.ticket_template,
+                            metadata: serde_json::from_str(&challenge.metadata).unwrap_or_default(),
+                            score_type: challenge.score_type,
+                        },
+                    )
+                })
+                .collect::<BTreeMap<_, _>>(),
+            authors: response
+                .authors
+                .into_iter()
+                .map(|author| (author.id.clone(), author))
+                .collect(),
+            categories: response
+                .categories
+                .into_iter()
+                .map(|category| (category.id.clone(), category))
+                .collect(),
+        };
 
         let difference = diff_challenges(&old_challenges, &new_challenges);
 

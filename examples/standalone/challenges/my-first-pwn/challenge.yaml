@@ -8,7 +8,7 @@ flag: flag{this_is_a_fake_flag}
 category: pwn
 author: mbund
 score_type: static
-points: 100
+points: 1337
 files:
   - src: hello.py
     dst: main.py

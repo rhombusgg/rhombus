@@ -59,6 +59,7 @@ pub struct Category {
     pub id: String,
     pub name: String,
     pub color: String,
+    pub sequence: u64,
 }
 
 #[derive(Debug, Serialize, Clone)]

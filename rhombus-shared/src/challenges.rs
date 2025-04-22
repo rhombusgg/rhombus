@@ -1,5 +1,5 @@
 use crate::errors::{Result, RhombusSharedError};
-use crate::proto::{self, Attachment, UpdateChallengesRequest, UpsertChallenge};
+use crate::proto::{Attachment, Author, Category, UpdateChallengesRequest, UpsertChallenge};
 use figment::{
     providers::{Format, Yaml},
     Figment,
@@ -117,15 +117,40 @@ pub struct ChallengeIntermediate {
     pub score_type: String,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct ChallengesIntermediate {
+    pub challenges: BTreeMap<String, ChallengeIntermediate>,
+    pub authors: BTreeMap<String, Author>,
+    pub categories: BTreeMap<String, Category>,
+}
+
 #[derive(Clone, Debug)]
 /// A challenge update that can include uploading files
 pub enum ChallengeUpdateIntermediate {
-    Edit {
+    EditChallenge {
         old: ChallengeIntermediate,
         new: ChallengeIntermediate,
     },
-    Create(ChallengeIntermediate),
-    Delete {
+    CreateChallenge(ChallengeIntermediate),
+    DeleteChallenge {
+        stable_id: String,
+    },
+
+    EditAuthor {
+        old: Author,
+        new: Author,
+    },
+    CreateAuthor(Author),
+    DeleteAuthor {
+        stable_id: String,
+    },
+
+    EditCategory {
+        old: Category,
+        new: Category,
+    },
+    CreateCategory(Category),
+    DeleteCategory {
         stable_id: String,
     },
 }
@@ -145,11 +170,46 @@ fn absolutize(base: &Path, p: &Path) -> PathBuf {
     }
 }
 
-pub async fn load_challenges(
-    loader_path: &Path,
-) -> Result<BTreeMap<String, ChallengeIntermediate>> {
+pub async fn load_challenges(loader_path: &Path) -> Result<ChallengesIntermediate> {
+    let loader = Figment::new()
+        .merge(Yaml::file_exact(loader_path))
+        .extract::<LoaderYaml>()?;
+
+    let authors = loader
+        .authors
+        .into_iter()
+        .map(|author| {
+            (
+                author.stable_id.clone(),
+                Author {
+                    name: author.name.unwrap_or_else(|| author.stable_id.clone()),
+                    id: author.stable_id,
+                    avatar: author.avatar,
+                    discord_id: author.discord_id,
+                },
+            )
+        })
+        .collect();
+
+    let categories = loader
+        .categories
+        .into_iter()
+        .enumerate()
+        .map(|(sequence, category)| {
+            (
+                category.stable_id.clone(),
+                Category {
+                    name: category.name.unwrap_or_else(|| category.stable_id.clone()),
+                    id: category.stable_id,
+                    color: category.color,
+                    sequence: sequence as u64,
+                },
+            )
+        })
+        .collect();
+
     let search_path = absolutize(&PathBuf::from("."), loader_path.parent().unwrap());
-    let new_challenges = ChallengeYamlWalker::new(&search_path)
+    let challenges = ChallengeYamlWalker::new(&search_path)
         .into_iter()
         .map(|p| {
             let base_path = p.parent().unwrap_or(&p);
@@ -219,14 +279,19 @@ pub async fn load_challenges(
         })
         .collect::<Result<BTreeMap<_, _>>>()?;
 
-    Ok(new_challenges)
+    Ok(ChallengesIntermediate {
+        challenges,
+        authors,
+        categories,
+    })
 }
 
 pub fn diff_challenges(
-    old_challenges: &BTreeMap<String, ChallengeIntermediate>,
-    new_challenges: &BTreeMap<String, ChallengeIntermediate>,
+    old_challenges: &ChallengesIntermediate,
+    new_challenges: &ChallengesIntermediate,
 ) -> Vec<ChallengeUpdateIntermediate> {
     let hash_to_url: HashMap<String, String> = old_challenges
+        .challenges
         .values()
         .flat_map(|old_challenge| {
             old_challenge.files.iter().filter_map(|file| match file {
@@ -240,8 +305,8 @@ pub fn diff_challenges(
         .collect();
 
     let mut updates = vec![];
-    for (id, new_challenge) in new_challenges.iter() {
-        match old_challenges.get(id) {
+    for (id, new_challenge) in new_challenges.challenges.iter() {
+        match old_challenges.challenges.get(id) {
             Some(old_challenge) => {
                 let mut new_challenge = new_challenge.clone();
                 for file in new_challenge.files.iter_mut() {
@@ -261,20 +326,73 @@ pub fn diff_challenges(
                     }
                 }
                 if new_challenge != *old_challenge {
-                    updates.push(ChallengeUpdateIntermediate::Edit {
+                    updates.push(ChallengeUpdateIntermediate::EditChallenge {
                         old: old_challenge.clone(),
                         new: new_challenge,
                     });
                 }
             }
-            None => updates.push(ChallengeUpdateIntermediate::Create(new_challenge.clone())),
+            None => updates.push(ChallengeUpdateIntermediate::CreateChallenge(
+                new_challenge.clone(),
+            )),
         }
     }
     for id in old_challenges
+        .challenges
         .keys()
-        .filter(|id| !new_challenges.contains_key(*id))
+        .filter(|id| !new_challenges.challenges.contains_key(*id))
     {
-        updates.push(ChallengeUpdateIntermediate::Delete {
+        updates.push(ChallengeUpdateIntermediate::DeleteChallenge {
+            stable_id: id.clone(),
+        });
+    }
+
+    for (id, new_category) in new_challenges.categories.iter() {
+        match old_challenges.categories.get(id) {
+            Some(old_category) => {
+                if old_category != new_category {
+                    updates.push(ChallengeUpdateIntermediate::EditCategory {
+                        old: old_category.clone(),
+                        new: new_category.clone(),
+                    });
+                }
+            }
+            None => updates.push(ChallengeUpdateIntermediate::CreateCategory(
+                new_category.clone(),
+            )),
+        }
+    }
+    for id in old_challenges
+        .categories
+        .keys()
+        .filter(|id| !new_challenges.categories.contains_key(*id))
+    {
+        updates.push(ChallengeUpdateIntermediate::DeleteCategory {
+            stable_id: id.clone(),
+        });
+    }
+
+    for (id, new_author) in new_challenges.authors.iter() {
+        match old_challenges.authors.get(id) {
+            Some(old_author) => {
+                if old_author != new_author {
+                    updates.push(ChallengeUpdateIntermediate::EditAuthor {
+                        old: old_author.clone(),
+                        new: new_author.clone(),
+                    });
+                }
+            }
+            None => updates.push(ChallengeUpdateIntermediate::CreateAuthor(
+                new_author.clone(),
+            )),
+        }
+    }
+    for id in old_challenges
+        .authors
+        .keys()
+        .filter(|id| !new_challenges.authors.contains_key(*id))
+    {
+        updates.push(ChallengeUpdateIntermediate::DeleteAuthor {
             stable_id: id.clone(),
         });
     }
@@ -292,9 +410,9 @@ pub async fn upload_files<Fut: Future<Output = std::result::Result<String, Err>>
     let files_to_upload: BTreeMap<String, AttachmentUpload> = difference
         .iter()
         .filter_map(|update| match update {
-            ChallengeUpdateIntermediate::Edit { old: _, new } => Some(new),
-            ChallengeUpdateIntermediate::Create(chal) => Some(chal),
-            ChallengeUpdateIntermediate::Delete { .. } => None,
+            ChallengeUpdateIntermediate::EditChallenge { old: _, new } => Some(new),
+            ChallengeUpdateIntermediate::CreateChallenge(chal) => Some(chal),
+            _ => None,
         })
         .flat_map(|chal| chal.files.iter())
         .filter_map(|file| match file {
@@ -332,8 +450,8 @@ pub fn update_challenges_request(
         upsert_challenges: difference
             .iter()
             .filter_map(|update| match update {
-                ChallengeUpdateIntermediate::Edit { old: _, new } => Some(new),
-                ChallengeUpdateIntermediate::Create(new) => Some(new),
+                ChallengeUpdateIntermediate::EditChallenge { old: _, new } => Some(new),
+                ChallengeUpdateIntermediate::CreateChallenge(new) => Some(new),
                 _ => None,
             })
             .map(|new| UpsertChallenge {
@@ -365,6 +483,22 @@ pub fn update_challenges_request(
                         },
                     })
                     .collect(),
+            })
+            .collect(),
+        upsert_authors: difference
+            .iter()
+            .filter_map(|update| match update {
+                ChallengeUpdateIntermediate::EditAuthor { old: _, new } => Some(new.clone()),
+                ChallengeUpdateIntermediate::CreateAuthor(author) => Some(author.clone()),
+                _ => None,
+            })
+            .collect(),
+        upsert_categories: difference
+            .iter()
+            .filter_map(|update| match update {
+                ChallengeUpdateIntermediate::EditCategory { old: _, new } => Some(new.clone()),
+                ChallengeUpdateIntermediate::CreateCategory(category) => Some(category.clone()),
+                _ => None,
             })
             .collect(),
     }

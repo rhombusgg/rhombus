@@ -61,6 +61,9 @@ pub async fn route_challenges(
             .is_some()
     };
 
+    let mut categories: Vec<_> = challenge_data.categories.values().collect();
+    categories.sort_by_key(|x| x.sequence);
+
     let challenge_json = json!({
         "division_id": team.division_id,
         "ticket_enabled": ticket_enabled,
@@ -88,7 +91,7 @@ pub async fn route_challenges(
                 "url": attachment.url,
             })).collect::<serde_json::Value>(),
         })).collect::<serde_json::Value>(),
-        "categories": challenge_data.categories.values().map(|category| json!({
+        "categories": categories.into_iter().map(|category| json!({
             "id": category.id,
             "name": category.name,
             "color": category.color,

@@ -6,8 +6,8 @@ use super::routes::challenges::ChallengePoints;
 use crate::grpc::proto::rhombus_server::{Rhombus, RhombusServer};
 use crate::grpc::proto::whoami_reply::Whoami;
 use crate::grpc::proto::{
-    self, Attachment, ChallengeAdmin, GetChallengesAdminResponse, UpdateChallengesResponse, User,
-    WhoamiReply, FILE_DESCRIPTOR_SET,
+    self, Attachment, Author, Category, ChallengeAdmin, GetChallengesAdminResponse,
+    UpdateChallengesResponse, User, WhoamiReply, FILE_DESCRIPTOR_SET,
 };
 use crate::internal::database::provider::Connection;
 use crate::plugin::RunContext;
@@ -125,6 +125,26 @@ impl Rhombus for RhombusImpl {
                             hash: attachment.hash.clone(),
                         })
                         .collect(),
+                })
+                .collect(),
+            authors: challenges
+                .authors
+                .values()
+                .map(|author| Author {
+                    id: author.id.clone(),
+                    name: author.name.clone(),
+                    avatar: author.avatar_url.clone(),
+                    discord_id: author.discord_id.into(),
+                })
+                .collect(),
+            categories: challenges
+                .categories
+                .values()
+                .map(|category| Category {
+                    id: category.id.clone(),
+                    name: category.name.clone(),
+                    color: category.color.clone(),
+                    sequence: category.sequence,
                 })
                 .collect(),
         }))

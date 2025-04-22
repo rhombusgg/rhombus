@@ -760,13 +760,17 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await;
 
         let category_rows = tx
-            .query("SELECT * FROM rhombus_category ORDER BY sequence", ())
+            .query(
+                "SELECT id, name, color, sequence FROM rhombus_category ORDER BY sequence",
+                (),
+            )
             .await?;
         #[derive(Debug, Deserialize)]
         struct DbCategory {
             id: String,
             name: String,
             color: String,
+            sequence: u64,
         }
         let categories = category_rows
             .into_stream()
@@ -778,6 +782,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                         id: category.id,
                         name: category.name,
                         color: category.color,
+                        sequence: category.sequence,
                     },
                 )
             })
@@ -825,6 +830,24 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     ) -> Result<()> {
         let tx = self.transaction().await?;
 
+        for category in update.upsert_categories.iter() {
+            let _ = tx
+                .execute(
+                    "INSERT OR REPLACE INTO rhombus_category (id, name, color, sequence) VALUES (?1, ?2, ?3, ?4)",
+                    params!(category.id.as_str(), category.name.as_str(), category.color.as_str(), category.sequence),
+                )
+                .await?;
+        }
+
+        for author in update.upsert_authors.iter() {
+            let _ = tx
+            .execute(
+                    "INSERT OR REPLACE INTO rhombus_author (id, name, avatar, discord_id) VALUES (?1, ?2, ?3, ?4)",
+                    params!(author.id.as_str(), author.name.as_str(), author.avatar.as_str(), author.discord_id),
+                )
+                .await?;
+        }
+
         for challenge in update.upsert_challenges.iter() {
             let points = score_type_map
                 .lock()
@@ -844,10 +867,12 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
             _ = tx
                 .execute(
+                    &format!(
                     "
                     INSERT INTO rhombus_challenge (id, name, description, flag, category_id, author_id, ticket_template, healthscript, score_type, points, metadata)
                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
                     ON CONFLICT(id) DO UPDATE SET
+                        {}
                         name = excluded.name,
                         description = excluded.description,
                         flag = excluded.flag,
@@ -857,7 +882,9 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                         healthscript = excluded.healthscript,
                         score_type = excluded.score_type,
                         metadata = excluded.metadata
-                ",
+                    ",
+                    if challenge.score_type == "static" { "points = excluded.points," } else {""},
+                    ),
                     params!(
                         challenge.id.as_str(),
                         challenge.name.as_str(),
