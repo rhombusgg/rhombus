@@ -1,12 +1,12 @@
 categories:
+  - stable_id: pwn
+    color: "#ef4444"
   - stable_id: web
     color: "#22c55e"
   - stable_id: crypto
     color: "#f59e0b"
   - stable_id: misc
     color: "#a855f7"
-  - stable_id: pwn
-    color: "#ef4444"
 authors:
   - stable_id: mbund
     avatar: https://www.gravatar.com/avatar

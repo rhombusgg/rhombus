@@ -1,14 +1,14 @@
 stable_id: my-first-pwn
 name: my-first-pwn
 description: |
-  At the foothills of the Himalayas
-
+  asjdlfhljasdfhjls
+  
   `nc abc 123`
 flag: flag{this_is_a_fake_flag}
 category: pwn
 author: mbund
 score_type: static
-points: 1337
+points: 100
 files:
   - src: hello.py
     dst: main.py
