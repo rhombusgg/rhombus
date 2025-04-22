@@ -914,6 +914,26 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             }
         }
 
+        for author in update.delete_authors.iter() {
+            let _ = tx
+                .execute(
+                    "DELETE FROM rhombus_author WHERE id = ?1",
+                    params!(author.as_str()),
+                )
+                .await?;
+        }
+
+        for category in update.delete_categories.iter() {
+            let _ = tx
+                .execute(
+                    "DELETE FROM rhombus_category WHERE id = ?1",
+                    params!(category.as_str()),
+                )
+                .await?;
+        }
+
+        // TODO: delete challenges
+
         tx.commit().await?;
 
         Ok(())

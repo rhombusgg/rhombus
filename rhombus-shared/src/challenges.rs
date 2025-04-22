@@ -515,6 +515,31 @@ pub fn update_challenges_request(
                 _ => None,
             })
             .collect(),
+        delete_authors: difference
+            .iter()
+            .filter_map(|update| match update {
+                ChallengeUpdateIntermediate::DeleteAuthor { stable_id } => Some(stable_id.clone()),
+                _ => None,
+            })
+            .collect(),
+        delete_categories: difference
+            .iter()
+            .filter_map(|update| match update {
+                ChallengeUpdateIntermediate::DeleteCategory { stable_id } => {
+                    Some(stable_id.clone())
+                }
+                _ => None,
+            })
+            .collect(),
+        delete_challenges: difference
+            .iter()
+            .filter_map(|update| match update {
+                ChallengeUpdateIntermediate::DeleteChallenge { stable_id } => {
+                    Some(stable_id.clone())
+                }
+                _ => None,
+            })
+            .collect(),
     }
 }
 

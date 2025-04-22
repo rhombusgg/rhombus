@@ -66,6 +66,9 @@ message UpdateChallengesRequest {
     repeated UpsertChallenge upsert_challenges = 1;
     repeated Author upsert_authors = 2;
     repeated Category upsert_categories = 3;
+    repeated string delete_authors = 4;
+    repeated string delete_categories = 5;
+    repeated string delete_challenges = 6;
 }
 
 message UpdateChallengesResponse {}
