@@ -1,1 +1,1 @@
-# CLI Tool for Rhombus
+# Code shared between rhombus and rhombus-cli

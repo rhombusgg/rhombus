@@ -121,6 +121,7 @@ impl ApplyCommand {
             return Ok(());
         }
 
+        // TODO: Print better
         println!("{:#?}", difference);
 
         if !inquire::prompt_confirmation("Apply changes?")? {
