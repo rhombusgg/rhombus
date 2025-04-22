@@ -932,7 +932,22 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                 .await?;
         }
 
-        // TODO: delete challenges
+        // TODO: this fails when the challenge has solves
+        for challenge in update.delete_challenges.iter() {
+            let _ = tx
+                .execute(
+                    "DELETE FROM rhombus_file_attachment WHERE challenge_id = ?1",
+                    params!(challenge.as_str()),
+                )
+                .await?;
+
+            let _ = tx
+                .execute(
+                    "DELETE FROM rhombus_challenge WHERE id = ?1",
+                    params!(challenge.as_str()),
+                )
+                .await?;
+        }
 
         tx.commit().await?;
 
