@@ -1,4 +1,5 @@
 use config::ConfigError;
+use rhombus_shared::errors::RhombusSharedError;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, RhombusError>;
@@ -72,6 +73,9 @@ pub enum RhombusError {
 
     #[error("{0}")]
     ChallengeDefinition(#[from] ChallengeDefinitionError),
+
+    #[error("{0}")]
+    RhombusShared(#[from] RhombusSharedError),
 }
 
 #[derive(Error, Debug)]

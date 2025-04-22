@@ -1,4 +1,5 @@
-use std::net::IpAddr;
+use rhombus::challenge_loader_plugin::ChallengeLoaderPlugin;
+use std::{net::IpAddr, path::PathBuf};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -24,7 +25,7 @@ async fn main() {
     let app = rhombus::Builder::default()
         .load_env()
         .config_source(rhombus::config::File::with_name("config"))
-        // .plugin(ChallengeLoaderPlugin::new(PathBuf::from("challenges")))
+        .plugin(ChallengeLoaderPlugin::new(PathBuf::from("challenges")))
         .extractor(move |_, _| Some(ip))
         .build()
         .await
