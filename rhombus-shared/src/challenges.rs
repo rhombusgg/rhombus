@@ -189,7 +189,7 @@ pub async fn load_challenges(loader_path: &Path) -> Result<ChallengesIntermediat
                 },
             )
         })
-        .collect();
+        .collect::<BTreeMap<_, _>>();
 
     let categories = loader
         .categories
@@ -206,7 +206,7 @@ pub async fn load_challenges(loader_path: &Path) -> Result<ChallengesIntermediat
                 },
             )
         })
-        .collect();
+        .collect::<BTreeMap<_, _>>();
 
     let search_path = absolutize(&PathBuf::from("."), loader_path.parent().unwrap());
     let challenges = ChallengeYamlWalker::new(&search_path)
@@ -277,6 +277,21 @@ pub async fn load_challenges(loader_path: &Path) -> Result<ChallengesIntermediat
                 })
         })
         .collect::<Result<BTreeMap<_, _>>>()?;
+
+    for challenge in challenges.values() {
+        authors.get(&challenge.author).ok_or_else(|| {
+            RhombusSharedError::AuthorNotFound(
+                challenge.author.clone(),
+                challenge.stable_id.clone(),
+            )
+        })?;
+        categories.get(&challenge.category).ok_or_else(|| {
+            RhombusSharedError::CategoryNotFound(
+                challenge.category.clone(),
+                challenge.stable_id.clone(),
+            )
+        })?;
+    }
 
     Ok(ChallengesIntermediate {
         challenges,
