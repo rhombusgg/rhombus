@@ -2,7 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     net::IpAddr,
     num::NonZeroU64,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 use async_trait::async_trait;
@@ -162,8 +162,8 @@ impl Database for Postgres {
 
     async fn update_challenges(
         &self,
-        update: &crate::grpc::proto::UpdateChallengesRequest,
-        score_type_map: Arc<
+        _update: &rhombus_shared::proto::UpdateChallengesRequest,
+        _score_type_map: Arc<
             tokio::sync::Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>,
         >,
     ) -> Result<()> {

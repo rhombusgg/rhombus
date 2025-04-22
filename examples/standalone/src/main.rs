@@ -1,4 +1,4 @@
-use std::{net::IpAddr, path::PathBuf};
+use std::net::IpAddr;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]

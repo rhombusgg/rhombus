@@ -2,7 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     net::IpAddr,
     num::NonZeroU64,
-    sync::{Arc, Mutex, Weak},
+    sync::{Arc, Weak},
 };
 
 use async_trait::async_trait;
@@ -233,7 +233,7 @@ pub trait Database {
     async fn get_challenges(&self) -> Result<Challenges>;
     async fn update_challenges(
         &self,
-        update: &crate::grpc::proto::UpdateChallengesRequest,
+        update: &rhombus_shared::proto::UpdateChallengesRequest,
         score_type_map: Arc<
             tokio::sync::Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>,
         >,

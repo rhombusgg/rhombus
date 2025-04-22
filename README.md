@@ -57,6 +57,7 @@ Run `task dev` to start the `standalone` example. This will build the project an
 │   ├── migrations/      # SQL database migrations
 │   ├── locales/         # translations for the UI
 ├── rhombus-cli/         # CLI tool to manage and play CTFs
+├── rhombus-shared/      # code shared by rhombus-cli and rhombus
 ├── rhombus-build/       # core library for build scripts
 ├── docs/                # hosted docs on https://rhombus.gg
 └── examples/

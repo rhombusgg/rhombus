@@ -210,14 +210,13 @@ pub async fn load_challenges(loader_path: &Path) -> Result<ChallengesIntermediat
 
     let search_path = absolutize(&PathBuf::from("."), loader_path.parent().unwrap());
     let challenges = ChallengeYamlWalker::new(&search_path)
-        .into_iter()
         .map(|p| {
             let base_path = p.parent().unwrap_or(&p);
             let metadata = serde_yml::from_reader(std::fs::File::open(&p)?)?;
             Figment::new()
                 .merge(Yaml::file_exact(&p))
                 .extract::<ChallengeYaml>()
-                .map_err(|err| RhombusSharedError::Figment(err))
+                .map_err(RhombusSharedError::Figment)
                 .and_then(|challenge_yaml| {
                     // TODO: Ask Mark if this should be done differently
                     let description = markdown::to_html_with_options(
@@ -231,7 +230,7 @@ pub async fn load_challenges(loader_path: &Path) -> Result<ChallengesIntermediat
                             ..markdown::Options::default()
                         },
                     )
-                    .map_err(|message| RhombusSharedError::Markdown(message))?;
+                    .map_err(RhombusSharedError::Markdown)?;
                     let files = challenge_yaml
                         .files
                         .into_iter()
@@ -505,7 +504,7 @@ pub fn update_challenges_request(
 }
 
 pub fn hash_file(path: &Path) -> Result<String> {
-    let data = std::fs::read(&path)?;
+    let data = std::fs::read(path)?;
     let digest = ring::digest::digest(&ring::digest::SHA256, &data);
     let hash = slice_to_hex_string(digest.as_ref());
     Ok(hash)

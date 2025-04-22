@@ -3,14 +3,14 @@ use std::sync::Arc;
 
 use super::auth::KeyHolder;
 use super::routes::challenges::ChallengePoints;
-use crate::grpc::proto::rhombus_server::{Rhombus, RhombusServer};
-use crate::grpc::proto::whoami_reply::Whoami;
-use crate::grpc::proto::{
+use crate::internal::database::provider::Connection;
+use crate::plugin::RunContext;
+use rhombus_shared::proto::rhombus_server::{Rhombus, RhombusServer};
+use rhombus_shared::proto::whoami_reply::Whoami;
+use rhombus_shared::proto::{
     self, Attachment, Author, Category, ChallengeAdmin, GetChallengesAdminResponse,
     UpdateChallengesResponse, User, WhoamiReply, FILE_DESCRIPTOR_SET,
 };
-use crate::internal::database::provider::Connection;
-use crate::plugin::RunContext;
 
 struct RhombusImpl {
     db: Connection,
@@ -93,7 +93,7 @@ impl Rhombus for RhombusImpl {
         &self,
         request: tonic::Request<proto::GetChallengesAdminRequest>,
     ) -> std::result::Result<tonic::Response<GetChallengesAdminResponse>, tonic::Status> {
-        let _ = self.get_admin_key_holder(request.metadata());
+        let _ = self.get_admin_key_holder(request.metadata()).await?;
         let challenges = self
             .db
             .get_challenges()
@@ -154,7 +154,7 @@ impl Rhombus for RhombusImpl {
         &self,
         request: tonic::Request<proto::UpdateChallengesRequest>,
     ) -> std::result::Result<tonic::Response<UpdateChallengesResponse>, tonic::Status> {
-        let _ = self.get_admin_key_holder(request.metadata());
+        let _ = self.get_admin_key_holder(request.metadata()).await?;
         let update = request.into_inner();
 
         self.db

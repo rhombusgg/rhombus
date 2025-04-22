@@ -1,7 +1,6 @@
-use crate::{get_client, ClientInfo};
-use anyhow::{anyhow, Result};
+use crate::get_client;
+use anyhow::Result;
 use clap::Subcommand;
-use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
 use rand::{
     distributions::{Alphanumeric, DistString},
     thread_rng,
@@ -9,20 +8,15 @@ use rand::{
 use reqwest::Body;
 use rhombus_shared::challenges::{
     diff_challenges, load_challenges, update_challenges_request, upload_files,
-    AttachmentIntermediate, AttachmentUpload, ChallengeIntermediate, ChallengeUpdateIntermediate,
-    ChallengesIntermediate,
+    AttachmentIntermediate, ChallengeIntermediate, ChallengesIntermediate,
 };
 use rhombus_shared::proto::GetChallengesAdminRequest;
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
 };
-use tokio::{fs::File, stream};
-use tokio_util::{
-    bytes::Bytes,
-    codec::{BytesCodec, FramedRead},
-    io::ReaderStream,
-};
+use tokio::fs::File;
+use tokio_util::codec::{BytesCodec, FramedRead};
 
 #[derive(Subcommand, Debug)]
 pub enum AdminCommand {
@@ -96,7 +90,7 @@ impl ApplyCommand {
                             files: challenge
                                 .attachments
                                 .into_iter()
-                                .map(|file| AttachmentIntermediate::Literal(file))
+                                .map(AttachmentIntermediate::Literal)
                                 .collect(),
                             flag: challenge.flag,
                             healthscript: challenge.healthscript,

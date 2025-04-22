@@ -2,7 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     net::IpAddr,
     num::NonZeroU64,
-    sync::{Arc, LazyLock, Mutex},
+    sync::{Arc, LazyLock},
     time::Duration,
 };
 
@@ -155,7 +155,7 @@ impl Database for DbCache {
 
     async fn update_challenges(
         &self,
-        update: &crate::grpc::proto::UpdateChallengesRequest,
+        update: &rhombus_shared::proto::UpdateChallengesRequest,
         score_type_map: Arc<
             tokio::sync::Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>,
         >,

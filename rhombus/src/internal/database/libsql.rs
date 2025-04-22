@@ -823,7 +823,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
 
     async fn update_challenges(
         &self,
-        update: &crate::grpc::proto::UpdateChallengesRequest,
+        update: &rhombus_shared::proto::UpdateChallengesRequest,
         score_type_map: Arc<
             tokio::sync::Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>,
         >,
@@ -892,7 +892,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                         challenge.flag.as_str(),
                         challenge.category.as_str(),
                         challenge.author.as_str(),
-                        challenge.ticket_template.as_ref().map(|x| x.as_str()),
+                        challenge.ticket_template.as_deref(),
                         challenge.healthscript.as_deref(),
                         challenge.score_type.as_str(),
                         points,
@@ -908,7 +908,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                             INSERT OR REPLACE INTO rhombus_file_attachment (challenge_id, name, url, hash)
                             VALUES (?1, ?2, ?3, ?4)
                         ",
-                        params!(challenge.id.as_str(), attachment.name.as_str(), attachment.url.as_str(), attachment.hash.as_ref().map(|x| x.as_str())),
+                        params!(challenge.id.as_str(), attachment.name.as_str(), attachment.url.as_str(), attachment.hash.as_deref()),
                     )
                     .await?;
             }
