@@ -62,7 +62,7 @@ impl RhombusImpl {
     ) -> std::result::Result<KeyHolder, tonic::Status> {
         let key_holder = self.get_key_holder(metadata).await?;
         if !key_holder.is_admin() {
-            return Err(tonic::Status::unauthenticated("Invalid api key"));
+            return Err(tonic::Status::unauthenticated("Unauthorized"));
         }
         Ok(key_holder)
     }
