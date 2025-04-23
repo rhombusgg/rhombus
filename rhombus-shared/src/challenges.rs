@@ -60,6 +60,7 @@ pub struct LoaderYaml {
     pub authors: Vec<AuthorYaml>,
     pub categories: Vec<CategoryYaml>,
 }
+
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AuthorYaml {
     pub stable_id: String,
@@ -415,8 +416,7 @@ pub fn diff_challenges(
 }
 
 /// Takes a function used to upload a file, and runs it for all the files which need to be uploaded,
-/// replacing the AttachmentIntermediate::Upload with an AttachmentIntermediate::Literal
-/// `f` should take the file to upload and return its uploaded url
+/// Returns a map from hash to url
 pub async fn upload_files<Fut: Future<Output = std::result::Result<String, Err>>, Err>(
     difference: &[ChallengeUpdateIntermediate],
     f: impl Clone + Fn(&AttachmentUpload) -> Fut,
@@ -455,7 +455,6 @@ pub async fn upload_files<Fut: Future<Output = std::result::Result<String, Err>>
 }
 
 /// Takes the difference in challenges and the uploaded files map (hash to url) returned by [upload_files]
-/// Panics if `uploaded_files` is missing any hash
 pub fn update_challenges_request(
     difference: &[ChallengeUpdateIntermediate],
     uploaded_files: &BTreeMap<String, String>,
