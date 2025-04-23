@@ -5,10 +5,169 @@
   <div
     class="my-4 grid h-fit w-full grid-cols-1 gap-4 px-4 md:grid-cols-[repeat(auto-fit,minmax(600px,1fr))]"
     id="challenges"
-  ></div>
-
-  <div class="hidden" id="initial-challenge-json">
-    {{- challenge_json | tojson -}}
+    hx-get="/challenges"
+    hx-trigger="manualRefresh from:body, focus from:window"
+    hx-select="#challenges"
+    hx-target="#challenges"
+    hx-swap="outerHTML"
+    hx-disinherit="*"
+  >
+    {% for category_id, category in challenge_data.categories | items | sort(attribute="1.sequence") %}
+      {% set challenges = challenge_data.challenges | items | map(attribute="1") | selectattr("category_id", "==", category.id) | sort(attribute="points") %}
+      <div>
+        <div
+          class="flex justify-between rounded-md p-4 font-bold"
+          style="background-color: {{ category.color }}"
+        >
+          <span>{{ category.name }}</span>
+          <span>
+            {{ challenges | selectattr("id", "in", team.solves) | length }} /
+            {{ challenges | length }}
+          </span>
+        </div>
+        <ul class="flex flex-col gap-4 px-2 pt-4">
+          {% for challenge in challenges %}
+            {% set solve=team.solves[challenge.id] %}
+            {% set author=challenge_data.authors[challenge.author_id] %}
+            <li
+              class="bg-card ring-offset-background border-l-4 p-4 ring-offset-4"
+              style="border-color: {{ category.color }}; --tw-ring-color: {{ category.color }}"
+            >
+              <div class="mb-2 flex h-8 justify-between">
+                <div class="flex items-center gap-2 font-bold">
+                  <button
+                    hx-trigger="click"
+                    hx-get="/challenges/{{ challenge.id }}"
+                    hx-target="body"
+                    hx-swap="beforeend"
+                  >
+                    <span style="color: {{ category.color }}">
+                      {{ category.name }} /
+                    </span>
+                    <span> {{ challenge.name }}</span>
+                  </button>
+                  <div
+                    class="{% if challenge.healthy %}bg-green-500{% else %}bg-red-500{% endif %} size-3 cursor-pointer rounded-full"
+                  ></div>
+                </div>
+                <div class="flex items-center gap-4">
+                  {% if solve %}
+                    {% set solved_user = team.users[solve.user_id] %}
+                    <a
+                      hx-boost="true"
+                      hx-select="#screen"
+                      hx-target="#screen"
+                      hx-swap="outerHTML"
+                      href="/user/{{ solve.user_id }}"
+                    >
+                      <img
+                        class="aspect-square h-8 rounded-full"
+                        title="{{ t('solved-by', name=solved_user.name) }}"
+                        src="{{ solved_user.avatar_url }}"
+                      />
+                    </a>
+                  {% endif %}
+                  <span class="cursor-pointer"
+                    >{{ t("solves-points", solves=challenge.division_solves[team.division_id], points=(solve.points if solve and solve.points else challenge.points)) }}</span
+                  >
+                  <img
+                    class="aspect-square h-8 rounded-full"
+                    title="{{ t('authored-by', name=author.name) }}"
+                    src="{{ author.avatar_url }}"
+                  />
+                  {% if ticket_enabled %}
+                    <button
+                      hx-trigger="click"
+                      hx-get="/challenges/{{ challenge.id }}/ticket"
+                      hx-target="body"
+                      hx-swap="beforeend"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        class="lucide lucide-ticket -rotate-45"
+                      >
+                        <path
+                          d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+                        />
+                        <path d="M13 5v2" />
+                        <path d="M13 17v2" />
+                        <path d="M13 11v2" />
+                      </svg>
+                    </button>
+                  {% endif %}
+                  <button
+                    hx-trigger="click"
+                    hx-get="/challenges/{{ challenge.id }}"
+                    hx-target="body"
+                    hx-swap="beforeend"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      class="lucide lucide-flag"
+                    >
+                      <path
+                        d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"
+                      />
+                      <line x1="4" x2="4" y1="22" y2="15" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="prose dark:prose-invert">
+                {{ challenge.description | safe }}
+              </div>
+              {% if challenge.attachments | length > 0 %}
+                <div class="mt-4 flex gap-2">
+                  {% for attachment in challenge.attachments %}
+                    <a
+                      class="flex max-w-fit rounded-lg py-1 pl-1 pr-2"
+                      style="background-color: {{ category.color }}77"
+                      href="{{ attachment.url }}"
+                    >
+                      <div class="scale-75">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          class="lucide lucide-paperclip"
+                        >
+                          <path
+                            d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"
+                          />
+                        </svg>
+                      </div>
+                      {{ attachment.name }}
+                    </a>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endfor %}
   </div>
   <script src="/static/challenges.js"></script>
 {% endblock %}

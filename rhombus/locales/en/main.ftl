@@ -4,6 +4,9 @@ team = Team
 account = Account
 challenges = Challenges
 
+solved-by = Solved by {$name}
+authored-by = Authored by {$name}
+
 account-description = Manage your individual account settings. View
     {$link_start}public profile{$link_end}.
 account-discord-integration = Discord Integration

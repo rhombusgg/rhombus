@@ -1,15 +1,11 @@
-use core::panic;
-use std::{
-    collections::BTreeSet,
-    fs::{self, ReadDir},
-    hash::{BuildHasher, BuildHasherDefault, Hasher},
-    path::{Path, PathBuf},
+use crate::{
+    errors::RhombusError,
+    internal::router::RouterState,
+    plugin::{PluginMeta, RunContext},
+    Plugin, Result, UploadProvider,
 };
-
 use axum::Router;
-use config::Config;
-use futures::{StreamExt, TryFutureExt, TryStreamExt};
-use libsql::params;
+use futures::TryStreamExt;
 use rhombus_shared::{
     challenges::{
         diff_challenges, load_challenges, update_challenges_request, upload_files,
@@ -17,22 +13,12 @@ use rhombus_shared::{
     },
     proto::{Attachment, Author, Category},
 };
-use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use tokio_util::{
     bytes::BytesMut,
     codec::{BytesCodec, FramedRead},
 };
 use tracing::info;
-
-use crate::{
-    errors::RhombusError,
-    internal::{
-        database::libsql::LibSQLConnection, local_upload_provider::slice_to_hex_string,
-        router::RouterState, routes::challenges,
-    },
-    plugin::{PluginMeta, RunContext},
-    Plugin, Result, UploadProvider,
-};
 
 pub struct ChallengeLoaderPlugin {
     pub path: PathBuf,

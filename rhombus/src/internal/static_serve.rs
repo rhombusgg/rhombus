@@ -22,7 +22,7 @@ pub async fn route_static_serve(uri: Uri, req: Request<Body>) -> impl IntoRespon
 
     let service = ServeDir::new("static");
     let Ok(response) = service.oneshot(req).await else {
-        unreachable!()
+        return (StatusCode::NOT_FOUND, "Not Found").into_response();
     };
 
     if response.status().is_informational()
