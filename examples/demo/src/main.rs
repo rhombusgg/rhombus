@@ -255,9 +255,7 @@ async fn create_team(libsql: Arc<LibSQL>, db: Connection, location_url: &str) ->
 async fn solve_challenge(
     libsql: Arc<LibSQL>,
     db: Connection,
-    score_type_map: Arc<
-        tokio::sync::Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>,
-    >,
+    score_type_map: Arc<Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>>,
 ) -> Result<()> {
     let conn = libsql.connect().await?;
 
