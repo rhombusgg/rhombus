@@ -10,9 +10,9 @@ author: mbund
 score_type: static
 points: 100
 files:
-  - src: hello.py
-    dst: main.py
   - url: https://upload.wikimedia.org/wikipedia/commons/f/f6/Great_Sphinx_of_Giza_-_20080716a.jpg
     dst: statue.jpg
+  - src: hello.py
+    dst: main.py
 ticket_template: |
   # Web template

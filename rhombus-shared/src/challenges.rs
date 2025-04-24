@@ -103,6 +103,15 @@ pub enum AttachmentIntermediate {
     Upload(AttachmentUpload),
 }
 
+impl AttachmentIntermediate {
+    pub fn name(&self) -> &str {
+        match self {
+            AttachmentIntermediate::Literal(attachment) => attachment.name.as_str(),
+            AttachmentIntermediate::Upload(attachment_upload) => attachment_upload.name.as_str(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ChallengeIntermediate {
     pub stable_id: String,
