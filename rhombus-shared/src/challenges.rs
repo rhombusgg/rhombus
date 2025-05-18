@@ -181,6 +181,12 @@ fn absolutize(base: &Path, p: &Path) -> PathBuf {
 }
 
 pub async fn load_challenges(loader_path: &Path) -> Result<ChallengesIntermediate> {
+    if !loader_path.exists() {
+        Err(RhombusSharedError::LoaderYamlDoesNotExist(
+            loader_path.to_path_buf(),
+        ))?;
+    }
+
     let loader = Figment::new()
         .merge(Yaml::file_exact(loader_path))
         .extract::<LoaderYaml>()?;
@@ -228,7 +234,6 @@ pub async fn load_challenges(loader_path: &Path) -> Result<ChallengesIntermediat
                 .extract::<ChallengeYaml>()
                 .map_err(RhombusSharedError::Figment)
                 .and_then(|challenge_yaml| {
-                    // TODO: Ask Mark if this should be done differently
                     let description = markdown::to_html_with_options(
                         &challenge_yaml.description,
                         &markdown::Options {
@@ -241,6 +246,7 @@ pub async fn load_challenges(loader_path: &Path) -> Result<ChallengesIntermediat
                         },
                     )
                     .map_err(RhombusSharedError::Markdown)?;
+
                     let files = challenge_yaml
                         .files
                         .into_iter()

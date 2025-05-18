@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, RhombusSharedError>;
@@ -24,4 +26,7 @@ pub enum RhombusSharedError {
 
     #[error("Author {0} not found for challenge {1}")]
     AuthorNotFound(String, String),
+
+    #[error("loader.yaml does not exist: {0}")]
+    LoaderYamlDoesNotExist(PathBuf),
 }
