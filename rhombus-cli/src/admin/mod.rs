@@ -172,6 +172,113 @@ fn render_difference(difference: &[ChallengeUpdateIntermediate]) {
 
     let mut renderer = DiffRenderer::new();
     for item in difference {
+        for item in difference {
+            if let ChallengeUpdateIntermediate::CreateAuthor(author) = item {
+                println!("{}", "Create author:".green());
+                renderer.indent();
+                renderer.attribute("stable_id", author.id.as_str());
+                renderer.attribute("name", author.name.as_str());
+                renderer.attribute("avatar", author.avatar.as_str());
+                renderer.attribute("discord_id", author.discord_id);
+                renderer.unindent();
+                println!("");
+            }
+        }
+        for item in difference {
+            if let ChallengeUpdateIntermediate::EditAuthor { old, new } = item {
+                println!("{}", "Edit author:".yellow());
+                renderer.indent();
+                renderer.attribute("stable_id", old.id.as_str());
+                renderer.attribute_if_changed("name", old.name.as_str(), new.name.as_str());
+                renderer.attribute_if_changed("avatar", old.avatar.as_str(), new.avatar.as_str());
+                renderer.attribute_if_changed("discord_id", old.discord_id, new.discord_id);
+
+                renderer.unindent();
+                println!("");
+            }
+        }
+        for item in difference {
+            if let ChallengeUpdateIntermediate::DeleteAuthor { stable_id } = item {
+                println!("{}", "Delete author:".red());
+                renderer.indent();
+                renderer.attribute("stable_id", stable_id.clone());
+                renderer.unindent();
+                println!("");
+            }
+        }
+
+        for item in difference {
+            if let ChallengeUpdateIntermediate::CreateCategory(category) = item {
+                println!("{}", "Create category:".green());
+                renderer.indent();
+                renderer.attribute("stable_id", category.id.as_str());
+                renderer.attribute("name", category.name.as_str());
+                renderer.attribute("color", category.color.as_str());
+                renderer.attribute("sequence", category.sequence);
+                renderer.unindent();
+                println!("");
+            }
+        }
+        for item in difference {
+            if let ChallengeUpdateIntermediate::EditCategory { old, new } = item {
+                println!("{}", "Edit author:".yellow());
+                renderer.indent();
+                renderer.attribute("stable_id", old.id.as_str());
+                renderer.attribute_if_changed("name", old.name.as_str(), new.name.as_str());
+                renderer.attribute_if_changed("avatar", old.color.as_str(), new.color.as_str());
+                renderer.attribute_if_changed("discord_id", old.sequence, new.sequence);
+                renderer.unindent();
+                println!("");
+            }
+        }
+        for item in difference {
+            if let ChallengeUpdateIntermediate::DeleteCategory { stable_id } = item {
+                println!("{}", "Delete category:".red());
+                renderer.indent();
+                renderer.attribute("stable_id", stable_id.clone());
+                renderer.unindent();
+                println!("");
+            }
+        }
+
+        for item in difference {
+            if let ChallengeUpdateIntermediate::CreateChallenge(challenge) = item {
+                println!("{}", "Create challenge:".green());
+                renderer.indent();
+                renderer.attribute("stable_id", challenge.stable_id.as_str());
+                renderer.attribute("author", challenge.author.as_str());
+                renderer.attribute("category", challenge.category.as_str());
+                renderer.attribute("description", challenge.description.as_str());
+                renderer.attribute("flag", challenge.flag.as_str());
+                renderer.attribute("name", challenge.name.as_str());
+                renderer.attribute(
+                    "healthscript",
+                    challenge.healthscript.as_ref().map(String::as_str),
+                );
+                renderer.attribute(
+                    "ticket_template",
+                    challenge.ticket_template.as_ref().map(String::as_str),
+                );
+                renderer.attribute("score_type", challenge.score_type.as_str());
+                if let Value::Object(metadata) = challenge.metadata.clone() {
+                    for (key, value) in metadata
+                        .into_iter()
+                        .filter(|(key, _)| !ignored_metadata_keys.contains(key.as_str()))
+                    {
+                        renderer.attribute(&key, value);
+                    }
+                } else {
+                    renderer.attribute("metadata", challenge.metadata.clone());
+                }
+                renderer.block("files");
+                for file in challenge.files.iter() {
+                    renderer.file(file);
+                }
+                renderer.unindent();
+                renderer.unindent();
+                println!("");
+            }
+        }
         if let ChallengeUpdateIntermediate::EditChallenge { old, new } = item {
             println!("{}", "Edit challenge:".yellow());
             renderer.indent();
@@ -280,44 +387,6 @@ fn render_difference(difference: &[ChallengeUpdateIntermediate]) {
                 }
             }
 
-            renderer.unindent();
-            println!("");
-        }
-    }
-    for item in difference {
-        if let ChallengeUpdateIntermediate::CreateChallenge(challenge) = item {
-            println!("{}", "Create challenge:".green());
-            renderer.indent();
-            renderer.attribute("stable_id", challenge.stable_id.as_str());
-            renderer.attribute("author", challenge.author.as_str());
-            renderer.attribute("category", challenge.category.as_str());
-            renderer.attribute("description", challenge.description.as_str());
-            renderer.attribute("flag", challenge.flag.as_str());
-            renderer.attribute("name", challenge.name.as_str());
-            renderer.attribute(
-                "healthscript",
-                challenge.healthscript.as_ref().map(String::as_str),
-            );
-            renderer.attribute(
-                "ticket_template",
-                challenge.ticket_template.as_ref().map(String::as_str),
-            );
-            renderer.attribute("score_type", challenge.score_type.as_str());
-            if let Value::Object(metadata) = challenge.metadata.clone() {
-                for (key, value) in metadata
-                    .into_iter()
-                    .filter(|(key, _)| !ignored_metadata_keys.contains(key.as_str()))
-                {
-                    renderer.attribute(&key, value);
-                }
-            } else {
-                renderer.attribute("metadata", challenge.metadata.clone());
-            }
-            renderer.block("files");
-            for file in challenge.files.iter() {
-                renderer.file(file);
-            }
-            renderer.unindent();
             renderer.unindent();
             println!("");
         }
