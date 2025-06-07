@@ -18,7 +18,7 @@ tasks:
     cmds:
       - systemfd --no-pid -s http::3000 -- mold -run cargo watch -x 'run -p standalone'
 
-  run-stanadlone:
+  run-standalone:
     desc: Run the standalone example
     dir: examples/standalone
     cmds:

@@ -558,7 +558,8 @@ pub fn update_challenges_request(
 }
 
 pub fn hash_file(path: &Path) -> Result<String> {
-    let data = std::fs::read(path)?;
+    let data = std::fs::read(path)
+        .map_err(|err| RhombusSharedError::FailedToReadFile(path.to_path_buf(), err))?;
     let digest = ring::digest::digest(&ring::digest::SHA256, &data);
     let hash = slice_to_hex_string(digest.as_ref());
     Ok(hash)

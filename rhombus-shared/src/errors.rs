@@ -29,4 +29,7 @@ pub enum RhombusSharedError {
 
     #[error("loader.yaml does not exist: {0}")]
     LoaderYamlDoesNotExist(PathBuf),
+
+    #[error("Failed to read file {0}")]
+    FailedToReadFile(PathBuf, #[source] std::io::Error),
 }
