@@ -180,7 +180,7 @@ fn render_difference(difference: &[ChallengeUpdateIntermediate]) {
             renderer.attribute("avatar", author.avatar.as_str());
             renderer.attribute("discord_id", author.discord_id);
             renderer.unindent();
-            println!("");
+            println!();
         }
     }
     for item in difference {
@@ -193,16 +193,16 @@ fn render_difference(difference: &[ChallengeUpdateIntermediate]) {
             renderer.attribute_if_changed("discord_id", old.discord_id, new.discord_id);
 
             renderer.unindent();
-            println!("");
+            println!();
         }
     }
     for item in difference {
         if let ChallengeUpdateIntermediate::DeleteAuthor { stable_id } = item {
             println!("{}", "Delete author:".red());
             renderer.indent();
-            renderer.attribute("stable_id", stable_id.clone());
+            renderer.attribute("stable_id", stable_id.as_str());
             renderer.unindent();
-            println!("");
+            println!();
         }
     }
 
@@ -215,7 +215,7 @@ fn render_difference(difference: &[ChallengeUpdateIntermediate]) {
             renderer.attribute("color", category.color.as_str());
             renderer.attribute("sequence", category.sequence);
             renderer.unindent();
-            println!("");
+            println!();
         }
     }
     for item in difference {
@@ -227,16 +227,16 @@ fn render_difference(difference: &[ChallengeUpdateIntermediate]) {
             renderer.attribute_if_changed("avatar", old.color.as_str(), new.color.as_str());
             renderer.attribute_if_changed("discord_id", old.sequence, new.sequence);
             renderer.unindent();
-            println!("");
+            println!();
         }
     }
     for item in difference {
         if let ChallengeUpdateIntermediate::DeleteCategory { stable_id } = item {
             println!("{}", "Delete category:".red());
             renderer.indent();
-            renderer.attribute("stable_id", stable_id.clone());
+            renderer.attribute("stable_id", stable_id.as_str());
             renderer.unindent();
-            println!("");
+            println!();
         }
     }
 
@@ -250,14 +250,8 @@ fn render_difference(difference: &[ChallengeUpdateIntermediate]) {
             renderer.attribute("description", challenge.description.as_str());
             renderer.attribute("flag", challenge.flag.as_str());
             renderer.attribute("name", challenge.name.as_str());
-            renderer.attribute(
-                "healthscript",
-                challenge.healthscript.as_ref().map(String::as_str),
-            );
-            renderer.attribute(
-                "ticket_template",
-                challenge.ticket_template.as_ref().map(String::as_str),
-            );
+            renderer.attribute("healthscript", challenge.healthscript.as_deref());
+            renderer.attribute("ticket_template", challenge.ticket_template.as_deref());
             renderer.attribute("score_type", challenge.score_type.as_str());
             if let Value::Object(metadata) = challenge.metadata.clone() {
                 for (key, value) in metadata
@@ -275,37 +269,37 @@ fn render_difference(difference: &[ChallengeUpdateIntermediate]) {
             }
             renderer.unindent();
             renderer.unindent();
-            println!("");
+            println!();
         }
     }
     for item in difference {
         if let ChallengeUpdateIntermediate::EditChallenge { old, new } = item {
             println!("{}", "Edit challenge:".yellow());
             renderer.indent();
-            renderer.attribute("stable_id", old.stable_id.clone());
-            renderer.attribute_if_changed("author", old.author.clone(), new.author.clone());
-            renderer.attribute_if_changed("category", old.category.clone(), new.category.clone());
+            renderer.attribute("stable_id", old.stable_id.as_str());
+            renderer.attribute_if_changed("author", old.author.as_str(), new.author.as_str());
+            renderer.attribute_if_changed("category", old.category.as_str(), new.category.as_str());
             renderer.attribute_if_changed(
                 "description",
-                old.description.clone(),
-                new.description.clone(),
+                old.description.as_str(),
+                new.description.as_str(),
             );
-            renderer.attribute_if_changed("flag", old.flag.clone(), new.flag.clone());
-            renderer.attribute_if_changed("name", old.name.clone(), new.name.clone());
+            renderer.attribute_if_changed("flag", old.flag.as_str(), new.flag.as_str());
+            renderer.attribute_if_changed("name", old.name.as_str(), new.name.as_str());
             renderer.attribute_if_changed(
                 "healthscript",
-                old.healthscript.clone(),
-                new.healthscript.clone(),
+                old.healthscript.as_deref(),
+                new.healthscript.as_deref(),
             );
             renderer.attribute_if_changed(
                 "ticket_template",
-                old.ticket_template.clone(),
-                new.ticket_template.clone(),
+                old.ticket_template.as_deref(),
+                new.ticket_template.as_deref(),
             );
             renderer.attribute_if_changed(
                 "score_type",
-                old.score_type.clone(),
-                new.score_type.clone(),
+                old.score_type.as_str(),
+                new.score_type.as_str(),
             );
             if let (Value::Object(old_metadata), Value::Object(new_metadata)) =
                 (old.metadata.clone(), new.metadata.clone())
@@ -315,7 +309,7 @@ fn render_difference(difference: &[ChallengeUpdateIntermediate]) {
                     .filter(|(key, _)| !ignored_metadata_keys.contains(key.as_str()))
                 {
                     renderer.attribute_if_changed(
-                        &key,
+                        key,
                         old_value.clone(),
                         new_metadata.get(key).cloned(),
                     );
@@ -376,28 +370,26 @@ fn render_difference(difference: &[ChallengeUpdateIntermediate]) {
             if !file_changes.is_empty() {
                 renderer.block("files");
                 for (old_file, new_file) in file_changes.iter() {
-                    renderer.changed_file(old_file.clone(), new_file.clone());
+                    renderer.changed_file(*old_file, *new_file);
                 }
                 renderer.unindent();
-            } else {
-                if old.files != new.files {
-                    renderer.block("files");
-                    println!("    {}", "Order changed".cyan());
-                    renderer.unindent();
-                }
+            } else if old.files != new.files {
+                renderer.block("files");
+                println!("    {}", "Order changed".cyan());
+                renderer.unindent();
             }
 
             renderer.unindent();
-            println!("");
+            println!();
         }
     }
     for item in difference {
         if let ChallengeUpdateIntermediate::DeleteChallenge { stable_id } = item {
             println!("{}", "Delete challenge:".red());
             renderer.indent();
-            renderer.attribute("stable_id", stable_id.clone());
+            renderer.attribute("stable_id", stable_id.as_str());
             renderer.unindent();
-            println!("");
+            println!();
         }
     }
 }
@@ -442,13 +434,13 @@ impl DiffRenderer {
         self.print_indent();
         print!("{}: ", name);
         self.value(&value.into());
-        println!("");
+        println!();
     }
 
     fn attribute_comment(&mut self, name: &str, comment: &str) {
         self.print_indent();
         print!("{}: {}", name, comment.cyan());
-        println!("");
+        println!();
     }
 
     fn attribute_changed_comment(
@@ -472,9 +464,9 @@ impl DiffRenderer {
         self.print_indent();
         print!("{}: ", name);
         self.value(&old_value.into());
-        print!(" {} ", "->");
+        print!(" -> ");
         self.value(&new_value.into());
-        println!("");
+        println!();
     }
 
     fn attribute_if_changed(
@@ -515,7 +507,7 @@ impl DiffRenderer {
             AttachmentIntermediate::Literal(attachment) => {
                 self.attribute("name", attachment.name.as_str());
                 self.attribute("url", attachment.url.as_str());
-                self.attribute("hash", attachment.hash.as_ref().map(String::as_str));
+                self.attribute("hash", attachment.hash.as_deref());
             }
             AttachmentIntermediate::Upload(upload) => {
                 self.attribute("name", upload.name.as_str());
@@ -544,7 +536,7 @@ impl DiffRenderer {
                     AttachmentIntermediate::Literal(attachment) => {
                         self.attribute("name", attachment.name.as_str());
                         self.attribute("url", attachment.url.as_str());
-                        self.attribute("hash", attachment.hash.as_ref().map(String::as_str));
+                        self.attribute("hash", attachment.hash.as_deref());
                     }
                     _ => unreachable!(),
                 }
@@ -568,8 +560,8 @@ impl DiffRenderer {
                         );
                         self.attribute_always(
                             "hash",
-                            old_attachment.hash.as_ref().map(String::as_str),
-                            new_attachment.hash.as_ref().map(String::as_str),
+                            old_attachment.hash.as_deref(),
+                            new_attachment.hash.as_deref(),
                         );
                     }
                     AttachmentIntermediate::Upload(upload) => {
@@ -585,7 +577,7 @@ impl DiffRenderer {
                         );
                         self.attribute_always(
                             "hash",
-                            old_attachment.hash.as_ref().map(String::as_str),
+                            old_attachment.hash.as_deref(),
                             upload.hash.as_str(),
                         );
                     }
@@ -594,6 +586,7 @@ impl DiffRenderer {
         }
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn value(&self, value: &Value) {
         match value {
             Value::Null => print!("{}", "null".blue()),
