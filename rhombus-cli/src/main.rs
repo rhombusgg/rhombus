@@ -47,7 +47,7 @@ async fn main() {
         ($error:expr) => {
             $error
                 .downcast_ref::<tonic::Status>()
-                .map(|status| format!("{}: {}", status.code().description(), status.message()))
+                .map(|status| format!("{}", status.message()))
                 .unwrap_or_else(|| $error.to_string())
         };
     }

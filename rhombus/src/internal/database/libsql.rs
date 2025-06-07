@@ -13,7 +13,7 @@ use argon2::{password_hash::SaltString, Argon2, PasswordHash, PasswordHasher, Pa
 use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
 use futures::stream::StreamExt;
-use libsql::{de, params, Builder, Transaction};
+use libsql::{de, ffi::SQLITE_CONSTRAINT_FOREIGNKEY, params, Builder, Transaction};
 use rand::rngs::OsRng;
 use rust_embed::RustEmbed;
 use serde::Deserialize;
@@ -932,7 +932,6 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                 .await?;
         }
 
-        // TODO: this fails when the challenge has solves
         for challenge in update.delete_challenges.iter() {
             let _ = tx
                 .execute(
@@ -946,7 +945,15 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                     "DELETE FROM rhombus_challenge WHERE id = ?1",
                     params!(challenge.as_str()),
                 )
-                .await?;
+                .await
+                .map_err(|err| match err {
+                    libsql::Error::SqliteFailure(code, _)
+                        if code == SQLITE_CONSTRAINT_FOREIGNKEY =>
+                    {
+                        RhombusError::ChallengeHasSolves(challenge.to_owned())
+                    }
+                    _ => err.into(),
+                })?;
         }
 
         tx.commit().await?;

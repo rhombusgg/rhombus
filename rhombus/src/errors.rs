@@ -76,6 +76,9 @@ pub enum RhombusError {
 
     #[error("{0}")]
     RhombusShared(#[from] RhombusSharedError),
+
+    #[error("Cannot delete challenge because it has solves, tickets, or writeups: {0}")]
+    ChallengeHasSolves(String),
 }
 
 #[derive(Error, Debug)]
