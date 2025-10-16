@@ -9,12 +9,14 @@ use std::{
     time::Duration,
 };
 
-use argon2::{password_hash::SaltString, Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
+use argon2::{
+    password_hash::{rand_core::OsRng, SaltString},
+    Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
+};
 use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
 use futures::stream::StreamExt;
 use libsql::{de, ffi::SQLITE_CONSTRAINT_FOREIGNKEY, params, Builder, Transaction};
-use rand::rngs::OsRng;
 use rust_embed::RustEmbed;
 use serde::Deserialize;
 use tokio_util::bytes::Bytes;
@@ -406,7 +408,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         } else {
             let team_id = create_team(&tx).await?;
 
-            let salt = SaltString::generate(&mut OsRng);
+            let salt = SaltString::try_from_rng(&mut OsRng).unwrap();
             let argon2 = Argon2::default();
             let hashed_password = argon2
                 .hash_password(password.as_bytes(), &salt)?

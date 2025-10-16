@@ -3,7 +3,7 @@ use std::{any::Any, borrow::Cow, collections::BTreeMap, convert::Infallible, syn
 use axum::Router;
 use prost_types::FileDescriptorSet;
 use tokio::sync::{Mutex, RwLock};
-use tonic::{body::BoxBody, service::RoutesBuilder};
+use tonic::service::RoutesBuilder;
 
 use crate::{
     builder::RawDb,
@@ -62,14 +62,13 @@ pub struct GrpcBuilder {
 impl GrpcBuilder {
     pub fn add_service<S>(&mut self, svc: S) -> &mut Self
     where
-        S: tower::Service<
-                axum::http::Request<BoxBody>,
-                Response = axum::http::Response<BoxBody>,
-                Error = Infallible,
-            > + tonic::server::NamedService
+        S: tower::Service<axum::http::Request<tonic::body::Body>, Error = Infallible>
+            + tonic::server::NamedService
             + Clone
             + Send
+            + Sync
             + 'static,
+        S::Response: axum::response::IntoResponse,
         S::Future: Send + 'static,
         S::Error: Into<Box<dyn std::error::Error + Send + Sync>> + Send,
     {

@@ -9,6 +9,7 @@ pub mod internal;
 mod internal;
 
 /// Known compatible version of the axum web framework
+pub use async_trait;
 pub use axum;
 pub use config;
 pub use minijinja;

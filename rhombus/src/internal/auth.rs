@@ -18,8 +18,8 @@ use axum_extra::extract::{
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use minijinja::context;
 use rand::{
-    distributions::{Alphanumeric, DistString as _},
-    thread_rng,
+    distr::{Alphanumeric, SampleString},
+    rng,
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -46,7 +46,7 @@ pub fn create_user_api_key(location_url: &str) -> String {
             base32::Alphabet::Rfc4648Lower { padding: false },
             location_url.as_bytes()
         ),
-        Alphanumeric.sample_string(&mut thread_rng(), 32)
+        Alphanumeric.sample_string(&mut rng(), 32)
     )
 }
 
@@ -89,11 +89,6 @@ impl KeyHolder {
 pub type MaybeTokenClaims = Option<TokenClaims>;
 pub type MaybeUser = Option<User>;
 pub type MaybeKeyHolder = Option<KeyHolder>;
-
-#[derive(Debug, Serialize, Clone)]
-pub struct ErrorResponse {
-    pub message: String,
-}
 
 pub async fn enforce_admin_middleware(
     Extension(user): Extension<User>,
@@ -370,7 +365,7 @@ pub async fn route_signin(
         .into_response())
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DiscordOAuthStateClaims {
     state: String,
     iat: i64,

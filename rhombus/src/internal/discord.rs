@@ -11,7 +11,7 @@ use chrono_tz::Tz;
 use dashmap::DashMap;
 use futures::{future::join_all, StreamExt};
 use minijinja::context;
-use rand::{prelude::SliceRandom, thread_rng, Rng};
+use rand::{prelude::IndexedRandom, rng, Rng};
 use reqwest::header;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -1274,10 +1274,7 @@ impl Bot {
                 .await
                 .unwrap();
 
-            let message = celebration_messages
-                .choose(&mut thread_rng())
-                .unwrap()
-                .to_string();
+            let message = celebration_messages.choose(&mut rng()).unwrap().to_string();
             thread
                 .send_message(&self.http, CreateMessage::new().content(message))
                 .await?;
@@ -1332,7 +1329,7 @@ impl Bot {
             ":crossed_swords:",
         ];
         let emoji = emoji
-            .choose_multiple(&mut thread_rng(), thread_rng().gen_range(1..=4))
+            .choose_multiple(&mut rng(), rng().random_range(1..=4))
             .cloned()
             .collect::<Vec<&str>>()
             .join(" ");
@@ -1613,7 +1610,7 @@ pub static INVITE_URL_CACHE: LazyLock<RwLock<DiscordInviteUrlCache>> = LazyLock:
     })
 });
 
-fn escape_discord_link(input: &str) -> Cow<str> {
+fn escape_discord_link(input: &str) -> Cow<'_, str> {
     // Discord markdown parsing is frustration.
     let special_characters = &['[', ']', '@', '#', '\\', '*', '`', '_'];
     if input

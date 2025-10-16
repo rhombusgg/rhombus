@@ -1,7 +1,6 @@
 use std::{any::Any, sync::Arc};
 
 use axum::{
-    async_trait,
     extract::State,
     response::{Html, IntoResponse},
     routing, Extension, Router,
@@ -9,6 +8,7 @@ use axum::{
 use fluent::FluentResource;
 use minijinja::context;
 use rhombus::{
+    async_trait::async_trait,
     internal::{
         auth::MaybeUser,
         database::provider::{Connection, Database},

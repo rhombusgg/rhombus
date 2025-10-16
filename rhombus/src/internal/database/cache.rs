@@ -160,8 +160,8 @@ impl Database for DbCache {
             tokio::sync::Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>,
         >,
     ) -> Result<()> {
-        self.inner.update_challenges(update, score_type_map).await?;
-        Ok(())
+        *CHALLENGES_CACHE.write().await = None;
+        self.inner.update_challenges(update, score_type_map).await
     }
 
     async fn set_challenge_health(

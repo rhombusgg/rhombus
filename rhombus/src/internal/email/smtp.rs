@@ -3,8 +3,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use lettre::{message::MultiPart, AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
 use rand::{
-    distributions::{Alphanumeric, DistString},
-    thread_rng,
+    distr::{Alphanumeric, SampleString},
+    rng,
 };
 use tokio::sync::RwLock;
 
@@ -95,5 +95,5 @@ impl OutboundEmailProvider for SmtpProvider {
 }
 
 pub fn create_message_id() -> String {
-    Alphanumeric.sample_string(&mut thread_rng(), 36)
+    Alphanumeric.sample_string(&mut rng(), 36)
 }

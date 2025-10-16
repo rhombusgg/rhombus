@@ -9,8 +9,8 @@ use axum::{
 use dashmap::DashMap;
 use minijinja::context;
 use rand::{
-    distributions::{Alphanumeric, DistString},
-    thread_rng,
+    distr::{Alphanumeric, SampleString},
+    rng,
 };
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -32,7 +32,7 @@ use crate::{
 };
 
 pub fn generate_email_callback_code() -> String {
-    Alphanumeric.sample_string(&mut thread_rng(), 16)
+    Alphanumeric.sample_string(&mut rng(), 16)
 }
 
 pub static IS_IN_SERVER_CACHE: LazyLock<DashMap<NonZeroU64, TimedCache<bool>>> =

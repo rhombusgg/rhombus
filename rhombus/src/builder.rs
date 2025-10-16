@@ -994,23 +994,23 @@ impl Builder {
                 .route("/account/roll-key", post(route_account_roll_key))
                 .route("/account/name", post(route_account_set_name))
                 .route("/account", get(route_account))
-                .route("/team/division/:id", post(route_team_set_division))
-                .route("/team/user/:id", delete(route_user_kick))
+                .route("/team/division/{id}", post(route_team_set_division))
+                .route("/team/user/{id}", delete(route_user_kick))
                 .route("/team/roll-token", post(route_team_roll_token))
                 .route("/team/name", post(route_team_set_name))
                 .route("/team", get(route_team))
                 .route("/challenges", get(route_challenges))
                 .route("/challenges.json", get(route_challenges))
                 .route(
-                    "/challenges/:id/writeup",
+                    "/challenges/{id}/writeup",
                     post(route_writeup_submit).delete(route_writeup_delete),
                 )
                 .route(
-                    "/challenges/:id/ticket",
+                    "/challenges/{id}/ticket",
                     get(route_ticket_view).post(route_ticket_submit),
                 )
                 .route(
-                    "/challenges/:id",
+                    "/challenges/{id}",
                     get(route_challenge_view).post(route_challenge_submit),
                 )
                 .route_layer(middleware::from_fn(enforce_auth_middleware))
@@ -1041,16 +1041,16 @@ impl Builder {
                 .route("/signin/discord", get(route_signin_discord))
                 .route("/signin", get(route_signin))
                 .route(
-                    "/scoreboard/:id/ctftime.json",
+                    "/scoreboard/{id}/ctftime.json",
                     get(route_scoreboard_division_ctftime),
                 )
-                .route("/scoreboard/:id", get(route_scoreboard_division))
+                .route("/scoreboard/{id}", get(route_scoreboard_division))
                 .route("/scoreboard", get(route_scoreboard))
                 .route("/scoreboard.json", get(route_scoreboard))
-                .route("/user/:id/og-image.png", get(route_user_og_image))
-                .route("/user/:id", get(route_public_user))
-                .route("/team/:id/og-image.png", get(route_team_og_image))
-                .route("/team/:id", get(route_public_team))
+                .route("/user/{id}/og-image.png", get(route_user_og_image))
+                .route("/user/{id}", get(route_public_user))
+                .route("/team/{id}/og-image.png", get(route_team_og_image))
+                .route("/team/{id}", get(route_public_team))
                 .route("/og-image.png", get(route_default_og_image))
                 .route("/robots.txt", get(route_robots_txt))
                 .with_state(router_state.clone())
@@ -1062,7 +1062,7 @@ impl Builder {
             let router = if !self_rc.plugins.is_empty() {
                 axum::Router::new()
                     .fallback_service(rhombus_router)
-                    .nest("/", plugin_router.with_state(router_state.clone()))
+                    .merge(plugin_router.with_state(router_state.clone()))
             } else {
                 rhombus_router
             };
@@ -1125,9 +1125,7 @@ impl Builder {
                         .unwrap(),
                 );
 
-                router.layer(GovernorLayer {
-                    config: governor_conf,
-                })
+                router.layer(GovernorLayer::new(governor_conf))
             } else {
                 router
             };

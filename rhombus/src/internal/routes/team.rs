@@ -6,8 +6,8 @@ use axum::{
 };
 use minijinja::context;
 use rand::{
-    distributions::{Alphanumeric, DistString},
-    thread_rng,
+    distr::{Alphanumeric, SampleString},
+    rng,
 };
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -24,7 +24,7 @@ use crate::internal::{
 };
 
 pub fn create_team_invite_token() -> String {
-    Alphanumeric.sample_string(&mut thread_rng(), 16)
+    Alphanumeric.sample_string(&mut rng(), 16)
 }
 
 #[derive(Debug, Serialize)]

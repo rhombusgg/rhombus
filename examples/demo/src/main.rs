@@ -16,7 +16,8 @@ use tokio::sync::{Mutex, RwLock};
 use tracing_subscriber::EnvFilter;
 
 use rhombus::{
-    axum::{async_trait, http::Response, response::IntoResponse, routing, Extension, Router},
+    async_trait::async_trait,
+    axum::{http::Response, response::IntoResponse, routing, Extension, Router},
     challenge_loader_plugin::ChallengeLoaderPlugin,
     internal::{
         auth::User,

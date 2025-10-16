@@ -157,7 +157,7 @@ async fn receive_emails(
             let mut ticket_number = None;
             if let Some(in_reply_tos) = message.in_reply_to().as_text_list() {
                 for message_id in in_reply_tos {
-                    tracing::trace!(message_id, "Checking in-reply-tos");
+                    tracing::trace!(message_id = message_id.as_ref(), "Checking in-reply-tos");
                     if let Ok(Some(tn)) = db
                         .get_ticket_number_by_message_id(&format!("<{}>", message_id))
                         .await
@@ -171,7 +171,7 @@ async fn receive_emails(
             if ticket_number.is_none() {
                 if let Some(references) = message.references().as_text_list() {
                     for message_id in references {
-                        tracing::trace!(message_id, "Checking references");
+                        tracing::trace!(message_id = message_id.as_ref(), "Checking references");
                         if let Ok(Some(tn)) = db
                             .get_ticket_number_by_message_id(&format!("<{}>", message_id))
                             .await

@@ -7,8 +7,8 @@ use axum::{
 };
 use futures::{Stream, TryStreamExt};
 use rand::{
-    distributions::{Alphanumeric, DistString},
-    thread_rng,
+    distr::{Alphanumeric, SampleString},
+    rng,
 };
 use tokio::{fs::File, io::BufWriter};
 use tokio_util::io::StreamReader;
@@ -41,8 +41,8 @@ impl UploadProvider for LocalUploadProvider {
     fn routes(&self) -> Result<Router> {
         let provider_state = Arc::new(self.clone());
         let router = Router::new()
-            .route("/uploads/:hash_filename", get(route_local_download))
-            .route("/upload/:path", post(route_upload_file::<Self>))
+            .route("/uploads/{hash_filename}", get(route_local_download))
+            .route("/upload/{path}", post(route_upload_file::<Self>))
             .with_state(provider_state);
         Ok(router)
     }
@@ -63,7 +63,7 @@ impl UploadProvider for LocalUploadProvider {
             let base_path = std::path::Path::new(&self.base_path);
             tokio::fs::create_dir_all(&base_path).await?;
 
-            let temp_name = format!("{}.tmp", Alphanumeric.sample_string(&mut thread_rng(), 60));
+            let temp_name = format!("{}.tmp", Alphanumeric.sample_string(&mut rng(), 60));
             let filepath = base_path.join(temp_name);
             let mut file = BufWriter::new(File::create(&filepath).await?);
 

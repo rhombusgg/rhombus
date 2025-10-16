@@ -1,4 +1,4 @@
-FROM rust:1.81 AS builder
+FROM rust:1.90 AS builder
 WORKDIR /app
 COPY --from=denoland/deno:bin-2.1.3 /deno /usr/local/bin/deno
 COPY Cargo.toml Cargo.lock ./

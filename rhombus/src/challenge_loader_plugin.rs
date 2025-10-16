@@ -114,7 +114,10 @@ impl Plugin for ChallengeLoaderPlugin {
                 .collect(),
         };
 
+        // println!("{:#?}", old_challenge_data);
+        // println!("{:#?}", new_challenges);
         let difference = diff_challenges(&old_challenges, &new_challenges);
+        // println!("{:#?}", difference);
 
         if difference.is_empty() {
             info!("Challenges up to date");

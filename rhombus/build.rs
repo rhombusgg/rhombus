@@ -16,7 +16,7 @@ fn main() {
             .args([
                 "run",
                 "-A",
-                "npm:@tailwindcss/cli@^4.0.0-beta.6",
+                "npm:@tailwindcss/cli@^4.1.14",
                 "--minify",
                 "--input",
                 "app.css",

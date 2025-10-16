@@ -3,8 +3,8 @@ use anyhow::Result;
 use clap::Subcommand;
 use colored::{ColoredString, Colorize};
 use rand::{
-    distributions::{Alphanumeric, DistString},
-    thread_rng,
+    distr::{Alphanumeric, SampleString},
+    rng,
 };
 use reqwest::Body;
 use rhombus_shared::challenges::{
@@ -58,7 +58,7 @@ impl GenerateApiKeyCommand {
                 base32::Alphabet::Rfc4648Lower { padding: false },
                 url.as_bytes()
             ),
-            Alphanumeric.sample_string(&mut thread_rng(), 32)
+            Alphanumeric.sample_string(&mut rng(), 32)
         );
         Ok(())
     }
