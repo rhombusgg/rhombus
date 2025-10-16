@@ -71,8 +71,24 @@ pub struct TokenClaims {
     pub exp: i64,
 }
 
+#[derive(Clone)]
+pub enum KeyHolder {
+    User(User),
+    Root,
+}
+
+impl KeyHolder {
+    pub fn is_admin(&self) -> bool {
+        match self {
+            KeyHolder::Root => true,
+            KeyHolder::User(user) => user.is_admin,
+        }
+    }
+}
+
 pub type MaybeTokenClaims = Option<TokenClaims>;
 pub type MaybeUser = Option<User>;
+pub type MaybeKeyHolder = Option<KeyHolder>;
 
 #[derive(Debug, Serialize, Clone)]
 pub struct ErrorResponse {
@@ -116,6 +132,9 @@ pub async fn auth_injector_middleware(
     let maybe_user: MaybeUser = None;
     req.extensions_mut().insert(maybe_user);
 
+    let maybe_key_holder: MaybeKeyHolder = None;
+    req.extensions_mut().insert(maybe_key_holder);
+
     let token = cookie_jar
         .get("rhombus-token")
         .map(|cookie| cookie.value().to_string())
@@ -141,8 +160,17 @@ pub async fn auth_injector_middleware(
             req.extensions_mut().insert(token_data.claims);
             if let Ok(user) = state.db.get_user_from_id(sub).await {
                 req.extensions_mut().insert(Some(user.clone()));
+                req.extensions_mut()
+                    .insert(Some(KeyHolder::User(user.clone())));
                 req.extensions_mut().insert(user);
             }
+        } else if let Ok(user) = state.db.get_user_from_api_key(&token).await {
+            req.extensions_mut().insert(Some(user.clone()));
+            req.extensions_mut()
+                .insert(Some(KeyHolder::User(user.clone())));
+            req.extensions_mut().insert(user);
+        } else if state.root_api_key.as_ref().is_some_and(|key| token == *key) {
+            req.extensions_mut().insert(Some(KeyHolder::Root));
         }
     }
 

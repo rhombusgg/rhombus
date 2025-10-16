@@ -13,14 +13,14 @@ use argon2::{password_hash::SaltString, Argon2, PasswordHash, PasswordHasher, Pa
 use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
 use futures::stream::StreamExt;
-use libsql::{de, params, Builder, Transaction};
+use libsql::{de, ffi::SQLITE_CONSTRAINT_FOREIGNKEY, params, Builder, Transaction};
 use rand::rngs::OsRng;
 use rust_embed::RustEmbed;
 use serde::Deserialize;
 use tokio_util::bytes::Bytes;
 
 use crate::{
-    errors::RhombusError,
+    errors::{ChallengeDefinitionError, RhombusError},
     internal::{
         auth::{create_user_api_key, User, UserInner},
         database::{
@@ -35,7 +35,10 @@ use crate::{
             },
         },
         division::Division,
-        routes::{account::generate_email_callback_code, team::create_team_invite_token},
+        routes::{
+            account::generate_email_callback_code, challenges::ChallengePoints,
+            team::create_team_invite_token,
+        },
         settings::Settings,
     },
     Result,
@@ -664,21 +667,26 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             }
         }
 
-        let mut query_challenges = tx
-            .query("SELECT * FROM rhombus_file_attachment", ())
+        let mut query_attachments = tx
+            .query(
+                "SELECT challenge_id, name, url, hash FROM rhombus_file_attachment",
+                (),
+            )
             .await?;
         #[derive(Debug, Deserialize)]
         struct QueryChallengeFileAttachment {
             challenge_id: String,
             name: String,
             url: String,
+            hash: Option<String>,
         }
         let mut challenge_attachments = BTreeMap::new();
-        while let Some(row) = query_challenges.next().await? {
+        while let Some(row) = query_attachments.next().await? {
             let query_attachment = de::from_row::<QueryChallengeFileAttachment>(&row).unwrap();
             let attachment = ChallengeAttachment {
                 name: query_attachment.name,
                 url: query_attachment.url,
+                hash: query_attachment.hash,
             };
             match challenge_attachments.get_mut(&query_attachment.challenge_id) {
                 None => {
@@ -752,13 +760,17 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             .await;
 
         let category_rows = tx
-            .query("SELECT * FROM rhombus_category ORDER BY sequence", ())
+            .query(
+                "SELECT id, name, color, sequence FROM rhombus_category ORDER BY sequence",
+                (),
+            )
             .await?;
         #[derive(Debug, Deserialize)]
         struct DbCategory {
             id: String,
             name: String,
             color: String,
+            sequence: u64,
         }
         let categories = category_rows
             .into_stream()
@@ -770,6 +782,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                         id: category.id,
                         name: category.name,
                         color: category.color,
+                        sequence: category.sequence,
                     },
                 )
             })
@@ -806,6 +819,146 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             authors,
             divisions,
         }))
+    }
+
+    async fn update_challenges(
+        &self,
+        update: &rhombus_shared::proto::UpdateChallengesRequest,
+        score_type_map: Arc<
+            tokio::sync::Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>,
+        >,
+    ) -> Result<()> {
+        let tx = self.transaction().await?;
+
+        for category in update.upsert_categories.iter() {
+            let _ = tx
+                .execute(
+                    "INSERT OR REPLACE INTO rhombus_category (id, name, color, sequence) VALUES (?1, ?2, ?3, ?4)",
+                    params!(category.id.as_str(), category.name.as_str(), category.color.as_str(), category.sequence),
+                )
+                .await?;
+        }
+
+        for author in update.upsert_authors.iter() {
+            let _ = tx
+            .execute(
+                    "INSERT OR REPLACE INTO rhombus_author (id, name, avatar, discord_id) VALUES (?1, ?2, ?3, ?4)",
+                    params!(author.id.as_str(), author.name.as_str(), author.avatar.as_str(), author.discord_id),
+                )
+                .await?;
+        }
+
+        for challenge in update.upsert_challenges.iter() {
+            let points = score_type_map
+                .lock()
+                .await
+                .get(challenge.score_type.as_str())
+                .ok_or_else(|| {
+                    ChallengeDefinitionError::UnknownScoreType(challenge.score_type.clone())
+                })?
+                .initial(&serde_json::from_str(&challenge.metadata).unwrap())
+                .await?;
+
+            tx.execute(
+                "DELETE FROM rhombus_file_attachment WHERE challenge_id = ?1",
+                [challenge.id.as_str()],
+            )
+            .await?;
+
+            _ = tx
+                .execute(
+                    &format!(
+                    "
+                    INSERT INTO rhombus_challenge (id, name, description, flag, category_id, author_id, ticket_template, healthscript, score_type, points, metadata)
+                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+                    ON CONFLICT(id) DO UPDATE SET
+                        {}
+                        name = excluded.name,
+                        description = excluded.description,
+                        flag = excluded.flag,
+                        category_id = excluded.category_id,
+                        author_id = excluded.author_id,
+                        ticket_template = excluded.ticket_template,
+                        healthscript = excluded.healthscript,
+                        score_type = excluded.score_type,
+                        metadata = excluded.metadata
+                    ",
+                    if challenge.score_type == "static" { "points = excluded.points," } else {""},
+                    ),
+                    params!(
+                        challenge.id.as_str(),
+                        challenge.name.as_str(),
+                        challenge.description.as_str(),
+                        challenge.flag.as_str(),
+                        challenge.category.as_str(),
+                        challenge.author.as_str(),
+                        challenge.ticket_template.as_deref(),
+                        challenge.healthscript.as_deref(),
+                        challenge.score_type.as_str(),
+                        points,
+                        challenge.metadata.as_str(),
+                    ),
+                )
+                .await?;
+
+            for attachment in challenge.attachments.iter() {
+                _ = tx
+                    .execute(
+                        "
+                            INSERT OR REPLACE INTO rhombus_file_attachment (challenge_id, name, url, hash)
+                            VALUES (?1, ?2, ?3, ?4)
+                        ",
+                        params!(challenge.id.as_str(), attachment.name.as_str(), attachment.url.as_str(), attachment.hash.as_deref()),
+                    )
+                    .await?;
+            }
+        }
+
+        for author in update.delete_authors.iter() {
+            let _ = tx
+                .execute(
+                    "DELETE FROM rhombus_author WHERE id = ?1",
+                    params!(author.as_str()),
+                )
+                .await?;
+        }
+
+        for category in update.delete_categories.iter() {
+            let _ = tx
+                .execute(
+                    "DELETE FROM rhombus_category WHERE id = ?1",
+                    params!(category.as_str()),
+                )
+                .await?;
+        }
+
+        for challenge in update.delete_challenges.iter() {
+            let _ = tx
+                .execute(
+                    "DELETE FROM rhombus_file_attachment WHERE challenge_id = ?1",
+                    params!(challenge.as_str()),
+                )
+                .await?;
+
+            let _ = tx
+                .execute(
+                    "DELETE FROM rhombus_challenge WHERE id = ?1",
+                    params!(challenge.as_str()),
+                )
+                .await
+                .map_err(|err| match err {
+                    libsql::Error::SqliteFailure(code, _)
+                        if code == SQLITE_CONSTRAINT_FOREIGNKEY =>
+                    {
+                        RhombusError::ChallengeHasSolves(challenge.to_owned())
+                    }
+                    _ => err.into(),
+                })?;
+        }
+
+        tx.commit().await?;
+
+        Ok(())
     }
 
     async fn set_challenge_health(

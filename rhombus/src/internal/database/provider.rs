@@ -12,7 +12,10 @@ use serde_json::Value;
 use tokio_util::bytes::Bytes;
 
 use crate::{
-    internal::{auth::User, database::cache::Writeups, division::Division, settings::Settings},
+    internal::{
+        auth::User, database::cache::Writeups, division::Division,
+        routes::challenges::ChallengePoints, settings::Settings,
+    },
     Result,
 };
 
@@ -23,6 +26,7 @@ pub type WeakConnection = Weak<dyn Database + Send + Sync>;
 pub struct ChallengeAttachment {
     pub name: String,
     pub url: String,
+    pub hash: Option<String>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -55,6 +59,7 @@ pub struct Category {
     pub id: String,
     pub name: String,
     pub color: String,
+    pub sequence: u64,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -226,6 +231,13 @@ pub struct ToBeClosedTicket {
 pub trait Database {
     async fn migrate(&self) -> Result<()>;
     async fn get_challenges(&self) -> Result<Challenges>;
+    async fn update_challenges(
+        &self,
+        update: &rhombus_shared::proto::UpdateChallengesRequest,
+        score_type_map: Arc<
+            tokio::sync::Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>,
+        >,
+    ) -> Result<()>;
     async fn set_challenge_health(
         &self,
         challenge_id: &str,

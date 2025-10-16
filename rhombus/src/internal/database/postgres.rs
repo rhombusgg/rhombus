@@ -2,6 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     net::IpAddr,
     num::NonZeroU64,
+    sync::Arc,
 };
 
 use async_trait::async_trait;
@@ -21,6 +22,7 @@ use crate::{
             },
         },
         division::Division,
+        routes::challenges::ChallengePoints,
         settings::Settings,
     },
     Result,
@@ -155,6 +157,16 @@ impl Database for Postgres {
         //     })
         //     .collect();
 
+        todo!()
+    }
+
+    async fn update_challenges(
+        &self,
+        _update: &rhombus_shared::proto::UpdateChallengesRequest,
+        _score_type_map: Arc<
+            tokio::sync::Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>,
+        >,
+    ) -> Result<()> {
         todo!()
     }
 

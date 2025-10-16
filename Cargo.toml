@@ -4,6 +4,7 @@ members = [
     "rhombus",
     "rhombus-build",
     "rhombus-cli",
+    "rhombus-shared",
     "examples/standalone",
     "examples/plugin",
     "examples/external-plugin",

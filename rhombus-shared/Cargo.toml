@@ -1,0 +1,26 @@
+[package]
+name = "rhombus-shared"
+version = "0.1.0"
+edition = "2021"
+description = "Common crate for code shared by rhombus and rhombus-cli"
+authors = ["Mark Bundschuh <mark@mbund.dev>"]
+license = "MPL-2.0"
+repository = "https://github.com/rhombusgg/rhombus"
+homepage = "https://rhombus.gg"
+keywords = ["ctf", "cli"]
+
+[dependencies]
+tonic = "0.12.3"
+prost = "0.13.4"
+figment = { version = "0.10.19", features = ["yaml"] }
+serde = { version = "1.0.210", features = ["derive"] }
+serde_yml = "0.0.12"
+serde_json = "1.0.128"
+ring = "0.17.8"
+markdown = "1.0.0-alpha.21"
+thiserror = "2.0.6"
+futures = "0.3.31"
+
+
+[build-dependencies]
+tonic-build = "0.12.3"

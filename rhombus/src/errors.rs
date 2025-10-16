@@ -1,4 +1,5 @@
 use config::ConfigError;
+use rhombus_shared::errors::RhombusSharedError;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, RhombusError>;
@@ -69,13 +70,28 @@ pub enum RhombusError {
 
     #[error("IO error: {0}")]
     IO(#[from] std::io::Error),
+
+    #[error("{0}")]
+    ChallengeDefinition(#[from] ChallengeDefinitionError),
+
+    #[error("{0}")]
+    RhombusShared(#[from] RhombusSharedError),
+
+    #[error("Cannot delete challenge because it has solves, tickets, or writeups: {0}")]
+    ChallengeHasSolves(String),
 }
 
 #[derive(Error, Debug)]
 pub enum DatabaseConfigurationError {
-    #[error("Unkown database scheme in url {0}")]
+    #[error("Unknown database scheme in url {0}")]
     UnknownUrlScheme(String),
 
     #[error("Feature `{0}` must be enabled for database url {0}")]
     MissingFeature(String, String),
+}
+
+#[derive(Error, Debug)]
+pub enum ChallengeDefinitionError {
+    #[error("Unknown score type: {0}")]
+    UnknownScoreType(String),
 }

@@ -3,7 +3,7 @@ use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use config::{read_project_config, read_secret_config};
-use grpc::proto::rhombus_client::RhombusClient;
+use rhombus_shared::proto::rhombus_client::RhombusClient;
 use std::process::exit;
 use tonic::{
     metadata::MetadataValue,
@@ -15,12 +15,6 @@ use tonic::{
 mod admin;
 mod auth;
 mod config;
-
-mod grpc {
-    pub mod proto {
-        tonic::include_proto!("rhombus");
-    }
-}
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -53,8 +47,8 @@ async fn main() {
         ($error:expr) => {
             $error
                 .downcast_ref::<tonic::Status>()
-                .map(|status| format!("{}: {}", status.code().description(), status.message()))
-                .unwrap_or_else(|| $error.to_string())
+                .map(|status| format!("{}", status.message()))
+                .unwrap_or_else(|| format!("{}", $error))
         };
     }
 
@@ -93,9 +87,15 @@ impl Interceptor for AuthInterceptor {
 
 type Client = RhombusClient<InterceptedService<Channel, AuthInterceptor>>;
 
+struct ClientInfo {
+    pub client: Client,
+    pub key: String,
+    pub url: String,
+}
+
 #[allow(dead_code)]
 /// Load the rhombus-cli.yaml config file and connect to the grpc server to which it refers
-async fn get_client() -> Result<Client> {
+async fn get_client() -> Result<ClientInfo> {
     let secret_config = read_secret_config()?;
     let project_config = read_project_config()?;
     let key = secret_config.keys.get(&project_config.url).ok_or_else(|| {
@@ -107,7 +107,7 @@ async fn get_client() -> Result<Client> {
     connect(&project_config.url, key).await
 }
 
-async fn connect(url: &str, key: &str) -> Result<Client> {
+async fn connect(url: &str, key: &str) -> Result<ClientInfo> {
     let auth_token: MetadataValue<_> = key.parse()?;
     let channel = Channel::from_shared(url.to_owned())
         .with_context(|| format!("failed to parse grpc url '{}'", url))?
@@ -115,5 +115,9 @@ async fn connect(url: &str, key: &str) -> Result<Client> {
         .await
         .with_context(|| format!("failed to connect to grpc server '{}'", url))?;
     let client = RhombusClient::with_interceptor(channel, AuthInterceptor { auth_token });
-    Ok(client)
+    Ok(ClientInfo {
+        client,
+        key: key.to_owned(),
+        url: url.to_owned(),
+    })
 }

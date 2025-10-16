@@ -12,7 +12,7 @@
     hx-swap="outerHTML"
     hx-disinherit="*"
   >
-    {% for category_id, category in challenge_data.categories | items %}
+    {% for category_id, category in challenge_data.categories | items | sort(attribute="1.sequence") %}
       {% set challenges = challenge_data.challenges | items | map(attribute="1") | selectattr("category_id", "==", category.id) | sort(attribute="points") %}
       <div>
         <div
