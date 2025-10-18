@@ -382,8 +382,7 @@ impl Builder {
                     }
                 } else {
                     return Err(RhombusError::MissingConfiguration(format!(
-                        "libsql.auth_token must be set for url {}",
-                        database_url
+                        "libsql.auth_token must be set for url {database_url}"
                     )));
                 }
             }
@@ -1212,7 +1211,7 @@ pub fn find_image_file(partial_path: &str) -> Option<std::path::PathBuf> {
         .unwrap();
 
     for ext in &extensions {
-        let file_path = dir.join(format!("{}.{ext}", base_name));
+        let file_path = dir.join(format!("{base_name}.{ext}"));
         if file_path.exists() {
             return Some(file_path);
         }

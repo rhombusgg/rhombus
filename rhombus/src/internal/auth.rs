@@ -538,7 +538,7 @@ pub async fn route_signin_discord_callback(
             ("code", code.as_str()),
             (
                 "redirect_uri",
-                format!("{}/signin/discord/callback", location_url).as_str(),
+                format!("{location_url}/signin/discord/callback").as_str(),
             ),
         ])
         .send()
@@ -597,10 +597,7 @@ pub async fn route_signin_discord_callback(
         )
     } else {
         let default_avatar_number = profile.discriminator.unwrap().parse::<i64>().unwrap() % 5;
-        format!(
-            "https://cdn.discordapp.com/embed/avatars/{}.png",
-            default_avatar_number
-        )
+        format!("https://cdn.discordapp.com/embed/avatars/{default_avatar_number}.png")
     };
 
     let location_url = state.settings.read().await.location_url.clone();
@@ -872,7 +869,7 @@ pub async fn route_signin_ctftime_callback(
         .await
         .map_err_page(&extensions, "Failed to add user to team")?;
     let mut response = if let Some(invite_token) = invite_token {
-        Redirect::temporary(format!("/signin?token={}", invite_token).as_str()).into_response()
+        Redirect::temporary(format!("/signin?token={invite_token}").as_str()).into_response()
     } else {
         Redirect::temporary("/team").into_response()
     };
@@ -933,12 +930,7 @@ pub async fn route_signin_ctftime(
     let signed_oauth_state =
         signed_oauth_state.replace('.', "______________________________________");
 
-    let signin_url = format!(
-        "https://oauth.ctftime.org/authorize?response_type=code&client_id={}&redirect_uri={}/signin/ctftime/callback&scope=profile%20team&state={}",
-        client_id,
-        location_url,
-        signed_oauth_state,
-    );
+    let signin_url = format!("https://oauth.ctftime.org/authorize?response_type=code&client_id={client_id}&redirect_uri={location_url}/signin/ctftime/callback&scope=profile%20team&state={signed_oauth_state}");
 
     let cookie = Cookie::build(("rhombus-oauth-ctftime", signed_oauth_state))
         .path("/")
@@ -1146,14 +1138,11 @@ pub fn avatar_from_email(email: &str) -> String {
     );
 
     let hash = digest.as_ref().iter().fold(String::new(), |mut output, b| {
-        let _ = write!(output, "{:02x}", b);
+        let _ = write!(output, "{b:02x}");
         output
     });
 
-    format!(
-        "https://seccdn.libravatar.org/avatar/{}?s=80&default=retro",
-        hash
-    )
+    format!("https://seccdn.libravatar.org/avatar/{hash}?s=80&default=retro")
 }
 
 pub async fn route_signin_email_callback(
@@ -1242,7 +1231,7 @@ pub async fn route_signin_email_confirm_callback(
     Ok(response)
 }
 
-async fn sign_in_cookie<'a>(
+async fn sign_in_cookie(
     state: &RouterState,
     user_id: i64,
     cookie_jar: &CookieJar,

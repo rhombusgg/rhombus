@@ -157,7 +157,7 @@ pub async fn route_mailgun_receive_email(
 
     let tag = hmac::sign(
         &hmac::Key::new(hmac::HMAC_SHA256, webhook_signing_key.as_bytes()),
-        format!("{}{}", timestamp, token).as_bytes(),
+        format!("{timestamp}{token}").as_bytes(),
     );
     let tag_signature = slice_to_hex_string(tag.as_ref());
 

@@ -64,7 +64,7 @@ impl Templates {
             .unwrap()
             .entry(name.to_string())
             .and_modify(|previous_content| {
-                *previous_content = format!("{}\n{}", previous_content, content);
+                *previous_content = format!("{previous_content}\n{content}");
             })
             .or_insert(content);
     }

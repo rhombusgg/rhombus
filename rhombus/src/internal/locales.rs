@@ -145,7 +145,7 @@ pub fn jinja_translate(
 
     let text = localizer.localize(&langs, msg_id, Some(&args));
 
-    text.unwrap_or(format!("Translation not found for {}", msg_id))
+    text.unwrap_or(format!("Translation not found for {msg_id}"))
 }
 
 pub fn jinja_timediff(time1: &str, time2: &str) -> Value {

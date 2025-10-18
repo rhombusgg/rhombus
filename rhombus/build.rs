@@ -10,7 +10,9 @@ fn main() {
         Command::new("deno")
             .arg("install")
             .spawn()
-            .expect("Failed to run deno install");
+            .expect("Failed to run deno install")
+            .wait()
+            .expect("Failed to wait for deno install");
 
         Command::new("deno")
             .args([
@@ -24,12 +26,16 @@ fn main() {
                 "static/rhombus.css",
             ])
             .spawn()
-            .expect("Failed to run tailwindcss");
+            .expect("Failed to run tailwindcss")
+            .wait()
+            .expect("Failed to wait for tailwindcss");
 
         Command::new("deno")
             .args(["run", "-A", "build.ts"])
             .spawn()
-            .expect("Failed to run js build");
+            .expect("Failed to run js build")
+            .wait()
+            .expect("Failed to wait for js build");
     } else {
         println!("cargo::warning=deno cli not found, not building static assets like CSS and JS");
     }

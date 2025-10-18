@@ -51,7 +51,7 @@ impl UploadProvider for DatabaseUploadProvider {
         S: Stream<Item = std::result::Result<Bytes, E>> + Send + 'async_trait,
         E: Into<axum::BoxError>,
     {
-        let body_with_io_error = stream.map_err(|err| io::Error::new(io::ErrorKind::Other, err));
+        let body_with_io_error = stream.map_err(|err| io::Error::other(err));
         let body_reader = StreamReader::new(body_with_io_error);
 
         futures::pin_mut!(body_reader);
@@ -68,7 +68,7 @@ impl UploadProvider for DatabaseUploadProvider {
 
         self.db.upload_file(&hash, filename, &buffer).await?;
 
-        let url = format!("/uploads/{}-{}", hash, filename);
+        let url = format!("/uploads/{hash}-{filename}");
 
         tracing::info!(url, "uploaded to database");
 

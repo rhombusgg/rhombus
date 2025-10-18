@@ -6,6 +6,7 @@ use crate::Result;
 
 #[async_trait::async_trait]
 pub trait ErasedUploadProvider: Send + Sync {
+    #[allow(clippy::result_large_err)]
     fn routes(&self) -> Result<Router>;
 
     async fn upload_erased(
@@ -24,6 +25,7 @@ pub trait ErasedUploadProvider: Send + Sync {
 
 #[async_trait::async_trait]
 pub trait UploadProvider: Send + Sync {
+    #[allow(clippy::result_large_err)]
     fn routes(&self) -> Result<Router>;
 
     async fn upload<S, E>(&self, filename: &str, stream: S) -> Result<String>

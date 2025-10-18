@@ -426,13 +426,13 @@ impl DiffRenderer {
 
     fn block(&mut self, name: &str) {
         self.print_indent();
-        println!("{}:", name);
+        println!("{name}:");
         self.indent();
     }
 
     fn attribute(&mut self, name: &str, value: impl Into<Value>) {
         self.print_indent();
-        print!("{}: ", name);
+        print!("{name}: ");
         self.value(&value.into());
         println!();
     }
@@ -450,7 +450,7 @@ impl DiffRenderer {
         comment: &str,
     ) {
         self.print_indent();
-        print!("{}: ", name);
+        print!("{name}: ");
         self.value(&old_value.into());
         println!(" -> {}", comment.cyan());
     }
@@ -462,7 +462,7 @@ impl DiffRenderer {
         new_value: impl Into<Value>,
     ) {
         self.print_indent();
-        print!("{}: ", name);
+        print!("{name}: ");
         self.value(&old_value.into());
         print!(" -> ");
         self.value(&new_value.into());

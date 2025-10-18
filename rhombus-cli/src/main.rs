@@ -110,10 +110,10 @@ async fn get_client() -> Result<ClientInfo> {
 async fn connect(url: &str, key: &str) -> Result<ClientInfo> {
     let auth_token: MetadataValue<_> = key.parse()?;
     let channel = Channel::from_shared(url.to_owned())
-        .with_context(|| format!("failed to parse grpc url '{}'", url))?
+        .with_context(|| format!("failed to parse grpc url '{url}'"))?
         .connect()
         .await
-        .with_context(|| format!("failed to connect to grpc server '{}'", url))?;
+        .with_context(|| format!("failed to connect to grpc server '{url}'"))?;
     let client = RhombusClient::with_interceptor(channel, AuthInterceptor { auth_token });
     Ok(ClientInfo {
         client,

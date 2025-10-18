@@ -80,7 +80,7 @@ impl OutboundMailer {
         self.inner
             .send_email(
                 to,
-                &format!("{} Email Verification", title),
+                &format!("{title} Email Verification"),
                 &plaintext,
                 &html,
                 None,
@@ -127,7 +127,7 @@ impl OutboundMailer {
         self.inner
             .send_email(
                 to,
-                &format!("{} Sign In", title),
+                &format!("{title} Sign In"),
                 &plaintext,
                 &html,
                 None,

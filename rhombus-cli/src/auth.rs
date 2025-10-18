@@ -36,7 +36,7 @@ impl AuthCommand {
 
         let url = match url {
             Some(url) => {
-                println!("✓ URL: {}", url);
+                println!("✓ URL: {url}");
                 url
             }
             None => inquire::prompt_text("CTF URL?")?,
@@ -60,7 +60,11 @@ impl AuthCommand {
             Some(Whoami::User(user)) => println!(
                 "✓ Authenticated as '{}'{}",
                 user.name,
-                user.is_admin.then_some(" (admin)").unwrap_or_default()
+                if user.is_admin {
+                    " (admin)"
+                } else {
+                    Default::default()
+                }
             ),
             None => Err(anyhow!("invalid response from server"))?,
         }

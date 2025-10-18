@@ -134,6 +134,7 @@ pub struct ChallengesIntermediate {
     pub categories: BTreeMap<String, Category>,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 /// A challenge update that can include uploading files
 pub enum ChallengeUpdateIntermediate {
@@ -189,7 +190,8 @@ pub async fn load_challenges(loader_path: &Path) -> Result<ChallengesIntermediat
 
     let loader = Figment::new()
         .merge(Yaml::file_exact(loader_path))
-        .extract::<LoaderYaml>()?;
+        .extract::<LoaderYaml>()
+        .map_err(|e| RhombusSharedError::Figment(Box::new(e)))?;
 
     let authors = loader
         .authors
@@ -232,7 +234,7 @@ pub async fn load_challenges(loader_path: &Path) -> Result<ChallengesIntermediat
             Figment::new()
                 .merge(Yaml::file_exact(&p))
                 .extract::<ChallengeYaml>()
-                .map_err(RhombusSharedError::Figment)
+                .map_err(|e| RhombusSharedError::Figment(Box::new(e)))
                 .and_then(|challenge_yaml| {
                     let description = markdown::to_html_with_options(
                         &challenge_yaml.description,

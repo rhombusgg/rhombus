@@ -142,7 +142,7 @@ pub async fn route_team_roll_token(
         .map_err_htmx(&extensions, "Failed to roll invite token")?;
 
     let location_url = { state.settings.read().await.location_url.clone() };
-    let team_invite_url = format!("{}/signin?token={}", location_url, new_invite_token);
+    let team_invite_url = format!("{location_url}/signin?token={new_invite_token}");
 
     Ok(Html(
         state

@@ -8,7 +8,9 @@ fn main() {
         Command::new("deno")
             .arg("install")
             .spawn()
-            .expect("Failed to run deno install");
+            .expect("Failed to run deno install")
+            .wait()
+            .expect("Failed to wait for deno install");
 
         Command::new("deno")
             .args([
@@ -22,7 +24,9 @@ fn main() {
                 "static/demo.css",
             ])
             .spawn()
-            .expect("Failed to run tailwindcss");
+            .expect("Failed to run tailwindcss")
+            .wait()
+            .expect("Failed to wait for tailwindcss");
     }
 
     println!("cargo:rerun-if-changed=static");

@@ -49,10 +49,11 @@ pub async fn route_scoreboard(
         format!(
             "/scoreboard/{}{}",
             default_division,
-            uri.path()
-                .ends_with(".json")
-                .then_some(".json")
-                .unwrap_or_default()
+            if uri.path().ends_with(".json") {
+                ".json"
+            } else {
+                Default::default()
+            }
         )
         .as_str(),
     )
@@ -85,7 +86,7 @@ pub async fn route_scoreboard_division(
             .map_err_page(&extensions, "Failed to get data")?;
 
     const PAGE_SIZE: usize = 25;
-    let num_pages = (leaderboard.len() + (PAGE_SIZE - 1)) / PAGE_SIZE;
+    let num_pages = leaderboard.len().div_ceil(PAGE_SIZE);
     let page_num = page_num.min(num_pages);
 
     let start = std::cmp::min(leaderboard.len(), page_num * PAGE_SIZE);

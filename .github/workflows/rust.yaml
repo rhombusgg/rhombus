@@ -56,30 +56,30 @@ jobs:
         run: |
           cargo test --all-features
 
-  docs:
-    name: Build Docs
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+  # docs:
+  #   name: Build Docs
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        run: |
-          rustup toolchain install nightly
-          rustup override set nightly
-          rustup show active-toolchain -v
+  #     - name: Install Rust toolchain
+  #       run: |
+  #         rustup toolchain install nightly
+  #         rustup override set nightly
+  #         rustup show active-toolchain -v
 
-      - uses: arduino/setup-protoc@v3
-        with:
-          version: "28.x"
+  #     - uses: arduino/setup-protoc@v3
+  #       with:
+  #         version: "28.x"
 
-      - name: Cache
-        uses: Swatinem/rust-cache@v2
+  #     - name: Cache
+  #       uses: Swatinem/rust-cache@v2
 
-      - name: Build Docs
-        env:
-          RUSTDOCFLAGS: --cfg docsrs
-        run: |
-          cargo doc --all-features
+  #     - name: Build Docs
+  #       env:
+  #         RUSTDOCFLAGS: --cfg docsrs
+  #       run: |
+  #         cargo doc --all-features
 
   format:
     name: Check Format

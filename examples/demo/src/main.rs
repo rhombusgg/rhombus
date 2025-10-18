@@ -107,7 +107,7 @@ impl Plugin for DemoPlugin {
                         .await;
 
                     for table_name in tables {
-                        tx.execute(&format!("DROP TABLE IF EXISTS {}", table_name), params!())
+                        tx.execute(&format!("DROP TABLE IF EXISTS {table_name}"), params!())
                             .await?;
                     }
 
@@ -176,10 +176,7 @@ fn create_dummy_user() -> DummyUser {
     hasher.update(&dummy_user.username);
     let hash = format!("{:x}", hasher.finalize());
 
-    let avatar = format!(
-        "https://seccdn.libravatar.org/avatar/{}?s=80&default=retro",
-        hash
-    );
+    let avatar = format!("https://seccdn.libravatar.org/avatar/{hash}?s=80&default=retro");
 
     dummy_user.avatar = avatar;
     dummy_user
@@ -422,16 +419,13 @@ async fn backup_tables(libsql: Arc<LibSQL>) -> Result<()> {
 
     for table_name in tables {
         tx.execute(
-            &format!("DROP TABLE IF EXISTS backup_{}", table_name),
+            &format!("DROP TABLE IF EXISTS backup_{table_name}"),
             params!(),
         )
         .await?;
 
         tx.execute(
-            &format!(
-                "CREATE TABLE backup_{} AS SELECT * FROM {}",
-                table_name, table_name
-            ),
+            &format!("CREATE TABLE backup_{table_name} AS SELECT * FROM {table_name}"),
             params!(),
         )
         .await?;
@@ -463,14 +457,11 @@ async fn reset_database(libsql: Arc<LibSQL>) -> Result<()> {
 
         let table_name = &table_name[7..];
 
-        tx.execute(&format!("DELETE FROM {}", table_name), params!())
+        tx.execute(&format!("DELETE FROM {table_name}"), params!())
             .await?;
 
         tx.execute(
-            &format!(
-                "INSERT INTO {} SELECT * FROM backup_{}",
-                table_name, table_name
-            ),
+            &format!("INSERT INTO {table_name} SELECT * FROM backup_{table_name}"),
             params!(),
         )
         .await?;

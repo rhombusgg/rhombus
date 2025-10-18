@@ -74,7 +74,7 @@ async fn ip_info(ip: IpAddr) -> Result<IPInfo> {
         country: String,
         timezone: String,
     }
-    let mut response = reqwest::get(&format!("https://ipinfo.io/{}/json", ip))
+    let mut response = reqwest::get(&format!("https://ipinfo.io/{ip}/json"))
         .await?
         .json::<IPInfoResponse>()
         .await?;
@@ -169,15 +169,9 @@ pub async fn whois(
                 }
 
                 if let Some(discord_id) = discord_id {
-                    format!(
-                        ":identification_card: <@{}> | [{}]({}/user/{})   {}",
-                        discord_id, user_name, location_url, user_id, flag
-                    )
+                    format!(":identification_card: <@{discord_id}> | [{user_name}]({location_url}/user/{user_id})   {flag}")
                 } else {
-                    format!(
-                        ":identification_card: [{}]({}/user/{})   {}",
-                        user_name, location_url, user_id, flag
-                    )
+                    format!(":identification_card: [{user_name}]({location_url}/user/{user_id})   {flag}")
                 }
             }
         });
@@ -293,7 +287,7 @@ pub async fn support_panel(ctx: Context<'_>) -> std::result::Result<(), DiscordE
                     .description("Submit a ticket for a challenge from the CTF website by clicking on the :tickets: button in the header of the challenge in question.")
             ).components(vec![
                 CreateActionRow::Buttons(vec![
-                    CreateButton::new_link(format!("{}/challenges", location_url))
+                    CreateButton::new_link(format!("{location_url}/challenges"))
                         .label("Go to Challenges"),
                 ])
             ]))
@@ -511,7 +505,7 @@ pub async fn ai(ctx: Context<'_>) -> std::result::Result<(), DiscordError> {
     let mut headers = header::HeaderMap::new();
     headers.insert(
         "Authorization",
-        header::HeaderValue::from_str(&format!("Bearer {}", openai_api_key))?,
+        header::HeaderValue::from_str(&format!("Bearer {openai_api_key}"))?,
     );
     headers.insert(
         "Content-Type",
@@ -558,7 +552,7 @@ pub async fn ai(ctx: Context<'_>) -> std::result::Result<(), DiscordError> {
 
 pub fn format_role(role: Option<NonZeroU64>) -> String {
     if let Some(role) = role {
-        format!("<@&{}>", role)
+        format!("<@&{role}>")
     } else {
         "(not set)".to_owned()
     }
@@ -566,7 +560,7 @@ pub fn format_role(role: Option<NonZeroU64>) -> String {
 
 pub fn format_channel(channel: Option<NonZeroU64>) -> String {
     if let Some(channel) = channel {
-        format!("<#{}>", channel)
+        format!("<#{channel}>")
     } else {
         "(not set)".to_owned()
     }
@@ -921,8 +915,7 @@ async fn event_handler(
                                 ctx,
                                 EditMessage::new().components(vec![CreateActionRow::Buttons(
                                     vec![CreateButton::new(format!(
-                                        "reopen-ticket-{}",
-                                        ticket_number
+                                        "reopen-ticket-{ticket_number}"
                                     ))
                                     .style(ButtonStyle::Primary)
                                     .label("Reopen Ticket")
@@ -953,8 +946,7 @@ async fn event_handler(
                                 ctx,
                                 EditMessage::new().components(vec![CreateActionRow::Buttons(
                                     vec![CreateButton::new(format!(
-                                        "close-ticket-{}",
-                                        ticket_number
+                                        "close-ticket-{ticket_number}"
                                     ))
                                     .style(ButtonStyle::Primary)
                                     .label("Close Ticket")
@@ -1109,7 +1101,7 @@ impl Bot {
                 .clone(),
         };
 
-        let invite_url = format!("https://discord.gg/{}", invite_code);
+        let invite_url = format!("https://discord.gg/{invite_code}");
 
         {
             let mut cached_invite_url = INVITE_URL_CACHE.write().await;
@@ -1205,7 +1197,7 @@ impl Bot {
                             .field("", "", true),
                     )
                     .components(vec![CreateActionRow::Buttons(vec![CreateButton::new(
-                        format!("close-ticket-{}", ticket_number),
+                        format!("close-ticket-{ticket_number}"),
                     )
                     .style(ButtonStyle::Primary)
                     .label("Close Ticket")
@@ -1355,7 +1347,7 @@ impl Bot {
             &self.http,
             CreateMessage::new().flags(MessageFlags::SUPPRESS_EMBEDS).content({
                 let user_link = match user.discord_id {
-                    Some(discord_id) => format!("<@{}>", discord_id),
+                    Some(discord_id) => format!("<@{discord_id}>"),
                     None => format!("**[{}]({}/user/{})**", escape_discord_link(&user.name), location_url, user.id),
                 };
                 format!(
@@ -1443,7 +1435,7 @@ impl Bot {
         );
 
         let embed = if let Some(from) = from {
-            embed.description(format!("From: {}", from))
+            embed.description(format!("From: {from}"))
         } else {
             embed
         };

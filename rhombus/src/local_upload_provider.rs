@@ -53,8 +53,7 @@ impl UploadProvider for LocalUploadProvider {
         E: Into<axum::BoxError>,
     {
         async {
-            let body_with_io_error =
-                stream.map_err(|err| io::Error::new(io::ErrorKind::Other, err));
+            let body_with_io_error = stream.map_err(|err| io::Error::other(err));
             let body_reader = StreamReader::new(body_with_io_error);
             futures::pin_mut!(body_reader);
 
@@ -69,7 +68,7 @@ impl UploadProvider for LocalUploadProvider {
 
             tokio::io::copy(&mut src, &mut file).await?;
             let hash = slice_to_hex_string(&src.hash());
-            let new_filename = format!("{}-{}", hash, filename);
+            let new_filename = format!("{hash}-{filename}");
 
             let new_filepath = std::path::Path::new(&self.base_path).join(&new_filename);
             tokio::fs::rename(&filepath, &new_filepath).await?;

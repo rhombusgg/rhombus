@@ -51,10 +51,9 @@ async fn is_in_server(
     let client = Client::new();
     let res = match client
         .get(format!(
-            "https://discord.com/api/guilds/{}/members/{}",
-            discord_guild_id, discord_id
+            "https://discord.com/api/guilds/{discord_guild_id}/members/{discord_id}"
         ))
-        .header("Authorization", format!("Bot {}", discord_bot_token))
+        .header("Authorization", format!("Bot {discord_bot_token}"))
         .send()
         .await
     {

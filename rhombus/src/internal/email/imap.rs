@@ -159,7 +159,7 @@ async fn receive_emails(
                 for message_id in in_reply_tos {
                     tracing::trace!(message_id = message_id.as_ref(), "Checking in-reply-tos");
                     if let Ok(Some(tn)) = db
-                        .get_ticket_number_by_message_id(&format!("<{}>", message_id))
+                        .get_ticket_number_by_message_id(&format!("<{message_id}>"))
                         .await
                     {
                         ticket_number = Some(tn);
@@ -173,7 +173,7 @@ async fn receive_emails(
                     for message_id in references {
                         tracing::trace!(message_id = message_id.as_ref(), "Checking references");
                         if let Ok(Some(tn)) = db
-                            .get_ticket_number_by_message_id(&format!("<{}>", message_id))
+                            .get_ticket_number_by_message_id(&format!("<{message_id}>"))
                             .await
                         {
                             ticket_number = Some(tn);

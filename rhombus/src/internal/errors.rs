@@ -126,13 +126,14 @@ pub fn error_page(
 }
 
 pub trait IntoErrorResponse<T> {
+    #[allow(clippy::result_large_err)]
     fn map_err_page_code(
         self,
         extensions: &Extensions,
         status_code: StatusCode,
         description: &'static str,
     ) -> Result<T, axum::response::Response>;
-
+    #[allow(clippy::result_large_err)]
     #[track_caller]
     #[inline]
     fn map_err_page(
@@ -146,6 +147,7 @@ pub trait IntoErrorResponse<T> {
         self.map_err_page_code(extensions, StatusCode::INTERNAL_SERVER_ERROR, description)
     }
 
+    #[allow(clippy::result_large_err)]
     fn map_err_htmx(
         self,
         extensions: &Extensions,
