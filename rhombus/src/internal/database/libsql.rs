@@ -67,9 +67,10 @@ impl LibSQLConnection for LocalLibSQL {
                 "
             PRAGMA busy_timeout = 5000;
             PRAGMA synchronous = NORMAL;
-            PRAGMA cache_size = 2000;
+            PRAGMA cache_size = 10000;
             PRAGMA temp_store = MEMORY;
             PRAGMA foreign_keys = TRUE;
+            PRAGMA mmap_size = 268435456;
         ",
             )
             .await?;
@@ -100,9 +101,10 @@ impl InMemoryLibSQL {
             "
         PRAGMA busy_timeout = 5000;
         PRAGMA synchronous = NORMAL;
-        PRAGMA cache_size = 2000;
+        PRAGMA cache_size = 10000;
         PRAGMA temp_store = MEMORY;
         PRAGMA foreign_keys = TRUE;
+        PRAGMA mmap_size = 268435456;
     ",
         )
         .await?;
@@ -156,9 +158,10 @@ impl LibSQLConnection for RemoteLibSQL {
                 "
             PRAGMA busy_timeout = 5000;
             PRAGMA synchronous = NORMAL;
-            PRAGMA cache_size = 2000;
+            PRAGMA cache_size = 10000;
             PRAGMA temp_store = MEMORY;
             PRAGMA foreign_keys = TRUE;
+            PRAGMA mmap_size = 268435456;
         ",
             )
             .await?;
