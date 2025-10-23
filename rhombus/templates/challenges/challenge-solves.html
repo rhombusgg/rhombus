@@ -1,0 +1,47 @@
+<div id="challenge-solves">
+  <ul>
+    {% for solve in global_solves.list %}
+      <li class="flex justify-between">
+        <a hx-boost="true" class="underline" href="/team/{{ solve.team_id }}"
+          >{{ solve.team_name }}</a
+        >
+        <span class="text-muted-foreground" title="{{ solve.solved_at }}">
+          {% with diff=timediff(solve.solved_at, now) %}
+            {{ t("time-difference", years=diff.years, days=diff.days, hours=diff.hours, minutes=diff.minutes, seconds=diff.seconds) }}
+          {%- endwith -%}
+        </span>
+      </li>
+    {% endfor %}
+  </ul>
+  {% if num_pages > 1 %}
+    <div class="flex justify-center">
+      <div>
+        {% for i in range(num_pages) %}
+          {% if i == 0 and page_num != 0 %}
+            <button
+              hx-select="#challenge-solves"
+              hx-target="#challenge-solves"
+              hx-swap="outerHTML"
+              hx-get="/challenges/{{ challenge.id }}"
+              class="underline"
+            >
+              1
+            </button>
+          {% elif i != page_num %}
+            <button
+              hx-select="#challenge-solves"
+              hx-target="#challenge-solves"
+              hx-swap="outerHTML"
+              hx-get="/challenges/{{ challenge.id }}?page={{ i + 1 }}"
+              class="underline"
+            >
+              {{ i + 1 }}
+            </button>
+          {% else %}
+            <span>{{ i + 1 }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+</div>

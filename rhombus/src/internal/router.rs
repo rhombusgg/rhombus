@@ -46,6 +46,7 @@ pub struct RouterStateInner {
     pub score_type_map: Arc<Mutex<BTreeMap<String, Box<dyn ChallengePoints + Send + Sync>>>>,
     pub flag_fn_map: Arc<Mutex<BTreeMap<String, Box<dyn ChallengeFlag + Send + Sync>>>>,
     pub root_api_key: Option<String>,
+    pub solve_lock: Mutex<()>,
 }
 
 pub struct Router {

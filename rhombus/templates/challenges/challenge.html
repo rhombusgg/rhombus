@@ -26,7 +26,7 @@
         </div>
 
         <span
-          >{{ t("solves-points", solves=challenge.division_solves[challenge.division_solves | first], points=challenge.points) }}</span
+          >{{ t("solves-points", solves=challenge.division_solves | items | list | map("last") | sum, points=challenge.points) }}</span
         >
       </rhombus-tooltip>
     </div>
@@ -117,6 +117,12 @@
           {{ attachment.name }}</a
         >
       {% endfor %}
+    </div>
+  {% endif %}
+  {% if global_solves.list | length > 0 %}
+    <div class="mt-4">
+      <span class="font-bold">Solves</span>
+      {% include "challenges/challenge-solves.html" %}
     </div>
   {% endif %}
 </dialog>

@@ -102,6 +102,20 @@ pub struct Writeup {
 }
 
 #[derive(Debug, Serialize, Clone)]
+pub struct ChallengeSolveList {
+    pub total: u64,
+    pub list: Vec<ChallengeSolveListItem>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct ChallengeSolveListItem {
+    pub team_id: i64,
+    pub team_name: String,
+    pub solved_at: DateTime<Utc>,
+    pub division_id: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
 pub struct TeamInner {
     pub id: i64,
     pub name: String,
@@ -331,6 +345,12 @@ pub trait Database {
     ) -> Result<()>;
     async fn get_writeups_from_user_id(&self, user_id: i64) -> Result<Writeups>;
     async fn delete_writeup(&self, challenge_id: i64, user_id: i64, team_id: i64) -> Result<()>;
+    async fn get_challenge_solves(
+        &self,
+        challenge_id: &str,
+        offset: u64,
+        limit: u64,
+    ) -> Result<ChallengeSolveList>;
     async fn get_next_ticket_number(&self) -> Result<u64>;
     async fn create_ticket(
         &self,

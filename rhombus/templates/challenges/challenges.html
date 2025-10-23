@@ -68,7 +68,7 @@
                     </a>
                   {% endif %}
                   <span class="cursor-pointer"
-                    >{{ t("solves-points", solves=challenge.division_solves[team.division_id], points=(solve.points if solve and solve.points else challenge.points)) }}</span
+                    >{{ t("solves-points", solves=challenge.division_solves | items | list | map("last") | sum, points=(solve.points if solve and solve.points else challenge.points)) }}</span
                   >
                   <img
                     class="aspect-square h-8 rounded-full"
@@ -92,14 +92,11 @@
                         stroke-width="2"
                         stroke-linecap="round"
                         stroke-linejoin="round"
-                        class="lucide lucide-ticket -rotate-45"
+                        class="lucide lucide-circle-question-mark-icon lucide-circle-question-mark"
                       >
-                        <path
-                          d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
-                        />
-                        <path d="M13 5v2" />
-                        <path d="M13 17v2" />
-                        <path d="M13 11v2" />
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                        <path d="M12 17h.01" />
                       </svg>
                     </button>
                   {% endif %}

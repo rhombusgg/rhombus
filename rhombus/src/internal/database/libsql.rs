@@ -29,11 +29,12 @@ use crate::{
             cache::Writeups,
             provider::{
                 Author, Category, Challenge, ChallengeAttachment, ChallengeData, ChallengeDivision,
-                ChallengeSolve, Challenges, Database, DiscordUpsertError, Email, Leaderboard,
-                LeaderboardEntry, Scoreboard, ScoreboardInner, ScoreboardSeriesPoint,
-                ScoreboardTeam, SetAccountNameError, SetTeamNameError, SiteStatistics,
-                StatisticsCategory, Team, TeamInner, TeamMeta, TeamMetaInner, TeamStanding,
-                TeamUser, Ticket, ToBeClosedTicket, UserTrack, Writeup,
+                ChallengeSolve, ChallengeSolveList, ChallengeSolveListItem, Challenges, Database,
+                DiscordUpsertError, Email, Leaderboard, LeaderboardEntry, Scoreboard,
+                ScoreboardInner, ScoreboardSeriesPoint, ScoreboardTeam, SetAccountNameError,
+                SetTeamNameError, SiteStatistics, StatisticsCategory, Team, TeamInner, TeamMeta,
+                TeamMetaInner, TeamStanding, TeamUser, Ticket, ToBeClosedTicket, UserTrack,
+                Writeup,
             },
         },
         division::Division,
@@ -65,7 +66,7 @@ impl LibSQLConnection for LocalLibSQL {
             let conn = conn?;
             conn.execute_batch(
                 "
-            PRAGMA busy_timeout = 5000;
+            PRAGMA busy_timeout = 8000;
             PRAGMA synchronous = NORMAL;
             PRAGMA cache_size = 10000;
             PRAGMA temp_store = MEMORY;
@@ -99,7 +100,7 @@ impl InMemoryLibSQL {
 
         conn.execute_batch(
             "
-        PRAGMA busy_timeout = 5000;
+        PRAGMA busy_timeout = 8000;
         PRAGMA synchronous = NORMAL;
         PRAGMA cache_size = 10000;
         PRAGMA temp_store = MEMORY;
@@ -156,7 +157,7 @@ impl LibSQLConnection for RemoteLibSQL {
             let conn = conn?;
             conn.execute_batch(
                 "
-            PRAGMA busy_timeout = 5000;
+            PRAGMA busy_timeout = 8000;
             PRAGMA synchronous = NORMAL;
             PRAGMA cache_size = 10000;
             PRAGMA temp_store = MEMORY;
@@ -1663,6 +1664,68 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         Ok(())
     }
 
+    async fn get_challenge_solves(
+        &self,
+        challenge_id: &str,
+        offset: u64,
+        limit: u64,
+    ) -> Result<ChallengeSolveList> {
+        let tx = self.transaction().await?;
+
+        let total = tx
+            .query(
+                "
+                SELECT COUNT(*)
+                FROM rhombus_solve
+                WHERE challenge_id = ?1
+            ",
+                [challenge_id],
+            )
+            .await?
+            .next()
+            .await?
+            .unwrap()
+            .get::<u64>(0)
+            .unwrap();
+
+        #[derive(Debug, Deserialize)]
+        struct DbChallengeSolveListItem {
+            pub team_id: i64,
+            pub team_name: String,
+            pub solved_at: i64,
+            pub division_id: String,
+        }
+
+        let list = tx
+            .query(
+                "
+                SELECT s.team_id, t.name AS team_name, s.solved_at, t.division_id
+                FROM rhombus_solve s
+                JOIN rhombus_team t ON t.id = s.team_id
+                WHERE challenge_id = ?1
+                ORDER BY solved_at DESC
+                LIMIT ?2
+                OFFSET ?3
+            ",
+                params!(challenge_id, limit, offset),
+            )
+            .await?
+            .into_stream()
+            .map(|row| de::from_row::<DbChallengeSolveListItem>(&row.unwrap()).unwrap())
+            .map(|row| ChallengeSolveListItem {
+                team_id: row.team_id,
+                team_name: row.team_name,
+                solved_at: DateTime::<Utc>::from_timestamp(row.solved_at, 0).unwrap(),
+                division_id: row.division_id,
+            })
+            .collect::<Vec<_>>()
+            .await;
+
+        tx.commit().await?;
+
+        Ok(ChallengeSolveList { total, list })
+    }
+
     async fn get_next_ticket_number(&self) -> Result<u64> {
         let ticket_number = self
             .connect()
@@ -2133,7 +2196,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
                 "
                 SELECT id AS team_id, name, points
                 FROM rhombus_team
-                WHERE division_id = ?1
+                WHERE division_id = ?1 AND points > 0
                 ORDER BY points DESC, last_solved_at ASC
             ",
                 params!(division_id),

@@ -16,9 +16,9 @@ use crate::{
         database::{
             cache::Writeups,
             provider::{
-                Challenge, Challenges, Database, DiscordUpsertError, Email, Leaderboard,
-                Scoreboard, SetAccountNameError, SetTeamNameError, SiteStatistics, Team, TeamMeta,
-                TeamStanding, Ticket, ToBeClosedTicket, UserTrack,
+                Challenge, ChallengeSolveList, Challenges, Database, DiscordUpsertError, Email,
+                Leaderboard, Scoreboard, SetAccountNameError, SetTeamNameError, SiteStatistics,
+                Team, TeamMeta, TeamStanding, Ticket, ToBeClosedTicket, UserTrack,
             },
         },
         division::Division,
@@ -269,6 +269,15 @@ impl Database for Postgres {
     }
 
     async fn delete_writeup(&self, _challenge_id: i64, _user_id: i64, _team_id: i64) -> Result<()> {
+        todo!()
+    }
+
+    async fn get_challenge_solves(
+        &self,
+        _challenge_id: &str,
+        _offset: u64,
+        _limit: u64,
+    ) -> Result<ChallengeSolveList> {
         todo!()
     }
 

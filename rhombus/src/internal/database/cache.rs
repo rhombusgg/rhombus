@@ -16,9 +16,10 @@ use crate::{
     internal::{
         auth::User,
         database::provider::{
-            Challenge, ChallengeData, Challenges, Connection, Database, DiscordUpsertError, Email,
-            Leaderboard, Scoreboard, SetAccountNameError, SetTeamNameError, SiteStatistics, Team,
-            TeamInner, TeamMeta, TeamStanding, Ticket, ToBeClosedTicket, UserTrack, Writeup,
+            Challenge, ChallengeData, ChallengeSolveList, Challenges, Connection, Database,
+            DiscordUpsertError, Email, Leaderboard, Scoreboard, SetAccountNameError,
+            SetTeamNameError, SiteStatistics, Team, TeamInner, TeamMeta, TeamStanding, Ticket,
+            ToBeClosedTicket, UserTrack, Writeup,
         },
         division::Division,
         routes::challenges::ChallengePoints,
@@ -387,6 +388,16 @@ impl Database for DbCache {
         result
     }
 
+    async fn get_challenge_solves(
+        &self,
+        challenge_id: &str,
+        offset: u64,
+        limit: u64,
+    ) -> Result<ChallengeSolveList> {
+        self.inner
+            .get_challenge_solves(challenge_id, offset, limit)
+            .await
+    }
     async fn get_next_ticket_number(&self) -> Result<u64> {
         self.inner.get_next_ticket_number().await
     }

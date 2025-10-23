@@ -11,7 +11,7 @@
     {% for division in divisions %}
       <tr class="*:p-2">
         <td class="flex items-center">
-          {{ division.name }}
+          <a href="/scoreboard/{{ division.id }}">{{ division.name }}</a>
           <div title="{{ division.description }}">
             {{ icons.info(class="h-4 ml-2") }}
           </div>

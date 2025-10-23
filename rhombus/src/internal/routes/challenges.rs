@@ -1,7 +1,7 @@
 use std::{cmp::max, sync::LazyLock, time::Duration};
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::Extensions,
     response::{Html, IntoResponse, Response},
     Extension, Form,
@@ -127,12 +127,14 @@ impl ChallengePoints for DynamicPoints {
             .as_f64()
             .unwrap_or(100.);
 
-        let solves = challenge.division_solves.values().sum::<u64>() as f64;
+        let solves = (challenge.division_solves.values().sum::<u64>() + 1) as f64;
 
         let points = max(
             (((minimum - initial) / (decay * decay) * (solves * solves)) + initial).ceil() as i64,
             minimum as i64,
         );
+
+        tracing::info!(solves, points, challenge_id = challenge.id, "next");
 
         Ok(points)
     }
@@ -161,11 +163,17 @@ impl ChallengePoints for StaticPoints {
     }
 }
 
+#[derive(Deserialize)]
+pub struct ChallengeParams {
+    page: Option<u64>,
+}
+
 pub async fn route_challenge_view(
     State(state): State<RouterState>,
     Extension(user): Extension<User>,
     Extension(page): Extension<PageMeta>,
     Path(challenge_id): Path<String>,
+    Query(params): Query<ChallengeParams>,
     extensions: Extensions,
 ) -> std::result::Result<impl IntoResponse, Response> {
     if let Some(start_time) = state.settings.read().await.start_time {
@@ -174,11 +182,18 @@ pub async fn route_challenge_view(
         }
     }
 
+    let page_num: u64 = params.page.unwrap_or(1).saturating_sub(1);
+    const PAGE_SIZE: u64 = 10;
+
     let challenge_data = state.db.get_challenges();
     let team = state.db.get_team_from_id(user.team_id);
     let user_writeups = state.db.get_writeups_from_user_id(user.id);
-    let (challenge_data, team, user_writeups) =
-        tokio::try_join!(challenge_data, team, user_writeups)
+    let global_solves =
+        state
+            .db
+            .get_challenge_solves(&challenge_id, page_num * PAGE_SIZE, PAGE_SIZE);
+    let (challenge_data, team, user_writeups, global_solves) =
+        tokio::try_join!(challenge_data, team, user_writeups, global_solves)
             .map_err_htmx(&extensions, "Failed to get data")?;
 
     let challenge = challenge_data
@@ -190,6 +205,10 @@ pub async fn route_challenge_view(
         .categories
         .get(&challenge.category_id)
         .unwrap();
+    let num_pages = global_solves.total.div_ceil(PAGE_SIZE);
+    let page_num = page_num.min(num_pages);
+
+    let now = chrono::Utc::now();
 
     Ok(Html(
         state
@@ -205,6 +224,10 @@ pub async fn route_challenge_view(
                 team,
                 divisions => challenge_data.divisions,
                 user_writeups,
+                global_solves,
+                page_num,
+                num_pages,
+                now,
             })
             .unwrap(),
     )
@@ -419,6 +442,8 @@ pub async fn route_challenge_submit(
             return (StatusCode::FORBIDDEN, "CTF not started yet").into_response();
         }
     }
+
+    let _ = state.solve_lock.lock().await;
 
     let challenge_data = match state.db.get_challenges().await {
         Ok(challenge_data) => challenge_data,
