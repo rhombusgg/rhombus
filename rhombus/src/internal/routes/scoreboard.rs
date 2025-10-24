@@ -78,12 +78,29 @@ pub async fn route_scoreboard_division(
 
     let division_id = division_id.strip_suffix(".json").unwrap_or(&division_id);
 
-    let scoreboard = state.db.get_scoreboard(division_id);
+    let scoreboard = state
+        .db
+        .get_scoreboard(division_id)
+        .await
+        .map_err_page(&extensions, "failed to get scoreboard")?;
+
+    let end_time = { state.settings.read().await.end_time };
+    let now = chrono::Utc::now();
+    let t = end_time.map_or(now, |t| t.min(now));
+
+    let json = json!({
+        "time": t,
+        "teams": scoreboard.teams,
+    });
+
+    if uri.path().ends_with(".json") {
+        return Ok(Json(json).into_response());
+    }
+
     let challenge_data = state.db.get_challenges();
     let leaderboard = state.db.get_leaderboard(division_id);
-    let (scoreboard, challenge_data, leaderboard) =
-        tokio::try_join!(scoreboard, challenge_data, leaderboard)
-            .map_err_page(&extensions, "Failed to get data")?;
+    let (challenge_data, leaderboard) = tokio::try_join!(challenge_data, leaderboard)
+        .map_err_page(&extensions, "Failed to get data")?;
 
     const PAGE_SIZE: usize = 25;
     let num_pages = leaderboard.len().div_ceil(PAGE_SIZE);
@@ -92,14 +109,6 @@ pub async fn route_scoreboard_division(
     let start = std::cmp::min(leaderboard.len(), page_num * PAGE_SIZE);
     let end = std::cmp::min(leaderboard.len(), start + PAGE_SIZE);
     let leaderboard = &leaderboard[start..end];
-
-    if uri.path().ends_with(".json") {
-        return Ok((
-            [("Content-Type", "application/json")],
-            scoreboard.cached_json.clone(),
-        )
-            .into_response());
-    }
 
     Ok(Html(
         state
@@ -112,7 +121,7 @@ pub async fn route_scoreboard_division(
                 user,
                 uri => "/scoreboard",
                 title => format!("Scoreboard | {}", state.global_page_meta.title),
-                scoreboard => scoreboard.teams,
+                scoreboard => json,
                 divisions => challenge_data.divisions,
                 leaderboard,
                 selected_division_id => division_id,

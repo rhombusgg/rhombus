@@ -64,7 +64,7 @@
         width: 4,
         // cap: "round",
       },
-      // symbolSize: 10,
+      symbolSize: 12,
     };
 
     const optionsCommon = {
@@ -116,11 +116,9 @@
 
     const timestampOffset = new Date().getTimezoneOffset() * 60;
 
-    const series = Object.values(scoreboard_data).map((team) => ({
-      name: team.team_name,
-      data: team.series.map((d) => ({
-        value: [d.timestamp * 1000 + timestampOffset, d.total_score],
-      })),
+    const series = scoreboard_data.teams.map(team => ({
+      name: team.name,
+      data: [...team.series.map(p => ({ value: [p.t * 1000 + timestampOffset, p.s] })), { value: [new Date(scoreboard_data.time).getTime() + timestampOffset, team.points] }],
       ...seriesCommon,
     }));
 

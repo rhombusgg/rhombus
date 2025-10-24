@@ -50,14 +50,6 @@ CREATE TABLE IF NOT EXISTS rhombus_author (
     discord_id INTEGER NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS rhombus_points_snapshot (
-    team_id INTEGER NOT NULL,
-    at INTEGER NOT NULL DEFAULT(strftime('%s', 'now')),
-    points INTEGER NOT NULL,
-    PRIMARY KEY (team_id, at ASC),
-    FOREIGN KEY (team_id) REFERENCES rhombus_team(id)
-);
-
 CREATE TABLE IF NOT EXISTS rhombus_category (
     id TEXT PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
@@ -71,6 +63,7 @@ CREATE TABLE IF NOT EXISTS rhombus_solve (
     team_id INTEGER NOT NULL,
     solved_at INTEGER NOT NULL DEFAULT(strftime('%s', 'now')),
     points INTEGER,
+    team_points INTEGER,
     PRIMARY KEY (team_id, challenge_id),
     FOREIGN KEY (challenge_id) REFERENCES rhombus_challenge(id),
     FOREIGN KEY (user_id) REFERENCES rhombus_user(id),
@@ -78,6 +71,8 @@ CREATE TABLE IF NOT EXISTS rhombus_solve (
 );
 
 CREATE INDEX IF NOT EXISTS challenge_id_idx ON rhombus_solve(challenge_id, team_id, points);
+CREATE INDEX IF NOT EXISTS user_id_idx ON rhombus_solve(user_id);
+CREATE INDEX IF NOT EXISTS scoreboard_idx ON rhombus_solve(team_id, solved_at ASC, team_points);
 
 CREATE TABLE IF NOT EXISTS rhombus_user (
     id INTEGER PRIMARY KEY NOT NULL,

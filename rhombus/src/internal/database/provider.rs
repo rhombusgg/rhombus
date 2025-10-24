@@ -6,7 +6,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::{serde::ts_seconds, DateTime, Utc};
 use serde::Serialize;
 use serde_json::Value;
 use tokio_util::bytes::Bytes;
@@ -120,6 +120,7 @@ pub struct TeamInner {
     pub id: i64,
     pub name: String,
     pub invite_token: String,
+    pub points: i64,
     pub users: BTreeMap<i64, TeamUser>,
     pub solves: BTreeMap<String, ChallengeSolve>,
     pub writeups: BTreeMap<String, Vec<Writeup>>,
@@ -139,28 +140,24 @@ pub struct TeamMetaInner {
 pub type TeamMeta = Arc<TeamMetaInner>;
 
 #[derive(Debug, Serialize, Clone)]
-pub struct ScoreboardSeriesPoint {
-    pub timestamp: i64,
-    pub total_score: i64,
-}
-
-#[derive(Debug, Serialize, Clone)]
 pub struct ScoreboardTeam {
-    pub team_name: String,
+    pub id: i64,
+    pub name: String,
+    pub points: i64,
     pub series: Vec<ScoreboardSeriesPoint>,
 }
 
 #[derive(Debug, Serialize, Clone)]
-pub struct ScoreboardInner {
-    pub teams: BTreeMap<i64, ScoreboardTeam>,
-    pub cached_json: Bytes,
+pub struct ScoreboardSeriesPoint {
+    #[serde(rename = "t", with = "ts_seconds")]
+    pub timestamp: DateTime<Utc>,
+    #[serde(rename = "s")]
+    pub total_score: i64,
 }
 
-impl ScoreboardInner {
-    pub fn new(teams: BTreeMap<i64, ScoreboardTeam>) -> Self {
-        let cached_json = serde_json::to_string(&teams).unwrap().into();
-        Self { teams, cached_json }
-    }
+#[derive(Debug, Serialize, Clone)]
+pub struct ScoreboardInner {
+    pub teams: Vec<ScoreboardTeam>,
 }
 
 pub type Scoreboard = Arc<ScoreboardInner>;
@@ -311,8 +308,7 @@ pub trait Database {
     async fn solve_challenge(
         &self,
         user_id: i64,
-        team_id: i64,
-        division_id: &str,
+        team: &Team,
         challenge: &Challenge,
         next_points: i64,
         now: DateTime<Utc>,

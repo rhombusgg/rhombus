@@ -579,14 +579,7 @@ pub async fn route_challenge_submit(
 
     if let Err(e) = state
         .db
-        .solve_challenge(
-            user.id,
-            team.id,
-            &team.division_id,
-            challenge,
-            next_points,
-            now,
-        )
+        .solve_challenge(user.id, &team, challenge, next_points, now)
         .await
     {
         tracing::error!(error = ?e, user_id=user.id, team_id=team.id, "Failed to solve challenge");

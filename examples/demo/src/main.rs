@@ -257,12 +257,11 @@ async fn solve_challenge(
 ) -> Result<()> {
     let conn = libsql.connect().await?;
 
-    if let Some((user_id, team_id, division_id)) = conn
+    if let Some((user_id, team_id)) = conn
         .query(
             "
-            SELECT rhombus_user.id, rhombus_user.team_id, rhombus_team.division_id
+            SELECT rhombus_user.id, rhombus_user.team_id
             FROM rhombus_user
-            JOIN rhombus_team ON rhombus_user.team_id = rhombus_team.id
             WHERE is_bot = 1
             ORDER BY RANDOM()
             LIMIT 1
@@ -272,13 +271,7 @@ async fn solve_challenge(
         .await?
         .next()
         .await?
-        .map(|row| {
-            (
-                row.get::<i64>(0).unwrap(),
-                row.get::<i64>(1).unwrap(),
-                row.get::<String>(2).unwrap(),
-            )
-        })
+        .map(|row| (row.get::<i64>(0).unwrap(), row.get::<i64>(1).unwrap()))
     {
         let mut rng = rand::rngs::OsRng;
         if let Some(challenge) = db
@@ -300,7 +293,7 @@ async fn solve_challenge(
                 .unwrap();
 
             let now = Utc::now();
-            db.solve_challenge(user_id, team_id, &division_id, challenge, next_points, now)
+            db.solve_challenge(user_id, &team, challenge, next_points, now)
                 .await?;
             tracing::info!(user_id, challenge_id = challenge.id, "Solved challenge");
         }

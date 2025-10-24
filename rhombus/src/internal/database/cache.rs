@@ -17,9 +17,9 @@ use crate::{
         auth::User,
         database::provider::{
             Challenge, ChallengeData, ChallengeSolveList, Challenges, Connection, Database,
-            DiscordUpsertError, Email, Leaderboard, Scoreboard, SetAccountNameError,
-            SetTeamNameError, SiteStatistics, Team, TeamInner, TeamMeta, TeamStanding, Ticket,
-            ToBeClosedTicket, UserTrack, Writeup,
+            DiscordUpsertError, Email, Leaderboard, Scoreboard, ScoreboardSeriesPoint,
+            SetAccountNameError, SetTeamNameError, SiteStatistics, Team, TeamInner, TeamMeta,
+            TeamStanding, Ticket, ToBeClosedTicket, UserTrack, Writeup,
         },
         division::Division,
         routes::challenges::ChallengePoints,
@@ -310,29 +310,27 @@ impl Database for DbCache {
     async fn solve_challenge(
         &self,
         user_id: i64,
-        team_id: i64,
-        division_id: &str,
+        team: &Team,
         solved_challenge: &Challenge,
         next_points: i64,
         now: DateTime<Utc>,
     ) -> Result<()> {
         let result = self
             .inner
-            .solve_challenge(
-                user_id,
-                team_id,
-                division_id,
-                solved_challenge,
-                next_points,
-                now,
-            )
+            .solve_challenge(user_id, team, solved_challenge, next_points, now)
             .await;
         if result.is_ok() {
             USER_CACHE.remove(&user_id);
             TEAM_CACHE.clear();
-            SCOREBOARD_CACHE.clear();
             LEADERBOARD_CACHE.clear();
             TEAM_STANDINGS.clear();
+
+            if let Some(mut scores) = HISTORICAL_SCORE_CACHE.get_mut(&team.id) {
+                scores.push(ScoreboardSeriesPoint {
+                    timestamp: now,
+                    total_score: team.points + next_points,
+                });
+            }
 
             if let Some(ref mut cached) = &mut *CHALLENGES_CACHE.write().await {
                 let mut challenges = cached.challenges.clone();
@@ -340,7 +338,10 @@ impl Database for DbCache {
                     .values_mut()
                     .find(|challenge| challenge.id == solved_challenge.id)
                 {
-                    *challenge.division_solves.get_mut(division_id).unwrap() += 1;
+                    *challenge
+                        .division_solves
+                        .get_mut(team.division_id.as_str())
+                        .unwrap() += 1;
                     challenge.points = next_points;
                 }
                 *cached = Arc::new(ChallengeData {
@@ -486,7 +487,7 @@ impl Database for DbCache {
     }
 
     async fn get_scoreboard(&self, division_id: &str) -> Result<Scoreboard> {
-        get_scoreboard(&self.inner, division_id).await
+        self.inner.get_scoreboard(division_id).await
     }
 
     async fn get_leaderboard(&self, division_id: &str) -> Result<Leaderboard> {
@@ -576,6 +577,7 @@ impl Database for DbCache {
                     id: v.value.id,
                     name: v.value.name.clone(),
                     invite_token: v.value.invite_token.clone(),
+                    points: v.value.points,
                     users: v.value.users.clone(),
                     solves: v.value.solves.clone(),
                     writeups: v.value.writeups.clone(),
@@ -584,7 +586,6 @@ impl Database for DbCache {
                 insert_timestamp: v.insert_timestamp,
             });
             TEAM_STANDINGS.clear();
-            SCOREBOARD_CACHE.clear();
             LEADERBOARD_CACHE.clear();
 
             if let Some(ref mut cached) = &mut *CHALLENGES_CACHE.write().await {
@@ -741,21 +742,22 @@ pub async fn get_writeups_from_user_id(db: &Connection, user_id: i64) -> Result<
     writeups
 }
 
-pub static SCOREBOARD_CACHE: LazyLock<DashMap<String, Scoreboard>> = LazyLock::new(DashMap::new);
+pub static HISTORICAL_SCORE_CACHE: LazyLock<DashMap<i64, Vec<ScoreboardSeriesPoint>>> =
+    LazyLock::new(DashMap::new);
 
-pub async fn get_scoreboard(db: &Connection, division_id: &str) -> Result<Scoreboard> {
-    if let Some(scoreboard) = SCOREBOARD_CACHE.get(division_id) {
-        return Ok(scoreboard.clone());
-    }
-    tracing::trace!(division_id, "cache miss: get_scoreboard");
+// pub async fn get_scoreboard(db: &Connection, division_id: &str) -> Result<Scoreboard> {
+//     if let Some(scoreboard) = SCOREBOARD_CACHE.get(division_id) {
+//         return Ok(scoreboard.clone());
+//     }
+//     tracing::trace!(division_id, "cache miss: get_scoreboard");
 
-    let scoreboard = db.get_scoreboard(division_id).await;
+//     let scoreboard = db.get_scoreboard(division_id).await;
 
-    if let Ok(scoreboard) = &scoreboard {
-        SCOREBOARD_CACHE.insert(division_id.to_owned(), scoreboard.clone());
-    }
-    scoreboard
-}
+//     if let Ok(scoreboard) = &scoreboard {
+//         SCOREBOARD_CACHE.insert(division_id.to_owned(), scoreboard.clone());
+//     }
+//     scoreboard
+// }
 
 pub static LEADERBOARD_CACHE: LazyLock<DashMap<String, Leaderboard>> = LazyLock::new(DashMap::new);
 
@@ -856,15 +858,15 @@ pub fn database_cache_evictor(seconds: u64, db: Connection) {
                 tracing::trace!(count, "Evicted user writeup cache");
             }
 
-            // Scoreboard cache
-            let mut count: i64 = 0;
-            SCOREBOARD_CACHE.retain(|_, _| {
-                count += 1;
-                false
-            });
-            if count > 0 {
-                tracing::trace!(count, "Evicted scoreboard cache");
-            }
+            // // Scoreboard cache
+            // let mut count: i64 = 0;
+            // SCOREBOARD_CACHE.retain(|_, _| {
+            //     count += 1;
+            //     false
+            // });
+            // if count > 0 {
+            //     tracing::trace!(count, "Evicted scoreboard cache");
+            // }
 
             // Leaderboard cache
             let mut count: i64 = 0;
@@ -908,7 +910,7 @@ pub async fn clear_all_caches() {
     USER_CACHE.clear();
     TEAM_CACHE.clear();
     USER_WRITEUP_CACHE.clear();
-    SCOREBOARD_CACHE.clear();
+    // SCOREBOARD_CACHE.clear();
     LEADERBOARD_CACHE.clear();
     USER_EMAILS_CACHE.clear();
     TEAM_STANDINGS.clear();

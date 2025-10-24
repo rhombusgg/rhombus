@@ -1024,10 +1024,11 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             invite_token: String,
             division_id: String,
             last_division_change: Option<i64>,
+            points: i64,
         }
         let query_team_row = tx
             .query(
-                "SELECT name, invite_token, division_id, last_division_change FROM rhombus_team WHERE id = ?1",
+                "SELECT name, invite_token, division_id, last_division_change, points FROM rhombus_team WHERE id = ?1",
                 [team_id],
             )
             .await?
@@ -1143,6 +1144,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             name: query_team.name,
             invite_token: query_team.invite_token,
             division_id: query_team.division_id,
+            points: query_team.points,
             last_division_change: query_team
                 .last_division_change
                 .map(|t| DateTime::<Utc>::from_timestamp(t, 0).unwrap()),
@@ -1481,30 +1483,12 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
     async fn solve_challenge(
         &self,
         user_id: i64,
-        team_id: i64,
-        division_id: &str,
+        team: &Team,
         challenge: &Challenge,
         next_points: i64,
         now: DateTime<Utc>,
     ) -> Result<()> {
         let tx = self.transaction().await?;
-
-        let top_10 = tx
-            .query(
-                "
-                SELECT id
-                FROM rhombus_team
-                WHERE division_id = ?1 AND points > 0
-                ORDER BY points DESC, last_solved_at ASC
-                LIMIT 10
-            ",
-                [division_id],
-            )
-            .await?
-            .into_stream()
-            .map(|row| row.unwrap().get::<i64>(0).unwrap())
-            .collect::<Vec<_>>()
-            .await;
 
         let point_difference = challenge.points - next_points;
 
@@ -1525,8 +1509,8 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         }
 
         tx.execute(
-            "INSERT INTO rhombus_solve (challenge_id, user_id, team_id, solved_at) VALUES (?1, ?2, ?3, ?4)",
-            params!(challenge.id.as_str(), user_id, team_id, now.timestamp()),
+            "INSERT INTO rhombus_solve (challenge_id, user_id, team_id, solved_at, team_points) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params!(challenge.id.as_str(), user_id, team.id, now.timestamp(), team.points + next_points),
         )
         .await?;
 
@@ -1535,7 +1519,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             INSERT INTO rhombus_challenge_division_solves (challenge_id, division_id, solves) VALUES (?1, ?2, 1)
             ON CONFLICT (challenge_id, division_id) DO UPDATE SET solves = solves + 1
         ",
-            params!(challenge.id.as_str(), division_id),
+            params!(challenge.id.as_str(), team.division_id.as_str()),
         )
         .await?;
 
@@ -1545,7 +1529,7 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             SET points = points + ?1, last_solved_at = ?2
             WHERE id = ?3
         ",
-            params!(next_points, now.timestamp(), team_id),
+            params!(next_points, now.timestamp(), team.id),
         )
         .await?;
 
@@ -1558,38 +1542,6 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             params!(challenge.id.as_str(), next_points),
         )
         .await?;
-
-        let new_top_10 = tx
-            .query(
-                "
-                SELECT id
-                FROM rhombus_team
-                WHERE division_id = ?1 AND points > 0
-                ORDER BY points DESC, last_solved_at ASC
-                LIMIT 10
-            ",
-                [division_id],
-            )
-            .await?
-            .into_stream()
-            .map(|row| row.unwrap().get::<i64>(0).unwrap())
-            .collect::<Vec<_>>()
-            .await;
-
-        if top_10 != new_top_10 {
-            tx.execute(
-                "
-                INSERT INTO rhombus_points_snapshot
-                SELECT id, ?2, points
-                FROM rhombus_team
-                WHERE division_id = ?1 AND points > 0
-                ORDER BY points DESC, last_solved_at ASC
-                LIMIT 20
-            ",
-                params!(division_id, now.timestamp()),
-            )
-            .await?;
-        }
 
         tx.commit().await?;
 
@@ -2099,13 +2051,19 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
         let tx = self.transaction().await?;
 
         #[derive(Debug, Deserialize)]
-        struct DbTeam {
+        struct DbTeamMeta {
             id: i64,
             name: String,
             points: i64,
         }
 
-        let mut db_teams = tx
+        #[derive(Debug, Deserialize)]
+        struct DbScoreboardSeriesPoint {
+            team_points: i64,
+            solved_at: i64,
+        }
+
+        let mut teams = tx
             .query(
                 "
                 SELECT id, name, points
@@ -2116,67 +2074,47 @@ impl<T: ?Sized + LibSQLConnection + Send + Sync> Database for T {
             ",
                 params!(division_id),
             )
-            .await?;
+            .await?
+            .into_stream()
+            .map(|row| {
+                let team = de::from_row::<DbTeamMeta>(&row.unwrap()).unwrap();
+                ScoreboardTeam {
+                    id: team.id,
+                    name: team.name,
+                    points: team.points,
+                    series: Vec::new(),
+                }
+            })
+            .collect::<Vec<_>>()
+            .await;
 
-        let mut teams = BTreeMap::new();
-        while let Some(row) = db_teams.next().await? {
-            let team = de::from_row::<DbTeam>(&row).unwrap();
-            teams.insert(
-                team.id,
-                (
-                    ScoreboardTeam {
-                        team_name: team.name,
-                        series: vec![],
-                    },
-                    team.points,
-                ),
-            );
-        }
-
-        #[derive(Debug, Deserialize)]
-        struct DbScoreboard {
-            at: i64,
-            points: i64,
-        }
-
-        for (team_id, (team, _)) in teams.iter_mut() {
-            let mut db_scoreboard = tx
+        for team in &mut teams {
+            team.series = tx
                 .query(
                     "
-                    SELECT at, points
-                    FROM rhombus_points_snapshot
-                    WHERE team_id = ?
-                    ORDER BY at ASC
+                    SELECT team_points, solved_at
+                    FROM rhombus_solve
+                    WHERE team_id = ?1
+                    ORDER BY solved_at ASC
                 ",
-                    params!(team_id),
+                    params!(team.id),
                 )
-                .await?;
-
-            while let Some(row) = db_scoreboard.next().await? {
-                let scoreboard = de::from_row::<DbScoreboard>(&row).unwrap();
-                let series_point = ScoreboardSeriesPoint {
-                    timestamp: scoreboard.at,
-                    total_score: scoreboard.points,
-                };
-                team.series.push(series_point);
-            }
+                .await?
+                .into_stream()
+                .map(|row| {
+                    let point = de::from_row::<DbScoreboardSeriesPoint>(&row.unwrap()).unwrap();
+                    ScoreboardSeriesPoint {
+                        timestamp: DateTime::<Utc>::from_timestamp(point.solved_at, 0).unwrap(),
+                        total_score: point.team_points,
+                    }
+                })
+                .collect::<Vec<_>>()
+                .await;
         }
 
         tx.commit().await?;
 
-        let now = chrono::Utc::now().timestamp();
-        let teams = teams
-            .into_iter()
-            .map(|(team_id, (mut team, current_points))| {
-                team.series.push(ScoreboardSeriesPoint {
-                    timestamp: now,
-                    total_score: current_points,
-                });
-                (team_id, team)
-            })
-            .collect();
-
-        Ok(Arc::new(ScoreboardInner::new(teams)))
+        Ok(Arc::new(ScoreboardInner { teams }))
     }
 
     async fn get_leaderboard(&self, division_id: &str) -> Result<Leaderboard> {

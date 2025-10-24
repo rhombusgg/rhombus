@@ -245,8 +245,7 @@ impl Database for Postgres {
     async fn solve_challenge(
         &self,
         _user_id: i64,
-        _team_id: i64,
-        _division_id: &str,
+        _team: &Team,
         _challenge: &Challenge,
         _next_points: i64,
         _now: DateTime<Utc>,
