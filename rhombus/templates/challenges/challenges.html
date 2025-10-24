@@ -33,13 +33,14 @@
               class="bg-card ring-offset-background border-l-4 p-4 ring-offset-4"
               style="border-color: {{ category.color }}; --tw-ring-color: {{ category.color }}"
             >
-              <div class="mb-2 flex h-8 justify-between">
+              <div class="mb-2 flex h-8 gap-2 justify-between">
                 <div class="flex items-center gap-2 font-bold">
                   <button
                     hx-trigger="click"
                     hx-get="/challenges/{{ challenge.id }}"
                     hx-target="body"
                     hx-swap="beforeend"
+                    class="text-left"
                   >
                     <span style="color: {{ category.color }}">
                       {{ category.name }} /
@@ -67,7 +68,7 @@
                       />
                     </a>
                   {% endif %}
-                  <span class="cursor-pointer"
+                  <span class="cursor-pointer whitespace-nowrap"
                     >{{ t("solves-points", solves=challenge.division_solves | items | list | map("last") | sum, points=(solve.points if solve and solve.points else challenge.points)) }}</span
                   >
                   <img
