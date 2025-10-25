@@ -220,12 +220,12 @@ fn render_difference(difference: &[ChallengeUpdateIntermediate]) {
     }
     for item in difference {
         if let ChallengeUpdateIntermediate::EditCategory { old, new } = item {
-            println!("{}", "Edit author:".yellow());
+            println!("{}", "Edit category:".yellow());
             renderer.indent();
             renderer.attribute("stable_id", old.id.as_str());
             renderer.attribute_if_changed("name", old.name.as_str(), new.name.as_str());
             renderer.attribute_if_changed("avatar", old.color.as_str(), new.color.as_str());
-            renderer.attribute_if_changed("discord_id", old.sequence, new.sequence);
+            renderer.attribute_if_changed("sequence", old.sequence, new.sequence);
             renderer.unindent();
             println!();
         }
