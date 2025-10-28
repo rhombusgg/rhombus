@@ -34,7 +34,6 @@ pub fn handle_panic(err: Box<dyn Any + Send + 'static>) -> Response<Body> {
     let body = serde_json::json!({
         "error": {
             "kind": "panic",
-            "details": details,
         }
     });
 
