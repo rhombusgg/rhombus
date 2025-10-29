@@ -25,7 +25,7 @@
               {% endcall %}
             {% endcall %}
             {% call card.content() %}
-              <div class="mt-1 ml-[18px] border-l pl-8">
+              <div class="ml-[18px] mt-1 border-l pl-8">
                 <h3
                   class="flex items-center text-xl font-semibold tracking-tight"
                 >
@@ -131,7 +131,7 @@
               </div>
               <button
                 type="submit"
-                class="border-input bg-background hover:bg-accent hover:text-accent-foreground ring-offset-background focus-visible:ring-ring inline-flex h-10 items-center justify-center rounded-md border px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
+                class="border-input bg-background hover:bg-accent hover:text-accent-foreground ring-offset-background focus-visible:ring-ring inline-flex h-10 items-center justify-center whitespace-nowrap rounded-md border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
               >
                 Verify Email
               </button>
@@ -182,7 +182,7 @@
             <div class="mb-4 flex gap-2">
               {% include "account/api-key.html" %}
               <button
-                class="border-input bg-background hover:bg-accent hover:text-accent-foreground ring-offset-background focus-visible:ring-ring inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
+                class="border-input bg-background hover:bg-accent hover:text-accent-foreground ring-offset-background focus-visible:ring-ring inline-flex items-center justify-center whitespace-nowrap rounded-md border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
                 onclick="copyInviteTokenToClipboard()"
                 title="Copy API key to clipboard"
               >
@@ -192,7 +192,7 @@
                 hx-post="/account/roll-key"
                 hx-target="#api-key"
                 hx-swap="outerHTML"
-                class="border-input bg-background hover:bg-accent hover:text-accent-foreground ring-offset-background focus-visible:ring-ring inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
+                class="border-input bg-background hover:bg-accent hover:text-accent-foreground ring-offset-background focus-visible:ring-ring inline-flex items-center justify-center whitespace-nowrap rounded-md border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
                 title="Roll a new API key"
               >
                 {{ icons.roll() }}
