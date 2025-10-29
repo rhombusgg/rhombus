@@ -31,7 +31,7 @@ const CommandDialog: ParentComponent<CommandDialogProps> = (props) => {
   return (
     <Dialog {...props}>
       <DialogContent class="overflow-hidden">
-        <Command class="[&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
+        <Command class="[&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group]]:px-2 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
           {props.children}
         </Command>
       </DialogContent>
@@ -55,7 +55,7 @@ const CommandInput: Component<CommandInputProps> = (props) => (
 const CommandList: ParentComponent<CommandListProps> = (props) => (
   <CommandPrimitive.List
     {...props}
-    class={cn("max-h-[300px] overflow-y-auto overflow-x-hidden", props.class)}
+    class={cn("max-h-[300px] overflow-x-hidden overflow-y-auto", props.class)}
   />
 );
 
@@ -84,7 +84,7 @@ const CommandItem: ParentComponent<CommandItemProps> = (props) => (
   <CommandPrimitive.Item
     {...props}
     class={cn(
-      "aria-selected:bg-accent aria-selected:text-accent-foreground relative flex cursor-default select-none items-center rounded-md px-2 py-1.5 text-sm outline-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50",
+      "aria-selected:bg-accent aria-selected:text-accent-foreground relative flex cursor-default items-center rounded-md px-2 py-1.5 text-sm outline-none select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50",
       props.class,
     )}
   />

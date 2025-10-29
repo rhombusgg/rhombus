@@ -45,7 +45,7 @@
                     </div>
                     {% if selected_division_id == division_id %}
                       <div
-                        class="bg-primary absolute -right-1 -top-1 size-3 cursor-pointer rounded-full"
+                        class="bg-primary absolute -top-1 -right-1 size-3 cursor-pointer rounded-full"
                       ></div>
                     {% endif %}
                   </a>
@@ -54,7 +54,7 @@
               {% if user.is_admin %}
                 <div class="mt-4 flex">
                   <button
-                    class="border-input bg-background hover:bg-accent hover:text-accent-foreground ring-offset-background focus-visible:ring-ring inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                    class="border-input bg-background hover:bg-accent hover:text-accent-foreground ring-offset-background focus-visible:ring-ring inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
                     onclick="copyDivisionCTFtimeScoreboardFeed()"
                     title="Copy CTFtime scoreboard feed to clipboard"
                   >
