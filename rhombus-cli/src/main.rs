@@ -111,6 +111,8 @@ async fn connect(url: &str, key: &str) -> Result<ClientInfo> {
     let auth_token: MetadataValue<_> = key.parse()?;
     let channel = Channel::from_shared(url.to_owned())
         .with_context(|| format!("failed to parse grpc url '{url}'"))?
+        .tls_config(tonic::transport::ClientTlsConfig::new().with_native_roots())?
+        .http2_keep_alive_interval(std::time::Duration::from_secs(10))
         .connect()
         .await
         .with_context(|| format!("failed to connect to grpc server '{url}'"))?;
