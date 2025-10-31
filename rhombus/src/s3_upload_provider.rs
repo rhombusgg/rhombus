@@ -71,7 +71,7 @@ impl UploadProvider for S3UploadProvider {
     fn routes(&self) -> Result<Router> {
         let provider_state = Arc::new(self.clone());
         let router = Router::new()
-            .route("/upload/:path", post(route_upload_file::<Self>))
+            .route("/upload/{path}", post(route_upload_file::<Self>))
             .with_state(provider_state);
         Ok(router)
     }
