@@ -60,12 +60,30 @@
                       hx-target="#screen"
                       hx-swap="outerHTML"
                       href="/user/{{ solve.user_id }}"
+                      class="relative inline-block"
+                      title="Solved by {{ solved_user.name }}"
                     >
                       <img
                         class="aspect-square h-8 rounded-full"
                         title="{{ t('solved-by', name=solved_user.name) }}"
                         src="{{ solved_user.avatar_url }}"
                       />
+                      <div
+                        class="absolute inset-0 flex items-center justify-center bg-green-500/50 rounded-full"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 20 20"
+                          fill="white"
+                          class="h-4 w-4"
+                        >
+                          <path
+                            fill-rule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414L8.414 15l-4.121-4.121a1 1 0 111.414-1.414L8.414 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clip-rule="evenodd"
+                          />
+                        </svg>
+                      </div>
                     </a>
                   {% endif %}
                   <span class="cursor-pointer whitespace-nowrap"
