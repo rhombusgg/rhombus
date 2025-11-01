@@ -62,18 +62,20 @@
                   </button>
                   <script>
                     function copyDivisionCTFtimeScoreboardFeed() {
-                      navigator.clipboard.writeText(`${location}/ctftime.json`).then(
-                        () => {
-                          rhombus.toast.success(
-                            "Copied CTFtime scoreboard feed to clipboard",
-                          );
-                        },
-                        () => {
-                          rhombus.toast.error(
-                            "Failed to copy CTFtime scoreboard feed to clipboard",
-                          );
-                        },
-                      );
+                      navigator.clipboard
+                        .writeText(`${location}/ctftime.json`)
+                        .then(
+                          () => {
+                            rhombus.toast.success(
+                              "Copied CTFtime scoreboard feed to clipboard",
+                            );
+                          },
+                          () => {
+                            rhombus.toast.error(
+                              "Failed to copy CTFtime scoreboard feed to clipboard",
+                            );
+                          },
+                        );
                     }
                   </script>
                 </div>
