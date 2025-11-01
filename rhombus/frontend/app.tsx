@@ -207,6 +207,29 @@ const CommandMenu = () => {
             </CommandItem>
           </Show>
         </CommandGroup>
+        {/* <CommandSeparator />
+          <CommandGroup heading={translate("theme")}>
+            <CommandItem
+              onSelect={() => {
+                // @ts-ignore
+                setTheme(false);
+                setOpen(false);
+              }}
+            >
+              <SunIcon class="mr-2 h-4 w-4" />
+              <span>{translate("light-theme")}</span>
+            </CommandItem>
+            <CommandItem
+              onSelect={() => {
+                // @ts-ignore
+                setTheme(true);
+                setOpen(false);
+              }}
+            >
+              <MoonIcon class="mr-2 h-4 w-4" />
+              <span>{translate("dark-theme")}</span>
+            </CommandItem>
+          </CommandGroup> */}
       </CommandList>
     </CommandDialog>
   );

@@ -36,7 +36,6 @@ const getThemePreference = () => {
     : "light";
 };
 const setTheme = (isDark) => {
-  document.documentElement.classList["add"]("dark");
   // document.documentElement.classList[isDark ? "add" : "remove"]("dark");
 };
 
