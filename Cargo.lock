@@ -2510,9 +2510,9 @@ dependencies = [
 
 [[package]]
 name = "healthscript"
-version = "1.0.3"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52606c189673201762024bc1251f0e4470fcef168c9796907a36d0170a4c09e6"
+checksum = "a933632e5f128cb692b05ec3197b046600a37f9d2c1ce0fc8491ae9f9d903bbb"
 dependencies = [
  "ariadne",
  "async-recursion",
@@ -2526,12 +2526,15 @@ dependencies = [
  "jaq-syn",
  "regex",
  "reqwest 0.12.24",
+ "rustls 0.21.12",
  "serde_json",
  "strsim",
  "surge-ping",
  "thiserror 1.0.69",
  "tokio",
+ "tokio-rustls 0.24.1",
  "tracing",
+ "webpki-roots 0.25.4",
  "yansi",
 ]
 

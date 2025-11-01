@@ -47,9 +47,12 @@
                     </span>
                     <span> {{ challenge.name }}</span>
                   </button>
-                  <div
-                    class="{% if challenge.healthy %}bg-green-500{% else %}bg-red-500{% endif %} size-3 cursor-pointer rounded-full"
-                  ></div>
+                  {% if challenge.healthscript %}
+                    <div
+                      class="{% if challenge.healthy %}bg-green-500{% else %}bg-red-500{% endif %} size-3 cursor-pointer rounded-full"
+                      title="{% if challenge.healthy %}Challenge healthy{% else %}Challenge unhealthy{% endif %}"
+                    ></div>
+                  {% endif %}
                 </div>
                 <div class="flex items-center gap-4">
                   {% if solve %}

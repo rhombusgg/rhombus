@@ -28,7 +28,7 @@ dotenvy = "0.15.7"
 fancy-regex = "0.16.2"
 fluent = "0.17.0"
 futures = "0.3.31"
-healthscript = "1.0.3"
+healthscript = "1.1.0"
 intl-memoizer = "0.5.3"
 jsonwebtoken = { version = "10.0.0", features = ["rust_crypto"] }
 lettre = { version = "0.11.19", default-features = false, optional = true, features = [

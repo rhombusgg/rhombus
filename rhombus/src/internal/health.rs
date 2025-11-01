@@ -36,7 +36,7 @@ pub async fn healthcheck_catch_up(db: Connection) {
 pub fn healthcheck_runner(db: WeakConnection) {
     tokio::task::spawn(async move {
         loop {
-            tokio::time::sleep(Duration::from_secs(30)).await;
+            tokio::time::sleep(Duration::from_secs(10)).await;
 
             let Some(db) = db.upgrade() else {
                 break;
